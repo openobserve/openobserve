@@ -1045,6 +1045,53 @@ describe("PanelSchemaRenderer", () => {
       );
     });
 
+    it("a hidden query that still ran never takes the point: View logs opens the drawn query", async () => {
+      asBuild("oss");
+      const query = breakdownPanel().queries[0];
+      // The hidden query still runs, so it keeps its slot in data and metadata.
+      vi.mocked(usePanelDataLoader).mockReturnValueOnce({
+        data: ref([[{ breakdown_1: "cart" }], [{ breakdown_1: "cart" }]]),
+        loading: ref(false),
+        errorDetail: ref({ message: "", code: "" }),
+        metadata: ref({
+          queries: [
+            { panelQueryIndex: 0, query: "SELECT * FROM \"default\" WHERE level = 'error'" },
+            { panelQueryIndex: 1, query: "SELECT * FROM \"default\" WHERE level = 'info'" },
+          ],
+        }),
+        resultMetaData: ref({}),
+        annotations: ref([]),
+        lastTriggeredAt: ref(null),
+        isCachedDataDifferWithCurrentTimeRange: ref(false),
+        searchRequestTraceIds: ref([]),
+        loadingProgressPercentage: ref(0),
+        isPartialData: ref(false),
+      } as any);
+      await mountPanel({
+        panelSchema: breakdownPanel({
+          queries: [
+            { ...query, config: { hide: true } },
+            { ...query, config: {} },
+          ],
+        }),
+      });
+      // The converter sees only the drawn result: position 0, stamped with metadata[0], the hidden query.
+      wrapper.vm.panelData = {
+        options: { series: [{ originalSeriesName: "cart", _queryIndex: 0, _panelQueryIndex: 0 }] },
+        extras: { isTimeSeries: true },
+      };
+      await wrapper.vm.onChartDomContextMenu({
+        x: 10,
+        y: 10,
+        value: 3,
+        seriesIndex: 0,
+        dataIndex: 0,
+        point: pointClick,
+      });
+      await flushPromises();
+      expect(wrapper.vm.pointExplore?.target.queryIndex).toBe(1);
+    });
+
     it("a point lookup that fails opens the menu as if no point were clicked: Create alert only", async () => {
       asBuild("oss");
       await mountPanel({ allowAlertCreation: true });

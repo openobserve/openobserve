@@ -13,7 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { fieldPredicate, type FieldFilter } from "@/utils/dashboard/chartPointExplore";
+import {
+  fieldPredicate,
+  filtersWhere,
+  type FieldFilter,
+} from "@/utils/dashboard/chartPointExplore";
 import { resolveBrowserTimezone } from "@/utils/timezone";
 import { gt } from "@/types/i18n";
 
@@ -71,8 +75,8 @@ export const whereOfExplorerSql = (stream: string, sql: string): string | null =
 const labelsWhere = (filters: FieldFilter[]): string => filters.map(fieldPredicate).join(" AND ");
 
 /** The raw-sample SQL of a metric under its label filters, newest first. */
-export const metricsSql = (stream: string, filters: FieldFilter[]): string =>
-  explorerSql(stream, labelsWhere(filters));
+export const metricsSql = (stream: string, filters: FieldFilter[], baseWhere = ""): string =>
+  explorerSql(stream, baseWhere ? filtersWhere(baseWhere, filters) : labelsWhere(filters));
 
 // A sample's own columns: its time, its value and the engine's bookkeeping, not labels.
 const isSampleColumn = (key: string): boolean => key === "value" || key.startsWith("_");

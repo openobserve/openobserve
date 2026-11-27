@@ -774,6 +774,10 @@ export const convertMultiSQLData = async (
       }
     }
   } else if (options && options[0] && options[0].options) {
+    // Tagged like the multi-result series, so the host can map its drawn position to the query.
+    options[0].options.series = options[0].options.series?.map((it: Record<string, unknown>) =>
+      isAnnotationSeries(it) ? it : { ...it, _queryIndex: 0 },
+    );
     // Single query with time shift: preserve existing time shift naming
     for (let i = 1; i < options.length; i++) {
       if (options[i] && options[i].options && options[i].options.series) {

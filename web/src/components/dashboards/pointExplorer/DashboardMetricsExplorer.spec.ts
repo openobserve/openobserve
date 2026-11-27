@@ -293,6 +293,31 @@ describe("DashboardMetricsExplorer", () => {
     expect(wrapper.find("[data-test='metrics-explorer-detail-position']").text()).toBe("102 / 288");
   });
 
+  it("› past a page's last sample opens the next page's first, and the counter follows", async () => {
+    stream.count = 288;
+    stream.rows = fullPage();
+    mountExplorer();
+    await flushPromises();
+    wrapper.vm.openSample(wrapper.vm.events[99]);
+    await flushPromises();
+    const next = wrapper.find("[data-test='metrics-explorer-detail-next']");
+    expect(next.attributes("disabled")).toBeUndefined();
+    await next.trigger("click");
+    await flushPromises();
+    expect(searches().at(-1).queryReq.query).toMatchObject({ from: 100 });
+    expect(wrapper.vm.selected).toBe(wrapper.vm.events[0]);
+    expect(wrapper.find("[data-test='metrics-explorer-detail-position']").text()).toBe("101 / 288");
+    await wrapper.find("[data-test='metrics-explorer-detail-prev']").trigger("click");
+    await flushPromises();
+    expect(wrapper.find("[data-test='metrics-explorer-detail-position']").text()).toBe("100 / 288");
+  });
+
+  it("View metrics from a metrics panel keeps the panel's WHERE before the labels", async () => {
+    mountExplorer({ baseWhere: "client = 'user'" });
+    await flushPromises();
+    expect(sqlOf(searches()[0])).toContain("WHERE (client = 'user') AND ");
+  });
+
   it("a broken query shows a short title, the cleaned backend message and the SQL", async () => {
     const backend = String.raw`Error# SQL error: ParserError("Expected: end of statement, found: \"cpu\" at Line: 1, Column: 14")`;
     fetchQueryDataWithHttpStream.mockImplementation((req: any, h: any) => {

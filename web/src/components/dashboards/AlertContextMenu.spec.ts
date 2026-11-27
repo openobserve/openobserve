@@ -382,6 +382,42 @@ describe("AlertContextMenu Component", () => {
     });
   });
 
+  describe("Closing when the page moves or another menu opens", () => {
+    const openMenu = async () => {
+      wrapper = createWrapper({ visible: false });
+      await wrapper.setProps({ visible: true });
+      // The listeners attach on the next tick, after the right-click that opened the menu.
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    };
+
+    it("a right-click outside closes it; one inside does not", async () => {
+      await openMenu();
+      const inside = wrapper.find('[data-test="alert-context-menu"]').element;
+      inside.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true }));
+      expect(wrapper.emitted("close")).toBeUndefined();
+      document.body.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true }));
+      expect(wrapper.emitted("close")).toHaveLength(1);
+    });
+
+    it("scrolling the page or resizing the window closes it; scrolling inside does not", async () => {
+      await openMenu();
+      wrapper.find('[data-test="alert-context-menu"]').element.dispatchEvent(new Event("scroll"));
+      expect(wrapper.emitted("close")).toBeUndefined();
+      document.body.dispatchEvent(new Event("scroll"));
+      expect(wrapper.emitted("close")).toHaveLength(1);
+      window.dispatchEvent(new Event("resize"));
+      expect(wrapper.emitted("close")).toHaveLength(2);
+    });
+
+    it("stops listening once closed", async () => {
+      await openMenu();
+      await wrapper.setProps({ visible: false });
+      document.body.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true }));
+      window.dispatchEvent(new Event("resize"));
+      expect(wrapper.emitted("close")).toBeUndefined();
+    });
+  });
+
   describe("Lifecycle Cleanup", () => {
     it("should clean up event listeners on unmount", () => {
       const removeEventListenerSpy = vi.spyOn(document, "removeEventListener");

@@ -647,6 +647,30 @@ describe("DashboardTraceExplorer", () => {
     expect(position()).toBe("28");
   });
 
+  it("› past a full page's last trace loads the next page and opens its first", async () => {
+    stream.hits = Array.from({ length: 25 }, (_, i) => rawTrace(`t${i}`, 100 * MIN - i));
+    mountExplorer();
+    await flushPromises();
+    const list = () => wrapper.findComponent({ name: "TracesSearchResultList" });
+    list().vm.$emit("row-click", wrapper.vm.hits[24]);
+    await flushPromises();
+    stream.hits = [rawTrace("next-first", 1), rawTrace("next-second", 0)];
+    await wrapper.find("[data-test='trace-explorer-detail-next']").trigger("click");
+    await flushPromises();
+    expect(lastRequest().queryReq.from).toBe(25);
+    expect(wrapper.vm.selected.trace_id).toBe("next-first");
+    expect(wrapper.find("[data-test='trace-explorer-detail-position']").text()).toBe("26");
+    expect(
+      wrapper.find("[data-test='trace-explorer-detail-next']").attributes("disabled"),
+    ).toBeUndefined();
+  });
+
+  it("View traces from a traces panel starts from the panel's WHERE", async () => {
+    mountExplorer({ baseWhere: "status = 'ERROR'" });
+    await flushPromises();
+    expect(lastRequest().queryReq.filter).toBe("(status = 'ERROR') AND service_name = 'cart'");
+  });
+
   it("a row opens the embedded trace over its own window ±1 min, with links in new tabs", async () => {
     mountExplorer();
     await flushPromises();

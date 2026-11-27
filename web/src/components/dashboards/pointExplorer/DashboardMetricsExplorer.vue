@@ -18,6 +18,7 @@ import { buildMetricsUrl } from "@/utils/metrics/buildMetricsUrl";
 import useStreams from "@/composables/useStreams";
 import { useExplorerSqlSearch } from "@/composables/dashboard/useExplorerSqlSearch";
 import { useExplorerTotal } from "@/composables/dashboard/useExplorerTotal";
+import { useExplorerPagedStep } from "@/composables/dashboard/useExplorerPagedStep";
 import ExplorerQueryError from "./ExplorerQueryError.vue";
 import { useExplorerCorrelation } from "@/composables/dashboard/useExplorerCorrelation";
 import { useExplorerDetailKeys } from "@/composables/dashboard/useExplorerDetailKeys";
@@ -56,6 +57,8 @@ const props = defineProps<{
   /** The clicked bucket (µs). */
   startTime: number;
   endTime: number;
+  /** The metrics panel's own WHERE, ANDed before the label filters. */
+  baseWhere?: string;
 }>();
 
 const { t } = useI18nTyped();
@@ -115,7 +118,8 @@ const errorSql = ref("");
 // One query: chips edit its WHERE while it keeps the plain shape; "write your own" edits it all.
 const showSql = ref(false);
 const customSql = ref("");
-const effectiveSql = () => customSql.value.trim() || metricsSql(metric.value, appliedLabels.value);
+const effectiveSql = () =>
+  customSql.value.trim() || metricsSql(metric.value, appliedLabels.value, props.baseWhere);
 // A query the chips cannot draw goes to them whole, so the builder shows its banner.
 const chipsQuery = computed(
   () => whereOfExplorerSql(metric.value, effectiveSql()) ?? effectiveSql(),
@@ -169,7 +173,7 @@ async function loadMetric() {
   page.value = 0;
   await loadSchema();
   // The clicked (or correlated) labels the metric carries open as the filter's chips.
-  customSql.value = metricsSql(metric.value, appliedLabels.value);
+  customSql.value = metricsSql(metric.value, appliedLabels.value, props.baseWhere);
   await runSql(effectiveSql(), 0, true);
 }
 // The chip bar's pending auto-run, if any; a run from here supersedes it, so one click sends one search.
@@ -179,9 +183,9 @@ function runQuery() {
   page.value = 0;
   void runSql(effectiveSql(), 0, true);
 }
-function goToPage(next: number) {
+function goToPage(next: number): Promise<void> {
   page.value = next;
-  void runSql(effectiveSql(), next * pageSize.value, false);
+  return runSql(effectiveSql(), next * pageSize.value, false);
 }
 watch(pageSize, () => goToPage(0));
 
@@ -213,10 +217,21 @@ function openSample(ev: Record<string, any>) {
 function closeSample() {
   selected.value = null;
 }
-function stepSample(by: number) {
-  const next = events.value[selectedIndex.value + by];
-  if (next) openSample(next);
-}
+const {
+  hasPrev,
+  hasNext,
+  step: stepSample,
+} = useExplorerPagedStep({
+  items: () => events.value,
+  index: () => selectedIndex.value,
+  page: () => page.value,
+  nextPageExists: () =>
+    total.value !== null
+      ? (page.value + 1) * pageSize.value < total.value
+      : events.value.length >= pageSize.value,
+  loadPage: goToPage,
+  open: openSample,
+});
 const onExplorerKeydown = useExplorerDetailKeys({
   isOpen: () => !!selected.value,
   prev: () => stepSample(-1),
@@ -246,7 +261,7 @@ function metricsPageHref(filters: FieldFilter[]): string {
 // An edited SQL opens in the Metrics page's Visualize mode, which runs SQL as given; a table fits raw samples.
 function openInMetrics() {
   const sql = effectiveSql();
-  const edited = sql !== metricsSql(metric.value, appliedLabels.value);
+  const edited = sql !== metricsSql(metric.value, appliedLabels.value, props.baseWhere);
   const href = edited
     ? buildMetricsUrl({
         orgId: orgId.value,
@@ -389,6 +404,8 @@ const fmtTs = (ts: unknown): string => explorerTime(ts, store.state.timezone);
         :subtitle="raw(metric)"
         :index="selectedIndex"
         :count="events.length"
+        :has-prev="hasPrev"
+        :has-next="hasNext"
         :offset="page * pageSize"
         :total="total"
         :prev-label="t('panel.metricsExplorer.prevSample')"

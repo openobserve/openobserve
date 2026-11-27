@@ -17,6 +17,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises } from "@vue/test-utils";
 import { gt } from "@/types/i18n";
 import { usePanelDrilldown } from "./usePanelDrilldown";
+import { filtersWhere } from "@/utils/dashboard/chartPointExplore";
 
 const appConfig = vi.hoisted(() => ({ isEnterprise: "false" }));
 vi.mock("@/aws-exports", () => ({ default: appConfig }));
@@ -924,6 +925,137 @@ describe("usePanelDrilldown point menu", () => {
       await flushPromises();
       expect(deps.findRelatedTelemetry).toHaveBeenCalledTimes(1);
       expect(api.pointExplore.value?.traces.state).toBe("enabled");
+    });
+  });
+
+  describe("issue #17304", () => {
+    const panelSql = (where: string) =>
+      `SELECT histogram(_timestamp) AS x_axis_1, service AS breakdown_1 FROM "app" ${where} GROUP BY x_axis_1, breakdown_1`;
+
+    it("View metrics keeps a metrics panel's own WHERE", async () => {
+      const deps = makeDeps({ streamType: "metrics" });
+      (deps.metadata.value.queries[0] as any).query = panelSql("WHERE client = 'user'");
+      const api = (lastApi = usePanelDrilldown(deps as any));
+      await api.explorePoint(lineClick);
+
+      expect(api.pointExplore.value?.metricsTarget).toEqual({
+        stream: "app",
+        filters: [{ field: "service", value: "cart" }],
+        baseWhere: "client = 'user'",
+      });
+      expect(String(api.pointExplore.value?.metrics.detail)).not.toContain("panel filter");
+    });
+
+    it("View traces keeps a traces panel's own WHERE", async () => {
+      const deps = makeDeps({ streamType: "traces" });
+      (deps.metadata.value.queries[0] as any).query = panelSql("WHERE status = 'ERROR'");
+      const api = (lastApi = usePanelDrilldown(deps as any));
+      await api.explorePoint(lineClick);
+
+      expect(api.pointExplore.value?.tracesTarget).toMatchObject({
+        filter: "(status = 'ERROR') AND service = 'cart'",
+        baseWhere: "status = 'ERROR'",
+      });
+    });
+
+    it("a WHERE that cannot be carried is said on the row, never silently dropped", async () => {
+      const deps = makeDeps({ streamType: "metrics" });
+      (deps.metadata.value.queries[0] as any).query =
+        `SELECT service AS breakdown_1 FROM (SELECT * FROM "app") WHERE env = 'prod' GROUP BY breakdown_1`;
+      const api = (lastApi = usePanelDrilldown(deps as any));
+      await api.explorePoint(lineClick);
+
+      expect(api.pointExplore.value?.metricsTarget?.baseWhere).toBeUndefined();
+      expect(String(api.pointExplore.value?.metrics.detail)).toContain("panel filter not applied");
+    });
+
+    it("an untagged series never opens a hidden query: the first visible one instead", async () => {
+      const deps = makeDeps();
+      const q = deps.panelSchema.value.queries[0];
+      deps.panelSchema.value.queries = [
+        { ...q, config: { hide: true }, query: "hidden" },
+        { ...q, config: {}, query: "visible" },
+      ];
+      const api = (lastApi = usePanelDrilldown(deps as any));
+      await api.explorePoint(lineClick);
+
+      expect(api.pointExplore.value?.target.queryIndex).toBe(1);
+    });
+
+    describe("a funnel's blank stages", () => {
+      const funnel = (value: string | null) => {
+        const deps = makeDeps({ type: "funnel" });
+        deps.panelSchema.value.queries[0].fields = {
+          ...deps.panelSchema.value.queries[0].fields,
+          x: [field("x_axis_1", "svc")],
+          breakdown: [],
+        };
+        deps.data.value = [
+          [
+            { x_axis_1: value, y_axis_1: 6 },
+            { x_axis_1: "info", y_axis_1: 9 },
+          ],
+        ];
+        deps.panelData.value = { options: { series: [{}] }, extras: {} } as any;
+        return deps;
+      };
+      const click = (name: string, rawName: string | null) => ({
+        componentType: "series",
+        seriesIndex: 0,
+        dataIndex: 0,
+        name,
+        value: 6,
+        data: { name, rawName, value: 6 },
+      });
+
+      it.each([
+        ["(empty)", "", "svc = ''"],
+        ["(null)", null, "svc IS NULL"],
+      ])("the %s stage opens the menu and filters its own value", async (name, raw, where) => {
+        const deps = funnel(raw);
+        const api = (lastApi = usePanelDrilldown(deps as any));
+        await api.explorePoint(click(name, raw));
+
+        expect(api.pointExplore.value?.target.filters).toEqual([{ field: "svc", value: raw }]);
+        expect(filtersWhere("", api.pointExplore.value!.target.filters)).toBe(where);
+      });
+    });
+
+    it("a computed group-by that cannot filter is said on the row", async () => {
+      const deps = makeDeps({
+        fields: { breakdown: [field("breakdown_1", "level", { functionName: "upper" })] },
+      });
+      const api = (lastApi = usePanelDrilldown(deps as any));
+      await api.explorePoint(lineClick);
+
+      expect(api.pointExplore.value?.target.filters).toEqual([]);
+      expect(String(api.pointExplore.value?.logs.detail)).toBe("00:05–00:10 · series not filtered");
+    });
+
+    it("names the query it opens when several are visible, and not when one is", async () => {
+      const deps = makeDeps();
+      const q = deps.panelSchema.value.queries[0];
+      deps.panelSchema.value.queries = [
+        { ...q, config: { query_label: "errors {series}" } },
+        { ...q, config: {} },
+      ];
+      deps.panelData.value.options.series = [
+        { originalSeriesName: "cart", _panelQueryIndex: 0 },
+        { originalSeriesName: "cart", _panelQueryIndex: 1 },
+      ];
+      const api = (lastApi = usePanelDrilldown(deps as any));
+      await api.explorePoint(lineClick);
+      expect(String(api.pointExplore.value?.logs.detail)).toBe(
+        "00:05–00:10 · service=cart · errors",
+      );
+      await api.explorePoint({ ...lineClick, seriesIndex: 1 });
+      expect(String(api.pointExplore.value?.logs.detail)).toBe(
+        "00:05–00:10 · service=cart · Query 2",
+      );
+
+      deps.panelSchema.value.queries = [q];
+      await api.explorePoint({ ...lineClick, seriesIndex: 0 });
+      expect(String(api.pointExplore.value?.logs.detail)).toBe("00:05–00:10 · service=cart");
     });
   });
 });

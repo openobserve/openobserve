@@ -10518,6 +10518,9 @@
       "slice": "{start}–{end}",
       "wholeRange": "Whole range {start}–{end}",
       "detail": "{slice} · {filters}",
+      "withNote": "{detail} · {note}",
+      "seriesNotFiltered": "series not filtered",
+      "panelFilterNotApplied": "panel filter not applied",
       "tracesForService": "Traces for service {service} · {slice}",
       "metricsForService": "Metrics for service {service} · {slice}",
       "findingService": "Finding the service for this point…"

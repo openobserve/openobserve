@@ -39,6 +39,10 @@ export interface PointTarget {
   endTime: number;
   timeSlice: TimeSlice;
   filters: FieldFilter[];
+  /** What the menu row adds after the filters: the query it opens, a group-by it could not filter. */
+  notes?: I18nText[];
+  /** A metrics or traces panel's own WHERE; not applied when its SQL is no plain one-stream SELECT. */
+  panelWhere?: { where: string; applied: boolean };
 }
 
 /** Where View traces opens: a trace stream, its WHERE, and whether correlation chose it. */
@@ -46,12 +50,16 @@ export interface TracesTarget {
   stream: string;
   filter: string;
   filters: FieldFilter[];
+  /** The panel's own WHERE, ANDed before the filters; empty for a correlated stream. */
+  baseWhere?: string;
 }
 
 /** Where View metrics opens: the metric (the chart's own, or correlation's first) and its label filters. */
 export interface MetricsTarget {
   stream: string;
   filters: FieldFilter[];
+  /** The panel's own WHERE, ANDed before the filters; empty for a correlated metric. */
+  baseWhere?: string;
 }
 
 /** The point menu's section: its target, the three rows, and where traces and metrics open once known. */
@@ -368,15 +376,20 @@ export const promqlMetricName = (
 };
 
 /** The group-by conditions of a clicked point: its category, series and tile values. */
-export const pointGroupFilters = (
+export const pointGroupFilters = (...args: Parameters<typeof pointGroupScope>): FieldFilter[] =>
+  pointGroupScope(...args).filters;
+
+/** The point's group-by conditions, and whether a group-by had no column to filter on (a computed one). */
+export const pointGroupScope = (
   query: any,
   panel: { type: string; config?: any },
   family: PointFamily,
   click: PointClick,
   rows: any[] | undefined,
   customColumns?: Map<string, string>,
-): FieldFilter[] => {
-  if (click.seriesLabels) return seriesLabelFilters(click.seriesLabels);
+): { filters: FieldFilter[]; unfiltered: boolean } => {
+  if (click.seriesLabels)
+    return { filters: seriesLabelFilters(click.seriesLabels), unfiltered: false };
   const fields = query?.fields ?? {};
   const x: any[] = fields.x ?? [];
   const breakdown: any[] = fields.breakdown ?? [];
@@ -405,14 +418,21 @@ export const pointGroupFilters = (
       if (!isOthers) pairs.push([field, label]);
     });
   }
-  return pairs.flatMap(([field, label]) => {
+  let unfiltered = false;
+  const filters = pairs.flatMap(([field, label]): FieldFilter[] => {
     if (!field || label === undefined) return [];
     // A bucketed heatmap row is a range's lower bound, not a value of the field.
     if (field === fields.y?.[0] && panel.config?.heatmap_y_bucket?.mode) return [];
     const column = groupFieldColumn(field, customColumns);
-    if (!column) return [];
-    return [{ field: column, value: toFilterValue(rowValue(rows, field.alias, label)) }];
+    if (!column) {
+      unfiltered = true;
+      return [];
+    }
+    // A null label is a stage's own NULL (a funnel's "(null)"), which no row lookup may turn into "".
+    const value = label === null ? null : toFilterValue(rowValue(rows, field.alias, label));
+    return [{ field: column, value }];
   });
+  return { filters, unfiltered };
 };
 
 const escSql = (value: string | number): string => String(value).replace(/'/g, "''");
@@ -494,13 +514,17 @@ export const isPathChart = (type: unknown): boolean =>
 
 /** The one query whose rows name the clicked funnel stage; null when none or several do. */
 export const funnelStageQuery = (schema: any, data: unknown[], stage: unknown): number | null => {
-  const name = String(stage ?? "");
+  // A NULL stage matches only NULL values, and "" only empty strings, as the funnel groups them.
+  const matches = (value: unknown) =>
+    stage === null
+      ? value === null || value === undefined
+      : value != null && String(value) === String(stage ?? "");
   // A funnel adds every query's stages into one series, so the stage name is all that says which query it came from.
   const owners = (schema?.queries ?? []).flatMap((query: any, index: number) => {
     const field = query?.fields?.x?.[0];
     const rows = data?.[index];
     if (query?.config?.hide || !field || !Array.isArray(rows)) return [];
-    const named = rows.some((row: any) => String(getDataValue(row, field.alias) ?? "") === name);
+    const named = rows.some((row: any) => matches(getDataValue(row, field.alias)));
     return named ? [index] : [];
   });
   return owners.length === 1 ? owners[0] : null;

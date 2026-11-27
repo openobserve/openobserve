@@ -26,6 +26,7 @@ import useTraces, { DEFAULT_TRACE_COLUMNS } from "@/composables/useTraces";
 import useStreams from "@/composables/useStreams";
 import { useTracesTableColumns } from "@/plugins/traces/composables/useTracesTableColumns";
 import { useExplorerDetailKeys } from "@/composables/dashboard/useExplorerDetailKeys";
+import { useExplorerPagedStep } from "@/composables/dashboard/useExplorerPagedStep";
 import { generateTraceContext } from "@/utils/auth";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import {
@@ -46,6 +47,8 @@ const props = defineProps<{
   filters: FieldFilter[];
   startTime: number;
   endTime: number;
+  /** The traces panel's own WHERE, ANDed before the clicked values. */
+  baseWhere?: string;
 }>();
 
 const PAGE_SIZE = 25;
@@ -57,7 +60,7 @@ const orgId = computed(() => store.state.selectedOrganization.identifier);
 
 const rangeStart = ref(props.startTime);
 const rangeEnd = ref(props.endTime);
-const whereText = ref(filtersWhere("", props.filters));
+const whereText = ref(filtersWhere(props.baseWhere ?? "", props.filters));
 const showFilter = ref(false);
 
 // ── Columns and schema: the drawer's own, never the Traces page's ────────────
@@ -104,17 +107,22 @@ const errorMsg = ref("");
 // The filter a failed search ran, shown under its message.
 const errorFilter = ref("");
 let runningId: string | null = null;
+// Settles the running search's promise, so a superseded one never leaves a waiter hanging.
+let settleRunning: (() => void) | null = null;
 
 function cancelRunning() {
+  settleRunning?.();
+  settleRunning = null;
   if (!runningId) return;
   cancelStreamQueryBasedOnRequestId({ trace_id: runningId, org_id: orgId.value });
   runningId = null;
 }
 
-function search() {
+function search(): Promise<void> {
   cancelRunning();
   const { traceId } = generateTraceContext();
   runningId = traceId;
+  const settled = new Promise<void>((resolve) => (settleRunning = resolve));
   loading.value = true;
   errorMsg.value = "";
   errorFilter.value = "";
@@ -159,6 +167,7 @@ function search() {
         hits.value = [];
         loading.value = false;
         searched.value = true;
+        settleRunning?.();
       },
       complete: () => {
         if (runningId !== traceId) return;
@@ -166,10 +175,12 @@ function search() {
         hits.value = rows;
         loading.value = false;
         searched.value = true;
+        settleRunning?.();
       },
       reset: () => {},
     },
   );
+  return settled;
 }
 onBeforeUnmount(cancelRunning);
 
@@ -188,9 +199,9 @@ function onSortChange(field: string, order: "asc" | "desc") {
   runQuery();
 }
 
-function goToPage(next: number) {
+function goToPage(next: number): Promise<void> {
   page.value = next;
-  search();
+  return search();
 }
 const hasNextPage = computed(() => hasFullPage(hits.value.length, PAGE_SIZE));
 // A page past an exactly full last page has no range to name; Previous stays to go back.
@@ -232,10 +243,18 @@ function openTrace(row: any) {
 function closeTrace() {
   selected.value = null;
 }
-function stepTrace(by: number) {
-  const next = hits.value[selectedIndex.value + by];
-  if (next) openTrace(next);
-}
+const {
+  hasPrev,
+  hasNext,
+  step: stepTrace,
+} = useExplorerPagedStep({
+  items: () => hits.value,
+  index: () => selectedIndex.value,
+  page: () => page.value,
+  nextPageExists: () => hasNextPage.value,
+  loadPage: goToPage,
+  open: openTrace,
+});
 const onExplorerKeydown = useExplorerDetailKeys({
   isOpen: () => !!selected.value,
   prev: () => stepTrace(-1),
@@ -400,6 +419,8 @@ const detailTitle = computed(() =>
         :subtitle="raw(selected.trace_id)"
         :index="selectedIndex"
         :count="hits.length"
+        :has-prev="hasPrev"
+        :has-next="hasNext"
         :offset="page * PAGE_SIZE"
         :total="page === 0 && !hasNextPage ? hits.length : null"
         :prev-label="t('panel.traceExplorer.prevTrace')"

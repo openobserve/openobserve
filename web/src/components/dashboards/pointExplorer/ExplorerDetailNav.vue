@@ -20,6 +20,9 @@ const props = defineProps<{
   offset?: number;
   /** The whole result's size: null while unknown (position only); omitted, the page's count. */
   total?: number | null;
+  /** Whether prev / next can step, past the page edge too. */
+  hasPrev: boolean;
+  hasNext: boolean;
   prevLabel: I18nText;
   nextLabel: I18nText;
   dataTestPrefix: string;
@@ -61,7 +64,7 @@ const position = computed(() => {
         size="icon-xs"
         variant="outline"
         icon-left="chevron-left"
-        :disabled="index <= 0"
+        :disabled="!hasPrev"
         :aria-label="prevLabel"
         :data-test="`${dataTestPrefix}-detail-prev`"
         @click="emit('prev')"
@@ -77,7 +80,7 @@ const position = computed(() => {
         size="icon-xs"
         variant="outline"
         icon-left="chevron-right"
-        :disabled="index < 0 || index >= count - 1"
+        :disabled="!hasNext"
         :aria-label="nextLabel"
         :data-test="`${dataTestPrefix}-detail-next`"
         @click="emit('next')"

@@ -1525,9 +1525,12 @@ export default defineComponent({
           (panelSchema.value?.queries?.[alertableQueries.value[0]]?.fields?.y?.length ?? 0) > 1),
     );
     // SQL drops hidden queries' data but not their metadata, so a series' position counts the kept entries only.
-    const sqlPanelQueryIndex = (position: number): number | undefined => {
+    const sqlResultIndex = (position: number): number | undefined => {
       const kept = keptDataIndexes.value;
-      const index = kept === null ? position : kept[position];
+      return kept === null ? position : kept[position];
+    };
+    const sqlPanelQueryIndex = (position: number): number | undefined => {
+      const index = sqlResultIndex(position);
       return index === undefined
         ? undefined
         : (metadata.value?.queries?.[index]?.panelQueryIndex ?? index);
@@ -2597,6 +2600,7 @@ export default defineComponent({
       hideChartTooltip: () => chartRendererRef.value?.chart?.dispatchAction?.({ type: "hideTip" }),
       findRelatedTelemetry,
       allowPointExplore,
+      sqlResultIndex: (position: number) => sqlResultIndex(position),
     });
 
     const pointExploreItems = computed(() => {
@@ -3063,7 +3067,7 @@ export default defineComponent({
         streamType: "traces",
         startTime: target.startTime,
         endTime: target.endTime,
-        baseWhere: "",
+        baseWhere: tracesTarget.baseWhere ?? "",
         filters: tracesTarget.filters,
         mode: "traces",
       };
@@ -3083,7 +3087,7 @@ export default defineComponent({
         streamType: "metrics",
         startTime: target.startTime,
         endTime: target.endTime,
-        baseWhere: "",
+        baseWhere: metricsTarget.baseWhere ?? "",
         filters: metricsTarget.filters,
         mode: "metrics",
       };

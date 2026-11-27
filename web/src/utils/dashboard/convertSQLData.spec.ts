@@ -4202,6 +4202,38 @@ describe("convertSQLData", () => {
         ]);
       });
 
+      it("tags a lone drawn result's series with its drawn position, as multi-result series are", async () => {
+        const searchData = [[{ timestamp: "2023-01-01", value: 10 }]];
+        const resultMetaData = { value: [[mockResultMetaData[0]]] };
+        const metadata = {
+          queries: [{ panelQueryIndex: 0, timeRangeGap: { seconds: 0, periodAsStr: "" } }],
+        };
+        const query = {
+          fields: {
+            x: [{ alias: "timestamp", label: "Timestamp" }],
+            y: [{ alias: "value", label: "Value" }],
+            z: [],
+            breakdown: [],
+          },
+        };
+        const schema = { ...mockPanelSchema, queries: [query] };
+        const result = await convertMultiSQLData(
+          schema,
+          searchData,
+          mockStore,
+          mockChartPanelRef,
+          mockHoveredSeriesState,
+          resultMetaData,
+          metadata,
+          mockChartPanelStyle,
+          mockAnnotations,
+        );
+
+        const drawn = result.options.series.filter((s: any) => s.name);
+        expect(drawn.length).toBeGreaterThan(0);
+        drawn.forEach((s: any) => expect(s._queryIndex).toBe(0));
+      });
+
       it.each([
         ["line", { lineStyle: { type: "dashed" } }],
         ["bar", { itemStyle: { opacity: 0.5 } }],

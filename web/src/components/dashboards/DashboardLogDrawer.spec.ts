@@ -440,6 +440,49 @@ describe("DashboardLogDrawer streaming search", () => {
     expect(controls.props("isFirstPage")).toBe(false);
   });
 
+  it("Next past a page's last event opens the next page's first; Previous comes back", async () => {
+    stream.reply = (req, h) => {
+      const { from, size } = req.queryReq.query;
+      h.data(req, hits(rowsOf(size).map((_r, i) => ({ i: from + i }))));
+      h.complete(req, {});
+    };
+    stream.count = countOf([203]);
+    const wrapper = mountIt();
+    await flushPromises();
+    state(wrapper).openEventDetail(state(wrapper).events[99]);
+    await flushPromises();
+    expect(state(wrapper).detailPosition).toBe("100 / 203");
+    expect(state(wrapper).hasNext).toBe(true);
+    await state(wrapper).goNext();
+    await flushPromises();
+    expect(state(wrapper).page).toBe(1);
+    expect(state(wrapper).selectedEvent).toEqual({ i: 100 });
+    expect(state(wrapper).detailPosition).toBe("101 / 203");
+    expect(state(wrapper).hasPrev).toBe(true);
+    await state(wrapper).goPrev();
+    await flushPromises();
+    expect(state(wrapper).page).toBe(0);
+    expect(state(wrapper).selectedEvent).toEqual({ i: 99 });
+    // The true first event has no Previous.
+    state(wrapper).openEventDetail(state(wrapper).events[0]);
+    expect(state(wrapper).hasPrev).toBe(false);
+  });
+
+  it("Next stops at the true last event", async () => {
+    stream.reply = (req, h) => {
+      const { from } = req.queryReq.query;
+      h.data(req, hits(rowsOf(from === 0 ? 100 : 3).map((_r, i) => ({ i: from + i }))));
+      h.complete(req, {});
+    };
+    stream.count = countOf([103]);
+    const wrapper = mountIt();
+    await flushPromises();
+    await state(wrapper).goToPage(1);
+    state(wrapper).openEventDetail(state(wrapper).events[2]);
+    expect(state(wrapper).detailPosition).toBe("103 / 103");
+    expect(state(wrapper).hasNext).toBe(false);
+  });
+
   it("no rows: the total is 0 and there is no pager", async () => {
     stream.count = countOf([100]);
     const wrapper = mountIt();

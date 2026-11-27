@@ -241,6 +241,30 @@ export default defineComponent({
       }
     };
 
+    // Fixed to the viewport, so a scroll or resize would leave it over the wrong panel; another
+    // right-click elsewhere opens its own menu, so this one must not stay open beside it.
+    const isOutside = (event: Event) =>
+      !!menuRef.value && !menuRef.value.contains(event.target as Node);
+    const closeIfOutside = (event: Event) => {
+      if (isOutside(event)) emit("close");
+    };
+    const closeOnResize = () => emit("close");
+    const listen = (on: boolean) => {
+      if (on) {
+        document.addEventListener("click", handleClickOutside);
+        document.addEventListener("keydown", handleEscape);
+        document.addEventListener("contextmenu", closeIfOutside, true);
+        window.addEventListener("scroll", closeIfOutside, true);
+        window.addEventListener("resize", closeOnResize);
+        return;
+      }
+      document.removeEventListener("click", handleClickOutside);
+      document.removeEventListener("keydown", handleEscape);
+      document.removeEventListener("contextmenu", closeIfOutside, true);
+      window.removeEventListener("scroll", closeIfOutside, true);
+      window.removeEventListener("resize", closeOnResize);
+    };
+
     const measure = async () => {
       await nextTick();
       menuSize.value = {
@@ -268,21 +292,14 @@ export default defineComponent({
           menuSize.value = { width: 0, height: 0 };
           placedTop.value = null;
           measure();
-          setTimeout(() => {
-            document.addEventListener("click", handleClickOutside);
-            document.addEventListener("keydown", handleEscape);
-          }, 0);
+          setTimeout(() => listen(true), 0);
         } else {
-          document.removeEventListener("click", handleClickOutside);
-          document.removeEventListener("keydown", handleEscape);
+          listen(false);
         }
       },
     );
 
-    onBeforeUnmount(() => {
-      document.removeEventListener("click", handleClickOutside);
-      document.removeEventListener("keydown", handleEscape);
-    });
+    onBeforeUnmount(() => listen(false));
 
     return {
       t,

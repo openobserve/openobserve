@@ -15,7 +15,7 @@
 
 import { ref, computed, watch, nextTick, onBeforeMount, onUnmounted } from "vue";
 import { toZonedTime } from "date-fns-tz";
-import type { I18nText, TranslateFn } from "@/types/i18n";
+import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
 import { useLicenseLocks } from "@/composables/useFeatureLock";
 import { streamTypeFeature } from "@/utils/featureGate";
 import { getAllDashboardsByFolderId, getDashboard, getFoldersList } from "@/utils/commons";
@@ -37,6 +37,7 @@ import {
   maxParenDepth,
   SQL_PARSE_MAX_DEPTH,
   stripWherePredicate,
+  topLevelWherePredicate,
 } from "@/utils/query/sqlComplexity";
 import { isExemplarSeriesId } from "@/utils/dashboard/exemplars/applyExemplarSeries";
 import {
@@ -59,7 +60,7 @@ import {
   logsAvailability,
   metricsAvailability,
   pointFamily,
-  pointGroupFilters,
+  pointGroupScope,
   promqlMetricName,
   promqlPointWindow,
   sliceBounds,
@@ -141,6 +142,7 @@ export function usePanelDrilldown({
   hideChartTooltip,
   findRelatedTelemetry,
   allowPointExplore,
+  sqlResultIndex,
 }: {
   panelSchema: any;
   variablesData: any;
@@ -174,6 +176,8 @@ export function usePanelDrilldown({
     currentStream: string,
   ) => Promise<CorrelationResult | null>;
   allowPointExplore?: { value: boolean };
+  /** Maps a SQL series' drawn position to its executed result, which hidden queries still occupy. */
+  sqlResultIndex?: (position: number) => number | undefined;
 }) {
   // Cross-linking: store cross-links from result_schema response
   const { getStream } = useStreams(t);
@@ -803,20 +807,38 @@ export function usePanelDrilldown({
     return own ?? pointSeries(params)?.[key];
   };
 
+  // A SQL series' _queryIndex counts drawn results; hidden queries still run, so the host maps it.
+  const sqlSeriesOrigin = (
+    params: any,
+  ): { resultIndex: number; panelQueryIndex: number } | null => {
+    const position = pointSeries(params)?._queryIndex;
+    if (panelSchema.value?.queryType === "promql" || typeof position !== "number") return null;
+    const resultIndex = sqlResultIndex ? sqlResultIndex(position) : position;
+    if (resultIndex === undefined) return null;
+    const panelQueryIndex = metadata?.value?.queries?.[resultIndex]?.panelQueryIndex;
+    return { resultIndex, panelQueryIndex: panelQueryIndex ?? resultIndex };
+  };
+
+  // A funnel stage shown as "(empty)" or "(null)" keeps its own value as rawName.
+  const funnelStage = (params: any): string | null =>
+    params?.data && typeof params.data === "object" && "rawName" in params.data
+      ? params.data.rawName
+      : String(params?.name ?? "");
+
   const pointQueryIndex = (params: any): number | null => {
     const queries = panelSchema.value?.queries ?? [];
     if (panelSchema.value?.type === "funnel") {
-      return funnelStageQuery(panelSchema.value, data.value ?? [], params?.name);
+      return funnelStageQuery(panelSchema.value, data.value ?? [], funnelStage(params));
     }
+    const firstVisible = Math.max(
+      0,
+      queries.findIndex((q: any) => !q?.config?.hide),
+    );
     // A tile carries no query of its own; treeOpensPointMenu admits only one visible query.
-    if (isPathChart(panelSchema.value?.type)) {
-      return Math.max(
-        0,
-        queries.findIndex((q: any) => !q?.config?.hide),
-      );
-    }
-    const index = pointTag(params, "_panelQueryIndex");
-    return typeof index === "number" && queries[index] ? index : 0;
+    if (isPathChart(panelSchema.value?.type)) return firstVisible;
+    const index = sqlSeriesOrigin(params)?.panelQueryIndex ?? pointTag(params, "_panelQueryIndex");
+    // An untagged series is never a hidden query's: those are not drawn.
+    return typeof index === "number" && queries[index] ? index : firstVisible;
   };
 
   // A multi-field category chart draws one axis per x and breakdown field, row-aligned by dataIndex.
@@ -857,7 +879,7 @@ export function usePanelDrilldown({
   const pointClick = (params: any, family: PointFamily, query: any): PointClick => {
     if (family !== "heatmap") {
       return {
-        name: params?.name,
+        name: panelSchema.value?.type === "funnel" ? funnelStage(params) : params?.name,
         seriesValue: clickedSeriesName(params),
         path: params?.data?.path,
         fieldValues: family === "category" ? axisFieldValues(params, query) : undefined,
@@ -900,6 +922,24 @@ export function usePanelDrilldown({
     if (!parser) await importSqlParser();
     const from = parseSelectColumns(sql)?.from;
     return Array.isArray(from) && from.length > 1;
+  };
+
+  // result_schema gives a panel WHERE for logs streams only; a metrics or traces panel's comes from its
+  // own SQL, and only from one plain SELECT on one stream, where it names that stream's columns.
+  const panelSqlWhere = async (
+    queryIndex: number,
+    resultIndex: number,
+  ): Promise<{ where: string; applied: boolean }> => {
+    const sql = executedQuery(queryIndex, resultIndex);
+    const { predicate, count } = topLevelWherePredicate(sql);
+    if (!count) return { where: "", applied: true };
+    if (!parser) await importSqlParser();
+    const from = parseSelectColumns(sql)?.from;
+    const oneStream =
+      Array.isArray(from) && from.length === 1 && !!from[0]?.table && !from[0]?.expr;
+    return predicate && oneStream
+      ? { where: predicate, applied: true }
+      : { where: "", applied: false };
   };
 
   // An h-bar time label is the raw histogram key in UTC, without a zone suffix.
@@ -977,13 +1017,16 @@ export function usePanelDrilldown({
       : t("panel.pointExplore.slice", bounds);
   };
 
-  const pointDetail = (target: PointTarget): I18nText =>
-    target.filters.length
-      ? t("panel.pointExplore.detail", {
-          slice: sliceText(target),
-          filters: filtersSummary(target.filters),
-        })
-      : sliceText(target);
+  const pointDetail = (target: PointTarget, extra: I18nText[] = []): I18nText =>
+    [...(target.notes ?? []), ...extra].reduce<I18nText>(
+      (detail, note) => t("panel.pointExplore.withNote", { detail, note }),
+      target.filters.length
+        ? t("panel.pointExplore.detail", {
+            slice: sliceText(target),
+            filters: filtersSummary(target.filters),
+          })
+        : sliceText(target),
+    );
 
   const hiddenItem: PointExploreItem = { state: "hidden" };
 
@@ -1016,7 +1059,11 @@ export function usePanelDrilldown({
     if (availability.kind === "correlate") {
       return { state: "pending", detail: t("panel.pointExplore.findingService") };
     }
-    return { state: "enabled", detail: pointDetail(target) };
+    const skipped = target.panelWhere?.applied === false;
+    return {
+      state: "enabled",
+      detail: pointDetail(target, skipped ? [t("panel.pointExplore.panelFilterNotApplied")] : []),
+    };
   };
 
   const availabilityInput = (target: PointTarget) => ({
@@ -1119,6 +1166,18 @@ export function usePanelDrilldown({
     );
 
   // Fills the point section for a click on a supported chart; false where the chart has none.
+  const visibleQueries = (schema: { queries?: Array<{ config?: { hide?: boolean } }> }) =>
+    (schema?.queries ?? []).filter((query) => !query?.config?.hide).length;
+
+  // A query's own label with its series placeholders taken out, else its number.
+  const queryName = (queryIndex: number): I18nText => {
+    const config = panelSchema.value?.queries?.[queryIndex]?.config ?? {};
+    const label = String(config.query_label ?? config.promql_legend ?? "")
+      .replace(/\{[^}]*\}/g, "")
+      .trim();
+    return label ? raw(label) : t("common.queryNumber", { index: queryIndex + 1 });
+  };
+
   const preparePointExplore = async (params: any): Promise<boolean> => {
     pointRequest += 1;
     const request = pointRequest;
@@ -1147,7 +1206,10 @@ export function usePanelDrilldown({
     const resultIndex =
       schema.type === "funnel"
         ? queryIndex
-        : (pointTag(params, "_resultIndex") ?? pointSeries(params)?._queryIndex ?? 0);
+        : (sqlSeriesOrigin(params)?.resultIndex ??
+          pointTag(params, "_resultIndex") ??
+          pointSeries(params)?._queryIndex ??
+          0);
     const query = schema.queries?.[queryIndex];
     const isPromql = schema.queryType === "promql";
     // A PromQL heatmap cell that names no series would open another query's metric unfiltered.
@@ -1161,7 +1223,7 @@ export function usePanelDrilldown({
     const seriesLabels: Record<string, string> | undefined = isPromql
       ? (pointTag(params, "_labels") ?? {})
       : undefined;
-    const filters = pointGroupFilters(
+    const { filters, unfiltered } = pointGroupScope(
       query,
       schema,
       family,
@@ -1194,6 +1256,15 @@ export function usePanelDrilldown({
           : "bucket",
       filters,
     };
+    const notes = [
+      ...(visibleQueries(schema) > 1 ? [queryName(queryIndex)] : []),
+      ...(unfiltered ? [t("panel.pointExplore.seriesNotFiltered")] : []),
+    ];
+    if (notes.length) target.notes = notes;
+    // View logs reads its panel WHERE from result_schema; a metrics or traces panel carries its own.
+    if (!isPromql && target.streamType !== "logs") {
+      target.panelWhere = await panelSqlWhere(queryIndex, resultIndex);
+    }
     const joinsStreams = !isPromql && (await queryJoinsStreams(queryIndex, resultIndex));
     if (request !== pointRequest) return false;
     const logs = logsItem(target, joinsStreams);
@@ -1205,7 +1276,8 @@ export function usePanelDrilldown({
       pointExplore.value = null;
       return false;
     }
-    const direct = { filters };
+    const baseWhere = target.panelWhere?.where ?? "";
+    const direct = { filters, ...(baseWhere ? { baseWhere } : {}) };
     pointExplore.value = {
       target,
       logs,
@@ -1213,7 +1285,7 @@ export function usePanelDrilldown({
       metrics,
       tracesTarget:
         traces.state === "enabled"
-          ? { stream: target.stream, filter: filtersWhere("", filters), ...direct }
+          ? { stream: target.stream, filter: filtersWhere(baseWhere, filters), ...direct }
           : null,
       metricsTarget: metrics.state === "enabled" ? { stream: target.stream, ...direct } : null,
     };

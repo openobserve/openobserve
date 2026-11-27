@@ -56,6 +56,7 @@ import { useLicenseLocks } from "@/composables/useFeatureLock";
 import { streamTypeFeature } from "@/utils/featureGate";
 import { useExplorerSqlSearch } from "@/composables/dashboard/useExplorerSqlSearch";
 import { useExplorerTotal } from "@/composables/dashboard/useExplorerTotal";
+import { useExplorerPagedStep } from "@/composables/dashboard/useExplorerPagedStep";
 import { useExplorerCorrelation } from "@/composables/dashboard/useExplorerCorrelation";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import {
@@ -551,16 +552,19 @@ const detailPosition = computed(() => {
   const at = page.value * pageSize.value + selectedIndex.value + 1;
   return total.value !== null ? `${at} / ${total.value}` : String(at);
 });
-const hasPrev = computed(() => selectedIndex.value > 0);
-const hasNext = computed(
-  () => selectedIndex.value >= 0 && selectedIndex.value < events.value.length - 1,
-);
-function goPrev() {
-  if (hasPrev.value) openEventDetail(events.value[selectedIndex.value - 1]);
-}
-function goNext() {
-  if (hasNext.value) openEventDetail(events.value[selectedIndex.value + 1]);
-}
+const { hasPrev, hasNext, step } = useExplorerPagedStep({
+  items: () => events.value,
+  index: () => selectedIndex.value,
+  page: () => page.value,
+  nextPageExists: () =>
+    total.value !== null
+      ? (page.value + 1) * pageSize.value < total.value
+      : events.value.length >= pageSize.value,
+  loadPage: (p) => goToPage(p),
+  open: openEventDetail,
+});
+const goPrev = () => step(-1);
+const goNext = () => step(1);
 const onExplorerKeydown = useExplorerDetailKeys({
   isOpen: () => !!selectedEvent.value,
   prev: goPrev,
@@ -764,7 +768,12 @@ function isSurroundExpanded(pageIdx: number) {
 
 // ── Navigation ────────────────────────────────────────────────────────────────
 function patternToSql(template: string): string | null {
-  return buildPatternLogsSql(template, props.stream, allPatternTemplates.value, defaultWhere() || undefined);
+  return buildPatternLogsSql(
+    template,
+    props.stream,
+    allPatternTemplates.value,
+    defaultWhere() || undefined,
+  );
 }
 
 function openPatternInLogs(template: string) {
@@ -828,6 +837,7 @@ function openInLogs() {
     :filters="filters ?? []"
     :start-time="startTime"
     :end-time="endTime"
+    :base-where="baseWhere"
   />
   <DashboardMetricsExplorer
     v-else-if="mode === 'metrics'"
@@ -835,6 +845,7 @@ function openInLogs() {
     :filters="filters ?? []"
     :start-time="startTime"
     :end-time="endTime"
+    :base-where="baseWhere"
   />
   <div v-else class="flex h-full min-h-0 flex-col overflow-hidden" @keydown="onExplorerKeydown">
     <div v-show="!detailOpen" class="flex min-h-0 flex-1 flex-col overflow-hidden">
