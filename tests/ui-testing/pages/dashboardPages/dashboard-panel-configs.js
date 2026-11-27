@@ -205,6 +205,12 @@ export default class DashboardPanelConfigs {
     this.funnelOrientOptions = page.locator(`[data-test="${this.funnelOrientId}-option"]`);
     this.funnelShowPercent = page.locator('[data-test="dashboard-config-funnel_show_percent"]');
 
+    //Node graph locators: Layout is an OToggleGroup, Show edge values an OSwitch
+    this.nodeGraphLayoutId = "dashboard-config-node_graph_layout";
+    this.nodeGraphLayout = page.locator(`[data-test="${this.nodeGraphLayoutId}"]`);
+    this.nodeGraphLayoutOptions = page.locator(`[data-test="${this.nodeGraphLayoutId}-option"]`);
+    this.nodeGraphShowEdgeLabels = page.locator('[data-test="dashboard-config-node_graph_show_edge_labels"]');
+
     //Box plot locators: Whiskers is an OSelect
     this.boxplotWhiskerId = "dashboard-config-boxplot_whisker";
     this.boxplotWhisker = page.locator(`[data-test="${this.boxplotWhiskerId}"]`);
@@ -2441,6 +2447,38 @@ export default class DashboardPanelConfigs {
     await this.scrollSidebarToElement(this.funnelOrient);
     await this.funnelOrientOptions.first().waitFor({ state: "visible", timeout: 10000 });
     return this.funnelOrientOptions.evaluateAll((els) => els.map((el) => el.getAttribute("data-test-label")));
+  }
+
+  // ========== Node graph ==========
+
+  /** Pick a node graph Layout item by its label; `value` is what the group then reports ("__auto__" for Default). */
+  async selectNodeGraphLayout(label, value) {
+    await this.scrollSidebarToElement(this.nodeGraphLayout);
+    await this._clickVirtualOption(this.nodeGraphLayoutId, label);
+    await expect(this.nodeGraphLayout).toHaveAttribute("data-test-selected-value", value);
+  }
+
+  /** Assert the node graph Layout's committed value, retrying while a reopened panel hydrates. */
+  async expectNodeGraphLayout(value) {
+    await this.scrollSidebarToElement(this.nodeGraphLayout);
+    await expect(this.nodeGraphLayout).toHaveAttribute("data-test-selected-value", value, { timeout: 15000 });
+  }
+
+  /** Labels of the node graph Layout items, the Default item first. */
+  async getNodeGraphLayoutOptionLabels() {
+    await this.scrollSidebarToElement(this.nodeGraphLayout);
+    await this.nodeGraphLayoutOptions.first().waitFor({ state: "visible", timeout: 10000 });
+    return this.nodeGraphLayoutOptions.evaluateAll((els) => els.map((el) => el.getAttribute("data-test-label")));
+  }
+
+  /** Turn the node graph "Show edge values" switch on or off; a no-op when it is already in that state. */
+  async setNodeGraphShowEdgeLabels(on) {
+    await this.setConfigToggle(this.nodeGraphShowEdgeLabels, on);
+  }
+
+  /** Assert the node graph "Show edge values" switch is on (true) or off (false). */
+  async expectNodeGraphShowEdgeLabels(on) {
+    await this.expectConfigToggle(this.nodeGraphShowEdgeLabels, on);
   }
 
   async toggleHeatmapHistogramMode() {

@@ -1224,6 +1224,105 @@ export default class DashboardactionPage {
     return stage;
   }
 
+  // A node graph is canvas-painted: its nodes, edges, drawn labels and page positions are read off the live
+  // ECharts instance. Positions come from the panel's own layout (series.layout is "none"), so the force and
+  // circular layouts are told apart by their edge curveness (0.12 force, 0.3 circular).
+  async getNodeGraphState(scopeSelector = this.chartRendererSelector) {
+    return this._withLiveCharts(scopeSelector, (findCharts, { scopeSel }) => {
+      const found = findCharts(scopeSel)
+        .map(({ chart }) => chart)
+        .find((chart) => {
+          try {
+            return chart.getOption()?.series?.[0]?.type === "graph";
+          } catch {
+            return false; // A disposed instance throws.
+          }
+        });
+      if (!found) return null;
+
+      const series = found.getOption().series[0];
+      const seriesModel = found.getModel().getSeriesByIndex(0);
+      const nodeData = seriesModel.getData();
+      const edgeData = seriesModel.getEdgeData();
+      const rect = found.getDom().getBoundingClientRect();
+      const shownText = (label) =>
+        label && !label.ignore && !label.invisible ? String(label.style?.text ?? "") : "";
+      const nodes = [];
+      for (let i = 0; i < nodeData.count(); i++) {
+        const item = (series.data ?? [])[i] ?? {};
+        const layout = nodeData.getItemLayout(i);
+        const [px, py] = layout ? found.convertToPixel({ seriesIndex: 0 }, layout) : [NaN, NaN];
+        const el = nodeData.getItemGraphicEl(i);
+        nodes.push({
+          name: String(nodeData.getName(i) ?? ""),
+          value: Number(item.value ?? 0),
+          self: item.self ?? null,
+          symbolSize: Number(item.symbolSize ?? 0),
+          labelText: shownText(el?.getSymbolPath?.()?.getTextContent?.()),
+          x: rect.left + px,
+          y: rect.top + py,
+        });
+      }
+      const edges = (series.links ?? []).map((link, i) => ({
+        source: String(link.source),
+        target: String(link.target),
+        value: Number(link.value ?? 0),
+        labelShown: link.label?.show === true,
+        labelText: shownText(edgeData.getItemGraphicEl(i)?.getTextContent?.()),
+      }));
+      return {
+        layout: series.layout ?? null,
+        curveness: series.lineStyle?.curveness ?? null,
+        edgeLabels: series.edgeLabel?.show === true,
+        draggable: series.draggable === true,
+        nodes,
+        edges,
+      };
+    });
+  }
+
+  /** Poll until a node graph is drawn with at least one node, and return its state. */
+  async waitForNodeGraph(timeout = 20000) {
+    let state = null;
+    await expect
+      .poll(async () => {
+        state = await this.getNodeGraphState();
+        return state?.nodes?.length ?? 0;
+      }, { timeout, message: "node graph never drew any node" })
+      .toBeGreaterThan(0);
+    return state;
+  }
+
+  /** The named node of a node graph state; throws when it is not drawn. */
+  nodeGraphNode(state, name) {
+    const node = state?.nodes.find((n) => n.name === name);
+    if (!node) throw new Error(`Node graph has no node "${name}"`);
+    return node;
+  }
+
+  /** The source → target edge of a node graph state, or undefined when it is not drawn. */
+  nodeGraphEdge(state, source, target) {
+    return state?.edges.find((e) => e.source === source && e.target === target);
+  }
+
+  /** Click the named node at its drawn centre; returns the node clicked. */
+  async clickNodeGraphNode(name) {
+    const node = this.nodeGraphNode(await this.waitForNodeGraph(), name);
+    await this.page.mouse.move(node.x, node.y);
+    await this.page.mouse.click(node.x, node.y);
+    return node;
+  }
+
+  /** Drag the named node by (dx, dy) page pixels in small steps, the way a user would. */
+  async dragNodeGraphNode(name, dx, dy) {
+    const node = this.nodeGraphNode(await this.waitForNodeGraph(), name);
+    await this.page.mouse.move(node.x, node.y);
+    await this.page.mouse.down();
+    await this.page.mouse.move(node.x + dx, node.y + dy, { steps: 10 });
+    await this.page.mouse.up();
+    return node;
+  }
+
   // A box plot is canvas-painted: read its categories, five-number boxes and outlier points off the live
   // instance. Each box's page position is its median, which always lies inside the drawn box.
   async getBoxplotState(scopeSelector = this.chartRendererSelector) {

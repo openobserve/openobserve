@@ -289,5 +289,47 @@ export const ingestionForStateTimeline = async (
   return await fetchResponse.json();
 };
 
+// A small service-call graph for the node graph panel: a repeated pair (summed into one edge),
+// a cycle (api → db → cache → api) and a self call (worker → worker, drawn on the node, not as an edge).
+// Parallel workers may each ingest it once, which multiplies every sum by the same factor, so tests
+// compare edges by ratio and never by absolute value.
+export const NODE_GRAPH_FIXTURE = {
+  streamName: "e2e_node_graph",
+  sourceField: "from_service",
+  targetField: "to_service",
+  valueField: "requests",
+  records: [
+    { from_service: "web", to_service: "api", requests: 600 },
+    { from_service: "web", to_service: "api", requests: 600 },
+    { from_service: "api", to_service: "db", requests: 300 },
+    { from_service: "db", to_service: "cache", requests: 150 },
+    { from_service: "cache", to_service: "api", requests: 80 },
+    { from_service: "api", to_service: "worker", requests: 30 },
+    { from_service: "worker", to_service: "worker", requests: 40 },
+  ],
+};
+
+export const ingestionForNodeGraph = async (page, streamName = NODE_GRAPH_FIXTURE.streamName) => {
+  if (!process.env["INGESTION_URL"]) {
+    throw new Error("Required environment variables are not set");
+  }
+  // Once per worker: a repeat only scales every sum, which adds nothing a test can observe.
+  const ingestKey = `${getOrgIdentifier()}:${streamName}`;
+  if (ingestedStreams.has(ingestKey)) {
+    return { skipped: true };
+  }
+
+  const fetchResponse = await postWithRetry(page, streamName, NODE_GRAPH_FIXTURE.records, "Node graph ingestion");
+  if (!fetchResponse.ok) {
+    const body = await fetchResponse.text().catch(() => "");
+    throw new Error(
+      `HTTP error! status: ${fetchResponse.status}, response: ${body.slice(0, 200)}`
+    );
+  }
+  ingestedStreams.add(ingestKey);
+  testLogger.info("Node graph data ingested", { streamName, records: NODE_GRAPH_FIXTURE.records.length });
+  return await fetchResponse.json();
+};
+
 // Export only the required functions
 export { ingestionForMaps, ingestionForDashboardChartJson, ingestionForSankey, getAuthToken, removeUTFCharacters };
