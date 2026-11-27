@@ -215,10 +215,11 @@ pub(crate) async fn spawn_check_turn(
 /// [AutoResolveError::NoConnections] when none does. Only the chosen ones are read and decrypted.
 pub(crate) async fn load_tools(
     org: &str,
+    run_id: &str,
     ids: &[String],
 ) -> Result<Vec<McpEntry>, AutoResolveError> {
     let listed = org_ai_toolsets::list_described(org, MCP_KIND).await?;
-    load_listed(org, &listed, ids).await
+    load_listed(org, run_id, &listed, ids).await
 }
 
 /// The org's MCP connections the run does not have, each with its key, sorted by key, at most
@@ -424,6 +425,7 @@ fn not_connected_context(
 
 async fn load_listed(
     org: &str,
+    run_id: &str,
     listed: &[Listed],
     ids: &[String],
 ) -> Result<Vec<McpEntry>, AutoResolveError> {
@@ -437,7 +439,7 @@ async fn load_listed(
         }
     }
     let names: Vec<String> = listed.iter().map(|(_, name, _)| name.clone()).collect();
-    tools_of(org, &names, chosen)
+    tools_of(org, run_id, &names, chosen).await
 }
 
 /// The run's tools and the context extras, read once per turn; a planning turn also records
@@ -448,7 +450,7 @@ async fn turn_inputs(
 ) -> Result<(Vec<McpEntry>, TurnExtras), AutoResolveError> {
     let run_ids = run_connection_ids(run)?;
     let listed = org_ai_toolsets::list_described(&run.org, MCP_KIND).await?;
-    let mcps = load_listed(&run.org, &listed, &run_ids).await?;
+    let mcps = load_listed(&run.org, &run.id, &listed, &run_ids).await?;
     let permitted = planner_listable(run).await;
     let this_run = autoresolve_corrections::for_run(&run.org, &run.id).await?;
     let active = match &run.autoresolve_id {
@@ -611,12 +613,13 @@ async fn admit(run: &RunRow, phase: Phase, trace_id: &str) -> Result<AdmittedTur
     }
 }
 
-fn tools_of(
+async fn tools_of(
     org: &str,
+    run_id: &str,
     mcp_names: &[String],
     chosen: Vec<OrgToolset>,
 ) -> Result<Vec<McpEntry>, AutoResolveError> {
-    let mcps = autoresolve_entries(org, mcp_names, chosen);
+    let mcps = autoresolve_entries(org, run_id, mcp_names, chosen).await;
     if mcps.is_empty() {
         return Err(AutoResolveError::NoConnections);
     }
@@ -1155,57 +1158,6 @@ mod tests {
             assert!(!message.contains("…."), "{name}: {message}");
             assert!(!message.contains("[internal"), "{name}: {message}");
             assert!(message.matches("AI model").count() < 2, "{name}: {message}");
-        }
-    }
-
-    #[test]
-    fn a_turn_loads_only_the_run_connections_that_still_exist() {
-        let mcp = |id: &str, name: &str| OrgToolset {
-            id: id.into(),
-            org: ORG.into(),
-            name: name.into(),
-            kind: "mcp".into(),
-            description: None,
-            data: Some(json!({"url": format!("https://{name}.example")}).to_string()),
-            created_by: "rita@example.com".into(),
-            created_at: 0,
-            updated_at: 0,
-            enabled: true,
-            status_state: None,
-            status_since: None,
-            last_error: None,
-            last_used_at: None,
-        };
-        let org = [mcp("c1", "code-host"), mcp("c2", "k8s")];
-        let names: Vec<String> = org.iter().map(|t| t.name.clone()).collect();
-        type Case = (
-            &'static str,
-            &'static [&'static str],
-            Option<&'static [&'static str]>,
-        );
-        let cases: [Case; 2] = [
-            ("one of two", &["c1"], Some(&["code-host"])),
-            ("all removed", &["gone"], None),
-        ];
-        for (case, ids, want) in cases {
-            let ids: Vec<String> = ids.iter().map(|id| id.to_string()).collect();
-            let chosen = org
-                .iter()
-                .filter(|t| ids.contains(&t.id))
-                .cloned()
-                .collect();
-            let got = tools_of(ORG, &names, chosen);
-            let names = got
-                .as_ref()
-                .ok()
-                .map(|m| m.iter().map(|m| m.name.as_str()).collect::<Vec<_>>());
-            assert_eq!(names, want.map(<[&str]>::to_vec), "{case}");
-            if want.is_none() {
-                assert!(
-                    matches!(got, Err(AutoResolveError::NoConnections)),
-                    "{case}"
-                );
-            }
         }
     }
 

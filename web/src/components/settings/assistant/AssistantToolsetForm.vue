@@ -144,6 +144,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <AssistantToolsetSecretRows
             :form="form"
             :rows="writeHeaders"
+            :picker-shown="pickerShown"
+            :consumer-id="editId ?? ''"
             field="writeHeaders"
             :legend="t('autoresolve.connection.writeCredential')"
             :add-label="t('autoresolve.connection.addWriteHeader')"
@@ -348,12 +350,23 @@ const dirty = form.useStore((s) => s.isDirty);
 
 const automationMissing = computed(() => {
   if (!pickerShown.value || kind.value !== "mcp") return [];
-  const saved = record.data.value as { data?: { headers?: Record<string, unknown> } } | undefined;
-  const headerValues = headers.value.map((row) => {
-    const value =
-      row.state === "unchanged" ? saved?.data?.headers?.[row.stored ?? row.key] : row.value;
-    return typeof value === "string" ? value : undefined;
-  });
+  const saved = record.data.value as
+    | { data?: { headers?: Record<string, unknown>; write_header_refs?: Record<string, unknown> } }
+    | undefined;
+  const headerValues = [
+    ...headers.value.map((row) => {
+      const value =
+        row.state === "unchanged" ? saved?.data?.headers?.[row.stored ?? row.key] : row.value;
+      return typeof value === "string" ? value : undefined;
+    }),
+    ...writeHeaders.value.map((row) => {
+      const value =
+        row.state === "unchanged"
+          ? saved?.data?.write_header_refs?.[row.stored ?? row.key]
+          : row.value;
+      return typeof value === "string" ? value : undefined;
+    }),
+  ];
   return missingManage(headerValues, usableSecrets.data.value ?? []);
 });
 const agentName = computed(() => (typedName.value ? agentNameOf(typedName.value) : ""));

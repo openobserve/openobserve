@@ -56,7 +56,9 @@ use infra::{
     },
 };
 use o2_enterprise::enterprise::{
-    ai::toolsets::{AutoResolveConnection, ToolsetKind, autoresolve_connection},
+    ai::toolsets::{
+        AutoResolveConnection, ToolsetKind, autoresolve_connection, autoresolve_write_headers,
+    },
     common::config::get_config as get_o2_config,
 };
 use sea_orm::{ConnectionTrait, TransactionTrait};
@@ -152,6 +154,15 @@ pub(crate) trait ConnectionSource: Send + Sync {
         name_or_id: &str,
     ) -> anyhow::Result<Option<AutoResolveConnection>>;
 
+    async fn write_headers(
+        &self,
+        _org: &str,
+        _run_id: &str,
+        connection: &AutoResolveConnection,
+    ) -> anyhow::Result<HashMap<String, String>> {
+        Ok(connection.write_headers.clone())
+    }
+
     /// The toolset with this id of any kind, as its name and whether it is an MCP connection.
     async fn toolset(&self, org: &str, id: &str) -> anyhow::Result<Option<(String, bool)>> {
         let found = self.get(org, id).await?.filter(|c| c.id == id);
@@ -170,6 +181,15 @@ impl ConnectionSource for LiveConnections {
         name_or_id: &str,
     ) -> anyhow::Result<Option<AutoResolveConnection>> {
         autoresolve_connection(org, name_or_id).await
+    }
+
+    async fn write_headers(
+        &self,
+        org: &str,
+        run_id: &str,
+        connection: &AutoResolveConnection,
+    ) -> anyhow::Result<HashMap<String, String>> {
+        Ok(autoresolve_write_headers(org, &connection.id, run_id, &connection.fingerprint).await?)
     }
 
     async fn toolset(&self, org: &str, id: &str) -> anyhow::Result<Option<(String, bool)>> {
@@ -203,6 +223,18 @@ impl ConnectionSource for Listable<'_> {
     ) -> anyhow::Result<Option<AutoResolveConnection>> {
         let found = self.source.get(org, name_or_id).await?;
         Ok(found.filter(|c| self.permits(org, &c.id)))
+    }
+
+    async fn write_headers(
+        &self,
+        org: &str,
+        run_id: &str,
+        connection: &AutoResolveConnection,
+    ) -> anyhow::Result<HashMap<String, String>> {
+        if !self.permits(org, &connection.id) {
+            anyhow::bail!("connection is not permitted");
+        }
+        self.source.write_headers(org, run_id, connection).await
     }
 
     async fn toolset(&self, org: &str, id: &str) -> anyhow::Result<Option<(String, bool)>> {
@@ -278,13 +310,6 @@ pub async fn start_run_for(
     if !autoresolve_on() {
         return Err(AutoResolveError::NotEnabled);
     }
-    let ids: Vec<String> = connections.iter().map(|c| c.id.clone()).collect();
-    match turn::load_tools(org, &ids).await {
-        Err(AutoResolveError::NoConnections) if autoresolve_id.is_some() => {
-            return Err(AutoResolveError::ConnectionsGone);
-        }
-        loaded => loaded?,
-    };
     let new = launch_row(
         org,
         goal,
@@ -298,6 +323,13 @@ pub async fn start_run_for(
         autoresolve_id,
         incident_id.clone(),
     )?;
+    let ids: Vec<String> = connections.iter().map(|c| c.id.clone()).collect();
+    match turn::load_tools(org, &new.id, &ids).await {
+        Err(AutoResolveError::NoConnections) if new.autoresolve_id.is_some() => {
+            return Err(AutoResolveError::ConnectionsGone);
+        }
+        loaded => loaded?,
+    };
     let db = infra::db::get_orm_client_rw().await;
     let Some(run) = record_run_with(db, new).await? else {
         return match incident_id {

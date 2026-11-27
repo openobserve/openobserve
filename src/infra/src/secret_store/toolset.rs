@@ -348,14 +348,17 @@ pub fn slots(kind: &str, data: &Value) -> Result<Vec<CredentialSlot>, SecretErro
     let mut out = Vec::new();
     let mut path = Vec::new();
     walk(kind, data, &mut path, &mut out)?;
-    if kind == KIND_MCP
-        && let Some(Value::Object(headers)) = data.get("headers")
-    {
+    if kind == KIND_MCP {
         let has_secret = out
             .iter()
             .any(|s| s.tokens.iter().any(|t| t.kind == RefKind::Secret));
-        for name in headers.keys() {
-            grammar::check_header_name(name, has_secret)?;
+        for headers in ["headers", "write_headers"]
+            .into_iter()
+            .filter_map(|field| data.get(field).and_then(Value::as_object))
+        {
+            for name in headers.keys() {
+                grammar::check_header_name(name, has_secret)?;
+            }
         }
     }
     Ok(out)
@@ -674,7 +677,9 @@ fn pin_intersection(pins: &[Vec<PinPattern>], url: &str) -> Result<Vec<String>, 
 
 fn slot_at(kind: &str, path: &[String]) -> Option<Slot> {
     match (kind, path) {
-        (KIND_MCP, [section, _]) if section == "headers" => Some(Slot::McpHeaderValue),
+        (KIND_MCP, [section, _]) if section == "headers" || section == "write_headers" => {
+            Some(Slot::McpHeaderValue)
+        }
         (KIND_MCP, [field]) if field == "url" => Some(Slot::McpUrlHost),
         (KIND_CLI, [section, _]) if section == "env" => Some(Slot::CliEnvValue),
         (KIND_CLI, [section, _]) if section == "credential_files" => Some(Slot::CredentialFile),
@@ -951,13 +956,16 @@ mod tests {
 
     #[test]
     fn t32_mcp_authority_header_is_refused_beside_a_secret_ref() {
-        for name in ["Host", " host", ":authority"] {
-            let data = json!({"url": "https://m", "headers": {name: "x", "A": "{{secrets.GH}}"}});
-            assert_eq!(
-                slots("mcp", &data),
-                Err(SecretErrorCode::AuthorityOverrideRefused),
-                "{name}"
-            );
+        for field in ["headers", "write_headers"] {
+            for name in ["Host", " host", ":authority"] {
+                let data =
+                    json!({"url": "https://m", field: {name: "x", "A": "{{secrets.TOKEN}}"}});
+                assert_eq!(
+                    slots("mcp", &data),
+                    Err(SecretErrorCode::AuthorityOverrideRefused),
+                    "{field} {name}"
+                );
+            }
         }
         let plain = json!({"url": "https://m", "headers": {"Host": "x", "A": "literal"}});
         assert!(slots("mcp", &plain).is_ok());
@@ -968,6 +976,58 @@ mod tests {
             Candidate::classify(toolset("t4", "mcp", data), &[]).refused,
             Some(Omitted::AuthorityOverrideRefused)
         );
+    }
+
+    #[test]
+    fn mcp_write_header_refs_use_header_value_slots() {
+        let data = json!({"write_headers": {"Authorization": "Bearer {{secrets.TOKEN}}"}});
+        let found = slots("mcp", &data).unwrap();
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].pointer, "/data/write_headers/Authorization");
+        assert_eq!(found[0].slot, Slot::McpHeaderValue);
+        assert!(!found[0].inline);
+        assert_eq!(found[0].tokens[0].kind, RefKind::Secret);
+        assert_eq!(found[0].tokens[0].name, "TOKEN");
+
+        let data = json!({"headers": {"Host": "x"}, "write_headers": {"A": "{{secrets.TOKEN}}"}});
+        assert_eq!(
+            slots("mcp", &data),
+            Err(SecretErrorCode::AuthorityOverrideRefused)
+        );
+        let data = json!({"headers": {"A": "{{secrets.TOKEN}}"}, "write_headers": {"Host": "x"}});
+        assert_eq!(
+            slots("mcp", &data),
+            Err(SecretErrorCode::AuthorityOverrideRefused)
+        );
+    }
+
+    #[test]
+    fn response_shows_only_write_header_ref_templates() {
+        let raw = json!({"write_headers": {
+            "Authorization": "Bearer {{secrets.TOKEN}}",
+            "Region": "{{vars.REGION}}",
+            "Literal": "stored-credential",
+        }});
+        let shown = super::super::toolset_save::response_data(
+            "mcp",
+            &raw,
+            json!({"write_header_names": ["Authorization", "Region", "Literal"]}),
+            1,
+            "u",
+        );
+        assert_eq!(
+            shown["write_header_refs"],
+            json!({
+                "Authorization": "Bearer {{secrets.TOKEN}}",
+                "Region": "{{vars.REGION}}",
+            })
+        );
+        assert!(shown.get("write_headers").is_none());
+        assert!(!shown.to_string().contains("stored-credential"));
+
+        let raw = json!({"write_headers": {"Literal": "stored-credential"}});
+        let shown = super::super::toolset_save::response_data("mcp", &raw, json!({}), 1, "u");
+        assert!(shown.get("write_header_refs").is_none());
     }
 
     #[test]

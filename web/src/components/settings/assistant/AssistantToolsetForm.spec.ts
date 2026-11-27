@@ -16,6 +16,7 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import config from "@/aws-exports";
 import { fakeAssistant } from "@/components/ai-assistant/__tests__/fakeAssistant";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import aiToolsets from "@/services/ai_toolsets";
@@ -68,14 +69,16 @@ const PICKED: SecretPickerItem = {
   rights: { see: true, use: true, manage: true, manage_access: true },
 };
 
+const isEnterprise = config.isEnterprise;
+
 async function settle() {
   await flushPromises();
   await new Promise((resolve) => setTimeout(resolve, 0));
   await flushPromises();
 }
 
-async function mountForm(props: Record<string, unknown>) {
-  const h = settingsHarness();
+async function mountForm(props: Record<string, unknown>, zoConfig: Record<string, unknown> = {}) {
+  const h = settingsHarness(zoConfig);
   await h.router.push("/settings/assistant/toolsets");
   const w = mount(AssistantToolsetForm, {
     props: { existing: [], mergeSecrets: true, ...props },
@@ -114,6 +117,7 @@ beforeEach(() => {
 afterEach(() => {
   wrapper?.unmount();
   wrapper = null;
+  config.isEnterprise = isEnterprise;
   vi.clearAllMocks();
 });
 
@@ -169,6 +173,81 @@ describe("AssistantToolsetForm", () => {
       headers: { Authorization: "{{secrets.PD_KEY}}" },
     });
     expect(secrets.picker).toHaveBeenCalledWith("acme", "ai_toolset", "ts_1", {});
+  });
+
+  it.each([false, true])("gates write-header pickers on store ready=%s", async (ready) => {
+    secretStore.ready = ready;
+    config.isEnterprise = "true";
+    vi.mocked(aiToolsets.get).mockResolvedValue({
+      data: { ...STORED, data: { ...STORED.data, write_header_names: ["Authorization"] } },
+    } as never);
+    const w = (wrapper = await mountForm({ editId: "ts_1" }, { autoresolve_enabled: true }));
+    const picker = w
+      .findAllComponents({ name: "SecretPicker" })
+      .find((item) => item.attributes("data-test") === "ai-toolset-write-header-0-secret-picker");
+    expect(!!picker).toBe(ready);
+    if (!picker) return;
+    expect(picker.props()).toMatchObject({
+      consumerType: "ai_toolset",
+      consumerId: "ts_1",
+      requireManage: true,
+    });
+    picker.vm.$emit("pick", { ...PICKED, name: "WRITE_KEY" });
+    await settle();
+    picker.vm.$emit("pick", { ...PICKED, kind: "variable", name: "REGION" });
+    await settle();
+    expect(w.get('[data-test="ai-toolset-write-header-0"]').attributes("data-state")).toBe(
+      "replacing",
+    );
+    expect(
+      (w.get('[data-test="ai-toolset-write-header-0-input"] input').element as HTMLInputElement)
+        .value,
+    ).toBe("{{secrets.WRITE_KEY}}{{vars.REGION}}");
+  });
+
+  it.each(["typed", "unchanged"])("checks manage on a %s write-header ref", async (state) => {
+    secretStore.ready = true;
+    config.isEnterprise = "true";
+    vi.mocked(secrets.picker).mockResolvedValue({
+      data: {
+        items: [{ ...PICKED, name: "WRITE_KEY", rights: { ...PICKED.rights, manage: false } }],
+      },
+    } as never);
+    vi.mocked(aiToolsets.get).mockResolvedValue({
+      data: {
+        ...STORED,
+        data: {
+          ...STORED.data,
+          write_header_names: ["Authorization"],
+          write_header_refs: { Authorization: "Bearer {{secrets.WRITE_KEY}}" },
+        },
+      },
+    } as never);
+    const w = (wrapper = await mountForm({ editId: "ts_1" }, { autoresolve_enabled: true }));
+    if (state === "typed") {
+      await w.get('[data-test="ai-toolset-write-header-0-replace"]').trigger("click");
+      await settle();
+      await w
+        .get('[data-test="ai-toolset-write-header-0-input"] input')
+        .setValue("Bearer {{secrets.WRITE_KEY}}");
+      await settle();
+    }
+    expect(
+      w.get('[data-test="ai-toolset-automation-switch-btn"]').attributes("disabled"),
+    ).toBeDefined();
+    expect(w.get('[data-test="ai-toolset-automation-locked"]').text()).toContain("WRITE_KEY");
+    if (state === "unchanged") {
+      await w.get('[data-test="ai-toolset-write-header-0-replace"]').trigger("click");
+      await settle();
+    }
+    await w
+      .get('[data-test="ai-toolset-write-header-0-input"] input')
+      .setValue("Bearer replacement");
+    await settle();
+    expect(
+      w.get('[data-test="ai-toolset-automation-switch-btn"]').attributes("disabled"),
+    ).toBeUndefined();
+    expect(w.find('[data-test="ai-toolset-automation-locked"]').exists()).toBe(false);
   });
 
   it.each([

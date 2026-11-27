@@ -350,6 +350,24 @@ pub fn response_data(kind: &str, raw: &Value, redacted: Value, updated_at: i64, 
             }
         }
     }
+    if kind == "mcp"
+        && let Some(Value::Object(raw_headers)) = raw.get("write_headers")
+        && let Some(shown) = shown.as_object_mut()
+    {
+        let refs = raw_headers
+            .iter()
+            .filter(|(_, value)| {
+                value.as_str().is_some_and(|text| {
+                    config::meta::secret_store::grammar::parse_refs(text)
+                        .is_ok_and(|tokens| !tokens.is_empty())
+                })
+            })
+            .map(|(name, value)| (name.clone(), value.clone()))
+            .collect::<serde_json::Map<_, _>>();
+        if !refs.is_empty() {
+            shown.insert("write_header_refs".to_owned(), Value::Object(refs));
+        }
+    }
     shown
 }
 
