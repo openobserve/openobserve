@@ -441,6 +441,17 @@ describe("patternWhere", () => {
     );
     expect(patternWhere({ template: "t", match_block: "shared" })).toBeNull();
   });
+
+  it("never repeats an include term inside an exclude set", () => {
+    expect(
+      patternWhere({
+        template: "User <*> logged in from <*>",
+        match_terms: ["logged in from"],
+        exclude_terms: [["User", "Logged in from", "via SSO"]],
+      }),
+    ).toBe("match_all('logged in from') AND NOT (match_all('User') AND match_all('via SSO'))");
+    expect(patternWhere({ template: "t", match_terms: ["a"], exclude_terms: [["A"]] })).toBeNull();
+  });
 });
 
 describe("resolvePatternMatchTerms", () => {
