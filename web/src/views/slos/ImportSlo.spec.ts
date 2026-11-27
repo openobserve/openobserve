@@ -48,7 +48,7 @@ const BaseImportStub = {
   props: ["title", "testPrefix", "isImporting"],
   emits: ["back", "cancel", "import"],
   template:
-    '<div><slot name="file-input-section" :json-files="null" :update-files="() => {}" /><slot name="output-content" /></div>',
+    '<div><slot name="above-input" /><slot name="file-input-section" :json-files="null" :update-files="() => {}" /><slot name="output-content" /></div>',
   setup(_props: unknown, { expose }: any) {
     const isImportingLocal = ref(true);
     expose({ isImportingLocal });

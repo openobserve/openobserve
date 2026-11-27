@@ -16504,6 +16504,13 @@
       "logoLightLabel": "Logo tùy chỉnh (chế độ sáng)",
       "logoLightHelp": "Hiển thị ở chế độ sáng. PNG, JPG, GIF hoặc BMP, tối đa 150 × 30 px.",
       "logoDarkLabel": "Logo tùy chỉnh (chế độ tối)",
+      "logoTitle": "Logo tùy chỉnh",
+      "logoHelp": "Hiển thị trong tiêu đề ứng dụng. PNG, JPG, GIF, BMP, WEBP hoặc SVG, tối đa 150 × 30 px.",
+      "logoLightTitle": "Chế độ sáng",
+      "logoDarkTitle": "Chế độ tối",
+      "logoSaved": "Đã lưu",
+      "logoNotSaved": "Chưa lưu",
+      "logoDimensions": "{width} × {height} px",
       "logoDarkHelp": "Hiển thị ở chế độ tối. PNG, JPG, GIF hoặc BMP, tối đa 150 × 30 px."
     },
     "modelPricingEditor": {
@@ -24186,8 +24193,19 @@
       "clear": "Xóa"
     },
     "file": {
-      "removeFile": "Xóa tệp",
-      "clearAll": "Xóa tất cả"
+      "removeNamed": "Xóa {name}",
+      "attachPrompt": "Thả tệp để đính kèm, hoặc {browse}",
+      "attachPromptMultiple": "Thả các tệp để đính kèm, hoặc {browse}",
+      "browseLink": "duyệt",
+      "supports": "Tệp được hỗ trợ {types}",
+      "dropFileToAttach": "Thả tệp để đính kèm",
+      "dropFilesToAttach": "Thả các tệp để đính kèm",
+      "typeRejected": "Chỉ chấp nhận tệp {allowed}",
+      "sizeRejected": "{size} vượt quá giới hạn {max}",
+      "countRejected": "Mỗi lần chỉ {count} tệp | Mỗi lần chỉ {count} tệp",
+      "invalidJson": "Không phải JSON hợp lệ: {detail}",
+      "invalidImage": "Không phải tệp hình ảnh hợp lệ",
+      "unavailable": "Không thể tải tệp lên"
     },
     "date": {
       "openCalendar": "Mở lịch",
