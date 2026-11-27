@@ -18,8 +18,7 @@ const testLogger = require("../utils/test-logger.js");
 // builder), drawn with a force or circular layout and optional edge value labels in compact numbers.
 
 const { sourceField: SOURCE, targetField: TARGET, valueField: VALUE } = NODE_GRAPH_FIXTURE;
-// Fixture shape: web → api is sent twice and merged into one edge; worker → worker is a self call, kept on
-// the node and never drawn as an edge. Sums scale with how many workers ingested, so compare by ratio.
+// web → api is sent twice and merged into one edge; worker → worker is a self call, never drawn as an edge.
 const NODE_NAMES = ["api", "cache", "db", "web", "worker"];
 const EDGE_PAIRS = [
   ["web", "api"],
@@ -254,20 +253,23 @@ test.describe("ConfigPanel — Node Graph Settings", () => {
 
       await actions.dragNodeGraphNode(NODE, dx, dy);
       testLogger.info("Dragged node graph node", { node: NODE, dx, dy });
-      const movedTo = async () => actions.nodeGraphNode(await actions.getNodeGraphState(), NODE);
+      // null while the chart is mid-redraw, so a poll waits instead of throwing.
+      const movedTo = async () => {
+        const state = await actions.getNodeGraphState();
+        return state ? actions.nodeGraphNode(state, NODE) : null;
+      };
       await expect
         .poll(async () => {
           const node = await movedTo();
-          return Math.hypot(node.x - start.x - dx, node.y - start.y - dy);
+          return node ? Math.hypot(node.x - start.x - dx, node.y - start.y - dy) : Infinity;
         })
         .toBeLessThan(8);
-      const dropped = await movedTo();
+      const dropped = actions.nodeGraphNode(await actions.waitForNodeGraph(), NODE);
 
       // A re-run redraws from the options, and the drop is written into them.
       await actions.applyDashboardBtn();
       await actions.waitForChartToRender();
-      await actions.waitForNodeGraph();
-      const afterRerun = await movedTo();
+      const afterRerun = actions.nodeGraphNode(await actions.waitForNodeGraph(), NODE);
       expect(Math.hypot(afterRerun.x - dropped.x, afterRerun.y - dropped.y)).toBeLessThan(3);
 
       // Another layout places every node afresh, so going back to Force restores the original spot.
@@ -280,7 +282,7 @@ test.describe("ConfigPanel — Node Graph Settings", () => {
       await expect
         .poll(async () => {
           const node = await movedTo();
-          return Math.hypot(node.x - start.x, node.y - start.y);
+          return node ? Math.hypot(node.x - start.x, node.y - start.y) : Infinity;
         })
         .toBeLessThan(3);
 

@@ -289,10 +289,8 @@ export const ingestionForStateTimeline = async (
   return await fetchResponse.json();
 };
 
-// A small service-call graph for the node graph panel: a repeated pair (summed into one edge),
-// a cycle (api → db → cache → api) and a self call (worker → worker, drawn on the node, not as an edge).
-// Parallel workers may each ingest it once, which multiplies every sum by the same factor, so tests
-// compare edges by ratio and never by absolute value.
+// Repeated pair (one summed edge), cycle and self call. Each worker may ingest once, scaling every sum
+// by the same factor, so tests compare edges by ratio, never by absolute value.
 export const NODE_GRAPH_FIXTURE = {
   streamName: "e2e_node_graph",
   sourceField: "from_service",

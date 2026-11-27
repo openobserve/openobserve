@@ -411,9 +411,8 @@ export async function setupSunburstPanelWithConfig(page, pm, dashboardName, {
   testLogger.info("Sunburst panel with config ready", { dashboardName, panelName, groupFields, subGroupField });
 }
 
-// Node graph panel with the config sidebar open. The switch to node graph clears the seeded X/Y, so the
-// Source/Target/Value wells start empty; pass null for any of them to leave it empty (validation tests).
-// Value is added through the sankey "value" well and defaults to sum().
+// Node graph panel with the config sidebar open; the type switch clears the seeded X/Y.
+// Pass null for a field to leave its well empty (validation tests).
 export async function setupNodeGraphPanelWithConfig(page, pm, dashboardName, {
   panelName = "Test Panel",
   stream = NODE_GRAPH_FIXTURE.streamName,

@@ -1224,9 +1224,8 @@ export default class DashboardactionPage {
     return stage;
   }
 
-  // A node graph is canvas-painted: its nodes, edges, drawn labels and page positions are read off the live
-  // ECharts instance. Positions come from the panel's own layout (series.layout is "none"), so the force and
-  // circular layouts are told apart by their edge curveness (0.12 force, 0.3 circular).
+  // Canvas-painted, so read off the live ECharts instance. series.layout is always "none", so the force and
+  // circular layouts are told apart by edge curveness (0.12 vs 0.3).
   async getNodeGraphState(scopeSelector = this.chartRendererSelector) {
     return this._withLiveCharts(scopeSelector, (findCharts, { scopeSel }) => {
       const found = findCharts(scopeSel)
@@ -1241,9 +1240,11 @@ export default class DashboardactionPage {
       if (!found) return null;
 
       const series = found.getOption().series[0];
-      const seriesModel = found.getModel().getSeriesByIndex(0);
-      const nodeData = seriesModel.getData();
-      const edgeData = seriesModel.getEdgeData();
+      // A lazy setOption (e.g. right after a node drop) leaves the series without its graph for a frame.
+      const seriesModel = found.getModel()?.getSeriesByIndex(0);
+      const nodeData = seriesModel?.getData?.();
+      const edgeData = nodeData?.graph?.edgeData;
+      if (!nodeData || !edgeData) return null;
       const rect = found.getDom().getBoundingClientRect();
       const shownText = (label) =>
         label && !label.ignore && !label.invisible ? String(label.style?.text ?? "") : "";
