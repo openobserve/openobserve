@@ -109,6 +109,7 @@ describe("AssistantSettingsView", () => {
       "history",
       "usage",
       "toolsets",
+      "memory",
       "permissions",
       "activity",
     ]) {
@@ -184,6 +185,22 @@ describe("AssistantSettingsView", () => {
     const { w, router } = await mountView("/settings/assistant/toolsets");
     wrapper = w;
     expect(w.find('[data-test="settings-assistant-tab-toolsets"]').exists()).toBe(false);
+    expect(router.currentRoute.value.params.tab).toBe("status");
+  });
+
+  it("deep-links the AI Memory tab", async () => {
+    const { w } = await mountView("/settings/assistant/memory");
+    wrapper = w;
+    expect(w.find('[data-test="settings-assistant-panel-memory"]').exists()).toBe(true);
+    expect(w.find('[data-test="settings-assistant-memory-tab"]').exists()).toBe(true);
+  });
+
+  it("hides AI Memory with Toolsets on Cloud", async () => {
+    config.isEnterprise = "false";
+    config.isCloud = "true";
+    const { w, router } = await mountView("/settings/assistant/memory");
+    wrapper = w;
+    expect(w.find('[data-test="settings-assistant-tab-memory"]').exists()).toBe(false);
     expect(router.currentRoute.value.params.tab).toBe("status");
   });
 

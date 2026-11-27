@@ -36434,6 +36434,7 @@
         "activity": "Activity",
         "data": "Data",
         "history": "History",
+        "memory": "AI Memory",
         "permissions": "Permissions",
         "status": "Status",
         "toolsets": "Toolsets",

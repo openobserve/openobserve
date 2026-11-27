@@ -16,12 +16,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="flex h-full flex-col p-0">
-    <OPageLayout
-      :title="t('aiMemory.header')"
-      icon="psychology"
-      :subtitle="t('aiMemory.subtitle')"
+    <!-- Embedded as an Autobot settings tab, the tab strip is the header. -->
+    <component
+      :is="embedded ? 'div' : OPageLayout"
+      v-bind="
+        embedded
+          ? { class: 'flex min-h-0 flex-1 flex-col' }
+          : {
+              title: t('aiMemory.header'),
+              icon: 'psychology',
+              subtitle: t('aiMemory.subtitle'),
+              bleed: true,
+            }
+      "
       data-test="ai-memory-page"
-      bleed
     >
       <template #actions>
         <OButton
@@ -83,6 +91,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="ai-memory-refresh"
               @click="refresh"
             />
+            <OButton
+              v-if="embedded && (groups.length || pendingLoading || pendingError)"
+              variant="outline"
+              size="sm"
+              data-test="ai-memory-review-pending-btn"
+              @click="openPending()"
+            >
+              <span class="inline-flex items-center gap-2">
+                {{ t("aiMemory.reviewPending") }}
+                <OBadge
+                  v-if="groups.length"
+                  variant="warning-soft"
+                  size="sm"
+                  data-test="ai-memory-pending-count"
+                >
+                  {{ groups.length }}
+                </OBadge>
+              </span>
+            </OButton>
           </template>
           <template #empty>
             <OEmptyState
@@ -116,7 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </OTable>
       </div>
-    </OPageLayout>
+    </component>
   </div>
 
   <ODrawer
@@ -456,6 +483,8 @@ import {
   groupPending,
   type PendingGroup,
 } from "@/components/ai_memory/memory";
+
+const { embedded = false } = defineProps<{ embedded?: boolean }>();
 
 // The editor puts this id on its form, so the drawer's primary button submits it.
 const EDITOR_FORM_ID = "ai-memory-drawer-form";

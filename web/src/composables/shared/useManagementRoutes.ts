@@ -209,14 +209,15 @@ const useManagementRoutes = () => {
               ? { name: "assistantSettings", params: { tab: "toolsets" }, query: to.query }
               : featureLockedLocation("aiToolsets", to),
         },
-        // Memory belongs to the same AI feature as toolsets, so it shares their license and gate.
-        withLicenseFeature("ai_toolsets", {
+        {
+          // Memory is an Autobot settings tab now; old links land on it, gated like toolsets.
           path: "ai_memory",
           name: "aiMemory",
-          component: () => import("@/components/settings/AiMemory.vue"),
-          meta: { titleKey: "aiMemory.header" },
-          beforeEnter: withFeatureGate("aiToolsets", routeGuard),
-        }),
+          redirect: (to: any) =>
+            checkFeatureAccess("aiToolsets", buildFeatureGateContext()).allowed
+              ? { name: "assistantSettings", params: { tab: "memory" }, query: to.query }
+              : featureLockedLocation("aiToolsets", to),
+        },
         {
           path: "pipeline_destinations",
           name: "pipelineDestinations",
