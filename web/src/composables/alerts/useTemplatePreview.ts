@@ -115,6 +115,8 @@ const MOCK_SAMPLE: Record<string, string> = {
   alert_trigger_time_millis: "1782303000000",
   alert_trigger_time_seconds: "1782303000",
   alert_trigger_time_str: raw("Jun 28, 2026 10:30:00"),
+  // The bar color of the prebuilt Slack body; the sample is a firing alert.
+  status_color: "#E01E5A",
 };
 
 export function buildPreviewContext(
