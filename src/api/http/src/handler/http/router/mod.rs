@@ -909,7 +909,8 @@ pub async fn audit_middleware(request: Request, next: Next) -> Response {
     response
 }
 
-/// The chat, confirm and cancel routes drive the assistant itself; `/{org}/mcp` checks each tool.
+/// The chat, confirm and cancel routes drive the assistant itself; `/{org}/mcp` checks each tool,
+/// and `agent_edits` checks the internal secret and the running turn.
 fn assistant_approval_exempt(path: &str) -> bool {
     let segments: Vec<&str> = path.split('/').filter(|s| !s.is_empty()).collect();
     matches!(
@@ -918,6 +919,7 @@ fn assistant_approval_exempt(path: &str) -> bool {
             | [_org, "ai", "chat" | "chat_stream"]
             | [_org, "ai", "confirm", _]
             | [_org, "ai", "chats", _, "cancel"]
+            | ["v2", _org, "ai", "memory", "agent_edits"]
     )
 }
 
@@ -5845,6 +5847,7 @@ mod tests {
             "/default/mcp/",
             "/ai/mcp",
             "/v2/ai/chat",
+            "/v2/default/ai/memory/agent_edits",
         ] {
             assert!(assistant_approval_exempt(path), "{path} should be exempt");
         }
@@ -5867,6 +5870,9 @@ mod tests {
             "/default/ai/grants/g1",
             "/default/ai/chats/s1/shares",
             "/default/ai/activity/a1/undo",
+            "/default/ai/memory/agent_edits",
+            "/v2/default/ai/memory/org",
+            "/v2/default/ai/memory/agent_edits/x",
             "/",
         ] {
             assert!(

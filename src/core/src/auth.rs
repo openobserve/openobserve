@@ -41,7 +41,8 @@ use {
 
 pub const V2_API_PREFIX: &str = "v2";
 /// Modules routed as `/v2/{org_id}/{module}`; any other path names its org in the first segment.
-pub const V2_ORG_MODULES: [&str; 12] = [
+pub const V2_ORG_MODULES: [&str; 13] = [
+    "ai",
     "alerts",
     "alert_leases",
     "folders",
