@@ -10984,7 +10984,6 @@
     },
     "starter": {
       "checking": "스타터 팩에 맞는 데이터인지 확인하는 중…",
-      "contextNote": "O2 Assistant가 일치하는 스타터 팩을 컨텍스트로 포함하고 있습니다.",
       "readyWhenYouAre": "준비되면 시작하세요:"
     },
     "placeholderRotation": {

@@ -10984,7 +10984,6 @@
     },
     "starter": {
       "checking": "Sprawdzanie danych pod kątem pakietów startowych…",
-      "contextNote": "Asystent O2 ma jako kontekst dopasowane pakiety startowe.",
       "readyWhenYouAre": "Gotowe, gdy tylko chcesz:"
     },
     "placeholderRotation": {

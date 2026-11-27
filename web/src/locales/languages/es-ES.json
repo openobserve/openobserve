@@ -10984,7 +10984,6 @@
     },
     "starter": {
       "checking": "Comprobando tus datos para detectar paquetes iniciales…",
-      "contextNote": "El Asistente O2 tiene como contexto los paquetes iniciales que coinciden con tus datos.",
       "readyWhenYouAre": "Cuando quieras:"
     },
     "placeholderRotation": {

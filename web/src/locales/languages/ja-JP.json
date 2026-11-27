@@ -10984,7 +10984,6 @@
     },
     "starter": {
       "checking": "スターターパックのためにデータを確認しています…",
-      "contextNote": "O2 アシスタントは一致したスターターパックをコンテキストとして保持しています。",
       "readyWhenYouAre": "準備ができたら始めましょう:"
     },
     "placeholderRotation": {

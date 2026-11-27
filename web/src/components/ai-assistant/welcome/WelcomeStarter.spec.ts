@@ -80,7 +80,7 @@ describe("starterSuggestions", () => {
       "What is in the Hosts pack?",
       'Map my "default" stream schema',
       "Show me errors from the last hour",
-      "Convert this Datadog query to OpenObserve SQL",
+      "Convert a query from another tool to OpenObserve SQL",
     ]);
   });
 

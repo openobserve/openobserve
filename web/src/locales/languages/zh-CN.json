@@ -10984,7 +10984,6 @@
     },
     "starter": {
       "checking": "正在检查您的数据以匹配入门包…",
-      "contextNote": "O2 助手已将匹配的入门包作为上下文。",
       "readyWhenYouAre": "准备就绪，随时开始："
     },
     "placeholderRotation": {

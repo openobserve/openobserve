@@ -10984,7 +10984,6 @@
     },
     "starter": {
       "checking": "Vérification de vos données pour les packs de démarrage…",
-      "contextNote": "L'assistante O2 a vos packs de démarrage correspondants comme contexte.",
       "readyWhenYouAre": "Prêt quand vous l'êtes :"
     },
     "placeholderRotation": {

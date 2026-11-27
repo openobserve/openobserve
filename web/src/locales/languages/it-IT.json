@@ -10984,7 +10984,6 @@
     },
     "starter": {
       "checking": "Verifica dei tuoi dati per i pacchetti starter…",
-      "contextNote": "L'Assistente O2 ha come contesto i pacchetti starter corrispondenti.",
       "readyWhenYouAre": "Pronti quando vuoi:"
     },
     "placeholderRotation": {

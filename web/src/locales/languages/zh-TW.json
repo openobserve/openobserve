@@ -10979,7 +10979,6 @@
     },
     "starter": {
       "checking": "正在檢查您的資料以尋找入門套件…",
-      "contextNote": "O2 Assistant 已將符合的入門套件納入上下文。",
       "readyWhenYouAre": "準備好時即可開始："
     },
     "placeholderRotation": {

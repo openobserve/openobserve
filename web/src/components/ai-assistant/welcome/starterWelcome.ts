@@ -71,6 +71,10 @@ export const starterSuggestions = (t: TranslateFn, titles: string[]): WelcomeSug
       icon: "error-outline",
       text: t("aiAssistant.starterSuggestions.errorsLastHour"),
     },
-    { id: "datadogToO2", icon: "swap-horiz", text: t("aiAssistant.suggestions.datadogToO2") },
+    {
+      id: "otherToolToO2",
+      icon: "swap-horiz",
+      text: t("assistant.welcome.starter.otherToolToO2"),
+    },
   ];
 };

@@ -10982,7 +10982,6 @@
     },
     "starter": {
       "checking": "กำลังตรวจสอบข้อมูลของคุณเพื่อค้นหาแพ็กเริ่มต้น…",
-      "contextNote": "O2 Assistant ใช้แพ็กเริ่มต้นที่ตรงกับคุณเป็นบริบท",
       "readyWhenYouAre": "พร้อมเมื่อคุณพร้อม:"
     },
     "placeholderRotation": {

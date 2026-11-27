@@ -10984,7 +10984,6 @@
     },
     "starter": {
       "checking": "A verificar os seus dados para pacotes iniciais…",
-      "contextNote": "O Assistente O2 tem como contexto os seus pacotes iniciais correspondentes.",
       "readyWhenYouAre": "Pronto quando quiser:"
     },
     "placeholderRotation": {
