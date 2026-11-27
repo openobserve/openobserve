@@ -51,9 +51,9 @@ function render() {
 
 describe("OnCallAwayDialog", () => {
   // U18: one line says how far an absence reaches and who picks up the shifts.
-  it("says the absence holds on every team, and who takes the shifts", () => {
+  it("says the absence holds on every team in this org, and who takes the shifts", () => {
     expect(render().find('[data-test="oncall-members-away-consequence"]').text()).toBe(
-      "Applies on every team ana@o2.ai is on. Their shifts go to the next person on each rotation, if there is one.",
+      "Applies on every team ana@o2.ai is on in this org. Their shifts go to the next person on each rotation, if there is one.",
     );
   });
 

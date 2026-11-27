@@ -22,6 +22,10 @@ import { invalidateLoginData } from "@/utils/zincutils";
 import { expireSession } from "@/utils/sessionServices";
 import MainLayoutCloudMixin from "./mainLayout.mixin";
 
+// No answer is running, so the assistant lets the sign-out through without building its runtime.
+vi.mock("@/composables/assistant", () => ({
+  assistantLifecycle: { onSignOut: async () => "proceed" },
+}));
 vi.mock("@/services/organizations", () => ({ default: { list: vi.fn() } }));
 vi.mock("@/utils/sessionServices", () => ({ expireSession: vi.fn() }));
 vi.mock("@/utils/zincutils", async (importOriginal) => ({

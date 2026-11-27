@@ -9,6 +9,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { activates } from "@/lib/core/Button/activation";
+import { useFloatingClearance } from "@/lib/core/Table/composables/useFloatingClearance";
 
 const { t } = useI18nTyped();
 const slots = useSlots();
@@ -54,6 +55,10 @@ const emit = defineEmits<{
   "next-page": [];
   "last-page": [];
 }>();
+
+// A floating launcher covers the page's bottom-end corner, so a pager under it ends its controls before it.
+const pagerRef = ref<HTMLElement | null>(null);
+const clearance = useFloatingClearance(pagerRef);
 
 const showSkeleton = useDelayedFlag(() => !!props.loading, LOADER_DELAY_MS);
 
@@ -171,6 +176,7 @@ const selectionLabel = computed(() => {
 
 <template>
   <div
+    ref="pagerRef"
     :data-test="`o2-table-pagination-${position}`"
     :class="[
       'flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-1 max-md:gap-y-2',
@@ -220,6 +226,9 @@ const selectionLabel = computed(() => {
     <!-- min-h is one small control, so a one-row footer keeps its height even when the page-size select is absent. -->
     <div
       class="ms-auto flex min-h-[2.125rem] min-w-0 flex-wrap items-center justify-end gap-x-3 gap-y-1 max-md:basis-full max-md:justify-between max-md:gap-x-2"
+      :class="clearance ? 'me-[calc(var(--o-pager-clearance)*1rem)]' : ''"
+      :style="clearance ? { '--o-pager-clearance': clearance } : undefined"
+      data-test="o2-table-pagination-controls"
     >
       <span
         v-if="loading"
@@ -270,7 +279,7 @@ const selectionLabel = computed(() => {
           :options="pageSizeSelectOptions"
           :searchable="false"
           size="xs"
-          :aria-label="t('search.recordsPerPage')"
+          :aria-label="t('components.pagination.recordsPerPage')"
           data-test="o2-table-page-size-select"
         />
       </div>
@@ -282,7 +291,7 @@ const selectionLabel = computed(() => {
           class="max-lg:h-6 max-lg:w-6"
           :disabled="isFirstPage || stale"
           focusable-unavailable
-          :aria-label="t('search.firstPage')"
+          :aria-label="t('components.pagination.firstPage')"
           data-test="o2-table-first-page-btn"
           :aria-disabled="isFirstPage || pagingInactive ? 'true' : undefined"
           @click="requestPage('first-page')"
@@ -331,7 +340,7 @@ const selectionLabel = computed(() => {
           class="max-lg:h-6 max-lg:w-6"
           :disabled="isLastPage || stale"
           focusable-unavailable
-          :aria-label="t('search.lastPage')"
+          :aria-label="t('components.pagination.lastPage')"
           data-test="o2-table-last-page-btn"
           :aria-disabled="isLastPage || pagingInactive ? 'true' : undefined"
           @click="requestPage('last-page')"

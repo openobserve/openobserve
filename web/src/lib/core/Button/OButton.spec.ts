@@ -626,6 +626,7 @@ describe("OButton", () => {
     "webinar-dismiss",
     "banner-dismiss",
     "outline-primary",
+    "field",
     "dashed",
     "pricing-chip",
     "section-chip",

@@ -1,0 +1,192 @@
+{
+  "session_id": "01a1c11a-d06d-72dc-8972-e3cd517a0bc6",
+  "title": "count error rows per service",
+  "agent_type": "generate-query",
+  "created_at": 1794241122455727,
+  "updated_at": 1794241139731265,
+  "last_committed_seq": 57,
+  "branched_from": null,
+  "active_turn": false,
+  "pending_approval": false,
+  "pinned": false,
+  "state_version": "57.1794241139732426.0.0.cbf29ce484222325",
+  "not_modified": false,
+  "has_more": false,
+  "turns": [
+    {
+      "turn_id": "01a1c11a-d06c-75c2-8f41-7f7e480149b0",
+      "created": 1794241122412,
+      "user": { "text": "count error rows per service" },
+      "status": "completed",
+      "frames": [
+        {
+          "type": "turn_started",
+          "turn_id": "01a1c11a-d06c-75c2-8f41-7f7e480149b0",
+          "agent_type": "generate-query"
+        },
+        {
+          "type": "query",
+          "language": "sql",
+          "text": "-- count error rows per service\nSELECT service, COUNT(*) AS error_count\nFROM ta_conversation3_logs\nWHERE level = 'error'\nGROUP BY service\nORDER BY error_count DESC",
+          "stream": "ta_conversation3_logs",
+          "time_range": { "from": 1794240205000, "to": 1794241105000 },
+          "validated": true
+        },
+        { "type": "complete" }
+      ]
+    },
+    {
+      "user_message_id": "msg_1c11ae89d001fwki3XiMi9Afud",
+      "created": 1794241128605,
+      "user": {
+        "text": "Now only for the checkout service.",
+        "images": [],
+        "window": { "from": 1794240205000, "to": 1794241105000 },
+        "entry_kind": "nl_toggle"
+      },
+      "frames": [
+        {
+          "type": "tool_call",
+          "tool": "StreamSchema",
+          "message": "Fetching stream schema",
+          "context": { "stream_name": "ta_conversation3_logs", "type": "logs" },
+          "call_id": "call_00_j8Q3zFFzVGftl4remZce1935"
+        },
+        {
+          "type": "tool_result",
+          "tool": "StreamSchema",
+          "success": true,
+          "message": "StreamSchema completed successfully",
+          "call_args": { "stream_name": "ta_conversation3_logs", "type": "logs" },
+          "call_id": "call_00_j8Q3zFFzVGftl4remZce1935"
+        },
+        {
+          "type": "tool_call",
+          "tool": "SearchSQL",
+          "message": "Querying logs",
+          "context": {
+            "type": "logs",
+            "request_body": {
+              "query": {
+                "sql": "SELECT service, COUNT(*) AS error_count\nFROM ta_conversation3_logs\nWHERE level = 'error' AND service = 'checkout'\nGROUP BY service\nORDER BY error_count DESC",
+                "start_time": 1794240205000000,
+                "end_time": 1794241105000000,
+                "size": 10
+              },
+              "search_type": "ui"
+            },
+            "sql": "SELECT service, COUNT(*) AS error_count\nFROM ta_conversation3_logs\nWHERE level = 'error' AND service = 'checkout'\nGROUP BY service\nORDER BY error_count DESC"
+          },
+          "call_id": "call_00_CDkvuGHkbul4RHCEEdsU6941"
+        },
+        {
+          "type": "tool_result",
+          "tool": "SearchSQL",
+          "success": true,
+          "message": "SearchSQL completed successfully",
+          "response": null,
+          "call_args": {
+            "type": "logs",
+            "request_body": {
+              "query": {
+                "sql": "SELECT service, COUNT(*) AS error_count\nFROM ta_conversation3_logs\nWHERE level = 'error' AND service = 'checkout'\nGROUP BY service\nORDER BY error_count DESC",
+                "start_time": 1794240205000000,
+                "end_time": 1794241105000000,
+                "size": 10
+              },
+              "search_type": "ui"
+            }
+          },
+          "call_id": "call_00_CDkvuGHkbul4RHCEEdsU6941"
+        },
+        {
+          "type": "tool_call",
+          "tool": "SearchSQL",
+          "message": "Querying logs",
+          "context": {
+            "request_body": {
+              "query": {
+                "sql": "SELECT service, level, COUNT(*) AS c FROM ta_conversation3_logs GROUP BY service, level ORDER BY c DESC",
+                "start_time": 1794227378072449,
+                "end_time": 1794230966072449,
+                "size": 50
+              },
+              "search_type": "ui"
+            },
+            "type": "logs",
+            "sql": "SELECT service, level, COUNT(*) AS c FROM ta_conversation3_logs GROUP BY service, level ORDER BY c DESC"
+          },
+          "call_id": "call_00_zQDUuIC1lfbCc4uLL9bj7100"
+        },
+        {
+          "type": "tool_result",
+          "tool": "SearchSQL",
+          "success": true,
+          "message": "SearchSQL completed successfully",
+          "response": null,
+          "call_args": {
+            "request_body": {
+              "query": {
+                "sql": "SELECT service, level, COUNT(*) AS c FROM ta_conversation3_logs GROUP BY service, level ORDER BY c DESC",
+                "start_time": 1794227378072449,
+                "end_time": 1794230966072449,
+                "size": 50
+              },
+              "search_type": "ui"
+            },
+            "type": "logs"
+          },
+          "call_id": "call_00_zQDUuIC1lfbCc4uLL9bj7100"
+        },
+        {
+          "type": "message_delta",
+          "content": "No checkout error rows in this editor window (the stream's data ends about 15 minutes before it starts) — want me to run it over the last 6 hours?\n\n```sql\nSELECT service, COUNT(*) AS error_count\nFROM ta_conversation3_logs\nWHERE level = 'error' AND service = 'checkout'\nGROUP BY service\nORDER BY "
+        },
+        { "type": "message_delta", "content": "error_count DESC\n```" },
+        {
+          "type": "query",
+          "language": "sql",
+          "text": "SELECT service, COUNT(*) AS error_count\nFROM ta_conversation3_logs\nWHERE level = 'error' AND service = 'checkout'\nGROUP BY service\nORDER BY error_count DESC",
+          "validated": true
+        },
+        { "type": "complete" }
+      ],
+      "error": null,
+      "first_seq": 2,
+      "last_seq": 57,
+      "turn_id": "01a1c11a-e885-722c-bdda-3db6e967f80a",
+      "status": "completed",
+      "error_code": null,
+      "agent_type": "generate-query"
+    }
+  ],
+  "seed": {
+    "as_of": 1794241122455727,
+    "origin": "nl_toggle",
+    "turns": [
+      {
+        "turn_id": "01a1c11a-d06c-75c2-8f41-7f7e480149b0",
+        "created": 1794241122412,
+        "user": { "text": "count error rows per service" },
+        "status": "completed",
+        "frames": [
+          {
+            "type": "turn_started",
+            "turn_id": "01a1c11a-d06c-75c2-8f41-7f7e480149b0",
+            "agent_type": "generate-query"
+          },
+          {
+            "type": "query",
+            "language": "sql",
+            "text": "-- count error rows per service\nSELECT service, COUNT(*) AS error_count\nFROM ta_conversation3_logs\nWHERE level = 'error'\nGROUP BY service\nORDER BY error_count DESC",
+            "stream": "ta_conversation3_logs",
+            "time_range": { "from": 1794240205000, "to": 1794241105000 },
+            "validated": true
+          },
+          { "type": "complete" }
+        ]
+      }
+    ]
+  },
+  "approvals": []
+}

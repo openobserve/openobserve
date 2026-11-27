@@ -179,6 +179,50 @@ describe("MenuLink", async () => {
     w.unmount();
   });
 
+  describe("active match", () => {
+    const stub = { template: "<div />" };
+    const activeRouter = createRouter({
+      history: createWebHistory(),
+      routes: [
+        { path: "/", name: "home", component: stub },
+        { path: "/ai", component: stub },
+        { path: "/ai/llm-insights", component: stub },
+        { path: "/ai-integrations", component: stub },
+        { path: "/ai/shared/:token", component: stub, meta: { navLink: "/" } },
+        { path: "/traces", component: stub },
+        { path: "/traces/databases", component: stub },
+      ],
+    });
+    const isActive = async (path: string, link: string) => {
+      await activeRouter.push(path);
+      const w = mount(MenuLink, {
+        props: { title: "Tile", link },
+        global: { plugins: [i18n, activeRouter], provide: { store } },
+      });
+      const active = w
+        .find(`[data-test="menu-link-${link}-item"]`)
+        .classes()
+        .includes("nav-menu-item--active");
+      w.unmount();
+      return active;
+    };
+
+    it("lights a tile on its own path and its sub-routes", async () => {
+      expect(await isActive("/ai", "/ai")).toBe(true);
+      expect(await isActive("/ai/llm-insights", "/ai")).toBe(true);
+      expect(await isActive("/traces/databases", "/traces")).toBe(true);
+    });
+
+    it("does not light a tile whose link is only a string prefix of the path", async () => {
+      expect(await isActive("/ai-integrations", "/ai")).toBe(false);
+    });
+
+    it("lets a route name its owner tile through meta.navLink", async () => {
+      expect(await isActive("/ai/shared/abc", "/ai")).toBe(false);
+      expect(await isActive("/ai/shared/abc", "/")).toBe(true);
+    });
+  });
+
   describe("accessible name and state (AC-9)", () => {
     it("marks the active tile with aria-current and a name without the current-page suffix", async () => {
       await mockRouter.push("/logs");

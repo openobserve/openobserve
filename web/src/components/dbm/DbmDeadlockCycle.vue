@@ -167,12 +167,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </p>
       <!-- Beside the fix sentence, because that sentence is exactly what the
            user wants elaborated: the band says WHAT to do, this asks HOW. -->
+      <!-- Without the license the door hides, so the locked button keeps the feature in sight. -->
       <DbmSuggestFixButton
+        v-if="aiLock.locked.value"
         :label="t('dbm.ai.deadlockFix')"
-        :tooltip="t('dbm.ai.deadlockFixHint')"
         :data-test="`${dataTest}-ask-ai`"
-        @click="emit('ask-ai')"
       />
+      <AiEntryButton v-else-if="aiDoor" v-bind="aiDoor" />
       <!-- The ONE labelled Copy in this view. It used to say "Copy for Slack",
            naming a destination rather than the payload, while a per-side
            "Copy SQL" sat inches away — two buttons competing for the same verb
@@ -199,13 +200,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, useId } from "vue";
+import { computed, defineAsyncComponent, useId } from "vue";
+import type { dbmFixDoor } from "@/components/dbm/dbmDoors";
 
 import DbmDeadlockSide from "@/components/dbm/DbmDeadlockSide.vue";
 import DbmSuggestFixButton from "@/components/dbm/DbmSuggestFixButton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { useLicenseLock } from "@/composables/useFeatureLock";
 import type { DeadlockEvent, DeadlockParticipant } from "@/services/db_monitoring";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { survivorOf, victimOf } from "@/utils/dbm/deadlocks";
@@ -216,17 +219,22 @@ const props = withDefaults(
     /** The pair's statements touch one object's rows in opposite order. */
     oppositeRowOrder?: boolean;
     dataTest?: string;
+    /** The page's `ai-entry-dbm-finding-fix` door for this pair. */
+    aiDoor?: ReturnType<typeof dbmFixDoor>;
   }>(),
-  { oppositeRowOrder: false, dataTest: "dbm-deadlock-cycle" },
+  { oppositeRowOrder: false, dataTest: "dbm-deadlock-cycle", aiDoor: undefined },
 );
 
 const emit = defineEmits<{
   (e: "participant-action", id: string, participant: DeadlockParticipant): void;
   (e: "copy-summary"): void;
-  (e: "ask-ai"): void;
 }>();
 
 const { t } = useI18nTyped();
+const aiLock = useLicenseLock("ai_assistant");
+const AiEntryButton = defineAsyncComponent(
+  () => import("@/components/ai-assistant/entry/AiEntryButton.vue"),
+);
 
 // SVG marker ids must be unique per instance: two expanded cycles on one page
 // would otherwise share a marker and the second would inherit the first's.

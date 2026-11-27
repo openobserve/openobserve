@@ -11,6 +11,7 @@ pub struct Model {
     pub destinations: String,
     pub l0_json: String,
     pub template: Option<String>,
+    pub saved_by_person: bool,
     pub created_at: i64,
     pub updated_at: i64,
 }

@@ -1,0 +1,37 @@
+[
+  {
+    "role": "user",
+    "content": "Show payments errors",
+    "sentAt": 1772418060000,
+    "turnId": "t-nav-1"
+  },
+  {
+    "role": "assistant",
+    "content": "I prepared a logs query for **payments errors in the last hour**.",
+    "contentBlocks": [
+      {
+        "type": "text",
+        "text": "I prepared a logs query for **payments errors in the last hour**."
+      },
+      {
+        "type": "link",
+        "link": {
+          "resourceType": "logs",
+          "action": "load_query",
+          "target": {
+            "stream": "default",
+            "stream_type": "logs",
+            "query": "SELECT * FROM \"default\" WHERE level = 'error'",
+            "sql_mode": true,
+            "from": 1772413200000000,
+            "to": 1772416800000000
+          }
+        }
+      },
+      {
+        "type": "footer",
+        "footer": {}
+      }
+    ]
+  }
+]
