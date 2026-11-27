@@ -1,0 +1,18 @@
+{
+  "_source": "o2-ai src/opencode/agents.py navigation_action frame",
+  "_item": "today",
+  "frame": {
+    "type": "navigation_action",
+    "resource_type": "logs",
+    "action": "load_query",
+    "label": "View payments errors in Logs",
+    "target": {
+      "stream": "default",
+      "stream_type": "logs",
+      "query": "SELECT * FROM \"default\" WHERE level = 'error' AND service_name = 'payments'",
+      "sql_mode": true,
+      "from": 1760000000000000,
+      "to": 1760003600000000
+    }
+  }
+}

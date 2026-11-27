@@ -190,6 +190,9 @@ function openPicker() {
   inputRef.value?.click();
 }
 
+/** Opens the OS file picker; for a control that hides the field behind its own button. */
+defineExpose({ open: openPicker });
+
 // ── Drag and drop ──────────────────────────────────────────────────────────
 // The zone swaps its content while dragging, and a removed child never fires its dragleave,
 // so a depth counter can stick; a leave counts only when the pointer really exits the zone.

@@ -300,16 +300,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="$emit('run-sql', matchAllFix.sql)"
             />
           </template>
-          <template v-if="aiEnabled" #extra>
+          <template v-if="$slots['ai-door']" #extra>
             <div class="flex justify-center">
-              <OButton
-                variant="ghost"
-                size="sm"
-                data-test="traces-sql-match-all-ask-ai-btn"
-                @click="$emit('ask-ai')"
-              >
-                {{ t("queryError.askAi") }}
-              </OButton>
+              <slot name="ai-door" />
             </div>
           </template>
         </OEmptyState>
@@ -356,7 +349,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :sort-by="searchObj.meta.resultGrid.sortBy"
           :sort-order="searchObj.meta.resultGrid.sortOrder"
           :search-mode="searchObj.meta.searchMode"
-          :ai-enabled="aiEnabled"
           :stream-doc-time-range="streamDocTimeRange"
           :query-window-us="queryWindowUs"
           :row-href="traceDetailsHref"
@@ -368,8 +360,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @sort-change="changeSortBy"
           @remove-filter="$emit('remove-filter')"
           @jump-to-stream-data="(from, to) => $emit('jump-to-stream-data', from, to)"
-          @ask-ai="$emit('ask-ai')"
-          @send-to-ai-chat="(v) => $emit('send-to-ai-chat', v)"
         />
       </div>
     </div>
@@ -511,7 +501,6 @@ export default defineComponent({
     "remove-filter",
     "jump-to-stream-data",
     "error-only-toggled",
-    "ask-ai",
     "send-to-ai-chat",
     "open-mobile-fields",
     "add-trace-id",

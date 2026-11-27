@@ -8,7 +8,6 @@ vi.mock("@/stores", () => ({
 vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
 
 import useAiChat from "./useAiChat";
-import analytics from "@/services/product_analytics";
 
 // Mock fetch globally
 const mockFetch = vi.fn();
@@ -47,21 +46,15 @@ describe("useAiChat", () => {
 
   describe("Composable Structure", () => {
     it("should return all expected methods", () => {
-      expect(aiChatComposable).toHaveProperty("fetchAiChat");
-      expect(aiChatComposable).toHaveProperty("registerAiChatHandler");
-      expect(aiChatComposable).toHaveProperty("removeAiChatHandler");
-      expect(aiChatComposable).toHaveProperty("getContext");
-      expect(aiChatComposable).toHaveProperty("getFormattedContext");
-      expect(aiChatComposable).toHaveProperty("tryToJson");
-    });
-
-    it("should return methods as functions", () => {
-      expect(typeof aiChatComposable.fetchAiChat).toBe("function");
-      expect(typeof aiChatComposable.registerAiChatHandler).toBe("function");
-      expect(typeof aiChatComposable.removeAiChatHandler).toBe("function");
-      expect(typeof aiChatComposable.getContext).toBe("function");
-      expect(typeof aiChatComposable.getFormattedContext).toBe("function");
-      expect(typeof aiChatComposable.tryToJson).toBe("function");
+      for (const name of [
+        "fetchAiChat",
+        "chatHistoryServer",
+        "registerAiChatHandler",
+        "removeAiChatHandler",
+        "getStructuredContext",
+      ]) {
+        expect(typeof (aiChatComposable as any)[name]).toBe("function");
+      }
     });
 
     it("should maintain separate instances", () => {
@@ -106,9 +99,9 @@ describe("useAiChat", () => {
       aiChatComposable.registerAiChatHandler(handler1);
       aiChatComposable.registerAiChatHandler(handler2);
 
-      const context = await aiChatComposable.getContext();
+      mockFetch.mockResolvedValue({ ok: true });
+      await aiChatComposable.fetchAiChat([{ role: "user", content: "q" }], "m", "org1");
 
-      expect(context).toBe("context2");
       expect(handler1).not.toHaveBeenCalled();
       expect(handler2).toHaveBeenCalled();
     });
@@ -121,9 +114,9 @@ describe("useAiChat", () => {
       aiChatComposable.registerAiChatHandler(mockHandler);
       aiChatComposable.removeAiChatHandler();
 
-      const context = await aiChatComposable.getContext();
+      mockFetch.mockResolvedValue({ ok: true });
+      await aiChatComposable.fetchAiChat([{ role: "user", content: "q" }], "m", "org1");
 
-      expect(context).toBe("");
       expect(mockHandler).not.toHaveBeenCalled();
     });
 
@@ -135,223 +128,6 @@ describe("useAiChat", () => {
       aiChatComposable.removeAiChatHandler();
 
       expect(() => aiChatComposable.removeAiChatHandler()).not.toThrow();
-    });
-  });
-
-  describe("getContext", () => {
-    it("should return empty string when no handler is registered", async () => {
-      const context = await aiChatComposable.getContext();
-
-      expect(context).toBe("");
-    });
-
-    it("should return empty string when handler is null", async () => {
-      aiChatComposable.registerAiChatHandler(null);
-
-      const context = await aiChatComposable.getContext();
-
-      expect(context).toBe("");
-    });
-
-    it("should return empty string when handler is not a function", async () => {
-      aiChatComposable.registerAiChatHandler("not a function");
-
-      const context = await aiChatComposable.getContext();
-
-      expect(context).toBe("");
-    });
-
-    it("should call and return result from valid handler", async () => {
-      const mockContext = "test context data";
-      const mockHandler = vi.fn().mockResolvedValue(mockContext);
-
-      aiChatComposable.registerAiChatHandler(mockHandler);
-
-      const context = await aiChatComposable.getContext();
-
-      expect(mockHandler).toHaveBeenCalledTimes(1);
-      expect(context).toBe(mockContext);
-    });
-
-    it("should handle async handler that resolves", async () => {
-      const mockContext = { data: "async context" };
-      const mockHandler = vi.fn().mockResolvedValue(mockContext);
-
-      aiChatComposable.registerAiChatHandler(mockHandler);
-
-      const context = await aiChatComposable.getContext();
-
-      expect(context).toEqual(mockContext);
-    });
-
-    it("should handle async handler that rejects", async () => {
-      const mockHandler = vi.fn().mockRejectedValue(new Error("Handler failed"));
-
-      aiChatComposable.registerAiChatHandler(mockHandler);
-
-      await expect(aiChatComposable.getContext()).rejects.toThrow("Handler failed");
-    });
-  });
-
-  describe("tryToJson", () => {
-    it("should convert simple object to JSON string", () => {
-      const obj = { name: "test", value: 123 };
-
-      const result = aiChatComposable.tryToJson(obj);
-
-      expect(result).toBe(JSON.stringify(obj));
-    });
-
-    it("should convert array to JSON string", () => {
-      const arr = [1, 2, "three", { four: 4 }];
-
-      const result = aiChatComposable.tryToJson(arr);
-
-      expect(result).toBe(JSON.stringify(arr));
-    });
-
-    it("should convert string to JSON string", () => {
-      const str = "test string";
-
-      const result = aiChatComposable.tryToJson(str);
-
-      expect(result).toBe(JSON.stringify(str));
-    });
-
-    it("should convert number to JSON string", () => {
-      const num = 42;
-
-      const result = aiChatComposable.tryToJson(num);
-
-      expect(result).toBe(JSON.stringify(num));
-    });
-
-    it("should convert boolean to JSON string", () => {
-      const bool = true;
-
-      const result = aiChatComposable.tryToJson(bool);
-
-      expect(result).toBe(JSON.stringify(bool));
-    });
-
-    it("should convert null to JSON string", () => {
-      const result = aiChatComposable.tryToJson(null);
-
-      expect(result).toBe(JSON.stringify(null));
-    });
-
-    it("should return original value when JSON.stringify throws error", () => {
-      const circularObj: any = {};
-      circularObj.self = circularObj; // Creates circular reference
-
-      const result = aiChatComposable.tryToJson(circularObj);
-
-      expect(result).toBe(circularObj);
-    });
-
-    it("should handle undefined value", () => {
-      const result = aiChatComposable.tryToJson(undefined);
-
-      // undefined gets returned as-is when JSON.stringify fails
-      expect(result).toBe(undefined);
-    });
-
-    it("should handle complex nested object", () => {
-      const complexObj = {
-        level1: {
-          level2: {
-            array: [1, 2, { nested: "value" }],
-            string: "test",
-          },
-        },
-      };
-
-      const result = aiChatComposable.tryToJson(complexObj);
-
-      expect(result).toBe(JSON.stringify(complexObj));
-    });
-  });
-
-  describe("getFormattedContext", () => {
-    it("should format message with simple context object", () => {
-      const message = { content: "Hello world" };
-      const context = { user: "john", role: "admin" };
-
-      const result = aiChatComposable.getFormattedContext(message, context);
-
-      expect(result).toContain("Hello world");
-      expect(result).toContain("Context");
-      expect(result).toContain('user: "john"');
-      expect(result).toContain('role: "admin"');
-    });
-
-    it("should format message with complex context", () => {
-      const message = { content: "Test message" };
-      const context = {
-        user: { name: "John", id: 123 },
-        settings: { theme: "dark", lang: "en" },
-        permissions: ["read", "write"],
-      };
-
-      const result = aiChatComposable.getFormattedContext(message, context);
-
-      expect(result).toContain("Test message");
-      expect(result).toContain("Context");
-      expect(result).toContain('user: {"name":"John","id":123}');
-      expect(result).toContain('settings: {"theme":"dark","lang":"en"}');
-      expect(result).toContain('permissions: ["read","write"]');
-    });
-
-    it("should handle empty context object", () => {
-      const message = { content: "Test message" };
-      const context = {};
-
-      const result = aiChatComposable.getFormattedContext(message, context);
-
-      expect(result).toContain("Test message");
-      expect(result).toContain("Context");
-    });
-
-    it("should handle message with empty content", () => {
-      const message = { content: "" };
-      const context = { key: "value" };
-
-      const result = aiChatComposable.getFormattedContext(message, context);
-
-      expect(result).toContain("Context");
-      expect(result).toContain('key: "value"');
-    });
-
-    it("should handle context with circular reference", () => {
-      const message = { content: "Test" };
-      const context: any = { name: "test" };
-      context.self = context;
-
-      const result = aiChatComposable.getFormattedContext(message, context);
-
-      expect(result).toContain("Test");
-      expect(result).toContain("Context");
-      expect(result).toContain('name: "test"');
-      // The circular reference should be handled by tryToJson
-    });
-
-    it("should format multiple context entries correctly", () => {
-      const message = { content: "Query" };
-      const context = {
-        a: 1,
-        b: "string",
-        c: true,
-        d: null,
-        e: [1, 2, 3],
-      };
-
-      const result = aiChatComposable.getFormattedContext(message, context);
-
-      expect(result).toContain("a: 1");
-      expect(result).toContain('b: "string"');
-      expect(result).toContain("c: true");
-      expect(result).toContain("d: null");
-      expect(result).toContain("e: [1,2,3]");
     });
   });
 
@@ -651,10 +427,6 @@ describe("useAiChat", () => {
       // Register handler
       aiChatComposable.registerAiChatHandler(mockHandler);
 
-      // Verify context can be retrieved
-      const context = await aiChatComposable.getContext();
-      expect(context).toEqual(mockContext);
-
       // Make API call
       const messages = [{ role: "user", content: "Test query" }];
       await aiChatComposable.fetchAiChat(messages, "gpt-4", "org123");
@@ -692,47 +464,11 @@ describe("useAiChat", () => {
     });
   });
 
-  describe("submitFeedback", () => {
-    it("tracks the feedback type once the server accepts it", async () => {
-      mockFetch.mockResolvedValue({ ok: true });
-
-      expect(await aiChatComposable.submitFeedback("thumbs_up", "org123")).toBe(true);
-
-      expect(analytics.track).toHaveBeenCalledWith("ai_assistant_feedback_given", {
-        type: "thumbs_up",
-      });
-    });
-
-    it("does not track feedback the server rejected", async () => {
-      mockFetch.mockResolvedValue({ ok: false });
-
-      expect(await aiChatComposable.submitFeedback("thumbs_down", "org123")).toBe(false);
-
-      expect(analytics.track).not.toHaveBeenCalled();
-    });
-
-    it("does not track feedback that never reached the server", async () => {
-      mockFetch.mockRejectedValue(new Error("offline"));
-
-      expect(await aiChatComposable.submitFeedback("thumbs_down", "org123")).toBe(false);
-
-      expect(analytics.track).not.toHaveBeenCalled();
-    });
-  });
   describe("server-side chat requests", () => {
-    it("cancels a turn with a JSON body the server can tell from a form post", async () => {
-      mockFetch.mockResolvedValue({ ok: true });
-      await aiChatComposable.cancelAiChat("org1", "s/1");
-      const [url, init] = mockFetch.mock.calls[0];
-      expect(url).toContain("/api/org1/ai/chats/s%2F1/cancel");
-      expect(init).toMatchObject({ method: "POST", body: "{}", keepalive: true });
-      expect(init.headers["Content-Type"]).toBe("application/json");
-    });
-
     it("sends known_version only alongside known_seq", async () => {
       mockFetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({}) });
-      await aiChatComposable.getServerChat("org1", "s1", 4, 50, "v2");
-      await aiChatComposable.getServerChat("org1", "s1", undefined, undefined, "v2");
+      await aiChatComposable.chatHistoryServer().get("org1", "s1", 4, 50, "v2");
+      await aiChatComposable.chatHistoryServer().get("org1", "s1", undefined, undefined, "v2");
       expect(mockFetch.mock.calls[0][0]).toContain("?known_seq=4&known_version=v2&limit=50");
       expect(mockFetch.mock.calls[1][0]).not.toContain("known_version");
     });

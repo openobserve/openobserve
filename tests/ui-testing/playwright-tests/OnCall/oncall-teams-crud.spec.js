@@ -41,9 +41,6 @@ const {
   seedNotificationDestination,
   createPagingAlert,
   waitForPages,
-  listResponses,
-  getDeliveries,
-  getEscalationProgress,
   orgId,
   uniqueName,
   deleteOnCallFixturesByPrefix,
@@ -51,10 +48,7 @@ const {
 const {
   createOrgUsers,
   getResponseRecord,
-  getResponseHistory,
-  eventsOfKind,
   resolveResponse,
-  shortenPolicyForSpeed,
   deleteTeamExpectingStatus,
   deleteAlertById,
 } = require('../utils/oncall-seed-ext.js');
@@ -445,10 +439,10 @@ test.describe('On-call teams CRUD', { tag: ['@oncall', '@oncallTeams', '@enterpr
       .not.toContain(member);
   });
 
-  test('TS-03.05 deleting a team with a live page stops its ladder and leaves the page open for a new owner', {
+  test('TS-03.05 deleting a team with a live page is refused until the page is closed', {
     tag: ['@P1'],
   }, async ({ page }, testInfo) => {
-    test.setTimeout(600_000);
+    test.setTimeout(300_000);
     const name = uniqueName(`${workerPrefix(testInfo)}_live`);
     const users = await createOrgUsers(page, name, 2);
     const team = await createTeam(page, { name, timezone: 'UTC' });
@@ -457,8 +451,6 @@ test.describe('On-call teams CRUD', { tag: ['@oncall', '@oncallTeams', '@enterpr
       timezone: 'UTC',
       rotations: [rotation({ id: 'Primary', members: users })],
     });
-    // Past the 60s first-delivery poll, so it is still pending at the delete but due inside the wait below.
-    await shortenPolicyForSpeed(page, team.id, 2, [0, 90]);
 
     const stream = `${name}_stream`;
     await seedOnCallStream(page, stream);
@@ -470,51 +462,21 @@ test.describe('On-call teams CRUD', { tag: ['@oncall', '@oncallTeams', '@enterpr
     });
     const [openRecord] = await waitForPages(page, { alertId: alert.id, expected: 1, expectTeamId: team.id });
 
-    await expect.poll(async () => (await getDeliveries(page, openRecord.id))?.total ?? 0, {
-      timeout: 60000, intervals: [1000], message: 'the first rung must have paged before the team goes',
-    }).toBeGreaterThan(0);
-    const ledgerAtDelete = await getDeliveries(page, openRecord.id);
-    expect(ledgerAtDelete.deliveries.map((row) => row.rung_micros),
-      'the second rung must still be pending when the team is deleted').toEqual(
-      ledgerAtDelete.deliveries.map(() => 0),
-    );
-
-    const refused = await deleteTeamExpectingStatus(page, team.id);
-    expect(refused.status, `an alert still names the team: ${refused.text}`).toBe(409);
-    expect(refused.text).toContain(alert.name);
+    const named = await deleteTeamExpectingStatus(page, team.id);
+    expect(named.status, `an alert still names the team: ${named.text}`).toBe(409);
+    expect(named.text).toContain(alert.name);
     await deleteAlertById(page, alert.id);
 
-    const deletedAtMicros = Date.now() * 1000;
-    const deleted = await deleteTeamExpectingStatus(page, team.id);
-    expect(deleted.status, `deleting a non-default team is allowed: ${deleted.text}`).toBe(200);
+    const refused = await deleteTeamExpectingStatus(page, team.id);
+    expect(refused.status, `an open page still belongs to the team: ${refused.text}`).toBe(409);
+    expect(refused.text, 'the refusal names the open page').toContain(openRecord.id);
+    expect(refused.text, 'in plain words').not.toContain('`');
+    expect((await getResponseRecord(page, openRecord.id)).state, 'the page is untouched').toBe('triggered');
 
-    const record = await getResponseRecord(page, openRecord.id);
-    testLogger.info('TS-03.05 record after the team delete', record);
-    expect(record.state, 'the page stays open: somebody still has to own it').toBe('triggered');
-    expect(record.exhausted_at, 'the ladder is stopped, and the record says when').toBeTruthy();
-    expect(record.team_id, 'the record keeps naming the team it was lost from').toBe(team.id);
-
-    const exhausted = eventsOfKind(await getResponseHistory(page, openRecord.id), 'exhausted');
-    expect(exhausted.length, 'the timeline must say once why the ladder stopped').toBe(1);
-    expect(exhausted[0].actor, 'the engine stopped it, not a person').toBe('o2-engine');
-    expect(exhausted[0].body, 'and say it was the team delete').toMatch(/owning team was deleted/);
-
-    const progress = await getEscalationProgress(page, openRecord.id);
-    expect(progress.stopped_because, 'the escalation view names the same reason')
-      .toMatch(/owning team was deleted/);
-    expect(progress.next_at ?? null, 'and schedules nothing further').toBeNull();
-
-    await page.waitForTimeout(100_000);
-    const ledgerAfter = await getDeliveries(page, openRecord.id);
-    expect(ledgerAfter.deliveries.filter((row) => row.at > deletedAtMicros),
-      'the pending rung must not fire once its team is gone').toEqual([]);
-
-    const open = await listResponses(page, { subjectType: 'alert', sourceId: alert.id });
-    expect(open.map((r) => r.id), 'the page stays on the open list until somebody closes it')
-      .toContain(openRecord.id);
     const resolved = await resolveResponse(page, openRecord.id, { cause: 'noisy_threshold' });
-    expect(resolved.status, `a page whose team is gone can still be closed: ${resolved.text}`).toBe(200);
-    expect((await getResponseRecord(page, openRecord.id)).state).toBe('resolved');
+    expect(resolved.status, resolved.text).toBe(200);
+    const deleted = await deleteTeamExpectingStatus(page, team.id);
+    expect(deleted.status, `nothing is open any more: ${deleted.text}`).toBe(200);
   });
 
 });

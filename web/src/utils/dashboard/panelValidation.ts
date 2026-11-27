@@ -6,6 +6,7 @@ import { HEATMAP_MAX_ROWS, isHeatmapColorRangeInverted } from "@/utils/dashboard
 import {
   heatmapYBucketError,
   isHeatmapYRangeInverted,
+  isNonNumericYField,
   isNumericYField,
 } from "@/utils/dashboard/heatmapYAxis";
 import { addCommasToNumber } from "@/utils/formatters";
@@ -1146,6 +1147,27 @@ const validateHeatmapConfig = (
   if (isHeatmapYRangeInverted(config)) errors.push(t("dashboard.utils.heatmapYRangeInverted"));
 };
 
+/** Why the builder left this query empty on purpose, or null: a box plot summarises its value with min, max and percentiles, which a text column cannot give. */
+export const builderQueryRejection = (
+  t: TranslateFn,
+  panelData: any,
+  query: any,
+): I18nText | null => {
+  const isPromQLMode =
+    panelData?.data?.queryType === "promql" || panelData?.data?.queryType === "promql-builder";
+  if (panelData?.data?.type !== "boxplot" || isPromQLMode || query?.customQuery) return null;
+  return isNonNumericYField(query?.fields?.y?.[0], panelData)
+    ? t("dashboard.utils.boxplotValueNotNumeric")
+    : null;
+};
+
+const validateBoxplotValue = (t: TranslateFn, panelData: any, errors: string[]) => {
+  const rejection = (panelData?.data?.queries ?? [])
+    .map((query: any) => builderQueryRejection(t, panelData, query))
+    .find(Boolean);
+  if (rejection) errors.push(rejection);
+};
+
 // The state timeline stores its own tooltip modes in the same key.
 const TOOLTIP_MODE_VALUES: readonly unknown[] = [...CARTESIAN_TOOLTIP_MODES, "segment", "all_rows"];
 
@@ -1425,6 +1447,7 @@ export const validatePanel = (
   validatePanelContentByType(t, panelData?.data, errors);
   validateOneQueryChart(t, panelData?.data, errors);
   validateHeatmapConfig(t, panelData, errors, isPromQLMode);
+  validateBoxplotValue(t, panelData, errors);
   validateCartesianConfig(t, panelData, errors, isPromQLMode);
   validatePanelTypeConfig(t, panelData, errors);
 

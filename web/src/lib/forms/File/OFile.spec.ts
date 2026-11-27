@@ -322,6 +322,15 @@ describe("OFile", () => {
     expect(wrapper.text()).not.toContain("Drop the file to attach");
   });
 
+  it("exposes open() to a control that hides the field behind its own button", () => {
+    wrapper = mount(OFile);
+    const input = wrapper.get('input[type="file"]').element as HTMLInputElement;
+    let clicked = 0;
+    input.addEventListener("click", () => (clicked += 1));
+    (wrapper.vm as unknown as { open(): void }).open();
+    expect(clicked).toBe(1);
+  });
+
   it("names the browse button after the field and points it at the field error", () => {
     wrapper = mount(OFile, {
       props: { label: raw("Select File"), errorMessage: raw("Pick a file") },

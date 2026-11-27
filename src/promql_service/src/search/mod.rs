@@ -377,7 +377,7 @@ async fn search_in_cluster(
                 user_email,
                 trace_id,
                 (original_start, end),
-                start_ins.elapsed().as_secs_f64(),
+                start_ins.elapsed().as_secs_f64() * 1000.0,
             )
         };
         usage_reporting::report_request_usage_stats(
@@ -573,7 +573,7 @@ async fn search_in_cluster(
             user_email,
             trace_id,
             (start, end),
-            start_ins.elapsed().as_secs_f64(),
+            start_ins.elapsed().as_secs_f64() * 1000.0,
         )
     };
 
@@ -650,10 +650,10 @@ fn request_stats(
     user_email: &str,
     trace_id: &str,
     (min_ts, max_ts): (i64, i64),
-    response_time: f64,
+    response_time_ms: f64,
 ) -> RequestStats {
     RequestStats {
-        response_time,
+        response_time: response_time_ms,
         request_body: req.query.as_ref().map(|stmt| stmt.query.clone()),
         user_email: Some(user_email.to_string()),
         min_ts: Some(min_ts),

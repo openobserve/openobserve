@@ -25,7 +25,8 @@ const THEMES = ['light', 'dark'];
 
 async function openHome(page, orgId, tab) {
     await page.evaluate((t) => localStorage.setItem('o2_home_active_tab', t), tab);
-    await page.goto(`${base()}/web/?org_identifier=${orgId}`);
+    // navigateToBase already migrated the legacy tab key for this org, so only the URL can pick the tab
+    await page.goto(`${base()}/web/?org_identifier=${orgId}&tab=${tab}`);
     await page.waitForLoadState('domcontentloaded', { timeout: 15000 }).catch(() => {});
 }
 

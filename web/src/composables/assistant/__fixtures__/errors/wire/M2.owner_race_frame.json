@@ -1,0 +1,10 @@
+{
+  "_source": "o2-ai src/server/app.py:2171-2179 (no code)",
+  "shape": "M2",
+  "body": {
+    "type": "error",
+    "message": "This conversation is being served by another o2-ai replica and cannot be continued here.",
+    "recoverable": true,
+    "category": "session_owner_unavailable"
+  }
+}

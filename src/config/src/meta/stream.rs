@@ -431,7 +431,6 @@ pub struct FileKey {
     pub meta: FileMeta,
     pub deleted: bool,
     pub selection: Option<FileSelection>,
-    pub row_group_size: Option<u32>,
 }
 
 impl FileKey {
@@ -443,7 +442,6 @@ impl FileKey {
             meta,
             deleted,
             selection: None,
-            row_group_size: None,
         }
     }
 
@@ -455,13 +453,11 @@ impl FileKey {
             meta: FileMeta::default(),
             deleted: false,
             selection: None,
-            row_group_size: None,
         }
     }
 
-    pub fn with_selection(&mut self, selection: FileSelection, row_group_size: Option<u32>) {
+    pub fn with_selection(&mut self, selection: FileSelection) {
         self.selection = Some(selection);
-        self.row_group_size = row_group_size;
     }
 }
 
@@ -804,7 +800,6 @@ impl From<&cluster_rpc::FileKey> for FileKey {
             meta: FileMeta::from(req.meta.as_ref().unwrap()),
             deleted: req.deleted,
             selection: None,
-            row_group_size: None,
         }
     }
 }
@@ -2357,18 +2352,16 @@ mod tests {
         let selection = FileSelection::Rows(Arc::new(BooleanBuffer::from_iter(
             (0..16u32).map(|i| [1u32, 5, 9].contains(&i)),
         )));
-        key.with_selection(selection, Some(1024));
+        key.with_selection(selection);
         assert!(key.selection.is_some());
-        assert_eq!(key.row_group_size, Some(1024));
     }
 
     #[test]
     fn test_file_key_with_row_range_selection() {
         let mut key = FileKey::from_file_name("files/k.parquet");
         let selection = FileSelection::RowRanges(Arc::new(vec![1..4, 8..12]));
-        key.with_selection(selection.clone(), Some(1024));
+        key.with_selection(selection.clone());
         assert_eq!(key.selection, Some(selection));
-        assert_eq!(key.row_group_size, Some(1024));
     }
 
     #[test]

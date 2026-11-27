@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { mount } from "@vue/test-utils";
+import { flushPromises, mount } from "@vue/test-utils";
 import { ref } from "vue";
 import { createStore } from "vuex";
 import { createRouter, createWebHistory } from "vue-router";
@@ -48,6 +48,7 @@ vi.mock("@/composables/useMcpCredential", async () => {
 
 import McpServerCard from "./McpServerCard.vue";
 import { MCP_READONLY_ROLE } from "@/composables/useMcpCredential";
+import en from "@/locales/languages/en-US.json";
 
 // Stubbed so assertions read the props rather than highlight.js-decorated markup.
 const CODE_BLOCK_STUB = {
@@ -78,7 +79,14 @@ const mountCard = (zoConfig: Record<string, unknown> = {}) =>
         createStore({ state: { zoConfig: { sso_enabled: false, ...zoConfig } } }),
         createRouter({
           history: createWebHistory(),
-          routes: [{ path: "/", component: { template: "<div />" } }],
+          routes: [
+            { path: "/", component: { template: "<div />" } },
+            {
+              path: "/settings/assistant/:tab?",
+              name: "assistantSettings",
+              component: { template: "<div />" },
+            },
+          ],
         }),
       ],
       stubs: { OCodeBlock: CODE_BLOCK_STUB },
@@ -273,7 +281,7 @@ describe("McpServerCard", () => {
       const wrapper = mountCard();
       const block = configBlock(wrapper);
 
-      expect(block.props("code")).toContain("Basic <base64 of service-account-email:token>");
+      expect(block.props("code")).toContain("Basic <your-token>");
       expect(block.props("codeMasked")).toBeUndefined();
       expect(wrapper.text()).not.toContain("[BASIC_PASSCODE]");
     });
@@ -320,5 +328,82 @@ describe("McpServerCard", () => {
       expect(wrapper.find('[data-test="ai-integrations-mcp-rbac-note"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="ai-integrations-mcp-readonly-warn"]').exists()).toBe(false);
     });
+  });
+});
+
+describe("McpServerCard with the assistant", () => {
+  const blank = { template: "<div />" };
+
+  async function mountOnClientTab(ssoEnabled: boolean) {
+    const router = createRouter({
+      history: createWebHistory(),
+      routes: [
+        { path: "/", component: blank },
+        { path: "/settings/assistant/:tab?", name: "assistantSettings", component: blank },
+      ],
+    });
+    const w = mount(McpServerCard, {
+      props: { subs: { url: "https://o2.example.com", org: "default", token: "t" } },
+      global: {
+        plugins: [
+          i18n,
+          router,
+          createStore({
+            state: {
+              zoConfig: { sso_enabled: ssoEnabled },
+              selectedOrganization: { identifier: "default" },
+            },
+          }),
+        ],
+        stubs: { OCodeBlock: { template: "<div />" } },
+      },
+    });
+    // The client picker is the last tab strip; the auth picker only renders with SSO.
+    const strips = w.findAllComponents({ name: "OTabs" });
+    await strips[strips.length - 1].vm.$emit("update:modelValue", "cursor");
+    await flushPromises();
+    return w;
+  }
+
+  beforeEach(() => {
+    mcp.generating = false;
+    mcp.error = "";
+    mcp.credential = null;
+  });
+
+  it("names the assistant and links to its toolsets", async () => {
+    const w = await mountOnClientTab(false);
+    expect(w.find('[data-test="mcp-server-assistant-parity"]').text()).toBe(
+      `Your agent gets the same tools and permissions as ${en.brand.autobot}. Tools ${en.brand.autobot} itself can use are set up in Settings › ${en.brand.autobot} › Toolsets.`,
+    );
+    expect(w.find('[data-test="mcp-server-assistant-toolsets-link"]').attributes("href")).toBe(
+      "/settings/assistant/toolsets?org_identifier=default",
+    );
+  });
+
+  it("puts Copy configuration first in token mode and discloses the token in the link", async () => {
+    const w = await mountOnClientTab(false);
+    expect(w.find('[data-test="ai-integrations-mcp-copy-config-btn"]').exists()).toBe(true);
+    const install = w.find('[data-test="ai-integrations-mcp-install-btn"]');
+    const note = w.find('[data-test="ai-integrations-mcp-deeplink-token-note"]');
+    expect(note.text()).toBe("This link includes your access token.");
+    expect(install.attributes("aria-describedby")).toBe(note.attributes("id"));
+  });
+
+  it("shows <your-token> in the snippet and says how to replace it in words", async () => {
+    const w = await mountOnClientTab(false);
+    const codes = w.findAll("[code]").map((block) => block.attributes("code") ?? "");
+    expect(codes.some((code) => code.includes("Basic <your-token>"))).toBe(true);
+    expect(codes.join("\n")).not.toContain("base64 of service-account-email");
+    expect(w.find('[data-test="ai-integrations-mcp-token-placeholder-note"]').text()).toContain(
+      "Replace <your-token> with the token you generate above",
+    );
+  });
+
+  it("keeps the deep link primary with no disclosure in OAuth mode", async () => {
+    const w = await mountOnClientTab(true);
+    expect(w.find('[data-test="ai-integrations-mcp-copy-config-btn"]').exists()).toBe(false);
+    expect(w.find('[data-test="ai-integrations-mcp-deeplink-token-note"]').exists()).toBe(false);
+    expect(w.find('[data-test="ai-integrations-mcp-install-btn"]').exists()).toBe(true);
   });
 });

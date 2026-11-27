@@ -178,8 +178,6 @@ pub async fn search(
                         &account,
                         &data_path,
                         &sidecar_path,
-                        config::FileFormat::from_extension(&data_path)
-                            .context("Unsupported metrics source format")?,
                         crate::block::ParentMetadata {
                             rows: u64::try_from(expected_rows)?,
                             compressed_size: u64::try_from(compressed_size)?,
@@ -193,11 +191,10 @@ pub async fn search(
                     .await?;
                     tokio::task::spawn_blocking(move || {
                         let complete = sidecar_covers_labels(data.schema.as_ref(), &labels);
-                        let row_group_size = data.row_group_size;
                         let physical_filter =
                             create_physical_filter(data.schema.as_ref(), &matchers)?;
                         evaluate_metrics_index(&data, physical_filter.as_deref(), expected_rows)
-                            .map(|ranges| (Arc::new(ranges), complete, row_group_size))
+                            .map(|ranges| (Arc::new(ranges), complete))
                     })
                     .await?
                 }
@@ -214,8 +211,8 @@ pub async fn search(
     let mut failed_files = 0usize;
     while let Some((data_path, result)) = evaluations.next().await {
         match result {
-            Ok((ranges, complete, row_group_size)) => {
-                evaluated.push((data_path, ranges, complete, row_group_size));
+            Ok((ranges, complete)) => {
+                evaluated.push((data_path, ranges, complete));
             }
             Err(error) => {
                 failed_files += 1;
@@ -244,20 +241,20 @@ pub async fn search(
         && residual_matchers_covered(table_schema, &matchers, &matcher_labels)
         && evaluated
             .iter()
-            .all(|(_, ranges, complete, _)| *complete || ranges.is_empty());
+            .all(|(_, ranges, complete)| *complete || ranges.is_empty());
     let mut selections = evaluated
         .into_iter()
-        .map(|(data_path, ranges, _, row_group_size)| (data_path, (ranges, row_group_size)))
+        .map(|(data_path, ranges, _)| (data_path, ranges))
         .collect::<HashMap<_, _>>();
     files.retain_mut(|file| {
-        let Some((ranges, row_group_size)) = selections.remove(&file.key) else {
+        let Some(ranges) = selections.remove(&file.key) else {
             // not indexed metrics: untouched, the caller decides how to scan it
             return true;
         };
         if ranges.is_empty() {
             return false;
         }
-        file.with_selection(FileSelection::RowRanges(ranges), row_group_size);
+        file.with_selection(FileSelection::RowRanges(ranges));
         true
     });
 

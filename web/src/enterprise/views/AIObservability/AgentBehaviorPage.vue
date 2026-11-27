@@ -125,7 +125,7 @@ import { useChildRefresh } from "@/enterprise/composables/useChildRefresh";
 import { selectedAgentScope } from "./agentScope";
 
 defineOptions({ name: "AgentBehaviorPage" });
-// "Explain with O2 AI" in the drill-down drawer; the AI shell forwards it to the chat panel.
+// The "Explain" action in the drill-down drawer; the AI shell forwards it to the chat panel.
 const emit = defineEmits<{ (e: "sendToAiChat", value: unknown, append?: boolean): void }>();
 
 const { t } = useI18nTyped();

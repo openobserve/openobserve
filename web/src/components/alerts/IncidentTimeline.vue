@@ -349,7 +349,7 @@ const severityLowered = (data: any): boolean => {
   return rank(data?.to) > rank(data?.from);
 };
 
-// True only for the fixed "AI SRE" badge treatment: a system-authored AI
+// True only for the fixed investigation badge treatment: a system-authored AI
 // event. A user-cancelled AI event goes through the normal badge instead.
 const isAiLabelled = (event: any): boolean => {
   return getUserId(event) === "System" && AI_TYPES.includes(event.type);

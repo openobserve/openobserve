@@ -69,7 +69,7 @@ def test_s02_the_link_in_the_text_acknowledges_as_that_person(client: OpenObserv
 
     again = open_link(env, link)
     assert again.status_code == 200, again.text[:300]
-    assert person.email.lower() in again.text.lower(), again.text[:300]
+    assert f"Already acknowledged by {person.display_name}" in again.text, again.text[:300]
 
 
 def test_s03_a_long_ascii_title_is_cut_and_the_link_kept(client: OpenObserveClient, env: TelephonyEnv):

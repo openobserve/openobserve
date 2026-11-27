@@ -17,7 +17,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="bg-surface-chrome-deeper flex h-10 w-full shrink-0 flex-nowrap items-center">
     <!-- LEFT SIDE: Logo -->
-    <div class="flex shrink-0 items-center justify-start gap-1 ps-3 max-md:ps-1.5">
+    <div
+      class="flex shrink-0 items-center justify-start gap-1 ps-3 max-xl:min-w-0 max-xl:shrink max-md:ps-1.5 xl:flex-1 xl:basis-0"
+    >
       <OButton
         v-if="!focusMode"
         variant="ghost"
@@ -53,8 +55,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           :href="homeUrl"
           @click.prevent="goToHome"
-          class="me-2 flex cursor-pointer items-center p-0 text-xl font-bold font-semibold text-inherit no-underline"
-          >{{ store.state.zoConfig.custom_logo_text }}</a
+          class="me-2 flex min-w-0 cursor-pointer items-center p-0 text-xl font-semibold text-inherit no-underline"
+          ><OTruncatedText class="max-w-37.5 max-xl:max-w-24">{{
+            store.state.zoConfig.custom_logo_text
+          }}</OTruncatedText></a
         >
 
         <!-- Custom logo image - shows appropriate logo based on current theme -->
@@ -68,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               store.state.zoConfig?.custom_logo_dark_img != null
             "
             :src="`data:image; base64, ` + store.state.zoConfig?.custom_logo_dark_img"
-            style="max-width: 9.375rem; max-height: 2rem"
+            class="max-h-8 max-w-37.5 object-contain max-xl:max-w-24 max-md:max-h-6"
           />
           <!-- Light mode: Show light logo, fallback to dark logo -->
           <img
@@ -79,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               store.state.zoConfig?.custom_logo_img != null
             "
             :src="`data:image; base64, ` + store.state.zoConfig?.custom_logo_img"
-            style="max-width: 9.375rem; max-height: 2rem"
+            class="max-h-8 max-w-37.5 object-contain max-xl:max-w-24 max-md:max-h-6"
           />
           <!-- Fallback: Show whichever logo exists (dark or light) -->
           <img
@@ -89,7 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               store.state.zoConfig?.custom_logo_dark_img != null
             "
             :src="`data:image; base64, ` + store.state.zoConfig?.custom_logo_dark_img"
-            style="max-width: 9.375rem; max-height: 2rem"
+            class="max-h-8 max-w-37.5 object-contain max-xl:max-w-24 max-md:max-h-6"
           />
           <img
             :alt="t('common.customLogoAlt')"
@@ -98,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               store.state.zoConfig?.custom_logo_img != null
             "
             :src="`data:image; base64, ` + store.state.zoConfig?.custom_logo_img"
-            style="max-width: 9.375rem; max-height: 2rem"
+            class="max-h-8 max-w-37.5 object-contain max-xl:max-w-24 max-md:max-h-6"
           />
         </a>
 
@@ -141,34 +145,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </a>
       </div>
+      <div
+        v-if="securityAccess.canOpen.value"
+        class="ms-2 flex shrink-0 items-center max-xl:min-w-0 max-xl:shrink max-md:ms-0 max-md:min-w-12"
+      >
+        <SolutionSwitcher :security-locked="securityAccess.licenseLocked.value" />
+      </div>
     </div>
     <!-- end left side -->
 
+    <!-- A crowded header (wide custom logo, solution switcher) sheds the label, then the keycap, never the button. -->
     <div
-      v-if="securityAccess.canOpen.value"
-      class="ms-3 flex shrink-0 items-center max-xl:min-w-0 max-xl:shrink max-md:ms-1 max-md:min-w-12"
+      class="@container/search flex min-w-14 flex-1 justify-center px-3 max-md:px-1 xl:w-66 xl:flex-none"
     >
-      <SolutionSwitcher :security-locked="securityAccess.licenseLocked.value" />
-    </div>
-
-    <div class="flex min-w-0 flex-1 justify-center px-3 max-md:px-1">
       <OButton
-        variant="outline"
+        variant="field"
         size="xs"
-        class="w-full max-w-112 justify-start max-md:w-auto"
+        class="w-full max-w-60 justify-start ps-1.5! pe-0.75! max-md:w-auto max-md:px-3! @max-[10rem]/search:w-auto @max-[6rem]/search:px-3!"
         data-test="header-command-palette"
         :aria-label="t('commandPalette.title')"
         @click="$emit('open-command-palette')"
       >
         <OIcon name="search" size="sm" />
-        <span class="min-w-0 flex-1 text-start max-md:hidden">{{ t("commandPalette.title") }}</span>
-        <OShortcut id="commandPalette" class="max-md:hidden" />
+        <OTruncatedText
+          class="text-text-secondary min-w-0 flex-1 text-start max-md:hidden @max-[10rem]/search:hidden"
+          >{{ t("commandPalette.trigger") }}</OTruncatedText
+        >
+        <OShortcut id="commandPalette" class="max-md:hidden @max-[6rem]/search:hidden" />
       </OButton>
     </div>
 
     <!-- RIGHT SIDE: Controls -->
     <div
-      class="flex shrink-0 items-center justify-end gap-1 pe-3 max-xl:min-w-0 max-xl:shrink max-md:pe-1.5"
+      class="flex shrink-0 items-center justify-end gap-1 pe-3 max-xl:min-w-0 max-xl:shrink max-md:pe-1.5 xl:flex-1 xl:basis-0"
     >
       <!-- SAMPLE DATA: stays visible while the org holds sample data -->
       <SampleDataHeaderChip class="me-2" />
@@ -194,7 +203,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- HEADER MENU: Contains all header navigation and user controls -->
-      <div class="header-menu flex items-center gap-x-2 max-xl:min-w-0">
+      <div class="header-menu flex items-center gap-x-2 max-xl:min-w-0 max-md:gap-x-1">
         <!-- INGESTION QUOTA WARNING: Shows when 85%+ of ingestion limit is used -->
         <OButton
           v-if="config.isEnterprise == 'true' && store.state.zoConfig.ingestion_quota_used >= 85"
@@ -251,43 +260,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @select="handleOrgSelection"
         />
 
-        <div class="header-utility-icons flex items-center gap-x-2 md:max-xl:shrink-0">
-          <!-- AI CHAT TOGGLE: Enterprise/Cloud feature to toggle AI chat panel.
-           Leads the utility-icon cluster, set off by a separator from the
-           org selector so it reads as the primary action in this group.
-           Shown locked (not hidden) in builds that don't unlock it. -->
-          <template v-if="aiButtonVisible || aiLicenseLocked">
-            <OButton
-              variant="ghost"
-              size="icon-toolbar"
-              @click="aiLicenseLocked ? openLockedAiAssistant() : toggleAIChat()"
-              :data-test="aiLicenseLocked ? 'menu-link-ai-locked' : 'menu-link-ai-item'"
-              :aria-label="aiButtonLabel"
-              class="group text-ai-accent! hover:shadow-ai-accent/35 dark:shadow-ai-accent/20 dark:hover:shadow-ai-accent/35 [background:var(--color-gradient-ai-subtle)]! [transition:background_0.3s_ease,box-shadow_0.3s_ease,color_0.3s_ease] hover:text-white! hover:shadow-md hover:[background:var(--color-gradient-ai)]! dark:text-white! dark:shadow-md dark:hover:shadow-md"
-              :class="store.state.isAiChatEnabled && !aiLicenseLocked ? 'ai-btn-active' : ''"
-              @mouseenter="handleMouseEnter"
-              @mouseleave="handleMouseLeave"
-            >
-              <img
-                alt=""
-                :src="getBtnLogo"
-                class="h-5 w-5 shrink-0 [transition:transform_0.6s_ease] group-hover:rotate-180 group-hover:brightness-0 group-hover:invert group-hover:[transition:filter_0.3s_ease]"
-              />
-              <OLockBadge v-if="!aiAccess.allowed || aiLicenseLocked" class="-end-2! -top-1!" />
-              <OTooltip
-                side="bottom"
-                align="center"
-                :content="aiButtonLabel"
-                :shortcut-id="aiAccess.allowed && !aiLicenseLocked ? 'aiChatToggle' : undefined"
-              />
-            </OButton>
-          </template>
-          <span
-            v-else-if="aiSlotPending"
-            aria-hidden="true"
-            class="size-[1.875rem] shrink-0"
-            data-test="header-ai-slot-placeholder"
-          />
+        <div
+          class="header-utility-icons flex items-center gap-x-2 max-md:shrink-0 max-md:gap-x-1 md:max-xl:shrink-0"
+        >
+          <!-- AI ASSISTANT: leads the utility-icon cluster; a license that lacks it shows the lock. -->
+          <OButton
+            v-if="aiLicenseLocked"
+            variant="ghost"
+            size="icon-toolbar"
+            @click="openLockedAiAssistant"
+            data-test="menu-link-ai-locked"
+            :aria-label="aiButtonLabel"
+            class="relative"
+          >
+            <AssistantSpark :size="20" />
+            <OLockBadge class="-end-2! -top-1!" />
+            <OTooltip side="bottom" align="center" :content="aiButtonLabel" />
+          </OButton>
+          <AssistantHeaderButton v-else-if="aiAssistantShown" />
 
           <!-- THEME SWITCHER: Toggle between light and dark mode -->
           <ThemeSwitcher class="max-md:hidden"></ThemeSwitcher>
@@ -511,7 +501,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, PropType, computed, nextTick, ref } from "vue";
+import { defineAsyncComponent, defineComponent, PropType, computed, nextTick, ref } from "vue";
 import { useRouter } from "vue-router";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useTheme } from "@/composables/useTheme";
@@ -526,7 +516,9 @@ import LinkedAccountsDialog from "./settings/LinkedAccountsDialog.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OShortcut from "@/lib/core/Shortcut/OShortcut.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OPageHeaderStatus from "@/lib/core/PageHeader/OPageHeaderStatus.vue";
+import AssistantSpark from "@/components/ai-assistant/common/AssistantSpark.vue";
 import OLockBadge from "@/lib/core/Badge/OLockBadge.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { checkFeatureAccess } from "@/utils/enterpriseFeatures";
@@ -545,6 +537,10 @@ import { chartColor } from "@/utils/chartTheme";
 export default defineComponent({
   name: "HeaderComponent",
   components: {
+    // Async, so the header's chunk does not carry the assistant.
+    AssistantHeaderButton: defineAsyncComponent(
+      () => import("@/components/ai-assistant/shell/AssistantHeaderButton.vue"),
+    ),
     OPageHeaderStatus,
     ThemeSwitcher,
     EnterpriseUpgradeDialog,
@@ -554,7 +550,9 @@ export default defineComponent({
     LinkedAccountsDialog,
     OButton,
     OShortcut,
+    OTruncatedText,
     OIcon,
+    AssistantSpark,
     OLockBadge,
     OTooltip,
     ODropdown,
@@ -618,24 +616,12 @@ export default defineComponent({
       type: Array as PropType<any[]>,
       required: true,
     },
-    // AI button hover state
-    isHovered: {
-      type: Boolean,
-      required: true,
-    },
-    // AI button logo based on state
-    getBtnLogo: {
-      type: String,
-      required: true,
-    },
   },
   emits: [
     "update:selectedOrg",
-    "update:isHovered",
     "updateOrganization",
     "goToHome",
     "goToAbout",
-    "toggleAIChat",
     "openSlack",
     "navigateToOpenAPI",
     "navigateToDocs",
@@ -737,11 +723,6 @@ export default defineComponent({
       event.stopPropagation();
     };
 
-    // AI chat toggle — shown locked (not hidden) in builds that don't unlock
-    // it. Same `ai_enabled`-is-an-admin-preference-not-an-upsell-target
-    // reasoning as QueryEditor.vue's floating AI icon: an entitled org that's
-    // turned AI off still never sees the button at all.
-    //
     // NOT `buildFeatureGateContext()` — that reads the `@/aws-exports`
     // singleton directly, but this component takes edition info as its own
     // `config` PROP (so a host can inject it / tests can override it) rather
@@ -763,23 +744,19 @@ export default defineComponent({
         Boolean(props.store.state.zoConfig.ai_enabled),
       ),
     );
-    const aiButtonLabel = computed(() => {
-      if (!aiAccess.value.allowed) {
-        return t("featureLock.availableInEnterprise", { feature: t("menu.aiAssistant") });
-      }
-      if (!aiLicenseLocked.value) return t("menu.aiAssistant");
-      return t("featureLock.headerLocked", {
+    const aiButtonLabel = computed(() =>
+      t("featureLock.headerLocked", {
         feature: featureName("ai_assistant") ?? t("featureLock.thisFeature"),
-      });
-    });
-    const aiButtonVisible = computed(
-      () => !focusMode.value && (!aiAccess.value.allowed || aiAssistantState.value === "enabled"),
-    );
-    const aiSlotPending = computed(
-      () => aiAccess.value.allowed && !props.store.state.zoConfig?.version,
+      }),
     );
     const aiLicenseLocked = computed(
       () => !focusMode.value && aiAccess.value.allowed && aiAssistantState.value === "locked",
+    );
+    // With AI off the assistant's own gate shows admins its setup card, so only a menu hidden while AI is on hides it.
+    const aiAssistantShown = computed(
+      () =>
+        !focusMode.value &&
+        !(aiAssistantState.value === "hidden" && props.store.state.zoConfig?.ai_enabled === true),
     );
 
     // The edition gate and the org's runtime switch both have to pass, as for Settings › Slack.
@@ -832,14 +809,6 @@ export default defineComponent({
       emit("goToAbout");
     };
 
-    const toggleAIChat = () => {
-      if (!aiAccess.value.allowed) {
-        openEnterpriseDialog();
-        return;
-      }
-      emit("toggleAIChat");
-    };
-
     const openLockedAiAssistant = () => {
       router.push({
         path: featureLockedPath("ai_assistant"),
@@ -875,15 +844,6 @@ export default defineComponent({
       emit("signout");
     };
 
-    // Handle mouse hover events for AI button
-    const handleMouseEnter = () => {
-      emit("update:isHovered", true);
-    };
-
-    const handleMouseLeave = () => {
-      emit("update:isHovered", false);
-    };
-
     // Handle organization selection from the OrganizationSelector menu
     const handleOrgSelection = (org: any) => {
       emit("update:selectedOrg", org);
@@ -898,7 +858,6 @@ export default defineComponent({
       featureName,
       getImageURL,
       enterpriseButtonText,
-      aiSlotPending,
       ingestionQuotaPercentage,
       ingestionQuotaColor,
       showEnterpriseDialog,
@@ -911,14 +870,11 @@ export default defineComponent({
       goToHome,
       homeUrl,
       goToAbout,
-      toggleAIChat,
-      aiAssistantState,
       openLockedAiAssistant,
-      aiAccess,
       aiButtonLabel,
-      aiButtonVisible,
       focusMode,
       aiLicenseLocked,
+      aiAssistantShown,
       linkedAccountsVisible,
       showLinkedAccounts,
       openSlack,
@@ -928,8 +884,6 @@ export default defineComponent({
       openPredefinedThemes,
       openShortcuts,
       signout,
-      handleMouseEnter,
-      handleMouseLeave,
       handleOrgSelection,
       openEnterpriseDialog,
     };

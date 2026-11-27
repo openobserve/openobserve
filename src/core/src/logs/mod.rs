@@ -413,7 +413,7 @@ async fn write_logs_by_stream(
         .await?;
 
         let time_took = time_stats.1.elapsed().as_secs_f64();
-        req_stats.response_time = time_took;
+        req_stats.response_time = time_took * 1000.0;
         req_stats.user_email = if user_email.is_empty() {
             None
         } else {

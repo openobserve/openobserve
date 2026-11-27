@@ -1,0 +1,9 @@
+{
+  "_source": "openobserve src/api/management/src/request/ai/chat.rs:1005 MetaHttpResponse::bad_request",
+  "shape": "A",
+  "status": 400,
+  "body": {
+    "code": 400,
+    "message": "AI is not enabled"
+  }
+}
