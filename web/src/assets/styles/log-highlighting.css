@@ -88,9 +88,9 @@
 :root:not(.dark) .log-cell-html {
   color: var(--color-text-body);
 }
-/* Dark log values one step brighter than body text (12.7:1), so dense lines stay readable. */
+/* Dark log values a calm light grey, below pure white, so dense lines do not glare. */
 :root.dark .log-cell-html {
-  color: #dcdde3;
+  color: #c4c5cb;
 }
 
 /* Highlighting class */

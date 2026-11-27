@@ -133,8 +133,8 @@
   --selected-tint: color-mix(in srgb, var(--color-accent) 20%, transparent);
   /* A raised pill one step above the dark track. */
   --toggle-pill: var(--color-surface-selected-neutral);
-  /* Soft slate key: saturated blue glared on dark; 7.8:1, a step below the log values. */
-  --color-log-key: #a8aec0;
+  /* Neutral grey key a clear step below the log values, so key=value runs stay calm. */
+  --color-log-key: #9c9da3;
   /* Info and debug rows carry a level strip in dark too, matching light. */
   --color-log-strip-info: #4d8fd4;
   --color-log-strip-debug: #3daab8;
