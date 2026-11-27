@@ -15,6 +15,7 @@
 
 import { describe, expect, it, vi } from "vitest";
 import {
+  dropUnsupportedPanelChoices,
   panelConfigRangeError,
   validateConditions,
   validateDashboardJson,
@@ -1814,5 +1815,24 @@ describe.each([
       ],
     });
     expect(errors).toEqual([]);
+  });
+});
+
+describe("dropUnsupportedPanelChoices", () => {
+  it("drops an unknown choice for the panel's type so the panel then saves", () => {
+    const panel = { type: "logs", config: { logs_order: "sideways", logs_wrap: true } };
+    dropUnsupportedPanelChoices(panel);
+    expect(panel.config).toEqual({ logs_wrap: true });
+  });
+
+  it("keeps allowed choices and choices that belong to another panel type", () => {
+    const panel = {
+      type: "gauge",
+      config: { gauge_style: "arc", logs_order: "sideways", table_density: "bogus" },
+    };
+    const before = JSON.parse(JSON.stringify(panel.config));
+    dropUnsupportedPanelChoices(panel);
+    expect(panel.config).toEqual(before);
+    dropUnsupportedPanelChoices({ type: "logs" });
   });
 });

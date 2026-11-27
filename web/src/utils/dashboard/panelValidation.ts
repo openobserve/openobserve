@@ -1351,6 +1351,17 @@ const validatePanelTypeChoices = (t: TranslateFn, panel: any, errors: string[]) 
   }
 };
 
+/** Drops choice settings this panel type cannot use, so the editor's "Default" really is unset and Save passes. */
+export const dropUnsupportedPanelChoices = (panel: any) => {
+  const config = panel?.config;
+  if (!config) return;
+  for (const [key, types, allowed] of PANEL_TYPE_CHOICE_KEYS) {
+    if (types.includes(panel.type) && isSetValue(config[key]) && !allowed.includes(config[key])) {
+      delete config[key];
+    }
+  }
+};
+
 /** The save-time range error for one ranged panel setting, or "" when it is unset or in range; config fields show it inline. */
 export const panelConfigRangeError = (t: TranslateFn, panel: any, key: string): I18nText => {
   const entry = PANEL_TYPE_RANGE_KEYS.find(([rangeKey]) => rangeKey === key);
