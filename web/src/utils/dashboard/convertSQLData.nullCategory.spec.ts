@@ -89,8 +89,8 @@ describe("SQL charts keep the NULL and empty x-axis groups", () => {
     expect(slices).toEqual([
       { name: "alpha", value: 1169 },
       { name: "beta", value: 1168 },
-      { name: "(null)", value: 429 },
-      { name: "(empty)", value: 234 },
+      { name: "(null)", value: 429, rawName: "" },
+      { name: "(empty)", value: 234, rawName: "" },
     ]);
     const total = slices.reduce((sum: number, slice: { value: number }) => sum + slice.value, 0);
     expect(total).toBe(3000);

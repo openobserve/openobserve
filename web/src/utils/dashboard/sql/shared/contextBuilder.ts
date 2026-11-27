@@ -184,7 +184,7 @@ export function buildSQLContext(
   const hasTimestampField = panelSchema.queries[0].fields?.x?.some(
     (it: { args?: { value?: { field?: string } }[]; aggregationFunction?: string }) =>
       it?.args?.[0]?.value?.field === store.state?.zoConfig?.timestamp_column ||
-      ["histogram", "date_bin"].includes(it.aggregationFunction),
+      ["histogram", "date_bin"].includes(it.aggregationFunction ?? ""),
   );
 
   const isMissing = (value: unknown) => value === null || value === undefined;
@@ -216,11 +216,15 @@ export function buildSQLContext(
       );
     }) || [];
 
+  // Read every row, since a row with a NULL x value may omit the key that the first row is read for.
+  const getRawAxisDataFromKey = (key: string | undefined): unknown[] =>
+    key === undefined || key === null
+      ? []
+      : getAxisRows().map((obj: Record<string, unknown>) => getDataValue(obj, key));
+
   // get the axis data using key
   const getAxisDataFromKey = (key: string) => {
-    // Read every row, since a row with a NULL x value may omit the key that the first row is read for.
-    const result = getAxisRows().map((obj: Record<string, unknown>) => getDataValue(obj, key));
-
+    const result = getRawAxisDataFromKey(key);
     return xAxisKeys.includes(key) ? result.map(xAxisCategory) : result;
   };
 
@@ -656,7 +660,7 @@ export function buildSQLContext(
       const data =
         index < xAxisKeys.length
           ? getAxisDataFromKey(key)
-          : getAxisDataFromKey(key).map(breakdownValueLabel);
+          : (getAxisDataFromKey(key) as string[]).map(breakdownValueLabel);
 
       //unique value index array
       const arr: any = [];
@@ -927,6 +931,7 @@ export function buildSQLContext(
     options,
     // Closure-based helpers
     getAxisDataFromKey,
+    getRawAxisDataFromKey,
     getSeries: seriesHelpers.getSeries,
     getAnnotationMarkLine: seriesHelpers.getAnnotationMarkLine,
     getSeriesMarkArea: seriesHelpers.getSeriesMarkArea,
