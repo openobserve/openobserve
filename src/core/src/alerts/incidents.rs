@@ -1930,6 +1930,11 @@ async fn correlate_rows(
             {
                 log::error!("[INCIDENTS::RCA] {e:#}");
             }
+            crate::autoresolve::triggers::on_incident_created(
+                &alert.org_id,
+                incident_id,
+                &subject.id,
+            );
         } else {
             start_unmuted_incident_rca(&alert.org_id, incident_id, routed_origin.as_ref()).await;
         }
@@ -5391,6 +5396,7 @@ async fn start_removed_member_incident(
     if let Err(error) = start_new_incident_rca(org_id, incident_id, routed.as_ref()).await {
         log::error!("[INCIDENTS::RCA] {error:#}");
     }
+    crate::autoresolve::triggers::on_incident_created(org_id, incident_id, &firing.alert_id);
     let destinations =
         collect_incident_destinations(org_id, incident_id, &subject.base_destinations).await;
     if let Some(alert) = definition {

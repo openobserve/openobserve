@@ -844,7 +844,8 @@ fn pending_migrations(latest: &str, existing: &str) -> PendingMigrations {
         pending.ownership_repair = true;
         pending.profiles = true;
     }
-    // 0.0.64 (`security`) relies on explicit grants only, so it needs no back-fill.
+    // `security` (0.0.64) and `autoresolve` use explicit grants only; 0.0.67 drops
+    // `autoflow_connection`. Per-toolset `ai_toolsets` grants are written lazily: no back-fill.
 
     pending
 }

@@ -9616,6 +9616,7 @@
       "promqlFiltersAndOnly": "PromQL 필터는 AND만 지원합니다. OR와 그룹을 제거하거나 SQL로 전환하세요.",
       "cappedHint": "처음 {count}개 값을 표시하고 있습니다",
       "cappedAllHint": "'모두'에는 목록에 없는 값도 포함됩니다",
+      "metricsTruncatedHint": "일부 메트릭은 선택되지 않았습니다. 모든 값을 보려면 메트릭 이름을 입력하세요.",
       "metric": "메트릭",
       "label": "레이블",
       "metricSelectTooltip": "메트릭을 선택하거나 $metricVariable과 같은 변수를 사용해 다른 값에 따라 선택하세요.",
@@ -16507,6 +16508,13 @@
       "logoLightLabel": "사용자 지정 로고(라이트 모드)",
       "logoLightHelp": "라이트 모드에 표시됩니다. PNG, JPG, GIF 또는 BMP, 최대 150 × 30 px.",
       "logoDarkLabel": "사용자 지정 로고(다크 모드)",
+      "logoTitle": "사용자 지정 로고",
+      "logoHelp": "앱 헤더에 표시됩니다. PNG, JPG, GIF, BMP, WEBP 또는 SVG, 최대 150 × 30 px.",
+      "logoLightTitle": "라이트 모드",
+      "logoDarkTitle": "다크 모드",
+      "logoSaved": "저장됨",
+      "logoNotSaved": "저장되지 않음",
+      "logoDimensions": "{width} × {height}px",
       "logoDarkHelp": "다크 모드에 표시됩니다. PNG, JPG, GIF 또는 BMP, 최대 150 × 30 px."
     },
     "modelPricingEditor": {
@@ -24189,8 +24197,19 @@
       "clear": "지우기"
     },
     "file": {
-      "removeFile": "파일 삭제",
-      "clearAll": "모두 지우기"
+      "removeNamed": "{name} 제거",
+      "attachPrompt": "파일을 끌어다 놓아 첨부하거나 {browse}",
+      "attachPromptMultiple": "파일을 끌어다 놓아 첨부하거나 {browse}",
+      "browseLink": "찾아보기",
+      "supports": "지원 파일 {types}",
+      "dropFileToAttach": "놓아서 파일 첨부",
+      "dropFilesToAttach": "놓아서 파일 첨부",
+      "typeRejected": "{allowed} 파일만 허용됩니다",
+      "sizeRejected": "{size}이(가) {max} 제한을 초과합니다",
+      "countRejected": "한 번에 {count}개 파일만 가능 | 한 번에 {count}개 파일만 가능",
+      "invalidJson": "올바르지 않은 JSON: {detail}",
+      "invalidImage": "유효한 이미지 파일이 아닙니다",
+      "unavailable": "파일 업로드를 사용할 수 없습니다"
     },
     "date": {
       "openCalendar": "달력 열기",

@@ -16,6 +16,7 @@
 import { queryClient } from "@/composables/query/queryClient";
 import type { Resource, Entity } from "@/ts/interfaces";
 import { destinationsQuery } from "@/services/alert_destination.queries";
+import { aiToolsetsQuery } from "@/services/ai_toolsets.queries";
 import { templatesQuery } from "@/services/alert_templates.queries";
 import pipelineService from "@/services/pipelines";
 import alertService from "@/services/alerts";
@@ -52,6 +53,7 @@ const LOADER_LICENSE_FEATURE: Record<string, string> = {
   synthetic_folder: "synthetics",
   synthetics: "synthetics",
   synthetic_environment: "synthetics",
+  ai_toolsets: "ai_toolsets",
 };
 
 type RowBuilders = {
@@ -157,6 +159,7 @@ export const useRoleEntityLoaders = (deps: LoaderDeps) => {
       logs_insights: getLogsInsightsStreams,
       logs_unredacted: getLogsUnredactedStreams,
       logs_cache: getLogsCacheStreams,
+      ai_toolsets: getAiToolsets,
     };
 
     // The loaders push, so two overlapping opens of one row would list every entity twice.
@@ -430,6 +433,14 @@ export const useRoleEntityLoaders = (deps: LoaderDeps) => {
     const list = (res.data?.items ?? []).map((f) => ({ id: f.id, name: f.name }));
     if (!list.some((f) => f.id === "default")) list.unshift({ id: "default", name: "default" });
     updateResourceEntities("fleets", ["id"], list, false, "name");
+    return true;
+  };
+  // The grant object is the toolset's id, so a rename keeps its grants.
+  const getAiToolsets = async () => {
+    const org = store.state.selectedOrganization.identifier;
+    const { toolsets } = await queryClient.fetchQuery(aiToolsetsQuery(org));
+    const list = toolsets.map((ts: { id: string; name: string }) => ({ id: ts.id, name: ts.name }));
+    updateResourceEntities("ai_toolsets", ["id"], list, false, "name");
     return true;
   };
   const _getGroups = async () => {
@@ -838,6 +849,7 @@ export const useRoleEntityLoaders = (deps: LoaderDeps) => {
     getWorkflowFolders,
     getWorkflows,
     getFleets,
+    getAiToolsets,
     _getGroups,
     _getRoles,
     getFunctions,

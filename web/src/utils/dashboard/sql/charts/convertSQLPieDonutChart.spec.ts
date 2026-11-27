@@ -67,6 +67,7 @@ function makeMockContext(overrides: Partial<any> = {}): any {
       if (key === "y1") return [100, 200, 300];
       return [];
     }),
+    getRawAxisDataFromKey: vi.fn(() => ["A", "B", "C"]),
     getPieChartRadius: vi.fn(() => 50),
     ...overrides,
   };

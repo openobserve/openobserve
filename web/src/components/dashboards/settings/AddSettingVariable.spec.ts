@@ -524,13 +524,47 @@ describe("AddSettingVariable", () => {
       expect(queryData).not.toHaveProperty("filter_group");
     });
 
-    it("saves an OR filter as filter_group without a flat filter copy", async () => {
+    it("saves a top-level OR as filter_group with an empty flat filter, since no row holds for every branch", async () => {
       builder().vm.$emit("update:modelValue", { filter_group: orGroup });
       await flushPromises();
       expect(wrapper.vm.form.state.values.query_data.filter).toBeUndefined();
       const queryData = payloadFor({});
       expect(queryData.filter_group).toEqual(orGroup);
-      expect(queryData).not.toHaveProperty("filter");
+      expect(queryData.filter).toEqual([]);
+    });
+
+    it("copies the top-level AND rows of an OR group into the flat filter for older readers", async () => {
+      const [env, level] = orGroup.conditions;
+      const nested = {
+        filterType: "group",
+        logicalOperator: "AND",
+        conditions: [
+          env,
+          {
+            filterType: "group",
+            logicalOperator: "AND",
+            conditions: [
+              { ...level, logicalOperator: "AND" },
+              { ...level, value: "warn", logicalOperator: "OR" },
+            ],
+          },
+          {
+            ...level,
+            column: { field: "host" },
+            operator: "!=",
+            value: "",
+            logicalOperator: "AND",
+          },
+        ],
+      };
+      builder().vm.$emit("update:modelValue", { filter_group: nested });
+      await flushPromises();
+      const queryData = payloadFor({});
+      expect(queryData.filter_group).toEqual(nested);
+      expect(queryData.filter).toEqual([
+        { name: "env", operator: "=", value: "$env" },
+        { name: "host", operator: "!=", value: "" },
+      ]);
     });
 
     it("uses the AND-only profile for PromQL and keeps a SQL group as it is", async () => {
@@ -544,7 +578,7 @@ describe("AddSettingVariable", () => {
         filter_group: JSON.parse(JSON.stringify(orGroup)),
       });
       expect(queryData.filter_group).toEqual(orGroup);
-      expect(queryData).not.toHaveProperty("filter");
+      expect(queryData.filter).toEqual([]);
     });
 
     it("offers the stream's fields and the visible $variables", async () => {
@@ -1409,7 +1443,7 @@ describe("AddSettingVariable", () => {
       await connector.trigger("click");
       await flushPromises();
       const queryData = savedQueryData(saved);
-      expect(queryData).not.toHaveProperty("filter");
+      expect(queryData.filter).toEqual([]);
       expect(queryData.filter_group.conditions.map((c: any) => c.logicalOperator)).toEqual([
         "AND",
         "OR",
@@ -1482,7 +1516,7 @@ describe("AddSettingVariable", () => {
       saved.unmount();
     });
 
-    it("loads a saved filter_group and re-saves it without a flat filter", async () => {
+    it("loads a saved filter_group and re-saves it with only the rows every OR branch needs as filter", async () => {
       const group = {
         filterType: "group",
         logicalOperator: "AND",
@@ -1515,7 +1549,7 @@ describe("AddSettingVariable", () => {
       });
       const queryData = savedQueryData(saved);
       expect(queryData.filter_group).toEqual(group);
-      expect(queryData).not.toHaveProperty("filter");
+      expect(queryData.filter).toEqual([]);
       saved.unmount();
     });
   });

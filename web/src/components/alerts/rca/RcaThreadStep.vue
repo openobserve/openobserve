@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="text-text-secondary text-compact m-0"
         role="status"
       >
-        {{ t("alerts.incidents.rcaThread.working") }}
+        {{ workingText ?? t("alerts.incidents.rcaThread.working") }}
       </p>
 
       <div
@@ -182,7 +182,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, useId, watch } fro
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-import { useI18nTyped } from "@/types/i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import type { RcaStep } from "@/services/incidents";
 import { formatTimestampInTimezone } from "@/utils/date";
 import {
@@ -208,8 +208,17 @@ const props = withDefaults(
     timezone?: string;
     /** The submitted run's last note: shown as the conclusion, cut at three lines. */
     conclusion?: boolean;
+    /** The running step's status line; the default tells an RCA reader when steering is read. */
+    workingText?: I18nText;
   }>(),
-  { runWaiting: false, finished: true, evidenceNumbers: null, timezone: "UTC", conclusion: false },
+  {
+    runWaiting: false,
+    finished: true,
+    evidenceNumbers: null,
+    timezone: "UTC",
+    conclusion: false,
+    workingText: undefined,
+  },
 );
 
 defineEmits<{

@@ -22,6 +22,7 @@ import type { InlineNoticeEmits, InlineNoticeProps } from "./OInlineNotice.types
 
 const props = withDefaults(defineProps<InlineNoticeProps>(), {
   variant: "warning",
+  wrap: false,
   actionLabel: undefined,
   dataTest: "inline-notice",
   actionDataTest: undefined,
@@ -36,7 +37,8 @@ const isError = computed(() => props.variant === "error");
   <span
     :role="isError ? 'alert' : 'status'"
     :class="[
-      'rounded-default inline-flex h-6 max-w-full min-w-0 items-center gap-1.5 px-2 text-xs',
+      'rounded-default inline-flex max-w-full min-w-0 gap-1.5 px-2 text-xs',
+      wrap ? 'min-h-6 items-start py-1' : 'h-6 items-center',
       isError
         ? 'bg-status-error-bg text-status-error-text'
         : 'bg-status-warning-bg text-status-warning-text',
@@ -47,10 +49,11 @@ const isError = computed(() => props.variant === "error");
     <OIcon
       :name="isError ? 'error-outline' : 'warning-amber'"
       size="xs"
-      class="shrink-0"
+      :class="['shrink-0', wrap && 'mt-0.5']"
       aria-hidden="true"
     />
-    <OTruncatedText class="min-w-0">{{ text }}</OTruncatedText>
+    <span v-if="wrap" class="min-w-0 wrap-anywhere">{{ text }}</span>
+    <OTruncatedText v-else class="min-w-0">{{ text }}</OTruncatedText>
     <button
       v-if="actionLabel"
       type="button"

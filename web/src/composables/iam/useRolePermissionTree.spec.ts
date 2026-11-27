@@ -343,14 +343,15 @@ describe("useRolePermissionTree - modifyResourcePermissions new resource types",
     ["AllowGet", "AllowPost"].forEach((action) => expect(r.permission[action].show).toBe(false));
   });
 
-  it("prompt_label shows only Update", () => {
-    const r = makeResource("prompt_label");
+  it.each([
+    ["prompt_label", ["AllowAll", "AllowPut"]],
+    // Listing and creating toolsets are checked only on the type row, so it keeps every column.
+    ["ai_toolsets", ["AllowAll", "AllowList", "AllowGet", "AllowPost", "AllowPut", "AllowDelete"]],
+  ])("%s shows exactly %j", (name, shown) => {
+    const r = makeResource(name);
     modifyResourcePermissions(r);
-    expect(r.permission.AllowPut.show).toBe(true);
-    expect(r.permission.AllowAll.show).toBe(true);
-    ["AllowList", "AllowGet", "AllowPost", "AllowDelete"].forEach((action) =>
-      expect(r.permission[action].show).toBe(false),
-    );
+    const actions = ["AllowAll", "AllowList", "AllowGet", "AllowPost", "AllowPut", "AllowDelete"];
+    expect(actions.filter((a) => r.permission[a].show)).toEqual(shown);
   });
 
   it("prompt hides AllowDelete only", () => {

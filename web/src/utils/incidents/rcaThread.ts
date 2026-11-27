@@ -15,7 +15,7 @@
 
 // Display helpers for the investigation thread of an RCA run.
 
-import { gt, raw, type I18nText } from "@/types/i18n";
+import { gt, raw, type I18nKey, type I18nText } from "@/types/i18n";
 import { formatTimestampInTimezone } from "@/utils/date";
 import { userLocalPart } from "@/utils/incidents/rcaCell";
 import { rcaSteerStatusLabel } from "@/utils/incidents/rcaSteering";
@@ -38,6 +38,29 @@ export const RCA_STAGES = [
   "metrics",
   "converge",
 ] as const;
+
+type RcaStage = (typeof RCA_STAGES)[number];
+
+/** One step of a run stepper: the stage id and the key of its label. */
+export interface StepperStage {
+  key: string;
+  labelKey: I18nKey;
+}
+
+const RCA_STAGE_LABEL_KEYS: Record<RcaStage, I18nKey> = {
+  context: "alerts.incidents.rcaThread.stage.context",
+  topology: "alerts.incidents.rcaThread.stage.topology",
+  changes: "alerts.incidents.rcaThread.stage.changes",
+  traces: "alerts.incidents.rcaThread.stage.traces",
+  log_patterns: "alerts.incidents.rcaThread.stage.logPatterns",
+  metrics: "alerts.incidents.rcaThread.stage.metrics",
+  converge: "alerts.incidents.rcaThread.stage.converge",
+};
+
+export const RCA_STEPPER_STAGES: readonly StepperStage[] = RCA_STAGES.map((key) => ({
+  key,
+  labelKey: RCA_STAGE_LABEL_KEYS[key],
+}));
 
 /** What the verdict card shows: the latest run, or a completed run picked from the history. */
 export type RcaCardState = "investigating" | "analyzed" | "failed" | "cancelled";
@@ -69,24 +92,9 @@ export function rcaTriggerLabel(trigger: RcaTrigger, startedBy: string): I18nTex
 
 /** Label of a stage by its id; an unknown id shows as written. */
 export function rcaStageLabel(stage: string): I18nText {
-  switch (stage) {
-    case "context":
-      return gt("alerts.incidents.rcaThread.stage.context");
-    case "topology":
-      return gt("alerts.incidents.rcaThread.stage.topology");
-    case "changes":
-      return gt("alerts.incidents.rcaThread.stage.changes");
-    case "traces":
-      return gt("alerts.incidents.rcaThread.stage.traces");
-    case "log_patterns":
-      return gt("alerts.incidents.rcaThread.stage.logPatterns");
-    case "metrics":
-      return gt("alerts.incidents.rcaThread.stage.metrics");
-    case "converge":
-      return gt("alerts.incidents.rcaThread.stage.converge");
-    default:
-      return raw(stage);
-  }
+  return Object.hasOwn(RCA_STAGE_LABEL_KEYS, stage)
+    ? gt(RCA_STAGE_LABEL_KEYS[stage as RcaStage])
+    : raw(stage);
 }
 
 /** Duration with seconds kept: "0.3s", "12s", "4m12s", "2m03s", "1h05m". */

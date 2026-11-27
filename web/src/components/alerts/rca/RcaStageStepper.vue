@@ -30,10 +30,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         })
       }}
     </p>
-    <ol class="m-0 grid list-none grid-cols-7 gap-1 p-0">
+    <ol class="m-0 grid list-none auto-cols-fr grid-flow-col gap-1 p-0">
       <li
         v-for="(stage, idx) in stages"
-        :key="stage"
+        :key="stage.key"
         class="flex min-w-0 flex-col gap-1"
         :aria-current="idx + 1 === current ? 'step' : undefined"
       >
@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-state="barState(idx + 1)"
         />
         <span class="text-2xs truncate" :class="labelClass(idx + 1)">
-          {{ rcaStageLabel(stage) }}
+          {{ t(stage.labelKey) }}
         </span>
       </li>
     </ol>
@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed } from "vue";
 import { useI18nTyped } from "@/types/i18n";
-import { RCA_STAGES, rcaStageLabel } from "@/utils/incidents/rcaThread";
+import { RCA_STEPPER_STAGES, type StepperStage } from "@/utils/incidents/rcaThread";
 
 const props = withDefaults(
   defineProps<{
@@ -61,35 +61,50 @@ const props = withDefaults(
     stageIndex?: number | null;
     /** Stage id of the run summary, used when the index is missing. */
     stage?: string | null;
+    /** Stages in order; Incidents uses the RCA protocol stages. */
+    stages?: readonly StepperStage[];
+    /** Keys of stages the run moved past without reaching. */
+    skipped?: readonly string[];
   }>(),
-  { stageIndex: null, stage: null },
+  { stageIndex: null, stage: null, stages: () => RCA_STEPPER_STAGES, skipped: () => [] },
 );
 
 const { t } = useI18nTyped();
 
-const stages = RCA_STAGES;
+const stages = computed(() => props.stages);
 
 /** 1-based index of the current stage; 0 before the first stage. */
 const current = computed(() => {
   const index = props.stageIndex;
-  if (index && index >= 1 && index <= stages.length) return index;
-  const byId = props.stage ? stages.indexOf(props.stage as (typeof stages)[number]) : -1;
-  return byId + 1;
+  if (index && index >= 1 && index <= stages.value.length) return index;
+  return stages.value.findIndex((item) => item.key === props.stage) + 1;
 });
 
 const currentLabel = computed(() =>
-  current.value > 0 ? rcaStageLabel(stages[current.value - 1]) : "",
+  current.value > 0 ? t(stages.value[current.value - 1].labelKey) : "",
 );
 
-const barState = (position: number) =>
-  position < current.value ? "done" : position === current.value ? "current" : "todo";
+type BarState = "done" | "skipped" | "current" | "todo";
 
-const BAR_CLASS = { done: "bg-accent", current: "bg-accent/45", todo: "bg-border-default" };
+const barState = (position: number): BarState => {
+  if (position === current.value) return "current";
+  if (position > current.value) return "todo";
+  return props.skipped.includes(stages.value[position - 1].key) ? "skipped" : "done";
+};
 
-const labelClass = (position: number) =>
-  position < current.value
-    ? "text-text-body"
-    : position === current.value
-      ? "text-text-heading font-bold"
-      : "text-text-secondary";
+const BAR_CLASS: Record<BarState, string> = {
+  done: "bg-accent",
+  skipped: "bg-border-default",
+  current: "bg-accent/45",
+  todo: "bg-border-default",
+};
+
+const LABEL_CLASS: Record<BarState, string> = {
+  done: "text-text-body",
+  skipped: "text-text-muted",
+  current: "text-text-heading font-bold",
+  todo: "text-text-secondary",
+};
+
+const labelClass = (position: number) => LABEL_CLASS[barState(position)];
 </script>

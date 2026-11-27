@@ -295,6 +295,7 @@ struct ConfigResponse<'a> {
     downtimes_enabled: bool,
     fleet_enabled: bool,
     alert_calibration_enabled: bool,
+    autoresolve_enabled: bool,
     service_streams_enabled: bool,
     model_pricing_enabled: bool,
     online_evals_enabled: bool,
@@ -657,6 +658,8 @@ pub async fn zo_config(
         )
     );
     let fleet_enabled = enterprise_value!(false, openobserve_core::fleet::enabled());
+    let autoresolve_enabled =
+        enterprise_value!(false, openobserve_core::autoresolve::autoresolve_on());
     let service_streams_enabled = enterprise_value!(false, o2cfg.service_streams.enabled);
     // Enterprise builds have it unless O2_ANOMALY_DETECTION_DISABLED turns it off.
     let anomaly_detection_enabled = enterprise_value!(false, !o2cfg.anomaly_detection.disabled);
@@ -856,6 +859,7 @@ pub async fn zo_config(
         downtimes_enabled,
         fleet_enabled,
         alert_calibration_enabled,
+        autoresolve_enabled,
         service_streams_enabled,
         model_pricing_enabled: cfg.common.model_pricing_enabled,
         online_evals_enabled,

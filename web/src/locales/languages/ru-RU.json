@@ -9616,6 +9616,7 @@
       "promqlFiltersAndOnly": "Фильтры PromQL поддерживают только AND. Удалите OR и группы или переключитесь на SQL.",
       "cappedHint": "Показаны первые {count} значений",
       "cappedAllHint": "«Все» включает и значения, которых нет в списке",
+      "metricsTruncatedHint": "Некоторые метрики не были проверены. Укажите метрику, чтобы увидеть все значения.",
       "metric": "Метрика",
       "label": "Метка",
       "metricSelectTooltip": "Выберите метрику или используйте переменную, например $metricVariable, чтобы выбрать её по другому значению.",
@@ -16507,6 +16508,13 @@
       "logoLightLabel": "Пользовательский логотип (светлая тема)",
       "logoLightHelp": "Отображается в светлой теме. PNG, JPG, GIF или BMP, до 150 × 30 px.",
       "logoDarkLabel": "Пользовательский логотип (тёмная тема)",
+      "logoTitle": "Свой логотип",
+      "logoHelp": "Отображается в шапке приложения. PNG, JPG, GIF, BMP, WEBP или SVG, до 150 × 30 px.",
+      "logoLightTitle": "Светлая тема",
+      "logoDarkTitle": "Тёмная тема",
+      "logoSaved": "Сохранено",
+      "logoNotSaved": "Не сохранено",
+      "logoDimensions": "{width} × {height} пикс.",
       "logoDarkHelp": "Отображается в тёмной теме. PNG, JPG, GIF или BMP, до 150 × 30 px."
     },
     "modelPricingEditor": {
@@ -24189,8 +24197,19 @@
       "clear": "Очистить"
     },
     "file": {
-      "removeFile": "Удалить файл",
-      "clearAll": "Очистить всё"
+      "removeNamed": "Удалить {name}",
+      "attachPrompt": "Перетащите файл, чтобы прикрепить, или {browse}",
+      "attachPromptMultiple": "Перетащите файлы, чтобы прикрепить, или {browse}",
+      "browseLink": "выберите",
+      "supports": "Поддерживаемые файлы {types}",
+      "dropFileToAttach": "Отпустите, чтобы прикрепить файл",
+      "dropFilesToAttach": "Отпустите, чтобы прикрепить файлы",
+      "typeRejected": "Принимаются только файлы: {allowed}",
+      "sizeRejected": "{size} превышает лимит {max}",
+      "countRejected": "Только {count} файл за раз | Только {count} файлов за раз",
+      "invalidJson": "Недопустимый JSON: {detail}",
+      "invalidImage": "Недопустимый файл изображения",
+      "unavailable": "Загрузка файлов недоступна"
     },
     "date": {
       "openCalendar": "Открыть календарь",
