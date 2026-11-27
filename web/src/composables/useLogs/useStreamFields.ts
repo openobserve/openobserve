@@ -86,6 +86,8 @@ export interface StreamListOptions {
   force?: boolean;
   /** Carries schemas already loaded for the current type onto the refreshed list, so a later schema reuse does not read the list's empty one. */
   keepLoadedSchemas?: boolean;
+  /** A refresh the user did not ask for as a page load, such as opening the picker: an empty list leaves the page's error alone. */
+  background?: boolean;
 }
 
 interface ListedStream {
@@ -738,7 +740,7 @@ export const useStreamFields = () => {
       } else {
         // A list that came back empty must not leave the previous streams in the picker.
         searchObj.data.stream.streamLists = [];
-        searchObj.data.errorMsg = t("search.noStreamFoundInOrganization");
+        if (!options.background) searchObj.data.errorMsg = t("search.noStreamFoundInOrganization");
       }
       return;
     } catch (e: any) {
@@ -764,8 +766,10 @@ export const useStreamFields = () => {
     Promise.resolve().then(() => {
       streamSchemaFieldsIndexMapping.value = {};
       for (let i = 0; i < searchObj.data.stream.selectedStreamFields.length; i++) {
-        streamSchemaFieldsIndexMapping.value[searchObj.data.stream.selectedStreamFields[i].name] =
-          i;
+        const row = searchObj.data.stream.selectedStreamFields[i];
+        // A stream's group header carries the stream name, which a field may share.
+        if (row.label) continue;
+        streamSchemaFieldsIndexMapping.value[row.name] = i;
       }
     });
   };

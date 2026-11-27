@@ -12,7 +12,7 @@ import { resolveTracesFilter } from "@/utils/traces/resolveTracesFilter";
 import { SPAN_KIND_MAP } from "@/utils/traces/constants";
 import { buildFieldValuesRequest } from "./fieldValuesRequest";
 import { escapeSingleQuotes } from "@/utils/queryUtils";
-import { removeConditions } from "@/utils/query/sqlFilterBuilder";
+import { relaxConditions } from "@/utils/query/sqlFilterBuilder";
 import { analyzeTracesSql, hasOwnCondition } from "@/utils/traces/tracesSql";
 import { activeScopePredicate, withScope } from "@/utils/traces/tracesScope";
 import type { FieldObj } from "@/utils/fieldCategories";
@@ -186,7 +186,7 @@ export const tracesFilterField =
     return typeof key?.value === "string" ? key.value : null;
   };
 
-/** Typed SQL without the field's own condition; it may qualify the column with its FROM alias and test it with IN or IS. */
+/** Typed SQL without the field's own condition or any OR group holding one; it may qualify the column with its FROM alias and test it with IN or IS. */
 export const stripTypedFieldCondition = (where: string, fieldName: string): string => {
   if (!where.trim()) return "";
   const escaped = fieldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -194,7 +194,7 @@ export const stripTypedFieldCondition = (where: string, fieldName: string): stri
     `^(?:(?:"[^"]+"|\\w+)\\.)?"?${escaped}"?\\s*(?:[=!<>]|(?:not\\s+)?in\\b|is\\b)`,
     "i",
   );
-  return removeConditions(where, (condition) => pattern.test(condition)).trim();
+  return relaxConditions(where.trim(), (condition) => pattern.test(condition)).trim();
 };
 
 export default function useTracesFieldSource(options: TracesFieldSourceOptions): TracesFieldSource {

@@ -306,6 +306,21 @@ describe("OFieldList opening a row", () => {
     expect(item.querySelector(".o-field-list__expansion")).not.toBeNull();
   });
 
+  it("renders a group header and a field that share a name as two rows", () => {
+    wrapper = mount(OFieldList, {
+      props: {
+        fields: [
+          { name: "Common fields", isGroup: true, groupName: "Common fields" },
+          { name: "app" },
+          { name: "app", isGroup: true, groupName: "app" },
+          { name: "other" },
+        ],
+      },
+    });
+    expect(wrapper.findAll(".o-field-list__row")).toHaveLength(2);
+    expect(wrapper.findAll(".o-field-list__group-header")).toHaveLength(2);
+  });
+
   it("pins an open row at the top when the list has no group header to sit under", async () => {
     wrapper = mount(OFieldList, {
       props: { fields: FIELDS.filter((row) => !row.isGroup), expandedIds: ["/a"] },

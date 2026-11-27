@@ -51,7 +51,7 @@
 
       <!-- Field rows (hidden while loading) -->
       <template v-if="!loading">
-        <template v-for="row in paginatedFields" :key="rowKey ? row[rowKey] : row.name">
+        <template v-for="row in paginatedFields" :key="vnodeKey(row)">
           <!-- Group header -->
           <div
             v-if="row.isGroup"
@@ -411,6 +411,9 @@ watch(
 
 // Keyed like the rows, so two same-named fields in different groups expand on their own.
 const expansionKey = (row: FieldItem): string => String(row[props.rowKey] ?? row.name);
+// A group header may share its text with a field (a stream named like one of its fields), so headers key apart.
+const vnodeKey = (row: FieldItem): string =>
+  row.isGroup ? `\u0000group:${row.groupName ?? row.name}` : expansionKey(row);
 
 const listId = useId();
 

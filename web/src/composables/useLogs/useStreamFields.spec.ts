@@ -98,6 +98,20 @@ describe("useStreamFields Composable", () => {
       consoleError.mockRestore();
     });
 
+    it("leaves the page error alone when a background refresh finds no streams", async () => {
+      queryClient.clear();
+      const { searchObj } = searchState();
+      searchObj.data.errorMsg = "";
+      const fetchQuery = vi.spyOn(queryClient, "fetchQuery").mockResolvedValueOnce([] as never);
+      try {
+        await wrapper.vm.getStreamList(false, { force: true, background: true });
+        expect(searchObj.data.stream.streamLists).toEqual([]);
+        expect(searchObj.data.errorMsg).toBe("");
+      } finally {
+        fetchQuery.mockRestore();
+      }
+    });
+
     it("should not apply a stream list fetched for an org the user has left", async () => {
       queryClient.clear();
       const { searchObj } = searchState();

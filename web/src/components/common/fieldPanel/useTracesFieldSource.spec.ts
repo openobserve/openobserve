@@ -18,8 +18,7 @@ vi.mock("@/lib/feedback/Toast/useToast", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/feedback/Toast/useToast")>()),
   toast: toastMock,
 }));
-// Reads the org through the real vuex injection, like the actual composable, so the adapter
-// must create it in setup; a watcher-created instance has no store and rejects.
+// The adapter must be created in setup: a watcher-created instance has no store to read the org from.
 vi.mock("@/composables/useServiceCorrelation", async () => {
   const { useStore } = await import("vuex");
   return {
@@ -123,6 +122,7 @@ vi.mock("@/composables/useTraces", () => ({
 import useTracesFieldSource, {
   buildTracesFieldList,
   buildTracesValueFilter,
+  stripTypedFieldCondition,
   mapSpanKindValues,
   TRACES_LOCKED_FIELD_NAMES,
   type TracesFieldSource,
@@ -1170,5 +1170,16 @@ describe("load more after a failed page, through the real values stream (F2)", (
     settleStream(20);
     harness.source.loadMoreValues("zebra");
     expect(sentPage()).toEqual({ from: 20, size: 30 });
+  });
+});
+
+describe("stripTypedFieldCondition", () => {
+  it("drops an OR group holding the field whole, so the other branch does not narrow its counts", () => {
+    expect(stripTypedFieldCondition("http_route='/a' OR service_name='api'", "http_route")).toBe(
+      "",
+    );
+    expect(
+      stripTypedFieldCondition("t.http_route IN ('/a') AND service_name='api'", "http_route"),
+    ).toBe("service_name='api'");
   });
 });

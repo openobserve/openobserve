@@ -4616,6 +4616,22 @@ describe("Index.vue (Main Traces Page)", () => {
       expect(mockSearchObj.data.editorValue).toBe("");
     });
 
+    it("forgets the old stream's filter when the sidebar switches streams in SQL mode, so SQL off shows an empty editor", async () => {
+      wrapper = mountIndexStubbed();
+      await flushPromises();
+      mockSearchObj.meta.sqlMode = true;
+      mockSearchObj.data.editorValue = `SELECT * FROM "default"`;
+      mockSqlTexts().sqlTexts.filter = "service_name = 'svc'";
+
+      await wrapper.vm.onSidebarStreamChange("sidebar-stream");
+      await flushPromises();
+      mockSqlTexts().leaveSql();
+
+      expect(wrapper.vm.streamChangeDialog.show).toBe(false);
+      expect(mockSearchObj.data.editorValue).toBe("");
+      mockSearchObj.meta.sqlMode = false;
+    });
+
     it("should show confirmation dialog when editorValue has content", async () => {
       mockSearchObj.data.editorValue = "service_name = 'test'";
 

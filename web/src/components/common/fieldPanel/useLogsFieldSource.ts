@@ -44,6 +44,8 @@ export interface LogsFieldSource extends FieldPanelSource {
   capabilities: ComputedRef<FieldPanelCapabilities>;
   showBackToLogs: ComputedRef<boolean>;
   backToLogs: () => void;
+  /** Closes every open values list and cancels its fetch, as unmounting the old sidebar did. */
+  closeAllValues: () => void;
   quickPickGroups: ComputedRef<QuickPickGroup[]>;
   quickPickMoreCount: ComputedRef<number>;
   quickSelectStream: (name: string) => void;
@@ -78,7 +80,8 @@ export default function useLogsFieldSource(options: LogsFieldSourceOptions): Log
 
   const picker = useLogsPickerSource({ searchObj, onStreamChange, getStreamList });
   const { selectedStreams, streamType } = picker;
-  const streamsKey = () => `${streamType.value}:${selectedStreams.value.join(",")}`;
+  // The page sorts the selected streams in place, so the key must not depend on their order.
+  const streamsKey = () => `${streamType.value}:${[...selectedStreams.value].sort().join(",")}`;
 
   const footer = useLogsFooterTabs({
     searchObj,
@@ -298,6 +301,7 @@ export default function useLogsFieldSource(options: LogsFieldSourceOptions): Log
       search.value = value;
     },
     toggleGroup,
+    closeAllValues: values.closeAll,
     openField: values.openField,
     closeField: values.closeField,
     searchValues: values.searchValues,

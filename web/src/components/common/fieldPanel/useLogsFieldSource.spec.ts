@@ -1247,6 +1247,24 @@ describe("useLogsFieldSource", () => {
       expect(source.fieldValues.value).toEqual({});
     });
 
+    it("keeps open fields when the page sorts the selected streams in place", async () => {
+      seed([stream("zeta"), stream("alpha")]);
+      searchObj.data.stream.selectedStream = ["zeta", "alpha"];
+      await nextTick();
+      open("level", ["zeta", "alpha"]);
+      searchObj.data.stream.selectedStream.sort();
+      await nextTick();
+      expect(source.expandedFields.value).toEqual(["level"]);
+    });
+
+    it("closes every open field when the panel is hidden", () => {
+      seed([stream("s1")]);
+      open("level", ["s1"]);
+      source.closeAllValues();
+      expect(source.expandedFields.value).toEqual([]);
+      expect(source.fieldValues.value).toEqual({});
+    });
+
     it("describes the pinned range and stream of an open field", () => {
       seed([stream("s1")]);
       open("level", ["s1"]);

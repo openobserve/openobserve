@@ -133,7 +133,12 @@ export function useLogsPickerSource(deps: LogsPickerDeps): LogsPickerSource {
       streamType.value,
     );
     const isCurrent = () => isSelected() && !waitForSchemaLoad();
-    void deps.getStreamList(false, { isCurrent, force: true, keepLoadedSchemas: true });
+    void deps.getStreamList(false, {
+      isCurrent,
+      force: true,
+      keepLoadedSchemas: true,
+      background: true,
+    });
   };
 
   watch(

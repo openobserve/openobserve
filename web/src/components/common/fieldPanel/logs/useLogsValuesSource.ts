@@ -177,6 +177,7 @@ export function useLogsValuesSource(deps: LogsValuesDeps): LogsValuesSource {
   return {
     expandedFields,
     fieldValues,
+    closeAll: resetValues,
     openField,
     closeField,
     searchValues,

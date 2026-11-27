@@ -2560,6 +2560,14 @@ export default defineComponent({
         setInterestingFieldInSQLQuery(field, isFieldExistInSQL),
     });
 
+    // A hidden panel shows no values, so its open lists close and their fetches stop.
+    watch(
+      () => (isMobile.value ? mobileFieldsOpen.value : searchObj.meta.showFields),
+      (visible) => {
+        if (!visible) fieldSource.closeAllValues();
+      },
+    );
+
     const processInterestingFiledInSQLQuery = (parsedSQL, field, isFieldExistInSQL) => {
       let fieldTable = null;
       if (parsedSQL) {
