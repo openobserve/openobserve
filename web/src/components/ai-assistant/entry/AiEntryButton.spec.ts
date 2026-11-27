@@ -380,7 +380,8 @@ describe("AiEntryButton tooltip", () => {
 
 describe("AiEntryButton activation", () => {
   it("sends Explain into a new thread with the payload, the invoker and the user+org key", async () => {
-    const { wrapper } = setup();
+    const onOpened = vi.fn();
+    const { wrapper } = setup({ onOpened });
     await door(wrapper).trigger("click");
     await flushPromises();
     expect(lastCall()).toMatchObject({
@@ -393,7 +394,27 @@ describe("AiEntryButton activation", () => {
       payload: payload(),
     });
     expect(lastCall().invoker).toBe(door(wrapper).element);
-    expect(wrapper.emitted("opened")?.[0]?.[0]).toMatchObject({ ok: true });
+    expect(onOpened).toHaveBeenCalledTimes(1);
+    expect(onOpened.mock.calls[0][0]).toMatchObject({ ok: true });
+  });
+
+  it("reports the result to its host even when it unmounts while the build is pending", async () => {
+    let release: (v: OpenAssistantArgs["payload"]) => void = () => undefined;
+    const onOpened = vi.fn();
+    const { wrapper } = setup({
+      onOpened,
+      build: () =>
+        new Promise((resolve) => {
+          release = resolve;
+        }),
+    });
+    await door(wrapper).trigger("click");
+    wrapper.unmount();
+    release(payload());
+    await flushPromises();
+    expect(openAssistant).toHaveBeenCalledTimes(1);
+    expect(onOpened).toHaveBeenCalledTimes(1);
+    expect(onOpened.mock.calls[0][0]).toMatchObject({ ok: true });
   });
 
   it("stages Add to chat into the current thread, and toasts Open only when no container shows", async () => {
