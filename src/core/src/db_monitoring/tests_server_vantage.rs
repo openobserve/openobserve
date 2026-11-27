@@ -8090,13 +8090,8 @@ fn idx_seed_proceeds_when_the_field_is_a_bloom_filter_field() {
     );
 }
 
-/// A bounded-cardinality tripwire guarding SELECTIVITY: a tantivy index only pays
-/// off when a term matches a small minority of rows, and `guard_matched_rows`
-/// abandons the index for a file once matches exceed
-/// `inverted_index_skip_threshold` percent (default 35). With 8 kinds the most
-/// common one, `activity`, sits around 21% — under the cutoff but not comfortably.
-/// Fewer kinds means a LARGER share each and a greater chance of tripping the
-/// guard.
+/// A bounded-cardinality tripwire guarding SELECTIVITY: fewer kinds means a
+/// larger row share each, so the index prunes less.
 #[test]
 fn idx_seed_kind_cardinality_stays_small() {
     let kinds = [
@@ -8205,9 +8200,7 @@ fn idx_seed_trigger_fires_on_a_mixed_batch() {
 // the WHOLE condition and the read falls back to a full scan — no index at all.
 //
 // That is the worst place to lose it: deadlock and blocking are the RARE kinds,
-// the ones whose row share sits far under `inverted_index_skip_threshold` (35%)
-// and where the index actually pays. `statement` — measured at 50.4% of rows —
-// is already past the cutoff and gains nothing either way.
+// where the index prunes the most.
 //
 // So the seeded set is the canonical kind column PLUS the union of the marker
 // columns of `DEADLOCK_MARKERS` and `BLOCKING_MARKERS`. Nothing else: every

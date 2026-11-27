@@ -42,25 +42,14 @@ pub enum TantivyResult {
     RowIdsSelection(Arc<BooleanBuffer>), // per-row match bitmap, length num_rows
     SelectCandidates(Arc<Vec<(i64, u32)>>), //(_timestamp, doc_id) pairs
     NoMatch,                             // the file should be excluded without building a bitmap
-    Skipped {
-        percent: usize, // skipped tantivy search, with the percentage
-    },
-    Count(usize),                            // simple count optimization
-    Histogram(Vec<u64>),                     // simple histogram optimization
+    Count(usize),                        // simple count optimization
+    Histogram(Vec<u64>),                 // simple histogram optimization
     MultiHistogram(Vec<(i64, String, u64)>), // multi histogram optimization (with breakdown)
-    TopN(Vec<(Vec<String>, u64)>),           // group by top n optimization (1..=4 fields)
-    Distinct(HashSet<String>),               // simple distinct optimization
+    TopN(Vec<(Vec<String>, u64)>),       // group by top n optimization (1..=4 fields)
+    Distinct(HashSet<String>),           // simple distinct optimization
 }
 
 impl TantivyResult {
-    // used for skip tantivy search
-    pub fn percent(&self) -> usize {
-        match self {
-            Self::Skipped { percent } => *percent,
-            _ => 0,
-        }
-    }
-
     pub fn get_memory_size(&self) -> usize {
         match self {
             Self::RowIds(row_ids) => {
@@ -74,7 +63,6 @@ impl TantivyResult {
                     + std::mem::size_of::<Vec<(i64, u32)>>()
             }
             Self::NoMatch => 0,
-            Self::Skipped { .. } => std::mem::size_of::<usize>(),
             Self::Count(_) => std::mem::size_of::<usize>(),
             Self::Histogram(histogram) => {
                 histogram.capacity() * std::mem::size_of::<u64>() + std::mem::size_of::<Vec<u64>>()
@@ -447,18 +435,6 @@ mod tests {
     fn test_select_candidates_memory_size() {
         let result = TantivyResult::SelectCandidates(Arc::new(vec![(100i64, 1u32), (99, 2)]));
         assert!(result.get_memory_size() >= 2 * std::mem::size_of::<(i64, u32)>());
-    }
-
-    #[test]
-    fn test_tantivy_result_percent() {
-        let result = TantivyResult::Skipped { percent: 75 };
-        assert_eq!(result.percent(), 75);
-
-        let result = TantivyResult::RowIds(Vec::new());
-        assert_eq!(result.percent(), 0);
-
-        let result = TantivyResult::Count(100);
-        assert_eq!(result.percent(), 0);
     }
 
     #[test]
