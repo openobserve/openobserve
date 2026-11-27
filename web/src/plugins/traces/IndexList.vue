@@ -18,8 +18,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     class="index-menu bg-surface-panel! flex w-full flex-col pt-1.5! pb-0! [&_.field-expansion-item_.o-field-row]:ps-3 [&_.field-expansion-item_.o-field-row>span:first-child]:me-0 [&_.field-expansion-item_.o-field-row>span:first-child]:w-4 [&_.o-field-list__row]:mt-0.5 [&_.o-field-list__row]:px-2 [&_.o-field-row]:h-7 [&_.o-field-row]:ps-8"
   >
-    <div class="px-2">
+    <div class="flex items-center gap-1.5 px-2">
       <OSelect
+        class="min-w-0 flex-1"
         :aria-label="t('search.selectStream')"
         data-test="log-search-index-list-select-stream"
         :model-value="searchObj.data.stream.selectedStream?.value ?? null"
@@ -37,6 +38,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="p-2">{{ t("search.noResult") }}</div>
         </template>
       </OSelect>
+      <OTag
+        v-if="assistantSet.has('stream')"
+        variant="primary-soft"
+        size="sm"
+        :icon="assistantGlyph.assistant"
+        :label="t('traces.assistantSet.label')"
+        role="note"
+        :aria-label="
+          t('traces.assistantSet.name', { field: t('traces.assistantSet.field.stream') })
+        "
+        class="shrink-0"
+        data-test="traces-assistant-set-stream"
+      />
     </div>
     <div class="index-table min-h-0 w-full flex-1" data-test="log-search-index-list-fields-table">
       <GroupedFieldList
@@ -218,7 +232,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, watch, defineAsyncComponent } from "vue";
+import { defineComponent, ref, computed, watch, defineAsyncComponent, type PropType } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -234,6 +248,9 @@ import FieldExpansion from "@/components/common/FieldExpansion.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
+import type { AssistantSetField } from "@/composables/assistant/pure";
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
@@ -267,6 +284,7 @@ export default defineComponent({
     FieldRow,
     OButton,
     OSelect,
+    OTag,
     OSpinner,
     OIcon,
     GroupedFieldList: defineAsyncComponent(
@@ -278,7 +296,7 @@ export default defineComponent({
     // Static: an async row renders empty until its chunk lands, leaving blank gaps under each group.
     FieldExpansion,
   },
-  emits: ["update:changeStream", "update:selectedFields", "group-by"],
+  emits: ["update:changeStream", "update:selectedFields", "assistant-set-cleared", "group-by"],
   props: {
     fieldList: {
       type: Array,
@@ -291,6 +309,11 @@ export default defineComponent({
     activeExcludeFieldValues: {
       type: Object as () => Record<string, string[]>,
       default: () => ({}),
+    },
+    /** Filters the assistant set when it opened the page; the stream shows a label until the user changes it. */
+    assistantSet: {
+      type: Object as PropType<Set<AssistantSetField>>,
+      default: () => new Set(),
     },
     /** The stream has a user-defined schema, so fields outside it are packed into the _all column. */
     storesExtraFieldsInAll: {
@@ -387,6 +410,7 @@ export default defineComponent({
       searchObj.data.query = "";
       searchObj.data.editorValue = "";
       searchObj.data.resultGrid.currentPage = 0;
+      if (props.assistantSet.has("stream")) emit("assistant-set-cleared", "stream");
       emit("update:changeStream");
     };
 
@@ -705,6 +729,7 @@ export default defineComponent({
       fnMarkerLabel,
       duration,
       onStreamChange,
+      assistantGlyph,
       showFtsFieldValues,
       normalizedFieldList,
       isFieldEditable,

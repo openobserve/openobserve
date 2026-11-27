@@ -4,7 +4,7 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
-const { ingestTraces } = require('../utils/trace-ingestion.js');
+const { seedSearchableTraces } = require('../utils/trace-ingestion.js');
 
 const FILTER = "service_name = 'api-gateway'";
 const PREFILLED = `SELECT * FROM "default" WHERE ${FILTER} ORDER BY start_time DESC`;
@@ -18,23 +18,13 @@ const PER_TRACE =
   'FROM "default" GROUP BY trace_id HAVING count(*) > 0 ORDER BY spans DESC LIMIT 100';
 
 test.describe("Traces SQL mode testcases", () => {
-  test.describe.configure({ mode: 'serial' });
+  test.describe.configure({ mode: 'parallel' });
   let pm;
 
   // Every seeded trace has a frontend and a backend span, so the Traces view queries below find rows.
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(120000);
-    const context = await browser.newContext({
-      storageState: 'playwright-tests/utils/auth/user.json',
-    });
-    const page = await context.newPage();
-    try {
-      await ingestTraces(page, 6, { forceScenario: 'success' });
-    } catch (e) {
-      testLogger.warn('SQL mode trace seeding failed (continuing)', { error: e.message });
-    } finally {
-      await context.close();
-    }
+    await seedSearchableTraces(browser, 6, { forceScenario: 'success' });
   });
 
   test.beforeEach(async ({ page }, testInfo) => {
@@ -90,12 +80,14 @@ test.describe("Traces SQL mode testcases", () => {
     await pm.tracesPage.expectQueryEditorValue(PREFILLED);
     await pm.tracesPage.setQueryEditorValue(GROUPED);
 
-    await pm.tracesPage.toggleSqlModeFromToolbar();
-
+    // The toast lives 5 s, so it is watched while the menu is still closing.
+    await Promise.all([
+      expect(pm.tracesPage.getToastMessage('Your SQL is kept.')).toBeVisible({ timeout: 30000 }),
+      pm.tracesPage.toggleSqlModeFromToolbar(),
+    ]);
     await expect(pm.tracesPage.getSqlModeConfirmDialog()).toHaveCount(0);
     await pm.tracesPage.expectSqlMode(false);
     await pm.tracesPage.expectQueryEditorValue(FILTER);
-    await expect(pm.tracesPage.getToastMessage('Your SQL is kept.')).toBeVisible({ timeout: 10000 });
 
     await pm.tracesPage.toggleSqlModeFromToolbar();
     await pm.tracesPage.expectSqlMode(true);
@@ -105,18 +97,19 @@ test.describe("Traces SQL mode testcases", () => {
   test("P1: The SQL switch in the Traces view moves to Spans, runs nothing, and Back to Traces returns", {
     tag: ['@tracesSqlMode', '@traces', '@query', '@P1', '@all']
   }, async () => {
-    await pm.tracesPage.switchToTracesMode();
+    await pm.tracesPage.switchToTracesModeAndSettle();
     await pm.tracesPage.setQueryEditorValue(FILTER);
     await pm.tracesPage.expectSqlMode(false);
 
+    const toast = pm.tracesPage.getToastMessage('SQL runs in the Spans view');
     const searches = await pm.tracesPage.countSearchStreams(async () => {
       await pm.tracesPage.toggleSqlModeFromToolbar();
-      await pm.tracesPage.expectSqlMode(true);
+      // Hovering pauses the toast's 5 s timer until its action is clicked.
+      await toast.hover({ timeout: 10000 });
     }, () => expect(pm.tracesPage.getSqlAwaitingRun()).toBeVisible({ timeout: 10000 }));
 
     expect(searches).toBe(0);
     await pm.tracesPage.expectQueryEditorValue(PREFILLED);
-    await expect(pm.tracesPage.getToastMessage('SQL runs in the Spans view')).toBeVisible();
 
     await pm.tracesPage.clickToastAction('Back to Traces');
 
@@ -147,7 +140,7 @@ test.describe("Traces SQL mode testcases", () => {
   test("P2: A SELECT typed in the Traces view sends nothing, and Open in Spans view carries it", {
     tag: ['@tracesSqlMode', '@traces', '@query', '@P2', '@all']
   }, async () => {
-    await pm.tracesPage.switchToTracesMode();
+    await pm.tracesPage.switchToTracesModeAndSettle();
     await pm.tracesPage.setQueryEditorValue(GROUPED);
     await pm.tracesPage.expectSqlMode(false);
 
@@ -169,7 +162,7 @@ test.describe("Traces SQL mode testcases", () => {
     tag: ['@tracesSqlMode', '@traces', '@query', '@P2', '@all']
   }, async () => {
     const subquery = `trace_id IN (SELECT trace_id FROM "default" WHERE ${FILTER})`;
-    await pm.tracesPage.switchToTracesMode();
+    await pm.tracesPage.switchToTracesModeAndSettle();
     await pm.tracesPage.setQueryEditorValue(subquery);
 
     const searches = await pm.tracesPage.countSearchStreams(async () => {

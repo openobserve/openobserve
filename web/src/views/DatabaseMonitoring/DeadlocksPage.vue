@@ -330,7 +330,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="dbm-deadlocks-cycle"
                 @participant-action="(id, p) => onParticipantAction(id, p, row)"
                 @copy-summary="copySummary(row)"
-                @ask-ai="askAiForFix(row)"
+                :ai-door="deadlockDoor(row)"
               />
 
               <!-- The repeats as a two-lane timeline rather than N rows: the
@@ -470,7 +470,8 @@ import { createDbmContextProvider } from "@/composables/contextProviders";
 import { copyToClipboard } from "@/utils/clipboard";
 import { requestAlertCreation } from "@/composables/alerts/useAlertCreation";
 import { buildDbmLockPrefill } from "@/utils/alerts/prefill/fromDbmLocks";
-import { buildDeadlockFixPrompt } from "@/utils/dbm/aiPrompts";
+import { dbmFixDoor } from "@/components/dbm/dbmDoors";
+import { useLoadedOrg } from "@/utils/assistant/doorBinding";
 import {
   deadlockCadenceSeconds,
   groupDeadlocks,
@@ -496,12 +497,6 @@ const { t } = useI18nTyped();
 const store = useStore();
 const route = useRoute();
 const router = useRouter();
-
-// This page is a route root, so MainLayout's `@sendToAiChat` binding is on it
-// directly — no re-emit chain needed.
-const emit = defineEmits<{
-  (e: "sendToAiChat", value: { query: string; autoSend: boolean }): void;
-}>();
 
 // The shared list-page spine: scope from the URL, the request-sequence guard,
 // the shell's badge snapshot, refresh/date-change handlers, the load envelope
@@ -1251,24 +1246,33 @@ const load = () =>
  * fragment would have the model reason about a WHERE clause with no statement
  * around it.
  */
-const askAiForFix = (row: DeadlockRow) => {
-  analytics.track("dbm_ai_fix_requested", { page: "deadlocks" });
+const deadlockInput = (row: DeadlockRow) => {
   const participants = row.selectedEvent?.participants ?? [];
   const queries = participants.map((p) => p.query ?? "").filter(Boolean);
-  emit("sendToAiChat", {
-    query: buildDeadlockFixPrompt({
-      queries: queries.length ? queries : row.queries,
-      dbSystem: row.db_system,
-      dbInstance: row.db_instance,
-      objects: row.objects,
-      oppositeRowOrder: row.oppositeRowOrder,
-      count: row.count,
-      cadenceSeconds: cadenceFor(row),
-      applications: row.applications,
-    }),
-    autoSend: true,
-  });
+  return {
+    queries: queries.length ? queries : row.queries,
+    dbSystem: row.db_system,
+    dbInstance: row.db_instance,
+    objects: row.objects,
+    oppositeRowOrder: row.oppositeRowOrder,
+    count: row.count,
+    cadenceSeconds: cadenceFor(row),
+    applications: row.applications,
+  };
 };
+
+// The org the rows were loaded under, so a door left on screen after an org switch is refused.
+const loadedOrg = useLoadedOrg(
+  () => tableRows.value,
+  () => store.state.selectedOrganization?.identifier ?? "",
+);
+const deadlockDoor = (row: DeadlockRow) =>
+  dbmFixDoor(
+    { label: t("dbm.ai.deadlockFix"), tooltip: t("dbm.ai.deadlockFixHint") },
+    () => ({ kind: "deadlock", input: deadlockInput(row) }),
+    store.state,
+    loadedOrg.value,
+  );
 
 /** The pair's recurrence gap, when the pair grouping produced one. */
 const cadenceFor = (row: DeadlockRow): number | null => {

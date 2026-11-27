@@ -76,6 +76,7 @@ import useIsMetaOrg from "@/composables/useIsMetaOrg";
 import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
 import { featureState, menuState } from "@/utils/featureGate";
 import { isSlackSettingsVisible, readSlackOrgConfig } from "@/utils/slackSettings";
+import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
 import { PAGE_ACTIONS_SLOT_ID } from "./pageActionsSlot";
 import { SAVE_BAR_SLOT_ID } from "./saveBarSlot";
 
@@ -116,6 +117,7 @@ export default defineComponent({
       syntheticsLocations: "synthetics_locations",
       correlationSettings: "correlation_settings",
       slack: "slack",
+      assistantSettings: "assistant",
     };
 
     const settingsTab = ref(
@@ -212,6 +214,7 @@ export default defineComponent({
       "Access & Security",
       "Destinations",
       "Integrations",
+      "Assistant",
       "Data",
       "Operations",
       "Synthetics",
@@ -242,6 +245,7 @@ export default defineComponent({
       const queryManagementAccess = checkFeatureAccess("queryManagement", featureGateCtx);
       const nodesAccess = checkFeatureAccess("nodes", featureGateCtx);
       const licenseAccess = checkFeatureAccess("license", featureGateCtx);
+      const assistantAccess = checkFeatureAccess("aiAssistant", featureGateCtx);
       // A locked license keeps the entry even where its runtime flag is off, so the lock stays discoverable.
       const syntheticsLicense = menuState(
         z?.features,
@@ -499,6 +503,23 @@ export default defineComponent({
           group: "Account",
         },
         {
+          key: "assistant",
+          label: t("assistant.settings.title"),
+          description: t("assistant.settings.railDesc"),
+          icon: assistantGlyph.assistant,
+          to: {
+            name: "assistantSettings",
+            params: { tab: "status" },
+            query: { org_identifier: org },
+          },
+          visible: aiAssistantLicense !== "hidden" && assistantAccess.visible,
+          locked: !assistantAccess.allowed,
+          lockedMessage: assistantAccess.message,
+          licenseLocked: aiAssistantLicense === "locked",
+          dataTest: "settings-assistant-tab",
+          group: "Assistant",
+        },
+        {
           key: "user_management",
           label: t("settings.userManagement"),
           description: t("settings.userManagementDesc"),
@@ -547,6 +568,7 @@ export default defineComponent({
         "Access & Security": t("settings.groupAccessSecurity"),
         Destinations: t("settings.groupDestinations"),
         Integrations: t("settings.groupIntegrations"),
+        Assistant: t("settings.groupAssistant"),
         Data: t("settings.groupData"),
         Operations: t("settings.groupOperations"),
         Synthetics: t("settings.groupSynthetics"),

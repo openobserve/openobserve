@@ -230,12 +230,16 @@ import Upload from "~icons/material-symbols-light/upload-outline";
 import VerifiedUser from "~icons/material-symbols-light/verified-user-outline";
 import Webhook from "~icons/material-symbols-light/webhook-outline";
 import MenuBook from "~icons/material-symbols-light/menu-book-outline";
+import CenterFocusWeak from "~icons/material-symbols-light/center-focus-weak-outline";
+import Mic from "~icons/material-symbols-light/mic-outline";
+import MicOff from "~icons/material-symbols-light/mic-off-outline";
 
 import OpenInBrowser from "~icons/material-symbols-light/open-in-browser-outline";
 import StackedLineChart from "~icons/material-symbols-light/stacked-line-chart-outline";
 import Keyboard from "~icons/material-symbols-light/keyboard-outline";
 import Checklist from "~icons/material-symbols-light/checklist-outline";
 import PhotoCamera from "~icons/material-symbols-light/photo-camera-outline";
+import PictureInPicture from "~icons/material-symbols-light/picture-in-picture-alt-outline";
 
 import AddCircleIcon from "~icons/material-symbols-light/add-circle-outline";
 import AdsClickIcon from "~icons/material-symbols-light/ads-click-outline";
@@ -283,6 +287,7 @@ import FastRewindIcon from "~icons/material-symbols-light/fast-rewind-outline";
 import FiberManualRecordIcon from "~icons/material-symbols-light/fiber-manual-record-outline";
 import FileDownloadIcon from "~icons/material-symbols-light/download-outline";
 import FilterAltIcon from "~icons/material-symbols-light/filter-alt-outline";
+import DockToRightIcon from "~icons/material-symbols-light/dock-to-right-outline";
 import DataPlusLineIcon from "~icons/majesticons/data-plus-line";
 import FilterListIcon from "~icons/material-symbols-light/filter-list-outline";
 import FlagIcon from "~icons/material-symbols-light/flag-outline";
@@ -367,6 +372,11 @@ import Emergency from "~icons/material-symbols-light/emergency-outline";
 import Compress from "~icons/material-symbols-light/compress-outline";
 import Pattern from "~icons/material-symbols-light/pattern-outline";
 import CallMerge from "~icons/material-symbols-light/call-merge-outline";
+import AddCommentIcon from "~icons/material-symbols-light/add-comment-outline";
+import RemoveCircleOutlineIcon from "~icons/material-symbols-light/do-not-disturb-on-outline";
+import PushPinIcon from "~icons/material-symbols-light/push-pin-outline";
+// Not in the light set, so this one stays on the regular weight.
+import AutoFixHighIcon from "~icons/material-symbols/auto-fix-high";
 // Not in the light set, so this one stays on the regular weight.
 import AutoGraph from "~icons/material-symbols/auto-graph";
 import PlayCircleFilled from "~icons/material-symbols-light/play-circle-outline";
@@ -422,6 +432,7 @@ import SupportAgentIcon from "~icons/material-symbols-light/support-agent-outlin
 import CloudSyncIcon from "~icons/material-symbols-light/cloud-sync-outline";
 
 // Brand marks (not Material Symbols) — local inline SVG components using currentColor.
+import AssistantSparkGlyph from "./AssistantSparkGlyph.vue";
 import McpLogo from "./McpLogo.vue";
 import SlackLogo from "./SlackLogo.vue";
 
@@ -466,6 +477,7 @@ export const iconRegistry = {
   "sb-sidebar-chevron-right": SbSidebarChevronRight,
   alarm: Alarm,
   add: Add,
+  "assistant-spark": AssistantSparkGlyph,
   mcp: McpLogo,
   slack: SlackLogo,
   "arrow-back": ArrowBack,
@@ -642,6 +654,7 @@ export const iconRegistry = {
   "navigate-next": ChevronRight,
   "fullscreen-exit": FullscreenExit,
   "fit-screen": FitScreen,
+  "center-focus-weak": CenterFocusWeak,
   group: Group,
   "hourglass-empty": HourglassEmpty,
   label: Label,
@@ -651,6 +664,8 @@ export const iconRegistry = {
   "mark-email-unread": MarkEmailUnread,
   "manage-search": ManageSearch,
   merge: Merge,
+  mic: Mic,
+  "mic-off": MicOff,
   "more-horiz": MoreHoriz,
   navigation: NavigationIcon,
   notifications: Notifications,
@@ -717,6 +732,7 @@ export const iconRegistry = {
   "delete-outline": Delete,
   "delete-sweep": DeleteSweepIcon,
   devices: DevicesIcon,
+  "dock-to-right": DockToRightIcon,
   "drag-indicator": DragIndicatorIcon,
   "event-note": EventNoteIcon,
   "exit-to-app": ExitToAppIcon,
@@ -825,6 +841,7 @@ export const iconRegistry = {
   // Batch 3: Synthetics / browser-check icons (2026-06-22)
   // (duplicate "person-pin-circle" from batch 2 removed — keep the first entry at line 624)
   "open-in-browser": OpenInBrowser,
+  "picture-in-picture": PictureInPicture,
   "stacked-line-chart": StackedLineChart,
   keyboard: Keyboard,
   checklist: Checklist,
@@ -847,6 +864,12 @@ export const iconRegistry = {
   router: RouterIcon,
   "support-agent": SupportAgentIcon,
   "cloud-sync": CloudSyncIcon,
+
+  // Batch 7: O2 Assistant glyphs (2026-10-16); Material Symbols has no remove-circle-outline, do-not-disturb-on-outline is its glyph.
+  "add-comment": AddCommentIcon,
+  "auto-fix-high": AutoFixHighIcon,
+  "remove-circle-outline": RemoveCircleOutlineIcon,
+  "push-pin": PushPinIcon,
 } as const satisfies Record<string, Component>;
 
 export type IconName = keyof typeof iconRegistry;

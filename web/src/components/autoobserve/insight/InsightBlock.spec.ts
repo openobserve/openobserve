@@ -22,6 +22,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import InsightBlock from "./InsightBlock.vue";
 import { ASK_AI_KEY } from "./insightCta";
 import type { InsightCta, InsightParts } from "./insightCopy";
+import en from "@/locales/languages/en-US.json";
 
 const cta: InsightCta = {
   key: "review-query",
@@ -141,7 +142,7 @@ describe("InsightBlock card (test 8)", () => {
     const ask = vi.fn();
     const wrapper = mountBlock(insight(), "card", { ask });
     const button = wrapper.get(sel("ask-ai"));
-    expect(button.text()).toBe("Ask AI");
+    expect(button.text()).toBe(en.brand.askAutobot);
     await button.trigger("click");
     expect(ask).toHaveBeenCalledTimes(1);
     expect(ask.mock.calls[0][0]).toMatchObject({

@@ -100,6 +100,8 @@ export interface InputProps {
    * 'inside' renders as an inline prefix inside the field border, one row tall.
    */
   labelPosition?: "inside" | "outside";
+  /** Extra attributes for the native control (an accessible name, `aria-describedby`) where no visible label fits. */
+  inputAttrs?: Record<string, string | number | boolean | undefined>;
 }
 
 export interface InputEmits {

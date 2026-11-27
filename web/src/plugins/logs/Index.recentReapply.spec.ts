@@ -196,6 +196,34 @@ describe("Logs re-apply from recent searches", { timeout: 30000 }, () => {
     expect(state.data.query).toBe(Q2);
   });
 
+  it("keeps the edited query when the run's URL rewrite drops the assistant nonce", async () => {
+    wrapper.unmount();
+    wrapper = mount(Index, {
+      attachTo: "#app",
+      global: { provide: { store }, plugins: [i18n, router] },
+    });
+    await flushPromises();
+    const state = wrapper.vm.searchObj;
+    const org = store.state.selectedOrganization.identifier;
+    const landing = recentSearchRoute(recorded(Q1), "now", org, "load")!;
+    const query = { ...landing.query, type: "ai_chat_query", t: "1" };
+    router.currentRoute.value = router.resolve({ ...landing, query });
+    await vi.waitFor(() => expect(state.data.query).toBe(Q1), WAIT);
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    await flushPromises();
+
+    state.data.editorValue = Q2;
+    state.data.query = Q2;
+    const { t: _nonce, ...rewritten } = query;
+    router.currentRoute.value = router.resolve({ ...landing, query: rewritten });
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    await flushPromises();
+    expect(state.data.query).toBe(Q2);
+
+    router.currentRoute.value = router.resolve({ ...landing, query: { ...query, t: "2" } });
+    await vi.waitFor(() => expect(state.data.query).toBe(Q1), WAIT);
+  });
+
   it("does not run a re-run that a load-only restore overtook", async () => {
     const state = wrapper.vm.searchObj;
     const searchBar = (wrapper.vm as unknown as { searchBarRef: SearchBarApi }).searchBarRef;

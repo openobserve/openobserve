@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import config from "@/aws-exports";
 import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { defineComponent, h } from "vue";
@@ -216,6 +216,8 @@ describe("MainLayout — Product Analytics menu entry", () => {
   describe("license-gated entries", () => {
     // The license map only applies on an enterprise or cloud build, and CI runs with neither set.
     const edition = config.isEnterprise;
+    // These tests end on `/`, whose lazy Home page is heavy enough on first import to outlast the test timeout.
+    beforeAll(() => import("@/views/HomeView.vue"), 60_000);
     beforeEach(() => {
       config.isEnterprise = "true";
     });

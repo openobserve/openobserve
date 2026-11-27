@@ -118,22 +118,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
           {{ raw("Windows") }}
         </EmptyStateIngestionChip>
-        <EmptyStateIngestionChip
-          v-if="aiEnabled"
-          variant="ai"
-          data-test="logs-no-data-ask-ai-btn"
-          @click="emit('ask-ai')"
-        >
-          <img :src="aiIconSrc" class="h-3.5 w-3.5 shrink-0" alt="" />
-          {{ t("logs.noData.askAi") }}
-        </EmptyStateIngestionChip>
+        <slot name="ai-door" />
       </div>
     </template>
   </OEmptyState>
 </template>
 
 <script setup lang="ts">
-import { useAiIcon } from "@/composables/useAiIcon";
 import { computed } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
@@ -144,7 +135,6 @@ import EmptyStateIngestionChip from "@/lib/core/EmptyState/EmptyStateIngestionCh
 import { getImageURL } from "@/utils/zincutils";
 
 const props = defineProps<{
-  aiEnabled: boolean;
   /** Under FirstDataPanel's card: only the cards and chips, under an "Or start another way" caption. */
   alternativesOnly?: boolean;
 }>();
@@ -152,13 +142,10 @@ const props = defineProps<{
 defineSlots<{
   /** A line between the description and the cards. */
   status?(): unknown;
+  /** The page's own AI door. */
+  "ai-door"?(): unknown;
 }>();
 
-const emit = defineEmits<{
-  "ask-ai": [];
-}>();
-
-const { aiIconSrc } = useAiIcon();
 const { t } = useI18nTyped();
 const router = useRouter();
 const store = useStore();

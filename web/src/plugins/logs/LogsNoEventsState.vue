@@ -31,7 +31,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
        → generic message (no action card; Ask AI / history below)
 
   Emits action IDs to the parent rather than mutating state directly.
-  The "Ask AI" ghost button is only shown when aiEnabled is true.
 -->
 <template>
   <div class="flex h-full flex-col">
@@ -92,18 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ t("logs.noEvents.openHistory") }}
           </OButton>
-          <OButton
-            v-if="aiEnabled && windowHasStreamData && !jumpTarget"
-            variant="outline"
-            size="sm"
-            data-test="logs-no-events-ask-ai-btn"
-            @click="emit('ask-ai')"
-          >
-            <template #icon-left>
-              <img :src="aiIconSrc" class="h-4 w-4 shrink-0" alt="" />
-            </template>
-            {{ t("logs.noEvents.askAi") }}
-          </OButton>
+          <slot v-if="windowHasStreamData && !jumpTarget" name="ai-door" />
         </div>
       </template>
     </OEmptyState>
@@ -111,7 +99,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { useAiIcon } from "@/composables/useAiIcon";
 import { computed } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -133,7 +120,6 @@ const props = defineProps<{
   query: string;
   relativeTimePeriod: string;
   dateType: string;
-  aiEnabled: boolean;
   /** doc_time_min/max from stream stats, in microseconds. */
   streamDocTimeRange?: { min: number; max: number };
   /** Resolved microsecond bounds of the active query window. */
@@ -147,11 +133,14 @@ const props = defineProps<{
 const emit = defineEmits<{
   "jump-to-stream-data": [fromUs: number, toUs: number];
   "open-history": [];
-  "ask-ai": [];
 }>();
 
-const { aiIconSrc } = useAiIcon();
 const { t } = useI18nTyped();
+
+defineSlots<{
+  /** The page's own AI door. */
+  "ai-door"?(): unknown;
+}>();
 
 // The server sends a list of messages, which can arrive as an array or as its JSON text.
 const functionMessages = computed<string>(() => {

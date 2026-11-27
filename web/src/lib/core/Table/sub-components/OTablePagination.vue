@@ -11,6 +11,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OPagination from "@/lib/navigation/Pagination/OPagination.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { guardMenusWhile, swallowActivation } from "../composables/useInactiveGuard";
+import { useFloatingClearance } from "@/lib/core/Table/composables/useFloatingClearance";
 
 const { t } = useI18nTyped();
 const slots = useSlots();
@@ -67,6 +68,10 @@ const emit = defineEmits<{
   "go-to-page": [page: number];
 }>();
 
+// A floating launcher covers the page's bottom-end corner, so a pager under it ends its controls before it.
+const pagerRef = ref<HTMLElement | null>(null);
+const clearance = useFloatingClearance(pagerRef);
+
 const showSkeleton = useDelayedFlag(() => !!props.loading, LOADER_DELAY_MS);
 
 // A second "next" before the first page arrives would count from the requested page, so paging waits for it.
@@ -113,6 +118,7 @@ const pageSizeSelectOptions = computed(() => {
 
 <template>
   <div
+    ref="pagerRef"
     :data-test="`o2-table-pagination-${position}`"
     :data-locked="lockedReason ? 'true' : undefined"
     :aria-describedby="lockedReason ? lockReasonId : undefined"
@@ -135,6 +141,9 @@ const pageSizeSelectOptions = computed(() => {
     <!-- min-h is one small control, so a one-row footer keeps its height even when the page-size select is absent. -->
     <div
       class="ms-auto flex min-h-[2.125rem] min-w-0 flex-wrap items-center justify-end gap-x-3 gap-y-1 max-md:basis-full max-md:justify-between max-md:gap-x-2"
+      :class="clearance ? 'me-[calc(var(--o-pager-clearance)*1rem)]' : ''"
+      :style="clearance ? { '--o-pager-clearance': clearance } : undefined"
+      data-test="o2-table-pagination-controls"
     >
       <span
         v-if="loading"
@@ -185,7 +194,7 @@ const pageSizeSelectOptions = computed(() => {
           :searchable="false"
           :disabled="!!lockedReason"
           size="sm"
-          :aria-label="t('search.recordsPerPage')"
+          :aria-label="t('components.pagination.recordsPerPage')"
           :data-test="pageSizeDataTest ?? 'o2-table-page-size-select'"
         />
       </div>

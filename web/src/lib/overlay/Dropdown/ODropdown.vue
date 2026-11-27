@@ -44,6 +44,7 @@ import {
   type Ref,
   type VNode,
 } from "vue";
+import { useOverlayScope } from "@/lib/overlay/overlayScope";
 import useBreakpoint from "@/composables/useBreakpoint";
 import {
   O_DROPDOWN_NESTED_KEY,
@@ -331,6 +332,8 @@ function hasRenderableContent(nodes: VNode[] | undefined): boolean {
     return true;
   });
 }
+// A scope that provides attributes (the assistant surface) keeps them on content teleported out of it.
+const overlayScope = useOverlayScope();
 </script>
 
 <template>
@@ -341,6 +344,8 @@ function hasRenderableContent(nodes: VNode[] | undefined): boolean {
 
     <DropdownMenuPortal>
       <DropdownMenuContent
+        v-bind="overlayScope"
+        :data-dd-privacy="privacy"
         :side="side"
         :align="align"
         :side-offset="sideOffset"

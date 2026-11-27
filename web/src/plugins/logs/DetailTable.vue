@@ -17,12 +17,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     class="searchdetaildialog flex h-full flex-col flex-nowrap"
-    :class="severityBorderClass"
+    :class="[severityBorderClass, 'max-w-full']"
     data-test="dialog-box"
     data-no-autofocus
   >
     <!-- Single Tab Row -->
-    <div class="flex shrink-0 items-center justify-between">
+    <div class="flex shrink-0 flex-wrap items-center justify-between">
       <div class="-mb-0.75 flex items-center gap-2">
         <OTabs
           :model-value="tab"
@@ -54,7 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </OTabs>
       </div>
-      <div class="flex shrink-0 items-center gap-2 pe-3">
+      <div class="ms-auto flex min-w-0 flex-wrap items-center justify-end gap-2 pe-3">
         <OPopover v-if="!embedded" align="end" :aria-label="t('logs.severity.popoverAriaLabel')">
           <template #trigger>
             <!-- Unknown takes the outline fill: its soft grey read lighter than the controls beside it in dark. -->
@@ -146,8 +146,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <LogLineLinkPopover source="drawer" />
         </div>
         <O2AIContextAddBtn
+          v-if="assistantDoorsShown"
           data-test="logs-detail-ai-context-btn"
-          @sendToAiChat="sendToAiChat(JSON.stringify(rowData))"
+          @sendToAiChat="addRecordToChat"
         />
         <!-- Lives in the header rather than inside the JSON tab so the action
              stays reachable from every tab. JsonPreview is told to hide its own
@@ -257,7 +258,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @add-field-to-table="addFieldToTable"
               @add-search-term="toggleIncludeSearchTerm"
               @view-trace="viewTrace"
-              @send-to-ai-chat="sendToAiChat"
+              :door-context="recordDoorBase"
+              :bound-org="doorBoundOrg"
               @closeTable="closeTable"
               @show-correlation="showCorrelation"
             />
@@ -386,26 +388,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           {{ crossLink.name }}
                         </ODropdownItem>
                       </template>
-                      <ODropdownItem
-                        v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
-                        data-test="log-details-table-send-to-ai-chat-btn"
-                        @select="sendToAiChat(JSON.stringify({ [row.field]: row.value }))"
-                      >
-                        <template #icon-left>
-                          <img :src="getBtnLogo" width="14" height="14" alt="" />
-                        </template>
-                        {{ t("logs.detailTable.sendToAiChat") }}
-                      </ODropdownItem>
-                      <ODropdownItem
-                        v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
-                        data-test="log-details-table-redirect-to-regex-pattern-btn"
-                        @select="createRegexPatternFromLogs(row.field, row.value)"
-                      >
-                        <template #icon-left>
-                          <img :src="regexIcon" width="14" height="14" alt="" />
-                        </template>
-                        {{ t("regex_patterns.create_regex_pattern_field") }}
-                      </ODropdownItem>
+                      <AiEntryButton
+                        v-bind="fieldDoor(row.field, row.value)"
+                        appearance="menu-item"
+                        reveal
+                        @opened="closeOnAdd"
+                      />
+                      <AiEntryButton
+                        v-bind="regexDoor(row.field, row.value)"
+                        appearance="menu-item"
+                      />
                     </ODropdown>
                     <pre
                       :data-test="`log-detail-${row.field}-value`"
@@ -456,7 +448,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :hide-search-term-actions="false"
             :hide-dimension-filters="true"
             :hide-reset-filters-button="true"
-            @sendToAiChat="sendToAiChat"
             @addSearchTerm="addSearchTerm"
           />
           <!-- Loading/Empty state when no data -->
@@ -656,6 +647,7 @@ import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import {
+  defineAsyncComponent,
   defineComponent,
   ref,
   reactive,
@@ -668,7 +660,6 @@ import {
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
-import { useTheme } from "@/composables/useTheme";
 import { getImageURL } from "../../utils/zincutils";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
@@ -705,7 +696,6 @@ import {
   rankCorrelatedStreams,
   semanticRecordDimensions,
 } from "@/plugins/correlation/correlationVersions";
-import config from "@/aws-exports";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { useEnterpriseUpgradeDialog } from "@/composables/useEnterpriseUpgradeDialog";
 import { useLicenseLock } from "@/composables/useFeatureLock";
@@ -723,6 +713,19 @@ import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import { isSafeNavigableUrl } from "@/utils/safeUrl";
 import { isFilterableLogField, STREAM_NAME_FIELD } from "@/utils/logs/streamNameColumn";
 import { scopeHighlightQuery } from "@/composables/useTextHighlighter";
+import { useLoadedOrg } from "@/utils/assistant/doorBinding";
+import {
+  logFieldBuild,
+  addDoorToChat,
+  currentUserOrgKey,
+  logRowBuild,
+  logsDoorBase,
+  regexFieldHandoff,
+  regexPatternsOpener,
+  rowKeyOf,
+  useAssistantDoorShown,
+  type LogsDoorBase,
+} from "@/plugins/logs/logsDoors";
 const SEVERITY_BORDER_CLASSES: Record<KnownLogSeverityLevel, string> = {
   emergency: "border-log-severity-emergency-indicator",
   alert: "border-log-severity-alert-indicator",
@@ -755,6 +758,9 @@ export default defineComponent({
     NotEqualIcon,
     JsonPreview,
     O2AIContextAddBtn,
+    AiEntryButton: defineAsyncComponent(
+      () => import("@/components/ai-assistant/entry/AiEntryButton.vue"),
+    ),
     LogsHighLighting,
     ChunkedContent,
     TelemetryCorrelationDashboard,
@@ -785,13 +791,17 @@ export default defineComponent({
     "search:timeboxed",
     "add:table",
     "view-trace",
-    "sendToAiChat",
     "closeTable",
     "show-correlation",
     "load-correlation", // New event for lazy loading correlation data
     "update:tab",
   ],
   props: {
+    /** The org the host loaded this row under; its doors carry it so a stale row is refused. */
+    boundOrg: {
+      type: String,
+      default: undefined,
+    },
     modelValue: {
       type: Object,
       default: () => defaultValue(),
@@ -807,6 +817,11 @@ export default defineComponent({
     streamType: {
       type: String,
       default: "logs",
+    },
+    /** The page the record doors describe; defaults to the Logs search (the dashboard cell drawer passes its own). */
+    doorContext: {
+      type: Function as PropType<() => LogsDoorBase>,
+      default: undefined,
     },
     highlightQuery: {
       type: String,
@@ -898,7 +913,6 @@ export default defineComponent({
     const rowData: any = ref({});
     const router = useRouter();
     const store = useStore();
-    const { isDark } = useTheme();
     const tableDropdownOpenMap = reactive<Record<string, boolean>>({});
     const tab = ref(props.initialTab || "json");
     // Must precede the immediate initialTab watcher, which reads it during setup.
@@ -1426,10 +1440,55 @@ export default defineComponent({
       emit("view-trace");
     };
 
-    const sendToAiChat = (value: any, append: boolean = true) => {
-      emit("sendToAiChat", value, append);
-      emit("closeTable");
+    const loadedOrg = useLoadedOrg(
+      () => props.modelValue,
+      () => store.state.selectedOrganization?.identifier ?? "",
+    );
+    const doorBoundOrg = computed(() => props.boundOrg ?? loadedOrg.value);
+    const recordDoorBase = (): LogsDoorBase =>
+      props.doorContext?.() ?? logsDoorBase(searchObj, store.state, rowData.value);
+    // As on main, Add opens the chat and closes the drawer.
+    const closeOnAdd = (result: { ok: boolean }) => {
+      if (result.ok) emit("closeTable");
     };
+    const assistantDoorsShown = useAssistantDoorShown();
+    const userOrgKey = currentUserOrgKey();
+    const addRecordToChat = async () =>
+      closeOnAdd(
+        await addDoorToChat(
+          {
+            entryKind: "object_verb",
+            boundOrg: doorBoundOrg.value,
+            objectKind: "log_row",
+            build: logRowBuild(recordDoorBase, { ...rowData.value }),
+          },
+          userOrgKey,
+        ),
+      );
+    const fieldDoor = (field: string, value: unknown) => ({
+      verb: "add_to_chat" as const,
+      entryKind: "object_verb" as const,
+      boundOrg: doorBoundOrg.value,
+      objectKind: "log_field" as const,
+      label: t("assistant.entry.addField"),
+      tooltip: t("assistant.entry.tooltip.add"),
+      dataTest: "ai-entry-log-field-add" as const,
+      build: logFieldBuild(recordDoorBase, String(field), value, { ...rowData.value }),
+      objectKey: `${rowKeyOf(rowData.value)}:${String(field)}`,
+    });
+    // The regex drawer receives the prompt in its own dock; the sidebar never also gets it.
+    const regexDoor = (field: string, value: unknown) => ({
+      verb: "ask" as const,
+      entryKind: "object_verb" as const,
+      boundOrg: props.boundOrg ?? loadedOrg.value,
+      objectKind: "log_field" as const,
+      label: t("assistant.entry.createRegex"),
+      tooltip: t("assistant.entry.tooltip.createRegex"),
+      dataTest: "ai-entry-regex-field-ask" as const,
+      build: () => undefined,
+      handoff: () => regexFieldHandoff(recordDoorBase(), String(field), value, openRegexPatterns),
+    });
+    const openRegexPatterns = regexPatternsOpener(store, router, () => emit("closeTable"));
 
     const addSearchTerm = (
       field: string | number,
@@ -1441,38 +1500,6 @@ export default defineComponent({
 
     const closeTable = () => {
       emit("closeTable");
-    };
-
-    const getBtnLogo = computed(() => {
-      return isDark.value
-        ? getImageURL("images/common/ai_icon_dark.svg")
-        : getImageURL("images/common/ai_icon_gradient.svg");
-    });
-
-    const regexIcon = computed(() => {
-      return getImageURL(
-        isDark.value
-          ? "images/regex_pattern/regex_icon_dark.svg"
-          : "images/regex_pattern/regex_icon_light.svg",
-      );
-    });
-
-    const createRegexPatternFromLogs = (key: string, value: any) => {
-      emit("closeTable");
-      // Prompt text handed to the assistant — model input, deliberately English.
-      const promptToBeAdded = raw(
-        `Create a regex pattern for ${key} field that contains the following value: "${value}" from the ${searchObj.data.stream.selectedStream[0]} stream`,
-      );
-      router.push({
-        path: "/settings/regex_patterns",
-        query: {
-          org_identifier: store.state.selectedOrganization.identifier,
-          from: "logs",
-        },
-      });
-      store.state.organizationData.regexPatternPrompt = promptToBeAdded;
-      store.state.organizationData.regexPatternTestValue = value;
-      emit("sendToAiChat", promptToBeAdded);
     };
 
     const showCorrelation = () => {
@@ -1551,9 +1578,14 @@ export default defineComponent({
       hasAggregationQuery,
       canSearchAroundStream,
       scopeHighlightQuery,
-      sendToAiChat,
+      doorBoundOrg,
+      recordDoorBase,
+      assistantDoorsShown,
+      addRecordToChat,
+      fieldDoor,
       addSearchTerm,
       closeTable,
+      closeOnAdd,
       showCorrelation,
       showCorrelationHeader,
       correlationScope,
@@ -1573,12 +1605,9 @@ export default defineComponent({
       onTabChange,
       tabOrder,
       onTabReorder,
-      config,
       getContentSize,
       getDisplayValue,
-      getBtnLogo,
-      regexIcon,
-      createRegexPatternFromLogs,
+      regexDoor,
     };
   },
   async created() {

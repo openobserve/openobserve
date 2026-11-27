@@ -14,7 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!-- The AI SRE triage gate per team: each row offers only the modes the server accepts, so the options list is the validation. -->
+<!-- The investigation triage gate per team: each row offers only the modes the server accepts, so the options list is the validation. -->
 <template>
   <div class="flex flex-col gap-4" data-test="oncall-l0-editor">
     <div class="flex flex-col gap-2">

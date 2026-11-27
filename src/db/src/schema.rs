@@ -15,7 +15,7 @@
 
 use std::sync::{Arc, atomic::Ordering};
 
-use arrow_schema::{DataType, Field, Schema};
+use arrow_schema::{DataType, Field, Metadata, Schema};
 use bytes::Bytes;
 use common::meta::stream::StreamSchema;
 use config::{
@@ -68,8 +68,9 @@ pub async fn update_setting(
     org_id: &str,
     stream_name: &str,
     stream_type: StreamType,
-    metadata: std::collections::HashMap<String, String>,
+    metadata: impl Into<Metadata>,
 ) -> Result<(), anyhow::Error> {
+    let metadata: Metadata = metadata.into();
     infra::schema::update_setting(org_id, stream_name, stream_type, metadata.clone()).await?;
 
     // super cluster

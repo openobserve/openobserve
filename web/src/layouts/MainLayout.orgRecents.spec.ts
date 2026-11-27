@@ -57,7 +57,7 @@ const mountLayout = async (path = "/") => {
       plugins: [store, i18n, router],
       stubs: {
         AppHeader: StubDiv,
-        ONavbar: StubDiv,
+        OSidebar: StubDiv,
         O2AIChat: StubDiv,
         WebinarBanner: StubDiv,
         AnnouncementBanner: StubDiv,

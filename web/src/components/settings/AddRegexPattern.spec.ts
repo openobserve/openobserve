@@ -31,7 +31,8 @@ vi.mock("@/composables/useStreams", () => ({
   }),
 }));
 
-vi.mock("@/utils/zincutils", () => ({
+vi.mock("@/utils/zincutils", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/utils/zincutils")>()),
   getImageURL: vi.fn((path) => path),
 }));
 
@@ -49,18 +50,36 @@ vi.mock("@/components/functions/FullViewContainer.vue", () => ({
     emits: ["update:is-expanded"],
   },
 }));
-
-vi.mock("@/components/O2AIChat.vue", () => ({
-  default: {
-    name: "O2AIChat",
-    template: "<div data-test='o2-ai-chat'></div>",
-    props: ["aiChatInputContext", "is-open"],
-    emits: ["close"],
-  },
-}));
+vi.mock("@/components/ai-assistant/entry/AiEntryButton.vue", () =>
+  import("@/components/ai-assistant/__tests__/assistantPartStubs").then((m) => m.aiEntryButtonStub),
+);
+vi.mock("@/components/ai-assistant/shell/AssistantDock.vue", () =>
+  import("@/components/ai-assistant/__tests__/assistantPartStubs").then((m) => m.assistantDockStub),
+);
+vi.mock("@/components/ai-assistant/entry/AiLabel.vue", () =>
+  import("@/components/ai-assistant/__tests__/assistantPartStubs").then((m) => m.aiLabelStub),
+);
+vi.mock("@/components/ai-assistant/evidence/AssistantDiffBlock.vue", () =>
+  import("@/components/ai-assistant/__tests__/assistantPartStubs").then((m) => m.diffBlockStub),
+);
 
 // Use real store from test helpers
 import store from "@/test/unit/helpers/store";
+import { createMemoryHistory } from "vue-router";
+import { settleAsyncParts } from "@/components/ai-assistant/__tests__/assistantPartStubs";
+import { AVAILABLE, fakeRuntime } from "@/composables/assistant/__tests__/fakeRuntime";
+import { queueDockStage } from "@/composables/assistant/hostAdapter";
+import {
+  registerLifecycleDialogs,
+  resetLifecycleForTests,
+  runLeaveGuards,
+  useLifecycleQuestion,
+} from "@/composables/assistant/lifecycleQuestions";
+import { createOpenAssistant } from "@/composables/assistant/openAssistant";
+import { setRuntimeHandle } from "@/composables/assistant/runtimeHandle";
+import { resetEditorProposalsForTests } from "@/composables/assistant/useEditorProposal";
+import { contextRegistry } from "@/composables/contextProviders/registry";
+import en from "@/locales/languages/en-US.json";
 
 // Create mock store for testing
 const mockStore = store;
@@ -72,7 +91,6 @@ const setupStoreForTest = () => {
     label: "default Organization",
   };
   mockStore.state.theme = "light";
-  mockStore.state.isAiChatEnabled = false;
   mockStore.state.organizationData = {
     regexPatternPrompt: "",
     regexPatternTestValue: "",
@@ -200,11 +218,6 @@ const lightStubs = {
     props: ["name", "isExpanded", "label", "labelClass"],
     emits: ["update:isExpanded"],
   },
-  O2AIChat: {
-    template: "<div data-test-stub='o2-ai-chat'></div>",
-    props: ["aiChatInputContext", "isOpen"],
-    emits: ["close"],
-  },
 };
 
 const createWrapper = (props = {}, options = {}) => {
@@ -249,7 +262,6 @@ const createRealFormWrapper = (props = {}) => {
       },
       stubs: {
         ODrawer: ODrawerStub,
-        O2AIChat: lightStubs.O2AIChat,
         FullViewContainer: lightStubs.FullViewContainer,
         // OForm, OFormInput, OFormTextarea, OInput, OButton, OIcon are REAL.
       },
@@ -263,7 +275,6 @@ describe("AddRegexPattern", () => {
     vi.clearAllMocks();
     setupStoreForTest();
     mockStore.state.theme = "light";
-    mockStore.state.isAiChatEnabled = false;
     mockStore.state.organizationData.regexPatternPrompt = "";
     mockStore.state.organizationData.regexPatternTestValue = "";
     mockRouter.currentRoute.value.query = {};
@@ -410,19 +421,6 @@ describe("AddRegexPattern", () => {
       await nextTick();
       expect(wrapper.vm.isFullScreen).toBe(!initialValue);
     });
-
-    it("should toggle AI chat when AI button is clicked", async () => {
-      mockStore.state.zoConfig.ai_enabled = true;
-      mockStore.state.isAiChatEnabled = false;
-      const wrapper = createWrapper();
-      const aiBtn = wrapper.find('[data-test="add-regex-pattern-open-close-ai-btn"]');
-
-      if (aiBtn.exists()) {
-        await aiBtn.trigger("click");
-        expect(mockStore.state.isAiChatEnabled).toBe(true);
-      }
-      wrapper.unmount();
-    });
   });
 
   describe("Form submission", () => {
@@ -549,25 +547,6 @@ describe("AddRegexPattern", () => {
   });
 
   describe("Conditional rendering", () => {
-    it("should show AI button when enterprise and AI is enabled", async () => {
-      mockStore.state.zoConfig.ai_enabled = true;
-
-      const wrapper = createWrapper();
-      await nextTick();
-
-      expect(wrapper.vm.config.isEnterprise).toBe("true");
-      expect(wrapper.vm.store.state.zoConfig.ai_enabled).toBe(true);
-
-      const aiBtn = wrapper.find('[data-test="add-regex-pattern-open-close-ai-btn"]');
-      const allBtns = wrapper.findAll("button[data-o2-btn]");
-
-      if (aiBtn.exists()) {
-        expect(aiBtn.exists()).toBe(true);
-      } else {
-        expect(allBtns.length).toBeGreaterThanOrEqual(0);
-      }
-    });
-
     it("should hide AI button when AI is disabled", async () => {
       mockStore.state.zoConfig.ai_enabled = false;
 
@@ -579,20 +558,6 @@ describe("AddRegexPattern", () => {
 
       const aiBtn = wrapper.find('[data-test="add-regex-pattern-open-close-ai-btn"]');
       expect(aiBtn.exists()).toBe(false);
-    });
-
-    it("should show AI chat component when enabled", async () => {
-      mockStore.state.isAiChatEnabled = true;
-      const wrapper = createWrapper();
-      const aiChat = wrapper.find('[data-test-stub="o2-ai-chat"]');
-      expect(aiChat.exists()).toBe(true);
-    });
-
-    it("should hide AI chat component when disabled", () => {
-      mockStore.state.isAiChatEnabled = false;
-      const wrapper = createWrapper();
-      const aiChat = wrapper.find('[data-test-stub="o2-ai-chat"]');
-      expect(aiChat.exists()).toBe(false);
     });
   });
 
@@ -657,15 +622,7 @@ describe("AddRegexPattern", () => {
       await wrapper.vm.$nextTick();
       await new Promise((resolve) => setTimeout(resolve, 50));
 
-      expect(wrapper.vm.inputContext).toBe("Test prompt");
       expect(wrapper.vm.testStringValue).toBe("Test value");
-    });
-
-    it("should widen the drawer to a size preset when AI chat is open", async () => {
-      mockStore.state.isAiChatEnabled = true;
-      const wrapper = createWrapper();
-      const drawer = wrapper.find('[data-test="o-drawer-stub"]');
-      expect(drawer.attributes("data-size")).toBe("xxl");
     });
 
     it("should handle full screen mode", async () => {
@@ -674,5 +631,134 @@ describe("AddRegexPattern", () => {
       await nextTick();
       expect(wrapper.vm.isFullScreen).toBe(true);
     });
+  });
+});
+
+describe("AddRegexPattern with the revamped assistant", () => {
+  const drawerStub = {
+    name: "ODrawer",
+    props: ["open", "size"],
+    template:
+      '<div data-test="o-drawer-stub" :data-size="String(size)"><slot name="header-right" /><slot /></div>',
+  };
+
+  async function setupWithAssistant() {
+    const base = fakeRuntime();
+    const runtime = {
+      ...base,
+      openAssistant: createOpenAssistant({
+        store: base.store,
+        capability: () => AVAILABLE,
+        hosts: base.hosts,
+        routeName: () => "regexPatterns",
+        routePrefersFloating: () => false,
+        pushRoute: vi.fn(),
+        lgUp: () => true,
+        viewportPx: () => 1280,
+        currentOrg: () => "org1",
+        now: () => Date.now(),
+        notify: vi.fn(),
+      }),
+    };
+    setRuntimeHandle(runtime as never);
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: "/", component: { render: () => null } }],
+    });
+    await router.push("/?from=logs");
+    const wrapper = mount(AddRegexPattern, {
+      props: { open: true },
+      global: {
+        plugins: [i18n, store, router],
+        stubs: { ODrawer: drawerStub, FullViewContainer: { template: "<div><slot /></div>" } },
+      },
+      attachTo: document.body,
+    });
+    await settleAsyncParts();
+    return { wrapper, runtime };
+  }
+
+  beforeEach(() => {
+    sessionStorage.clear();
+    contextRegistry.cleanup();
+    store.state.zoConfig = { ...store.state.zoConfig, ai_enabled: true };
+    store.state.organizationData = {
+      ...store.state.organizationData,
+      regexPatternPrompt: "",
+      regexPatternTestValue: "",
+    };
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    resetEditorProposalsForTests();
+    resetLifecycleForTests();
+    setRuntimeHandle(null);
+    document.body.innerHTML = "";
+  });
+
+  it("has one assistant door: the toggle, without the inline Try link", async () => {
+    const { wrapper, runtime } = await setupWithAssistant();
+    expect(wrapper.findAll('[data-test="ai-entry-regex-ask"]')).toHaveLength(1);
+    expect(wrapper.find('[data-test="add-regex-pattern-open-close-ai-btn"]').exists()).toBe(false);
+    expect(wrapper.text()).not.toContain(`Try ${en.brand.autobot}`);
+    expect(runtime.hosts.get("regex")?.language).toBe("regex");
+  });
+
+  it("widens the drawer as it did for the legacy chat while docked, and docks in its body row", async () => {
+    const { wrapper, runtime } = await setupWithAssistant();
+    expect(wrapper.get('[data-test="add-regex-pattern-drawer"]').attributes("data-size")).toBe(
+      "lg",
+    );
+    runtime.store.open({ kind: "docked", hostId: "regex" }, { focus: "none" });
+    await settleAsyncParts();
+    expect(wrapper.get('[data-test="add-regex-pattern-drawer"]').attributes("data-size")).toBe(
+      "xxl",
+    );
+    expect(wrapper.find('[data-test="assistant-dock-stub"]').exists()).toBe(true);
+  });
+
+  it("stages a log field's hand-off once into its own dock, never the sidebar", async () => {
+    vi.stubGlobal("innerWidth", 1440);
+    queueDockStage(
+      "regex",
+      { chips: [], text: "Which regex matches values like the sample?" },
+      { entryKind: "object_verb", objectKind: "log_field" },
+    );
+    const { runtime } = await setupWithAssistant();
+    await settleAsyncParts();
+    expect(runtime.store.state.shell.placement).toEqual({ kind: "docked", hostId: "regex" });
+    const sid = runtime.store.state.shell.activeSid!;
+    expect(runtime.store.state.sessions[sid].composer.text).toBe(
+      "Which regex matches values like the sample?",
+    );
+    expect(runtime.store.state.sessions[sid].origin.objectKind).toBe("log_field");
+  });
+
+  it("falls back to the sidebar where the widened drawer cannot hold 20 rem beside the pattern", async () => {
+    vi.stubGlobal("innerWidth", 1100);
+    queueDockStage(
+      "regex",
+      { chips: [], text: "Which regex?" },
+      { entryKind: "object_verb", objectKind: "log_field" },
+    );
+    const { runtime } = await setupWithAssistant();
+    await settleAsyncParts();
+    expect(runtime.store.state.shell.placement.kind).toBe("sidebar");
+  });
+
+  it("guards a typed pattern: leaving asks first, named by the pattern", async () => {
+    const off = registerLifecycleDialogs();
+    const { wrapper } = await setupWithAssistant();
+    (wrapper.vm as unknown as { patternValue: string }).patternValue = "\\d{16}";
+    const leaving = runLeaveGuards();
+    await settleAsyncParts();
+    expect(useLifecycleQuestion().value?.question).toEqual({
+      kind: "leave_guard",
+      name: "this pattern",
+    });
+    useLifecycleQuestion().value!.answer("keep");
+    await expect(leaving).resolves.toBe(false);
+    off();
   });
 });

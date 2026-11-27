@@ -158,7 +158,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:initial-variable-values="updateInitialVariableValues"
             @onEditLayout="openEditLayout"
             @contextmenu="$emit('chart:contextmenu', $event)"
-            @send-to-ai-chat="(value, append) => $emit('sendToAiChat', value, append)"
             @exploreCreateAlert="$emit('exploreCreateAlert', $event)"
             @exploreAddToDashboard="$emit('exploreAddToDashboard', $event)"
           />
@@ -272,7 +271,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @onEditLayout="openEditLayout"
                   @update:runId="updateRunId"
                   @contextmenu="$emit('chart:contextmenu', $event)"
-                  @send-to-ai-chat="(value, append) => $emit('sendToAiChat', value, append)"
                   @exploreCreateAlert="$emit('exploreCreateAlert', $event)"
                   @exploreAddToDashboard="$emit('exploreAddToDashboard', $event)"
                 >
@@ -444,7 +442,6 @@ export default defineComponent({
     "panelsValues",
     "searchRequestTraceIds",
     "variablesManagerReady",
-    "sendToAiChat",
     "layoutChange",
     "exploreCreateAlert",
     "exploreAddToDashboard",
