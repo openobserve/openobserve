@@ -278,7 +278,7 @@ import {
   watch,
   defineAsyncComponent,
 } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { getAllDashboards, getFoldersList, dedupeDashboardIds } from "../../utils/commons.js";
 import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
@@ -313,13 +313,17 @@ export default defineComponent({
     const router = useRouter();
     const route = useRoute();
     const { showPositiveNotification, showErrorNotification } = useNotifications();
-    const selectedFolder = ref({
-      label:
-        store.state.organizationData.folders.find(
-          (item: any) => item.folderId === (route.query.folder ?? "default"),
-        )?.name ?? "default",
-      value: route.query.folder,
-    });
+    // The route may name a view such as Favorites, which is not a folder a dashboard can be created in.
+    const folderFromRoute = () => {
+      const folderId = route.query.folder ?? "default";
+      const folder = store.state.organizationData.folders.find(
+        (item: any) => item.folderId === folderId,
+      );
+      return folder
+        ? { label: folder.name, value: folderId }
+        : { label: "default", value: "default" };
+    };
+    const selectedFolder = ref(folderFromRoute());
 
     // Monaco editor content (a non-OForm* code editor, bridged at @submit).
     // url + jsonFiles are form-owned and read below via form.useStore.
@@ -389,13 +393,7 @@ export default defineComponent({
     onMounted(async () => {
       filesImportResults.value = [];
       await getFoldersList(store);
-      selectedFolder.value = {
-        label:
-          store.state.organizationData.folders.find(
-            (item: any) => item.folderId === (route.query.folder ?? "default"),
-          )?.name ?? "default",
-        value: route.query.folder,
-      };
+      selectedFolder.value = folderFromRoute();
     });
 
     watch(jsonFiles, (newVal) => {
@@ -493,6 +491,13 @@ export default defineComponent({
       return converted;
     };
 
+    // The backend says why it refused the dashboard, as JSON or as a plain-text body; axios only reports the status code.
+    const importErrorMessage = (error: any) => {
+      const body = error?.response?.data;
+      const text = typeof body === "string" ? body.trim() : "";
+      return body?.message || text || error?.message || String(error);
+    };
+
     // Counts confirmed creates for the running import action; a later refresh failure must not hide them.
     let createdInAction = 0;
 
@@ -581,7 +586,7 @@ export default defineComponent({
                   const res = await importDashboardFromJSON(convertedSchema, importFolder);
                   results.push({ index: i + 1, result: res });
                 } catch (e) {
-                  results.push({ index: i + 1, error: e });
+                  results.push({ index: i + 1, error: new Error(importErrorMessage(e)) });
                 }
               }
 
@@ -692,10 +697,12 @@ export default defineComponent({
             const validationErrors = validateDashboardJson(t, converted);
             if (validationErrors.length > 0) {
               const errorMessage = validationErrors.join("; ");
-              return Promise.reject({ index, error: new Error(errorMessage) });
+              return Promise.reject({ index, error: errorMessage });
             }
 
-            return importDashboardFromJSON(converted, importFolder);
+            return importDashboardFromJSON(converted, importFolder).catch((e) =>
+              Promise.reject({ index, error: importErrorMessage(e) }),
+            );
           } catch (e) {
             return Promise.reject({ index, error: e });
           }
@@ -764,7 +771,11 @@ export default defineComponent({
           );
         });
       } catch (error) {
-        showErrorNotification(t("dashboard.importDashboardPage.pleaseEnterJsonObject"));
+        showErrorNotification(
+          error?.response
+            ? raw(importErrorMessage(error))
+            : t("dashboard.importDashboardPage.pleaseEnterJsonObject"),
+        );
       } finally {
         if (createdInAction > 0) {
           analytics.track("dashboard_imported", { source: "json", count: createdInAction });
