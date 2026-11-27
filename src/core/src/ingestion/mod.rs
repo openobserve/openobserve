@@ -430,24 +430,26 @@ pub fn inferred_column_type(key: &str, value: &Value) -> Option<DataType> {
 }
 
 /// The `ZO_COLS_PER_RECORD_LIMIT` rule on one record; the caller reads `limit` once per batch.
-/// `pending_columns` counts columns the record gains only after this check.
+/// `pending_columns` names columns written only after this check; one the record holds counts once.
 pub fn check_record_columns_limit(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
     record: &Map<String, Value>,
     limit: usize,
-    pending_columns: usize,
+    pending_columns: &[&str],
 ) -> std::result::Result<(), anyhow::Error> {
     // a column count never exceeds the entry count, so the cheap bound settles most records
-    if record.len() + pending_columns <= limit {
+    if record.len() + pending_columns.len() <= limit {
         return Ok(());
     }
-    let columns = record
+    let is_column = |key: &str, value: &Value| inferred_column_type(key, value).is_some();
+    let columns = record.iter().filter(|(k, v)| is_column(k, v)).count();
+    let added = pending_columns
         .iter()
-        .filter(|(key, value)| inferred_column_type(key, value).is_some())
+        .filter(|name| !record.get(**name).is_some_and(|v| is_column(name, v)))
         .count();
-    check_request_columns_limit(org_id, stream_type, stream_name, columns + pending_columns)
+    check_request_columns_limit(org_id, stream_type, stream_name, columns + added)
 }
 
 /// Whether a value of `inferred` type lands in an `existing` column without a cast or evolution.

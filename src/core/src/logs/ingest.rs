@@ -710,7 +710,11 @@ async fn ingest_inner(
                                 &destination_stream,
                                 &local_val,
                                 columns_limit,
-                                usize::from(need_all_values),
+                                if need_all_values {
+                                    &[config::ALL_VALUES_COL_NAME]
+                                } else {
+                                    &[]
+                                },
                             ) {
                                 stream_status.status.failed += 1;
                                 stream_status.status.error = e.to_string();
@@ -1144,7 +1148,11 @@ fn finalize_and_buffer_record(
         ctx.stream_name,
         &local_val,
         ctx.columns_limit,
-        usize::from(need_all_values),
+        if need_all_values {
+            &[config::ALL_VALUES_COL_NAME]
+        } else {
+            &[]
+        },
     ) {
         ctx.stream_status.status.failed += 1;
         ctx.stream_status.status.error = e.to_string();
