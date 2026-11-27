@@ -318,7 +318,6 @@ mod tests {
                 meta: config::meta::stream::FileMeta::default(),
                 deleted: false,
                 selection: None,
-                row_group_size: None,
             },
             FileKey {
                 id: 2,
@@ -327,7 +326,6 @@ mod tests {
                 meta: config::meta::stream::FileMeta::default(),
                 deleted: true,
                 selection: None,
-                row_group_size: None,
             },
         ];
 
@@ -357,7 +355,6 @@ mod tests {
                 meta: config::meta::stream::FileMeta::default(),
                 deleted: false,
                 selection: None,
-                row_group_size: None,
             });
 
             assert_eq!(queue.len(), initial_len + 1);
@@ -382,7 +379,6 @@ mod tests {
             meta: config::meta::stream::FileMeta::default(),
             deleted,
             selection: None,
-            row_group_size: None,
         }
     }
 

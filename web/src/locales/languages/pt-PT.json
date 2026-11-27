@@ -10107,6 +10107,7 @@
       "boxplotUpperWhisker": "Bigode superior",
       "boxplotMedian": "Mediana",
       "boxplotSamples": "Amostras",
+      "boxplotValueNotNumeric": "O valor do box plot tem de ser um campo numérico",
       "boxplotOutlier": "Valor atípico",
       "fieldNotAllowedForDistribution": "O campo {label} não é permitido no gráfico de distribuição",
       "distributionCount": "Contagem",
@@ -34589,7 +34590,15 @@
     "offline": "Sem ligação. As visitas recentes continuam disponíveis.",
     "sourceUnavailable": "Este tipo de recurso está indisponível",
     "emptyHelp": "Introduza um nome ou ID para pesquisar",
-    "globalShortcut": "Abrir pesquisa global"
+    "globalShortcut": "Abrir pesquisa global",
+    "trigger": "Pesquisar ou ir para…",
+    "allTypes": "Todos",
+    "capped": "A mostrar a primeira correspondência. | A mostrar as primeiras {count} correspondências.",
+    "hintNavigate": "Navegar",
+    "hintOpen": "Abrir",
+    "hintNewTab": "Abrir num novo separador",
+    "hintTypes": "Filtrar por tipo",
+    "hintClose": "Fechar"
   },
   "timeRangeInput": {
     "label": "Introduza um intervalo de tempo",

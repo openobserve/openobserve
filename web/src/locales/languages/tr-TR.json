@@ -10107,6 +10107,7 @@
       "boxplotUpperWhisker": "Üst bıyık",
       "boxplotMedian": "Medyan",
       "boxplotSamples": "Örnekler",
+      "boxplotValueNotNumeric": "Kutu grafiği değeri sayısal bir alan olmalıdır",
       "boxplotOutlier": "Aykırı değer",
       "fieldNotAllowedForDistribution": "{label} alanına dağılım grafiğinde izin verilmez",
       "distributionCount": "Sayı",
@@ -34589,7 +34590,15 @@
     "offline": "Çevrimdışısınız. Son ziyaretler kullanılabilir.",
     "sourceUnavailable": "Bu kaynak türü şu anda kullanılamıyor",
     "emptyHelp": "Kaynak aramak için ad veya kimlik girin",
-    "globalShortcut": "Genel aramayı aç"
+    "globalShortcut": "Genel aramayı aç",
+    "trigger": "Ara veya git…",
+    "allTypes": "Tümü",
+    "capped": "İlk eşleşme gösteriliyor. | İlk {count} eşleşme gösteriliyor.",
+    "hintNavigate": "Gezin",
+    "hintOpen": "Aç",
+    "hintNewTab": "Yeni sekmede aç",
+    "hintTypes": "Türe göre filtrele",
+    "hintClose": "Kapat"
   },
   "timeRangeInput": {
     "label": "Bir zaman aralığı yazın",

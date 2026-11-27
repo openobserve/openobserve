@@ -11294,10 +11294,17 @@
   },
   "commandPalette": {
     "actions": "4759498ac2a719c6",
+    "allTypes": "a52ace420f2175d0",
+    "capped": "813d0befc1c9d4dd",
     "clearRecent": "4cf1529e6f624067",
     "emptyHelp": "1acfcac58d315783",
     "failed": "0e4b48c490e81d95",
     "globalShortcut": "90d31a87a719a155",
+    "hintClose": "7d9eb7acb13e2462",
+    "hintNavigate": "5ea5fbe811dbe99a",
+    "hintNewTab": "e0af5c0bc2457475",
+    "hintOpen": "ed077f3d8125d60d",
+    "hintTypes": "51035b5b67dca0d1",
     "historyStorageUnavailable": "f210033cbc7d85ee",
     "loading": "c31723ab330289fe",
     "localHistory": "151e228bad8b98d0",
@@ -11309,7 +11316,8 @@
     "recent": "38ef8405e1625c8f",
     "recentUnavailable": "39da35d2f133e47b",
     "sourceUnavailable": "d5c6942375701062",
-    "title": "e7608f20367d6e18"
+    "title": "e7608f20367d6e18",
+    "trigger": "22e6cbc402efe74f"
   },
   "common": {
     "absolute": "f288738f604233a7",
@@ -14675,6 +14683,7 @@
       "boxplotOutlier": "c1f25bd5c2732041",
       "boxplotSamples": "bc228b269ce0d87f",
       "boxplotUpperWhisker": "8d54fdd65dbb7ecf",
+      "boxplotValueNotNumeric": "2a563ea64fed7baf",
       "categoryEmptyGroup": "d29a0939bcb51176",
       "categoryNullGroup": "2874d7800fecae20",
       "configValueAbove": "ba899d282a02da73",

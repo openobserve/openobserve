@@ -456,20 +456,19 @@ describe("anomalyExplanation", () => {
     return key;
   };
 
-  it("returns patternAnomalyRare key for very low percentage with freq===1", () => {
-    const result = anomalyExplanation({ percentage: 0.05, frequency: 1 }, t);
+  it("returns patternAnomalyRare key for very low percentage with one estimated log", () => {
+    const result = anomalyExplanation({ percentage: 0.05, frequency: 1, estimated_count: 1 }, t);
     expect(result).toContain("search.patternAnomalyRare");
     expect(result).toContain("pct=0.05");
     expect(result).toContain("freq=1");
   });
 
-  // One pipe-plural message, so the KEY no longer changes with the count — the
-  // `count` arg is what picks the form, and that is what this asserts.
-  it("passes the raw frequency as the plural choice for freq>1", () => {
-    const result = anomalyExplanation({ percentage: 0.5, frequency: 3 }, t);
+  // The window share needs the window estimate beside it, not the sample count.
+  it("pairs the rare share with the window estimate, also as the plural choice", () => {
+    const result = anomalyExplanation({ percentage: 0.5, frequency: 3, estimated_count: 300 }, t);
     expect(result).toContain("search.patternAnomalyRare");
-    expect(result).toContain("freq=3");
-    expect(result).toContain("count=3");
+    expect(result).toContain("freq=300");
+    expect(result).toContain("count=300");
   });
 
   it("returns patternAnomalyLowFreq when z_score < -1.5 and avg_frequency > 0", () => {

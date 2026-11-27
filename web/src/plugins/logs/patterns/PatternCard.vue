@@ -226,11 +226,9 @@ const volumeUnavailableTitle = computed(() =>
 
 const countLabel = computed(() => {
   if (volumeCount.value !== null) return `~${compactCount(volumeCount.value)}`;
-  return volumeIssue.value ? "—" : (props.pattern.frequency ?? 0).toLocaleString();
+  return volumeIssue.value ? "—" : `~${compactCount(props.pattern.estimated_count ?? 0)}`;
 });
 
-// Share of the analyzed sample — a clean partition (every analyzed log belongs
-// to exactly one pattern), so these percentages sum to ~100%.
 const percentageLabel = computed(() => `${(props.pattern.percentage ?? 0).toFixed(2)}%`);
 
 const severityKey = computed<PatternSeverityKey>(() => patternSeverityKeyForPattern(props.pattern));
@@ -245,8 +243,6 @@ const STATUS_LABEL_KEY: Record<PatternSeverityKey, string> = {
 };
 const statusLabel = computed(() => t(STATUS_LABEL_KEY[severityKey.value]));
 
-// Share bar width: snap the frequency-vs-max ratio to twelfths (rem-free,
-// no inline style). Zero when there's no max to compare against.
 const SHARE_WIDTHS = [
   "w-1/12",
   "w-2/12",
@@ -262,7 +258,7 @@ const SHARE_WIDTHS = [
 ];
 const shareWidthClass = computed(() => {
   const max = props.maxFrequency ?? 0;
-  const freq = props.pattern.frequency ?? 0;
+  const freq = props.pattern.estimated_count ?? 0;
   if (max <= 0 || freq <= 0) return "w-0";
   const twelfths = Math.min(12, Math.max(1, Math.round((freq / max) * 12)));
   return twelfths >= 12 ? "w-full" : SHARE_WIDTHS[twelfths - 1];

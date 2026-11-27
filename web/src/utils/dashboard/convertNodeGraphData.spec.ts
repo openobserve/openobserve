@@ -17,7 +17,13 @@ import { describe, expect, it, vi } from "vitest";
 import * as echarts from "echarts";
 import { convertPanelData } from "./convertPanelData";
 import { sankeyChartQuery } from "./dashboardAutoQueryBuilder";
-import { buildGraph, circularPositions, forcePositions } from "./convertNodeGraphData";
+import {
+  buildGraph,
+  circularPositions,
+  forcePositions,
+  type GraphEdge,
+  type GraphNode,
+} from "./convertNodeGraphData";
 
 vi.mock("./convertCustomChartData", () => ({
   prepareCustomChartRun: vi.fn(),
@@ -133,7 +139,7 @@ const renderedLayout = (options: any, width: number, height: number) => {
     const symbol = data.getItemGraphicEl(i).childAt(0);
     const m = symbol.getComputedTransform();
     // The symbol path is a unit circle scaled to the node radius.
-    return { x: m[4], y: m[5], radius: Math.hypot(m[0], m[1]) };
+    return { x: m[4], y: m[5], radius: Math.hypot(m[0], m[1]), radiusY: Math.hypot(m[2], m[3]) };
   });
   chart.dispose();
   return { chips, symbols };
@@ -452,6 +458,152 @@ describe("node graph", () => {
     const series = (await convert(panel(), [rows])).options.series[0];
     series.links.forEach((link: any) => expect(link.label).toBeUndefined());
     expect(series.emphasis.edgeLabel.show).toBe(false);
+  });
+
+  it("keeps a node's traffic to itself on the node, in its total, tooltip and, with edge values on, under its name", async () => {
+    const withSelf = [
+      ...rows,
+      { source: "db", target: "db", value: 10 },
+      { source: "db", target: "db", value: 20 },
+    ];
+    const { nodes, edges } = buildGraph(panel(), [withSelf]);
+    expect(edges.some((edge) => edge.source === edge.target)).toBe(false);
+    expect(nodes.find((node) => node.name === "db")).toEqual({ name: "db", value: 55, self: 30 });
+    expect(nodes.find((node) => node.name === "api")).toEqual({ name: "api", value: 40 });
+
+    for (const layout of ["force", "circular"]) {
+      const off = (await convert(panel({ node_graph_layout: layout }), [withSelf])).options;
+      const db = off.series[0].data.find((node: GraphNode) => node.name === "db");
+      expect(off.series[0].links.some((link: GraphEdge) => link.source === link.target)).toBe(
+        false,
+      );
+      expect(off.tooltip.formatter({ dataType: "node", name: "db", value: 55, data: db })).toBe(
+        "db: <strong>55</strong><br>db → db: <strong>30</strong>",
+      );
+      expect(off.series[0].label.formatter({ name: "db", data: db })).toBe("db");
+
+      const on = (
+        await convert(panel({ node_graph_layout: layout, node_graph_show_edge_labels: true }), [
+          withSelf,
+        ])
+      ).options;
+      const onDb = on.series[0].data.find((node: GraphNode) => node.name === "db");
+      expect(on.series[0].label.formatter({ name: "db", data: onDb })).toBe("db\n↻ 30");
+      const { chips } = renderedLayout(on, 800, 400);
+      expect(chips.map((chip) => chip.text)).toContain("db\n↻ 30");
+    }
+  });
+
+  it("draws a node whose only traffic is to itself", async () => {
+    const series = (await convert(panel(), [[{ source: "db", target: "db", value: 5 }]])).options
+      .series[0];
+    expect(series.data).toMatchObject([{ name: "db", value: 5, self: 5 }]);
+    expect(series.links).toEqual([]);
+  });
+
+  it("draws one or two nodes round, unscaled, where they are placed, even after a drag", async () => {
+    const graphs = [
+      [{ source: "db", target: "db", value: 5 }],
+      [{ source: "api", target: "db", value: 5 }],
+    ];
+    for (const layout of ["force", "circular"]) {
+      for (const rows of graphs) {
+        const { options, extras } = await convert(panel({ node_graph_layout: layout }), [rows]);
+        const dragged = extras.nodeGraph.placeNodes(options, new Map([["db", [0.3, 0.4]]]));
+        for (const drawn of [options, dragged]) {
+          const { symbols } = renderedLayout(drawn, 800, 400);
+          drawn.series[0].data.forEach((node: any, i: number) => {
+            expect(symbols[i].x).toBeCloseTo(node.x);
+            expect(symbols[i].y).toBeCloseTo(node.y);
+            expect(symbols[i].radius).toBeCloseTo(node.symbolSize / 2);
+            expect(symbols[i].radiusY).toBeCloseTo(node.symbolSize / 2);
+          });
+        }
+      }
+    }
+  });
+
+  it("keeps node names only where they fit at a default panel size, and shows the rest on hover", async () => {
+    const names = [
+      "web",
+      "api",
+      "db",
+      "cache",
+      "queue",
+      "auth",
+      "search",
+      "payments",
+      "inventory",
+      "checkout",
+      "notifications",
+      "<img src=x onerror=alert(1)>",
+      "支付服务 🚀",
+      "a-very-long-service-name-for-testing",
+    ];
+    const ring = names.map((source, i) => ({
+      source,
+      target: names[(i + 1) % names.length],
+      value: 1000 * (i + 1),
+    }));
+    for (const layout of ["circular", "force"]) {
+      const { options } = await convert(panel({ node_graph_layout: layout }), [ring], {
+        width: 727,
+        height: 263,
+      });
+      const series = options.series[0];
+      const { chips, symbols } = renderedLayout(options, 727, 263);
+      expect(chips.length).toBe(series.data.filter((node: GraphNode) => node.label?.show).length);
+      expect(chips.length).toBeGreaterThan(0);
+      chips.forEach((chip, i) => {
+        chips.slice(i + 1).forEach((other) => {
+          expect(polygonsOverlap(chip.corners, other.corners), `${chip.text} / ${other.text}`).toBe(
+            false,
+          );
+        });
+        symbols.forEach((symbol: any) =>
+          expect(polygonHitsCircle(chip.corners, symbol), `${chip.text} on a node`).toBe(false),
+        );
+      });
+      expect(series.emphasis.label.show).toBe(true);
+    }
+    const ringAt = async (size: { width: number; height: number }) =>
+      (
+        await convert(panel({ node_graph_layout: "circular" }), [ring], size)
+      ).options.series[0].data.filter((node: GraphNode) => node.label?.show).length;
+    expect(await ringAt({ width: 727, height: 263 })).toBeLessThan(names.length);
+    expect(await ringAt({ width: 1400, height: 700 })).toBe(names.length);
+  });
+
+  it("draws a node the user moved where it was dropped, every other node in place, at its own pixel position", async () => {
+    const mesh = ["web", "api", "db", "cache", "queue"].flatMap((source, i, all) =>
+      all.filter((target) => target !== source).map((target) => ({ source, target, value: i + 1 })),
+    );
+    for (const layout of ["force", "circular"]) {
+      const { options, extras } = await convert(panel({ node_graph_layout: layout }), [mesh]);
+      expect(extras.nodeGraph.layout).toBe(layout);
+      const moved = extras.nodeGraph.placeNodes(
+        { ...options, animation: false },
+        new Map([["web", [0.9, 0.1]]]),
+      );
+      // Whatever the renderer added to the options is kept.
+      expect(moved.animation).toBe(false);
+      expect(moved.tooltip).toBe(options.tooltip);
+      const before = new Map(
+        options.series[0].data.map((node: any) => [node.name, [node.x, node.y]]),
+      );
+      moved.series[0].data.forEach((node: any) =>
+        expect([node.x, node.y]).toEqual(node.name === "web" ? [720, 40] : before.get(node.name)),
+      );
+      const { symbols } = renderedLayout(moved, 800, 400);
+      moved.series[0].data.forEach((node: any, i: number) => {
+        expect(symbols[i].x).toBeCloseTo(node.x);
+        expect(symbols[i].y).toBeCloseTo(node.y);
+      });
+      // A node dropped past the edge stays on it.
+      const edge = extras.nodeGraph.placeNodes(options, new Map([["web", [1.4, -0.2]]]));
+      const web = edge.series[0].data.find((node: any) => node.name === "web");
+      expect([web.x, web.y]).toEqual([800 - web.symbolSize / 2, web.symbolSize / 2]);
+    }
   });
 
   it("draws nothing without complete edges", async () => {

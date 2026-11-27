@@ -10107,6 +10107,7 @@
       "boxplotUpperWhisker": "Oberer Whisker",
       "boxplotMedian": "Median",
       "boxplotSamples": "Stichproben",
+      "boxplotValueNotNumeric": "Der Boxplot-Wert muss ein numerisches Feld sein",
       "boxplotOutlier": "Ausreißer",
       "fieldNotAllowedForDistribution": "Das Feld {label} ist für das Verteilungsdiagramm nicht zulässig",
       "distributionCount": "Anzahl",
@@ -28577,7 +28578,7 @@
     "mineJoinTeam": "Einem Team beitreten",
     "mineTestTeam": "Eine Testalarmierung an {team} senden",
     "mineCoverSaved": "Vertretung gespeichert",
-    "mineSlackLinkHow": "{command} link in Slack eingeben",
+    "mineSlackLinkHow": "Geben Sie in Slack {command} link ein",
     "mineSlackSetUpHint": "Öffnet Einstellungen › Slack",
     "myDeliveriesWhen": "Wann",
     "phoneAddHint": "Eine Nummer für SMS und Anrufe hinzufügen",
@@ -30930,7 +30931,7 @@
         "settings": "Einstellungen",
         "install": "Bei Installation",
         "destination": "Von einem Alarmziel",
-        "oncall": "Von {command} oncall hier"
+        "oncall": "Hier über {command} oncall"
       },
       "channel": "Kanal",
       "channelPlaceholder": "Kanäle durchsuchen",
@@ -34589,7 +34590,15 @@
     "offline": "Offline. Letzte Besuche bleiben verfügbar.",
     "sourceUnavailable": "Dieser Ressourcentyp ist nicht verfügbar",
     "emptyHelp": "Name oder ID zum Suchen eingeben",
-    "globalShortcut": "Globale Suche öffnen"
+    "globalShortcut": "Globale Suche öffnen",
+    "trigger": "Suchen oder zu … springen",
+    "allTypes": "Alle",
+    "capped": "Der erste Treffer wird angezeigt. | Die ersten {count} Treffer werden angezeigt.",
+    "hintNavigate": "Navigieren",
+    "hintOpen": "Öffnen",
+    "hintNewTab": "In neuem Tab öffnen",
+    "hintTypes": "Nach Typ filtern",
+    "hintClose": "Schließen"
   },
   "timeRangeInput": {
     "label": "Zeitbereich eingeben",
