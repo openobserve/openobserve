@@ -293,7 +293,11 @@ describe("AlertDetail — route reuse", () => {
     );
     mockRouteParams.alert_id = "slow-alert";
     await flushPromises();
-    expect(alertsService.get_by_alert_id).toHaveBeenLastCalledWith(expect.anything(), "slow-alert");
+    expect(alertsService.get_by_alert_id).toHaveBeenLastCalledWith(
+      expect.anything(),
+      "slow-alert",
+      undefined,
+    );
     vi.mocked(alertsService.get_by_alert_id).mockResolvedValueOnce({
       data: { ...makeSimpleAlert(), id: "new-alert", name: "New alert" },
     } as never);
@@ -639,6 +643,19 @@ describe("AlertDetail — History tab", () => {
       const back = wrapper.findComponent({ name: "OPageHeader" }).props("back") as any;
 
       expect(back.to.query.folder).toBe("team-a");
+    });
+
+    it("fetches the alert with the folder it was opened from", async () => {
+      // The server checks folder-scoped grants against this folder; without it they never match.
+      mockRouteQuery.folder = "team-a";
+
+      await mountView({});
+
+      expect(alertsService.get_by_alert_id).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.anything(),
+        "team-a",
+      );
     });
 
     it("falls back to the default folder when none was carried in", async () => {

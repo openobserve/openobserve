@@ -989,7 +989,11 @@ const fetchAlert = async () => {
   const recentId = request.id;
   const recentFolder = String(route.query.folder ?? "default");
   try {
-    const res = await alertsService.get_by_alert_id(request.org, request.id);
+    const res = await alertsService.get_by_alert_id(
+      request.org,
+      request.id,
+      route.query.folder as string | undefined,
+    );
     if (!isCurrentDetailRequest(request)) return;
     alert.value = res.data;
     loadFailure.value = res.data ? null : "not-found";

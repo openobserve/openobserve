@@ -3116,7 +3116,7 @@ export default defineComponent({
       return false;
     };
 
-    const getAlertById = async (id: string) => {
+    const getAlertById = async (id: string, folderId: string) => {
       const dismiss = toast({
         variant: "loading",
         message: t("toastMessages.alerts.pleaseWaitWhileLoadingAlert"),
@@ -3127,7 +3127,7 @@ export default defineComponent({
         // WorkflowLinkAlertsDialog deliberately still goes straight to the
         // service — a stale alert there would overwrite someone else's edit.
         const org = store.state.selectedOrganization.identifier;
-        const data = await fetchAlertRead(queryClient, org, alertDetailQuery(org, id));
+        const data = await fetchAlertRead(queryClient, org, alertDetailQuery(org, id, folderId));
         dismiss();
         return data;
       } catch (error) {
@@ -3494,7 +3494,7 @@ export default defineComponent({
         const alertId = router.currentRoute.value.query.alert_id as string;
         editFolderId.value = String(router.currentRoute.value.query.folder ?? "");
         try {
-          const alert = await getAlertById(alertId);
+          const alert = await getAlertById(alertId, editFolderId.value || activeFolderId.value);
           if (!(await divertSloAlert(alert))) {
             showAddUpdateFn({ row: alert });
           }
@@ -3678,7 +3678,7 @@ export default defineComponent({
       // Anomaly and composite rows use the /clone endpoint — no need to pre-fetch full data
       if (needsSource) {
         try {
-          const source = await getAlertById(row.alert_id);
+          const source = await getAlertById(row.alert_id, folderIdToBeCloned.value);
           // getAlertById hands back the cached detail, and submitForm renames the copy and drops its id.
           if (request === cloneSourceRequest)
             toBeClonedAlert.value = structuredClone(toRaw(source));
