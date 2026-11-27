@@ -53,6 +53,29 @@ impl StreamingAggsPartitionStrategy {
         }
     }
 
+    /// Heap bytes held by the strategy, excluding the enum itself.
+    pub fn heap_size(&self) -> usize {
+        match self {
+            StreamingAggsPartitionStrategy::FullyCached { cache_files } => {
+                cache_entries_heap_size(cache_files)
+            }
+            StreamingAggsPartitionStrategy::Hybrid {
+                cached_partitions,
+                uncached_partitions,
+            } => {
+                cached_partitions.capacity() * size_of::<CachedPartition>()
+                    + cached_partitions
+                        .iter()
+                        .map(|p| cache_entries_heap_size(&p.cache_files))
+                        .sum::<usize>()
+                    + uncached_partitions.capacity() * size_of::<UncachedPartition>()
+            }
+            StreamingAggsPartitionStrategy::NoCacheAvailable { partitions } => {
+                partitions.capacity() * size_of::<UncachedPartition>()
+            }
+        }
+    }
+
     /// Returns the number of partitions that need to be executed
     pub fn execution_partition_count(&self) -> usize {
         match self {
@@ -335,6 +358,14 @@ fn align_time_to_interval(timestamp: i64, interval_micros: i64, round_up: bool) 
     } else {
         timestamp - remainder
     }
+}
+
+fn cache_entries_heap_size(entries: &Vec<CacheEntry>) -> usize {
+    entries.capacity() * size_of::<CacheEntry>()
+        + entries
+            .iter()
+            .map(|e| e.file_path.capacity())
+            .sum::<usize>()
 }
 
 #[cfg(test)]

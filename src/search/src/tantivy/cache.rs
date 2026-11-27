@@ -15,12 +15,15 @@
 
 use std::{
     collections::HashSet,
-    sync::{Arc, LazyLock as Lazy},
+    sync::{
+        Arc, LazyLock as Lazy,
+        atomic::{AtomicUsize, Ordering},
+    },
 };
 
 use arrow::buffer::BooleanBuffer;
 use config::metrics;
-use dashmap::DashMap;
+use dashmap::{DashMap, mapref::entry::Entry};
 use infra::cache::recency::{EvictedKeys, Recency, now_secs};
 
 use super::TantivyResult;
@@ -70,48 +73,51 @@ impl CacheEntry {
                 histogram.capacity() * std::mem::size_of::<u64>() + std::mem::size_of::<Vec<u64>>()
             }
             CacheEntry::MultiHistogram(multi_histogram) => {
-                multi_histogram
-                    .iter()
-                    .map(|(_, s, _)| {
-                        s.capacity() + std::mem::size_of::<i64>() + std::mem::size_of::<u64>()
-                    })
-                    .sum::<usize>()
+                multi_histogram.capacity() * std::mem::size_of::<(i64, String, u64)>()
+                    + multi_histogram
+                        .iter()
+                        .map(|(_, s, _)| s.capacity())
+                        .sum::<usize>()
                     + std::mem::size_of::<Vec<(i64, String, u64)>>()
             }
             CacheEntry::TopN(top_n) => {
-                top_n
-                    .iter()
-                    .map(|(keys, _)| {
-                        keys.iter().map(|s| s.capacity()).sum::<usize>()
-                            + std::mem::size_of::<Vec<String>>()
-                            + std::mem::size_of::<u64>()
-                    })
-                    .sum::<usize>()
+                top_n.capacity() * std::mem::size_of::<(Vec<String>, u64)>()
+                    + top_n
+                        .iter()
+                        .map(|(keys, _)| {
+                            keys.capacity() * std::mem::size_of::<String>()
+                                + keys.iter().map(|s| s.capacity()).sum::<usize>()
+                        })
+                        .sum::<usize>()
                     + std::mem::size_of::<Vec<(Vec<String>, u64)>>()
             }
+            // A hash set slot holds the String plus one control byte.
             CacheEntry::Distinct(distinct) => {
-                distinct.iter().map(|s| s.capacity()).sum::<usize>()
+                distinct.capacity() * (std::mem::size_of::<String>() + 1)
+                    + distinct.iter().map(|s| s.capacity()).sum::<usize>()
                     + std::mem::size_of::<HashSet<String>>()
             }
         }
     }
 }
 
-/// Cache created for storing the tantivy result
+/// Cache created for storing the tantivy result, bounded by bytes.
 pub struct TantivyResultCache {
     readers: DashMap<String, ResultEntry>,
     evicting: parking_lot::Mutex<()>,
     evicted: EvictedKeys,
-    max_entries: usize,
+    mem_size: AtomicUsize,
+    max_size: usize,
 }
 
 impl TantivyResultCache {
-    pub fn new(max_entries: usize) -> Self {
+    pub fn new(max_size: usize) -> Self {
         Self {
             readers: DashMap::new(),
             evicting: parking_lot::Mutex::new(()),
             evicted: EvictedKeys::new(),
-            max_entries,
+            mem_size: AtomicUsize::new(0),
+            max_size,
         }
     }
 
@@ -132,10 +138,7 @@ impl TantivyResultCache {
     }
 
     pub fn memory_size(&self) -> usize {
-        self.readers
-            .iter()
-            .map(|r| r.value().value.get_memory_size() + 2 * r.key().capacity())
-            .sum()
+        self.mem_size.load(Ordering::Relaxed)
     }
 
     fn lookup(&self, key: &str, now: u32) -> Option<CacheEntry> {
@@ -151,53 +154,79 @@ impl TantivyResultCache {
         None
     }
 
+    /// An entry larger than the whole cache is not stored.
     fn insert(&self, key: String, value: CacheEntry, now: u32) -> Option<CacheEntry> {
-        if self.readers.len() >= self.max_entries {
-            self.evict();
+        let size = entry_size(&key, &value);
+        if size > self.max_size {
+            return None;
         }
-        let memory_usage = value.get_memory_size() + 2 * key.capacity();
-        metrics::TANTIVY_RESULT_CACHE_MEMORY_USAGE
-            .with_label_values::<&str>(&[])
-            .add(memory_usage as i64);
+        if self.memory_size() + size > self.max_size {
+            self.evict(size);
+        }
         let entry = ResultEntry {
             value,
             recency: Recency::new(now),
         };
-        self.readers.insert(key, entry).map(|old| old.value)
+        self.track_add(size);
+        match self.readers.entry(key) {
+            Entry::Occupied(mut occupied) => {
+                let old = occupied.insert(entry);
+                self.track_sub(entry_size(occupied.key(), &old.value));
+                Some(old.value)
+            }
+            Entry::Vacant(vacant) => {
+                vacant.insert(entry);
+                None
+            }
+        }
     }
 
-    /// Drops the least recently read 10% of `max_entries`.
-    fn evict(&self) {
+    /// Drops the least recently read entries until 10% of `max_size` and `incoming` fit.
+    fn evict(&self, incoming: usize) {
         // Another thread is evicting; the next insert still over the limit evicts again.
         let Some(_evicting) = self.evicting.try_lock() else {
             return;
         };
-        if self.readers.len() < self.max_entries {
+        if self.memory_size() + incoming <= self.max_size {
             return;
         }
         metrics::TANTIVY_RESULT_CACHE_GC_TOTAL
             .with_label_values::<&str>(&[])
             .inc();
+        let target = (self.max_size - self.max_size / 10).min(self.max_size - incoming);
         let mut coldest = self
             .readers
             .iter()
             .map(|entry| (entry.recency.rank(), entry.key().clone()))
             .collect::<Vec<_>>();
         coldest.sort_unstable();
-        let mut memory_usage = 0;
-        for (rank, key) in coldest.into_iter().take((self.max_entries / 10).max(1)) {
+        for (rank, key) in coldest {
+            if self.memory_size() <= target {
+                break;
+            }
             // An entry read or replaced after the snapshot has a new rank and stays.
             if let Some((key, entry)) = self
                 .readers
                 .remove_if(&key, |_, entry| entry.recency.rank() == rank)
             {
-                memory_usage += entry.value.get_memory_size() + 2 * key.capacity();
+                self.track_sub(entry_size(&key, &entry.value));
                 self.evicted.record(&key);
             }
         }
+    }
+
+    fn track_add(&self, size: usize) {
+        self.mem_size.fetch_add(size, Ordering::Relaxed);
         metrics::TANTIVY_RESULT_CACHE_MEMORY_USAGE
             .with_label_values::<&str>(&[])
-            .sub(memory_usage as i64);
+            .add(size as i64);
+    }
+
+    fn track_sub(&self, size: usize) {
+        self.mem_size.fetch_sub(size, Ordering::Relaxed);
+        metrics::TANTIVY_RESULT_CACHE_MEMORY_USAGE
+            .with_label_values::<&str>(&[])
+            .sub(size as i64);
     }
 }
 
@@ -206,7 +235,7 @@ impl Default for TantivyResultCache {
         Self::new(
             config::get_config()
                 .search
-                .inverted_index_result_cache_max_entries,
+                .inverted_index_result_cache_max_size,
         )
     }
 }
@@ -216,11 +245,30 @@ struct ResultEntry {
     recency: Recency,
 }
 
+fn entry_size(key: &str, value: &CacheEntry) -> usize {
+    value.get_memory_size() + size_of::<String>() + key.len()
+}
+
 #[cfg(test)]
 mod tests {
     use std::{collections::HashSet, sync::Arc, time::Duration};
 
     use super::*;
+
+    const TEST_MAX_SIZE: usize = 1024 * 1024;
+
+    /// A cap that fits exactly `n` entries of `value` under keys as long as `key`.
+    fn cap_for(n: usize, key: &str, value: &CacheEntry) -> usize {
+        n * entry_size(key, value)
+    }
+
+    fn tracked_size(cache: &TantivyResultCache) -> usize {
+        cache
+            .readers
+            .iter()
+            .map(|r| entry_size(r.key(), &r.value().value))
+            .sum()
+    }
 
     fn create_test_tantivy_result() -> CacheEntry {
         CacheEntry::RowIds(Arc::new(BooleanBuffer::from_iter(
@@ -261,12 +309,13 @@ mod tests {
     #[test]
     fn test_tantivy_result_cache_new() {
         let cache = TantivyResultCache::new(10);
-        assert_eq!(cache.max_entries, 10);
+        assert_eq!(cache.max_size, 10);
+        assert_eq!(cache.memory_size(), 0);
     }
 
     #[test]
     fn test_tantivy_result_cache_put_and_get() {
-        let cache = TantivyResultCache::new(10);
+        let cache = TantivyResultCache::new(TEST_MAX_SIZE);
         let key = "test_key".to_string();
         let result = create_test_tantivy_result();
 
@@ -284,14 +333,14 @@ mod tests {
 
     #[test]
     fn test_tantivy_result_cache_get_nonexistent() {
-        let cache = TantivyResultCache::new(10);
+        let cache = TantivyResultCache::new(TEST_MAX_SIZE);
         let result = cache.get("nonexistent_key");
         assert!(result.is_none());
     }
 
     #[test]
     fn test_tantivy_result_cache_multiple_entries() {
-        let cache = TantivyResultCache::new(10);
+        let cache = TantivyResultCache::new(TEST_MAX_SIZE);
 
         cache.put("count_key".to_string(), create_test_count_result());
         cache.put("histogram_key".to_string(), create_test_histogram_result());
@@ -320,7 +369,7 @@ mod tests {
 
     #[test]
     fn test_tantivy_result_cache_eviction() {
-        let cache = TantivyResultCache::new(5);
+        let cache = TantivyResultCache::new(cap_for(5, "key_0", &create_test_count_result()));
 
         for i in 0..10 {
             let key = format!("key_{i}");
@@ -334,25 +383,32 @@ mod tests {
 
     #[test]
     fn test_eviction_keeps_recently_read_entry_over_newer_unread_ones() {
-        let cache = TantivyResultCache::new(10);
-        cache.insert("hot".to_string(), create_test_count_result(), 1);
+        let cache = TantivyResultCache::new(cap_for(10, "hot_00", &create_test_count_result()));
+        cache.insert("hot_00".to_string(), create_test_count_result(), 1);
         for i in 0..9 {
             cache.insert(format!("cold_{i}"), create_test_count_result(), 2 * i + 2);
-            assert!(cache.lookup("hot", 2 * i + 3).is_some());
+            assert!(cache.lookup("hot_00", 2 * i + 3).is_some());
         }
-        cache.insert("new".to_string(), create_test_count_result(), 30);
+        cache.insert("new_00".to_string(), create_test_count_result(), 30);
 
-        assert!(cache.lookup("hot", 31).is_some(), "hot entry was evicted");
+        assert!(
+            cache.lookup("hot_00", 31).is_some(),
+            "hot entry was evicted"
+        );
         assert!(cache.lookup("cold_0", 31).is_none());
         assert!(!cache.evicted.take("cold_0"), "re-read counted twice");
         assert!(cache.lookup("cold_1", 31).is_some());
-        assert!(cache.lookup("new", 31).is_some());
+        assert!(cache.lookup("new_00", 31).is_some());
         assert!(!cache.evicted.take("never_cached"));
     }
 
     #[test]
     fn test_put_does_not_wait_for_a_running_eviction() {
-        let cache = Arc::new(TantivyResultCache::new(1));
+        let cache = Arc::new(TantivyResultCache::new(cap_for(
+            1,
+            "key1",
+            &create_test_count_result(),
+        )));
         cache.put("key1".to_string(), create_test_count_result());
         let held = cache.evicting.lock();
         let (done, finished) = std::sync::mpsc::channel();
@@ -374,7 +430,7 @@ mod tests {
 
     #[test]
     fn test_tantivy_result_cache_overwrite_existing() {
-        let cache = TantivyResultCache::new(10);
+        let cache = TantivyResultCache::new(TEST_MAX_SIZE);
         let key = "test_key".to_string();
         let result1 = create_test_count_result();
         let result2 = create_test_histogram_result();
@@ -399,7 +455,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_tantivy_result_cache_concurrent_access() {
-        let cache = Arc::new(TantivyResultCache::new(50));
+        let cache = Arc::new(TantivyResultCache::new(TEST_MAX_SIZE));
         let mut handles = vec![];
 
         for i in 0..10 {
@@ -428,7 +484,11 @@ mod tests {
 
     #[tokio::test]
     async fn test_tantivy_result_cache_concurrent_eviction() {
-        let cache = Arc::new(TantivyResultCache::new(20));
+        let cache = Arc::new(TantivyResultCache::new(cap_for(
+            20,
+            "eviction_key_29",
+            &create_test_count_result(),
+        )));
         let mut handles = vec![];
 
         for i in 0..30 {
@@ -463,9 +523,9 @@ mod tests {
 
     #[test]
     fn test_tantivy_result_cache_edge_cases() {
-        let cache = TantivyResultCache::new(1);
         let result1 = create_test_count_result();
         let result2 = create_test_histogram_result();
+        let cache = TantivyResultCache::new(cap_for(1, "key2", &result2));
 
         cache.put("key1".to_string(), result1.clone());
         cache.put("key2".to_string(), result2.clone());
@@ -476,7 +536,7 @@ mod tests {
 
     #[test]
     fn test_tantivy_result_cache_different_result_types() {
-        let cache = TantivyResultCache::new(10);
+        let cache = TantivyResultCache::new(TEST_MAX_SIZE);
 
         let distinct_result = create_test_distinct_result();
         cache.put("distinct_key".to_string(), distinct_result.clone());
@@ -522,7 +582,7 @@ mod tests {
 
     #[test]
     fn test_tantivy_result_cache_select_candidates_roundtrip() {
-        let cache = TantivyResultCache::new(10);
+        let cache = TantivyResultCache::new(TEST_MAX_SIZE);
 
         let candidates = Arc::new(vec![(100i64, 7u32), (99, 3)]);
         let entry = CacheEntry::SelectCandidates(candidates.clone());
@@ -537,7 +597,7 @@ mod tests {
 
     #[test]
     fn test_tantivy_result_cache_row_ids_roundtrip() {
-        let cache = TantivyResultCache::new(10);
+        let cache = TantivyResultCache::new(TEST_MAX_SIZE);
 
         let entry = CacheEntry::RowIds(Arc::new(BooleanBuffer::from_iter(
             (0..64u32).map(|i| [10u32, 20].contains(&i)),
@@ -549,5 +609,60 @@ mod tests {
         } else {
             panic!("Expected RowIdsSelection result");
         }
+    }
+
+    #[test]
+    fn test_eviction_by_bytes_keeps_memory_under_max_size() {
+        let max_size = cap_for(8, "key_00", &create_test_histogram_result());
+        let cache = TantivyResultCache::new(max_size);
+        for i in 0..40u32 {
+            let value = match i % 3 {
+                0 => create_test_count_result(),
+                1 => create_test_histogram_result(),
+                _ => create_test_distinct_result(),
+            };
+            cache.insert(format!("key_{i:02}"), value, i);
+            assert!(cache.memory_size() <= max_size, "over max size after {i}");
+            assert_eq!(cache.memory_size(), tracked_size(&cache));
+        }
+        assert!(cache.lookup("key_00", 40).is_none());
+        assert!(cache.lookup("key_39", 40).is_some());
+    }
+
+    #[test]
+    fn test_entry_larger_than_max_size_is_not_cached() {
+        let small = create_test_count_result();
+        let cache = TantivyResultCache::new(cap_for(2, "small", &small));
+        cache.put("small".to_string(), small);
+        let before = cache.memory_size();
+
+        let big = CacheEntry::Histogram(vec![0; 1024]);
+        assert!(cache.put("big".to_string(), big).is_none());
+        assert!(cache.get("big").is_none());
+        assert!(
+            cache.get("small").is_some(),
+            "oversized entry evicted others"
+        );
+        assert_eq!(cache.memory_size(), before);
+    }
+
+    #[test]
+    fn test_replace_and_evict_then_insert_keep_byte_count() {
+        let cache = TantivyResultCache::new(cap_for(3, "key_0", &create_test_histogram_result()));
+        cache.insert("key_0".to_string(), create_test_count_result(), 1);
+        cache.insert("key_0".to_string(), create_test_histogram_result(), 2);
+        assert_eq!(cache.len(), 1);
+        assert_eq!(
+            cache.memory_size(),
+            entry_size("key_0", &create_test_histogram_result())
+        );
+        for i in 1..6 {
+            cache.insert(format!("key_{i}"), create_test_histogram_result(), 2 + i);
+            assert_eq!(cache.memory_size(), tracked_size(&cache));
+        }
+        assert!(cache.lookup("key_0", 10).is_none());
+        cache.insert("key_0".to_string(), create_test_count_result(), 11);
+        assert_eq!(cache.memory_size(), tracked_size(&cache));
+        assert!(cache.memory_size() <= cache.max_size);
     }
 }

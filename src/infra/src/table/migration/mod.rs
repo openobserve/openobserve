@@ -295,7 +295,8 @@ mod m20261225_000014_create_ai_approvals;
 mod m20261225_000015_ai_chat_sessions_branched_from;
 mod m20261225_000016_add_approval_scope_to_ai_actions;
 mod m20261225_000017_add_oncall_policy_saved_by_person;
-mod m20261226_000001_add_source_stream_to_llm_annotation_queue_items;
+mod m20261226_000001_add_oncall_team_to_incident_integrations;
+mod m20261227_000001_add_source_stream_to_llm_annotation_queue_items;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
 
@@ -960,7 +961,8 @@ impl MigratorTrait for Migrator {
             Box::new(m20261225_000015_ai_chat_sessions_branched_from::Migration),
             Box::new(m20261225_000016_add_approval_scope_to_ai_actions::Migration),
             Box::new(m20261225_000017_add_oncall_policy_saved_by_person::Migration),
-            Box::new(m20261226_000001_add_source_stream_to_llm_annotation_queue_items::Migration),
+            Box::new(m20261226_000001_add_oncall_team_to_incident_integrations::Migration),
+            Box::new(m20261227_000001_add_source_stream_to_llm_annotation_queue_items::Migration),
         ]
     }
 }
@@ -1111,7 +1113,11 @@ mod tests {
         (168, "m20261225_000017_add_oncall_policy_saved_by_person"),
         (
             169,
-            "m20261226_000001_add_source_stream_to_llm_annotation_queue_items",
+            "m20261226_000001_add_oncall_team_to_incident_integrations",
+        ),
+        (
+            170,
+            "m20261227_000001_add_source_stream_to_llm_annotation_queue_items",
         ),
     ];
 
@@ -1362,6 +1368,10 @@ mod tests {
             (
                 "m20260414_000002_create_org_ai_toolsets",
                 "m20261224_000001_delete_cli_ai_toolsets",
+            ),
+            (
+                "m20260730_000002_create_incident_integrations",
+                "m20261226_000001_add_oncall_team_to_incident_integrations",
             ),
         ] {
             assert!(
