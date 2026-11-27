@@ -27,6 +27,7 @@ pub struct Model {
     pub enabled: bool,
     pub config: String,
     pub destinations: Option<String>,
+    pub oncall_team: Option<String>,
     pub created_by: String,
     pub created_at: i64,
     pub updated_at: i64,

@@ -86,8 +86,6 @@ struct DestinationSettings<'a> {
     dbm: bool,
     uds_fields: Option<&'a HashSet<String>>,
     need_original: bool,
-    need_all_values: bool,
-    all_values_max_len: usize,
 }
 
 impl DestinationSettings<'_> {
@@ -125,49 +123,27 @@ impl DestinationSettings<'_> {
                 Value::String(record_id.to_string()),
             );
         }
-        if self.need_all_values {
-            let values = all_values_of(&record, self.all_values_max_len);
+        record
+    }
+}
+
+/// Runs after SDR and before the write, so `_all_values` holds only the values SDR left.
+fn insert_all_values(
+    json_data_by_stream: &mut HashMap<String, IngestJsonData>,
+    streams_need_all_values: &HashMap<String, bool>,
+    max_len: usize,
+) {
+    for (stream, (records, _)) in json_data_by_stream.iter_mut() {
+        if !streams_need_all_values.get(stream).is_some_and(|v| *v) {
+            continue;
+        }
+        for (_, record) in records.iter_mut() {
+            let values = all_values_of(record, max_len);
             record.insert(
                 config::ALL_VALUES_COL_NAME.to_string(),
                 Value::String(values),
             );
         }
-        record
-    }
-}
-
-/// No association names `_all_values`, so the scan leaves its stale pre-redaction text.
-#[cfg(feature = "enterprise")]
-pub fn snapshot_derived_sources(records: &[(i64, Map<String, Value>)]) -> Vec<String> {
-    let max_len = get_config().limit.index_all_max_value_length;
-    records
-        .iter()
-        .map(|(_, record)| {
-            if record.contains_key(config::ALL_VALUES_COL_NAME) {
-                all_values_of(record, max_len)
-            } else {
-                String::new()
-            }
-        })
-        .collect()
-}
-
-/// `_original` is redacted in place by the engine; only `_all_values` needs rebuilding here.
-#[cfg(feature = "enterprise")]
-pub fn refresh_derived_columns(before: &[String], records: &mut [(i64, Map<String, Value>)]) {
-    let max_len = get_config().limit.index_all_max_value_length;
-    for (stale, (_, record)) in before.iter().zip(records.iter_mut()) {
-        if !record.contains_key(config::ALL_VALUES_COL_NAME) {
-            continue;
-        }
-        let values = all_values_of(record, max_len);
-        if &values == stale {
-            continue;
-        }
-        record.insert(
-            config::ALL_VALUES_COL_NAME.to_string(),
-            Value::String(values),
-        );
     }
 }
 
@@ -1277,63 +1253,5 @@ mod tests {
         assert!(ts >= before && ts <= after);
         // field should be inserted
         assert!(val.get(TIMESTAMP_COL_NAME).is_some());
-    }
-
-    #[cfg(feature = "enterprise")]
-    fn record_with(pairs: &[(&str, &str)]) -> (i64, Map<String, Value>) {
-        let mut record = Map::new();
-        for (k, v) in pairs {
-            record.insert(k.to_string(), Value::from(*v));
-        }
-        (1, record)
-    }
-
-    #[test]
-    #[cfg(feature = "enterprise")]
-    fn refresh_rebuilds_all_values_from_the_redacted_fields() {
-        let mut records = vec![record_with(&[
-            ("email", "bob@x.com"),
-            (config::ALL_VALUES_COL_NAME, "\"bob@x.com\""),
-        ])];
-        let before = snapshot_derived_sources(&records);
-        records[0]
-            .1
-            .insert("email".to_string(), Value::from("[REDACTED]"));
-        refresh_derived_columns(&before, &mut records);
-
-        let rebuilt = records[0].1[config::ALL_VALUES_COL_NAME].as_str().unwrap();
-        assert!(rebuilt.contains("[REDACTED]"));
-        assert!(!rebuilt.contains("bob@x.com"));
-    }
-
-    #[test]
-    #[cfg(feature = "enterprise")]
-    fn refresh_keeps_original_the_engine_already_redacted() {
-        let mut records = vec![record_with(&[
-            ("email", "[REDACTED]"),
-            (config::ORIGINAL_DATA_COL_NAME, "{\"email\":\"[REDACTED]\"}"),
-            (config::ALL_VALUES_COL_NAME, "\"bob@x.com\""),
-        ])];
-        let before = vec!["stale".to_string()];
-        refresh_derived_columns(&before, &mut records);
-
-        assert_eq!(
-            records[0].1[config::ORIGINAL_DATA_COL_NAME].as_str(),
-            Some("{\"email\":\"[REDACTED]\"}")
-        );
-    }
-
-    #[test]
-    #[cfg(feature = "enterprise")]
-    fn a_record_without_all_values_is_left_alone() {
-        let mut records = vec![record_with(&[
-            ("email", "[REDACTED]"),
-            (config::ORIGINAL_DATA_COL_NAME, "{\"email\":\"[REDACTED]\"}"),
-        ])];
-        let before = snapshot_derived_sources(&records);
-        assert_eq!(before, vec![String::new()]);
-
-        refresh_derived_columns(&before, &mut records);
-        assert_eq!(records[0].1.len(), 2);
     }
 }
