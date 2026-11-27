@@ -288,11 +288,19 @@ export class HomePage {
     }
 
     async homePageDefaultOrg() {
-        await this.orgSelector.click();
-        await this.orgMenuList.waitFor({ state: 'visible', timeout: 10000 });
-        // Find the "default" row by its label cell text using a data-test scoped lookup.
-        await this.orgSearchInput.fill('default');
-        await this.clickOrgRow(this.orgMenuItemLabel.first());
+        const defaultRow = this.getOrgMenuItemByIdentifier('default');
+        // A route change still settling can dismiss the popover mid-pick, so reopen it on each try.
+        await expect(async () => {
+            if (!(await this.orgMenuList.isVisible())) {
+                await this.orgSelector.click();
+                await this.orgMenuList.waitFor({ state: 'visible', timeout: 5000 });
+            }
+            await this.orgSearchInput.fill('default', { force: true });
+            await defaultRow.waitFor({ state: 'visible', timeout: 5000 });
+            await defaultRow.click({ force: true, timeout: 5000 });
+            await this.orgMenuList.waitFor({ state: 'hidden', timeout: 3000 });
+            await this.page.waitForURL(/org_identifier=default(&|$)/, { timeout: 5000 });
+        }).toPass({ timeout: 30000 });
     }
 
     async homePageURLValidationDefaultOrg() {
