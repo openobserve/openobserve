@@ -17,7 +17,7 @@
 
 use ::db::ai_memory::{self as memory_db, Submission, Submitted};
 use axum::{
-    Extension, Json,
+    Json,
     body::Bytes,
     extract::Path,
     http::{HeaderMap, StatusCode},
@@ -28,7 +28,7 @@ use config::{
         AgentMemoryWrites, Author, ContentError, EditFlag, Evidence, MemoryEdit, MemoryScope,
         MemorySettings, RevisionState,
     },
-    utils::{delegation::SCOPE_AI_MEMORY, str::constant_time_eq},
+    utils::str::constant_time_eq,
 };
 use infra::table::ai_memory::{AgentOutcome, AgentWrite, Change, MemoryKey, Outcome, Revision};
 use o2_enterprise::enterprise::{
@@ -41,7 +41,7 @@ use o2_enterprise::enterprise::{
     },
     common::config::get_config as get_o2_config,
 };
-use openobserve_api_common::{auth::delegation::DelegatedCaller, extractors::Headers};
+use openobserve_api_common::extractors::Headers;
 use openobserve_core::{
     ai_chat::admission::{AdmitError, resolve_owner},
     auth::{UserEmail, check_permissions},
@@ -184,7 +184,7 @@ pub struct PendingListResponse {
     pub pending: Vec<PendingEdit>,
 }
 
-/// An agent's edit from o2-ai; the turn's row decides the user, never this body.
+/// An agent's edit from o2-ai; the caller must own the chat of the turn this body names.
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct AgentEditsRequest {
     pub session_id: String,
@@ -216,6 +216,13 @@ pub struct AgentEditsReply {
 struct TurnWrite {
     org_id: String,
     request: AgentEditsRequest,
+}
+
+/// Who called `agent_edits`: the route's org, the authenticated user and the request's headers.
+struct TurnCaller<'a> {
+    org_id: &'a str,
+    user_email: &'a str,
+    headers: &'a HeaderMap,
 }
 
 /// The caller as a memory author, and whether their shared-memory writes apply directly.
@@ -944,10 +951,10 @@ pub async fn revert_my_memory(
 }
 
 /// The agent's own way to edit memory; people use the PUT routes. It is a separate route because
-/// its rules differ: the agent is the author, it sends edits rather than whole text, a shared edit
-/// may wait for a memory admin, the turn must still be running, and it never uses a user's rights.
-/// It sits under `/api` and needs a token bound to that one turn plus the internal secret, the
-/// same pattern AutoResolve's run callbacks use, so only o2-ai can call it and only mid-turn.
+/// its rules differ: the agent is the author, it sends edits rather than whole text, and a shared
+/// edit may wait for a memory admin whatever the user's own rights are. It is called with the
+/// turn's own credential (the one the agent's MCP calls use) plus the internal secret, so only
+/// o2-ai can call it, and only for a running turn of a chat that credential's user owns.
 #[utoipa::path(
     post,
     path = "/v2/{org_id}/ai/memory/agent_edits",
@@ -955,14 +962,14 @@ pub async fn revert_my_memory(
     tag = "AI",
     operation_id = "AgentEditAiMemory",
     summary = "Send a running turn's memory edits",
-    description = "Internal: o2-ai posts the edits the agent made with `update_memory`. Needs the turn's token and `x-o2-internal-secret`. Only available in enterprise deployments.",
+    description = "Internal: o2-ai posts the edits the agent made with `update_memory`, as the user the turn runs for. Needs `x-o2-internal-secret`. Only available in enterprise deployments.",
     security(("Authorization" = [])),
     params(("org_id" = String, Path, description = "Organization name")),
     request_body(content = AgentEditsRequest, description = "The edits, the revision they were made against and their evidence", content_type = "application/json"),
     responses(
         (status = 200, description = "Applied, pending a memory admin's approval, or refused with a reason", content_type = "application/json", body = AgentEditsReply),
         (status = 400, description = "The body is not an edit request", content_type = "application/json", body = Object),
-        (status = 403, description = "Not the turn's token, no internal secret, or the turn is no longer running", content_type = "application/json", body = Object),
+        (status = 403, description = "No internal secret, the turn is no longer running, or its chat belongs to another user", content_type = "application/json", body = Object),
         (status = 500, description = "Internal error", content_type = "application/json", body = Object),
     ),
     extensions(
@@ -972,48 +979,46 @@ pub async fn revert_my_memory(
 )]
 pub async fn agent_edits(
     Path(org_id): Path<String>,
+    Headers(user_email): Headers<UserEmail>,
     headers: HeaderMap,
-    caller: Option<Extension<DelegatedCaller>>,
     body: Bytes,
 ) -> Response {
-    let parsed = serde_json::from_slice::<AgentEditsRequest>(&body);
-    let turn_id = parsed.as_ref().map_or("", |r| r.turn_id.as_str());
-    let secret = &get_o2_config().ai.internal_secret;
-    if !caller_ok_with(&headers, caller.as_deref(), &org_id, turn_id, secret) {
-        let reply = json!({"code": "caller_refused", "message": CALLER_REFUSED});
+    let caller = TurnCaller {
+        org_id: &org_id,
+        user_email: &user_email.user_id,
+        headers: &headers,
+    };
+    agent_edits_from(caller, &body, &get_o2_config().ai.internal_secret).await
+}
+
+/// [`agent_edits`] with the configured secret passed in; the secret is checked before the body.
+async fn agent_edits_from(caller: TurnCaller<'_>, body: &[u8], secret: &str) -> Response {
+    let org_id = caller.org_id;
+    if !secret_ok_with(caller.headers, secret) {
+        let reply = json!({"code": "secret_refused", "message": SECRET_REFUSED});
         return (StatusCode::FORBIDDEN, Json(reply)).into_response();
     }
-    let request = match parsed {
+    let request = match serde_json::from_slice::<AgentEditsRequest>(body) {
         Ok(request) => request,
         Err(e) => return MetaHttpResponse::bad_request(format!("invalid request: {e}")),
     };
     if request.edits.is_empty() {
         return MetaHttpResponse::bad_request("edits must not be empty");
     }
-    let (status, reply) = write_for_turn(TurnWrite {
-        org_id: org_id.clone(),
-        request,
-    })
-    .await;
-    audit_agent_edits(&org_id, &body, status, &reply).await;
+    let (status, reply) = match turn_refusal(&caller, &request).await {
+        Some(refusal) => refusal,
+        None => {
+            let org_id = org_id.to_string();
+            write_for_turn(TurnWrite { org_id, request }).await
+        }
+    };
+    audit_agent_edits(&caller, body, status, &reply).await;
     (status, Json(reply)).into_response()
 }
 
-/// True only for the turn's own token, in its org, together with the configured internal secret.
-fn caller_ok_with(
-    headers: &HeaderMap,
-    caller: Option<&DelegatedCaller>,
-    org: &str,
-    turn: &str,
-    secret: &str,
-) -> bool {
-    let Some(caller) = caller else {
-        return false;
-    };
-    if caller.scope != SCOPE_AI_MEMORY || caller.org != org || caller.link_id != turn {
-        return false;
-    }
-    if turn.is_empty() || secret.is_empty() {
+/// True only for exactly one secret header that equals the configured, non-empty secret.
+fn secret_ok_with(headers: &HeaderMap, secret: &str) -> bool {
+    if secret.is_empty() {
         return false;
     }
     let mut sent = headers.get_all(INTERNAL_SECRET_HEADER).iter();
@@ -1021,6 +1026,61 @@ fn caller_ok_with(
         (Some(value), None) => constant_time_eq(value.as_bytes(), secret.as_bytes()),
         _ => false,
     }
+}
+
+/// The 403 unless the body's turn is running in its session and that chat is the caller's.
+async fn turn_refusal(
+    caller: &TurnCaller<'_>,
+    request: &AgentEditsRequest,
+) -> Option<(StatusCode, Value)> {
+    let not_owner = || {
+        let reply = json!({"code": "not_chat_owner", "message": NOT_CHAT_OWNER});
+        Some((StatusCode::FORBIDDEN, reply))
+    };
+    let user_id = match resolve_owner(caller.user_email).await {
+        Ok(user_id) => user_id,
+        Err(AdmitError::NotRegistered) => return not_owner(),
+        Err(_) => return Some(write_failed()),
+    };
+    let owner = match running_turn_owner(caller.org_id, request).await {
+        Ok(owner) => owner,
+        Err(e) => {
+            log::error!("[AI-MEMORY] cannot read the turn of an agent edit: {e}");
+            return Some(write_failed());
+        }
+    };
+    match owner {
+        None => Some(turn_not_running()),
+        Some(owner) if owner != user_id => not_owner(),
+        Some(_) => None,
+    }
+}
+
+/// The user id owning the chat of the body's turn, if that turn is running in the body's session.
+async fn running_turn_owner(
+    org_id: &str,
+    request: &AgentEditsRequest,
+) -> Result<Option<String>, infra::errors::Error> {
+    use infra::table::{ai_chat_sessions, ai_chat_turns};
+    let turn = ai_chat_turns::get_running(org_id, &request.turn_id).await?;
+    if !turn.is_some_and(|t| t.session_id == request.session_id) {
+        return Ok(None);
+    }
+    let primary = infra::db::get_orm_client_rw().await;
+    let chat = ai_chat_sessions::get_with(primary, org_id, &request.session_id).await?;
+    Ok(chat.map(|c| c.user_id))
+}
+
+fn turn_not_running() -> (StatusCode, Value) {
+    (
+        StatusCode::FORBIDDEN,
+        json!({"code": "turn_not_running", "message": "the turn is not running"}),
+    )
+}
+
+fn write_failed() -> (StatusCode, Value) {
+    let reply = json!({"code": "internal_error", "message": "the write failed"});
+    (StatusCode::INTERNAL_SERVER_ERROR, reply)
 }
 
 /// Holding `ai_memory` PUT is what makes someone a memory admin.
@@ -1374,10 +1434,7 @@ async fn write_for_turn(write: TurnWrite) -> (StatusCode, Value) {
         now,
     };
     match memory_db::agent_write(write).await {
-        Ok(AgentOutcome::TurnNotRunning) => (
-            StatusCode::FORBIDDEN,
-            json!({"code": "turn_not_running", "message": "the turn is not running"}),
-        ),
+        Ok(AgentOutcome::TurnNotRunning) => turn_not_running(),
         Ok(AgentOutcome::UserScopeRefused) => (
             StatusCode::OK,
             refusal(
@@ -1394,8 +1451,7 @@ async fn write_for_turn(write: TurnWrite) -> (StatusCode, Value) {
         }
         Err(e) => {
             log::error!("[AI-MEMORY] agent write failed: {e}");
-            let reply = json!({"code": "internal_error", "message": "the write failed"});
-            (StatusCode::INTERNAL_SERVER_ERROR, reply)
+            write_failed()
         }
     }
 }
@@ -1473,16 +1529,21 @@ fn agent_reply(scope: MemoryScope, outcome: Outcome) -> Value {
 }
 
 /// The generic audit skips this route, so the notes in its body are never recorded.
-async fn audit_agent_edits(org_id: &str, body: &[u8], status: StatusCode, reply: &Value) {
+async fn audit_agent_edits(
+    caller: &TurnCaller<'_>,
+    body: &[u8],
+    status: StatusCode,
+    reply: &Value,
+) {
     if !get_o2_config().common.audit_enabled {
         return;
     }
-    audit::audit(agent_edits_audit_message(org_id, body, status, reply)).await;
+    audit::audit(agent_edits_audit_message(caller, body, status, reply)).await;
 }
 
-/// Attributed to o2-ai; the body names the session and turn the edit came from.
+/// Attributed to o2-ai; the body names the session and turn, and the user the turn ran for.
 fn agent_edits_audit_message(
-    org_id: &str,
+    caller: &TurnCaller<'_>,
     body: &[u8],
     status: StatusCode,
     reply: &Value,
@@ -1490,6 +1551,12 @@ fn agent_edits_audit_message(
     use o2_enterprise::enterprise::common::auditor::{AuditMessage, Protocol, ResponseMeta};
     let error_msg = (reply["status"] != "applied" && reply["status"] != "pending")
         .then(|| reply["code"].as_str().unwrap_or("refused").to_string());
+    let org_id = caller.org_id;
+    let mut http_body = audited_body(body);
+    if let Ok(Value::Object(mut fields)) = serde_json::from_str(&http_body) {
+        fields.insert("acting_user".to_string(), json!(caller.user_email));
+        http_body = Value::Object(fields).to_string();
+    }
     AuditMessage {
         login_ip: None,
         user_agent: None,
@@ -1501,7 +1568,7 @@ fn agent_edits_audit_message(
             http_method: "POST".to_string(),
             http_path: format!("api/v2/{org_id}/ai/memory/agent_edits"),
             http_query_params: String::new(),
-            http_body: audited_body(body),
+            http_body,
             http_response_code: status.as_u16(),
             error_msg,
             trace_id: None,
@@ -1512,7 +1579,8 @@ fn agent_edits_audit_message(
     }
 }
 
-const CALLER_REFUSED: &str = "This route needs the turn's token and the internal secret.";
+const SECRET_REFUSED: &str = "This route needs the internal secret.";
+const NOT_CHAT_OWNER: &str = "The turn's chat belongs to another user.";
 
 /// Whether `path` is a memory PUT the generic audit must skip: its handler records it without the
 /// notes.
@@ -1917,6 +1985,11 @@ pub(crate) mod tests {
 
     /// A user who is a member of `org`; private memory is written only for members.
     async fn member(org: &str, label: &str) -> String {
+        member_with_email(org, label).await.0
+    }
+
+    /// A new member of `org` as `(user id, email)`.
+    async fn member_with_email(org: &str, label: &str) -> (String, String) {
         use config::meta::{organization::OrganizationType, user::UserRole};
         use infra::table::{org_users, organizations, users};
         let email = format!("{label}-{}@example.com", config::utils::time::now_micros());
@@ -1942,7 +2015,8 @@ pub(crate) mod tests {
         org_users::add(org, &email, UserRole::User, "", None)
             .await
             .unwrap();
-        users::get_id_by_email(&email).await.unwrap().unwrap()
+        let id = users::get_id_by_email(&email).await.unwrap().unwrap();
+        (id, email)
     }
 
     #[tokio::test]
@@ -2217,55 +2291,26 @@ pub(crate) mod tests {
         memory_db::set_settings(key, None, &settings).await.unwrap();
     }
 
-    fn turn_caller(scope: &str, org: &str, turn: &str) -> DelegatedCaller {
-        DelegatedCaller {
-            link_id: turn.to_string(),
-            installation_id: String::new(),
-            org: org.to_string(),
-            jti: "j1".to_string(),
-            scope: scope.to_string(),
+    fn secret_headers(sent: &[&str]) -> HeaderMap {
+        let mut headers = HeaderMap::new();
+        for value in sent {
+            headers.append(INTERNAL_SECRET_HEADER, value.parse().unwrap());
         }
+        headers
     }
 
     #[test]
-    fn agent_edits_need_the_turn_token_in_its_org_and_the_secret() {
-        let turn_token = turn_caller(SCOPE_AI_MEMORY, "acme", "t1");
-        let other_turn = turn_caller(SCOPE_AI_MEMORY, "acme", "t2");
-        let other_org = turn_caller(SCOPE_AI_MEMORY, "other", "t1");
-        let no_turn = turn_caller(SCOPE_AI_MEMORY, "acme", "");
-        let scopes =
-            ["assistant", "slack_action", "autoresolve"].map(|s| turn_caller(s, "acme", "t1"));
-        type Case<'a> = (
-            &'a str,
-            Option<&'a DelegatedCaller>,
-            &'a [&'a str],
-            &'a str,
-            &'a str,
-            bool,
-        );
-        #[rustfmt::skip]
-        let cases: [Case; 13] = [
-            ("token and secret", Some(&turn_token), &["s3cret"], "s3cret", "t1", true),
-            ("body names another turn", Some(&turn_token), &["s3cret"], "s3cret", "t2", false),
-            ("another turn's token", Some(&other_turn), &["s3cret"], "s3cret", "t1", false),
-            ("another org's token", Some(&other_org), &["s3cret"], "s3cret", "t1", false),
-            ("assistant token", Some(&scopes[0]), &["s3cret"], "s3cret", "t1", false),
-            ("slack_action token", Some(&scopes[1]), &["s3cret"], "s3cret", "t1", false),
-            ("autoresolve token", Some(&scopes[2]), &["s3cret"], "s3cret", "t1", false),
-            ("no token", None, &["s3cret"], "s3cret", "t1", false),
-            ("no secret", Some(&turn_token), &[], "s3cret", "t1", false),
-            ("wrong secret", Some(&turn_token), &["s3crex"], "s3cret", "t1", false),
-            ("secret sent twice", Some(&turn_token), &["s3cret", "s3cret"], "s3cret", "t1", false),
-            ("empty configured secret", Some(&turn_token), &[""], "", "t1", false),
-            ("no turn id", Some(&no_turn), &["s3cret"], "s3cret", "", false),
+    fn agent_edits_need_exactly_one_matching_secret() {
+        let cases: [(&str, &[&str], &str, bool); 5] = [
+            ("the secret", &["s3cret"], "s3cret", true),
+            ("no secret", &[], "s3cret", false),
+            ("wrong secret", &["s3crex"], "s3cret", false),
+            ("secret sent twice", &["s3cret", "s3cret"], "s3cret", false),
+            ("empty configured secret", &[""], "", false),
         ];
-        for (label, caller, sent, configured, turn, want) in cases {
-            let mut headers = HeaderMap::new();
-            for value in sent {
-                headers.append(INTERNAL_SECRET_HEADER, value.parse().unwrap());
-            }
+        for (label, sent, configured, want) in cases {
             assert_eq!(
-                caller_ok_with(&headers, caller, "acme", turn, configured),
+                secret_ok_with(&secret_headers(sent), configured),
                 want,
                 "{label}"
             );
@@ -2273,12 +2318,88 @@ pub(crate) mod tests {
     }
 
     #[tokio::test]
-    async fn agent_edits_without_the_turn_token_are_refused_before_the_body_is_read() {
+    async fn agent_edits_without_the_secret_are_refused_before_the_body_is_read() {
         let body = json!({"session_id": "s1", "turn_id": "t1", "scope": "org", "base_rev": 0, "edits": []});
-        for body in [Bytes::new(), Bytes::from(body.to_string())] {
-            let resp = agent_edits(Path("acme".to_string()), HeaderMap::new(), None, body).await;
-            assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+        for sent in [&[][..], &["s3crex"], &["s3cret", "s3cret"]] {
+            for body in [Bytes::new(), Bytes::from(body.to_string())] {
+                let headers = secret_headers(sent);
+                let caller = TurnCaller {
+                    org_id: "acme",
+                    user_email: "u@example.com",
+                    headers: &headers,
+                };
+                let resp = agent_edits_from(caller, &body, "s3cret").await;
+                assert_eq!(resp.status(), StatusCode::FORBIDDEN, "{sent:?}");
+            }
         }
+    }
+
+    #[tokio::test]
+    async fn agent_edits_apply_only_for_a_running_turn_of_the_callers_chat() {
+        use infra::table::{ai_chat_sessions, ai_chat_turns};
+        if !meta_store().await {
+            return;
+        }
+        let org = unique_org("memory_agent_edits");
+        let (owner, owner_email) = member_with_email(&org, "owner").await;
+        let (_, other_email) = member_with_email(&org, "other").await;
+        let (session, turn) = (config::ider::uuid(), config::ider::uuid());
+        let now = config::utils::time::now_micros();
+        ai_chat_sessions::get_or_create(&org, &session, &owner, &owner_email, "o2-ai", now)
+            .await
+            .unwrap();
+        ai_chat_turns::admit(&org, &session, &turn, 0, now)
+            .await
+            .unwrap();
+        set_writes(&MemoryKey::org(&org), AgentMemoryWrites::Auto).await;
+        let headers = secret_headers(&["s3cret"]);
+        let post = async |org: &str, email: &str, session: &str, turn: &str| {
+            let body = json!({
+                "session_id": session, "turn_id": turn, "scope": "org", "base_rev": 0,
+                "edits": [{"op": "add", "section": "Quirks", "text": "- a"}],
+                "evidence": [{"call_ref": "user"}],
+            });
+            let caller = TurnCaller {
+                org_id: org,
+                user_email: email,
+                headers: &headers,
+            };
+            let resp = agent_edits_from(caller, body.to_string().as_bytes(), "s3cret").await;
+            let status = resp.status();
+            let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX).await;
+            let reply: Value = serde_json::from_slice(&bytes.unwrap()).unwrap();
+            let outcome = reply["code"].as_str().or(reply["status"].as_str());
+            (status, outcome.unwrap_or_default().to_string())
+        };
+        let refused = |code: &str| (StatusCode::FORBIDDEN, code.to_string());
+        let other_session = config::ider::uuid();
+        #[rustfmt::skip]
+        let cases = [
+            ("another user", org.as_str(), other_email.as_str(), session.as_str(), turn.as_str(), "not_chat_owner"),
+            ("an unknown user", &org, "nobody@example.com", &session, &turn, "not_chat_owner"),
+            ("another org", "memory_agent_elsewhere", &owner_email, &session, &turn, "turn_not_running"),
+            ("another session", &org, &owner_email, &other_session, &turn, "turn_not_running"),
+            ("an unknown turn", &org, &owner_email, &session, "no-such-turn", "turn_not_running"),
+        ];
+        for (label, org, email, session, turn, code) in cases {
+            assert_eq!(
+                post(org, email, session, turn).await,
+                refused(code),
+                "{label}"
+            );
+        }
+        assert_eq!(
+            post(&org, &owner_email, &session, &turn).await,
+            (StatusCode::OK, "applied".to_string())
+        );
+        let done = ai_chat_turns::TURN_COMPLETED;
+        ai_chat_turns::finish(&org, &session, &turn, done, None, None, None, now)
+            .await
+            .unwrap();
+        assert_eq!(
+            post(&org, &owner_email, &session, &turn).await,
+            refused("turn_not_running")
+        );
     }
 
     #[tokio::test]
@@ -2515,8 +2636,14 @@ pub(crate) mod tests {
     #[test]
     fn each_agent_edit_is_audited_with_its_outcome() {
         let body = br#"{"turn_id":"t1"}"#;
+        let headers = HeaderMap::new();
+        let caller = TurnCaller {
+            org_id: "o1",
+            user_email: "u@x.io",
+            headers: &headers,
+        };
         let ok = agent_edits_audit_message(
-            "o1",
+            &caller,
             body,
             StatusCode::OK,
             &json!({"status": "applied", "rev": 2}),
@@ -2530,7 +2657,7 @@ pub(crate) mod tests {
         assert_eq!(ok.response_meta.http_response_code, 200);
         assert!(ok.response_meta.error_msg.is_none());
         let refused = agent_edits_audit_message(
-            "o1",
+            &caller,
             body,
             StatusCode::FORBIDDEN,
             &json!({"code": "turn_not_running"}),
@@ -2596,8 +2723,14 @@ pub(crate) mod tests {
             "evidence": [{"call_ref": "user"}],
             "reason": "why-note",
         });
+        let headers = HeaderMap::new();
+        let caller = TurnCaller {
+            org_id: "o1",
+            user_email: "u@x.io",
+            headers: &headers,
+        };
         let audited = agent_edits_audit_message(
-            "o1",
+            &caller,
             body.to_string().as_bytes(),
             StatusCode::OK,
             &json!({"status": "applied"}),
@@ -2618,6 +2751,7 @@ pub(crate) mod tests {
                 ],
                 "evidence": [{"call_ref": "user"}],
                 "reason": "[REDACTED: 8 bytes]",
+                "acting_user": "u@x.io",
             })
         );
         assert_eq!(

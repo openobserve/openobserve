@@ -3916,13 +3916,6 @@ async fn persisted_turn(turn: StreamTurn) -> Response {
         return refusal.into_response();
     }
     openobserve_core::ai_chat::admission::apply_admission(&mut query_req, &admitted);
-    // The token names the user the turn runs as; the edits' author is still the agent.
-    o2_enterprise::enterprise::ai::memory_token::attach(
-        &mut query_req,
-        &user_id,
-        &org_id,
-        PersistSettings::from_config().max_turn,
-    );
     let openobserve_core::ai_chat::admission::AdmittedTurn {
         row,
         owner,

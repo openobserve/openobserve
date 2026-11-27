@@ -6684,30 +6684,11 @@ mod tests {
         assert_eq!(scope_allows(in_autoresolve_scope), sorted(&expected));
     }
 
-    #[cfg(feature = "enterprise")]
-    #[test]
-    fn ai_memory_scope_is_exactly_the_agent_edits_route() {
-        use openobserve_api_common::auth::delegation::{
-            in_ai_memory_scope, in_assistant_scope, in_autoresolve_scope, in_slack_action_scope,
-        };
-
-        let route = "POST /v2/{org_id}/ai/memory/agent_edits";
-        assert_eq!(scope_allows(in_ai_memory_scope), vec![route.to_string()]);
-        let others: [fn(&Method, &str) -> bool; 3] = [
-            in_assistant_scope,
-            in_slack_action_scope,
-            in_autoresolve_scope,
-        ];
-        for other in others {
-            assert!(!scope_allows(other).contains(&route.to_string()));
-        }
-    }
-
     /// A pattern parameter must not admit a path that axum hands to a more specific route.
     #[test]
     fn scopes_agree_with_axum_dispatch() {
         use openobserve_api_common::auth::delegation::{
-            in_ai_memory_scope, in_assistant_scope, in_autoresolve_scope, in_slack_action_scope,
+            in_assistant_scope, in_autoresolve_scope, in_slack_action_scope,
         };
 
         let assistant: fn(&Method, &str) -> bool = in_assistant_scope;
@@ -6719,7 +6700,6 @@ mod tests {
                 in_autoresolve_scope,
                 "RESERVED_STREAM_SLOTS or ALERT_ID_LITERALS",
             ),
-            ("ai_memory", in_ai_memory_scope, "AI_MEMORY_SCOPE"),
         ];
         for (scope, in_scope, fix) in cases {
             let wrong = dispatch_disagreements(in_scope);
