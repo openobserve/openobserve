@@ -9613,6 +9613,7 @@
       "promqlFiltersAndOnly": "Bộ lọc PromQL chỉ hỗ trợ AND. Hãy xóa OR và các nhóm, hoặc chuyển sang SQL.",
       "cappedHint": "Đang hiển thị {count} giá trị đầu tiên",
       "cappedAllHint": "“Tất cả” cũng khớp với các giá trị không có trong danh sách",
+      "metricsTruncatedHint": "Một số chỉ số chưa được chọn. Nhập tên chỉ số để xem tất cả giá trị.",
       "metric": "Chỉ số",
       "label": "Nhãn",
       "metricSelectTooltip": "Chọn một chỉ số hoặc dùng biến như $metricVariable để chọn nó dựa trên giá trị khác.",

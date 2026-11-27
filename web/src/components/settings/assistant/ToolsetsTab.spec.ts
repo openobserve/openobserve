@@ -199,6 +199,21 @@ describe("ToolsetsTab", () => {
     expect(w.text()).not.toContain("My_Tool");
   });
 
+  it("hides Add, but keeps a granted toolset editable, when the caller may not create one", async () => {
+    const row = { ...ROWS[0], enabled: true, status: { state: "ok" } };
+    vi.mocked(aiToolsets.list).mockResolvedValue({
+      data: { toolsets: [row], can_create: false },
+    } as never);
+    const h = settingsHarness({});
+    await h.router.push("/settings/assistant/toolsets");
+    const w = mount(ToolsetsTab, { global: { plugins: h.plugins }, attachTo: document.body });
+    wrapper = w;
+    await settle();
+    await vi.waitFor(() => expect(w.find('[data-test="o2-table-row-0"]').exists()).toBe(true));
+    expect(w.find('[data-test="ai-toolsets-add-btn"]').exists()).toBe(false);
+    expect(w.find('[data-test="ai-toolset-pagerduty-delete"]').exists()).toBe(true);
+  });
+
   it("leaves editing to the server's Toolsets permission, then turns read-only on a 403", async () => {
     fake.current = fakeAssistant("available", { isAdmin: false });
     vi.mocked(assistantSettings.setToolsetEnabled).mockRejectedValue({ response: { status: 403 } });

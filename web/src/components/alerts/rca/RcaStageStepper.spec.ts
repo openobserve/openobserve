@@ -17,6 +17,8 @@ import { describe, expect, it } from "vitest";
 import { mount } from "@vue/test-utils";
 import i18n from "@/locales";
 import RcaStageStepper from "./RcaStageStepper.vue";
+import { RCA_STEPPER_STAGES } from "@/utils/incidents/rcaThread";
+import { AUTORESOLVE_STAGES } from "@/utils/autoresolve/autoresolveText";
 
 const mountStepper = (props: Record<string, unknown>) =>
   mount(RcaStageStepper, { props, global: { plugins: [i18n] } });
@@ -63,5 +65,30 @@ describe("RcaStageStepper (02 TH37)", () => {
 
     expect(wrapper.find('[data-test="rca-stage-label"]').exists()).toBe(false);
     expect(wrapper.findAll('[data-state="todo"]')).toHaveLength(7);
+  });
+
+  it("shows the stages a run moved past without reaching as skipped, not done", () => {
+    const wrapper = mountStepper({
+      stages: AUTORESOLVE_STAGES,
+      stage: "outcome",
+      skipped: ["ask", "proceed", "check"],
+    });
+
+    const states = wrapper.findAll("[data-state]").map((bar) => bar.attributes("data-state"));
+    expect(states).toEqual(["done", "skipped", "skipped", "skipped", "current"]);
+  });
+
+  it.each([
+    ["RCA stages by default", undefined, RCA_STEPPER_STAGES],
+    ["the stages passed in", AUTORESOLVE_STAGES, AUTORESOLVE_STAGES],
+  ])("renders the stages passed in, and RCA stages by default (%s)", (_, stages, expected) => {
+    const wrapper = mountStepper({ stageIndex: 2, stages });
+
+    const items = wrapper.findAll("li");
+    expect(items.map((item) => item.text())).toEqual(
+      expected.map((stage) => i18n.global.t(stage.labelKey)),
+    );
+    expect(items[1].attributes("aria-current")).toBe("step");
+    expect(wrapper.find('[data-test="rca-stage-label"]').text()).toContain(`2/${expected.length}`);
   });
 });

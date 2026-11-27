@@ -68,6 +68,8 @@ export const GATE_PREDICATES: Record<string, (c: NavGateContext) => boolean> = {
     (c.alertCalibrationEnabled || featureState(c.features, "alerts") === "locked"),
   // Enterprise plus `/config` `fleet_enabled`; the route stays so management reads keep working.
   fleet: (c) => c.isEnterprise && c.fleetEnabled,
+  // `autoresolve_enabled` already folds in the licence and the deployment flag, so a locked licence hides it.
+  autoresolve: (c) => c.isEnterprise && c.autoresolveEnabled,
 };
 
 /**
@@ -233,6 +235,17 @@ export const NAV_GROUPS: NavGroupDef[] = [
         requires: "incidentList",
         gate: "incidents",
         feature: "incidents",
+      },
+      {
+        titleKey: "menu.autoresolve",
+        icon: "bolt",
+        name: "autoresolve",
+        categoryKey: "menu.response",
+        requires: "alertList",
+        gate: "autoresolve",
+        feature: "autoresolve",
+        activeOnRoutes: ["autoresolveRun", "autoresolveSaved", "autoresolveSavedNew"],
+        alpha: true,
       },
       {
         titleKey: "menu.downtimes",

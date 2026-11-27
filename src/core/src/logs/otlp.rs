@@ -1928,6 +1928,7 @@ mod tests {
         use config::meta::self_reporting::usage::is_feature_writer_stream;
         for stream in [
             "_o2_alert_calibration_digests",
+            "_o2_autoresolve_runs",
             "_o2_autoobserve_health",
             "_o2_service_verdicts",
             "_o2_service_requests_total",

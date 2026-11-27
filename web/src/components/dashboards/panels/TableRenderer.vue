@@ -240,7 +240,11 @@ import { parseSparklineValue, tableRowHeight } from "@/utils/dashboard/tableOpti
 import { TABLE_ROWS_PER_PAGE_DEFAULT_VALUE } from "@/utils/dashboard/constants";
 import { getColorForTable } from "@/utils/dashboard/colorPalette";
 import { isColorDark } from "@/utils/dashboard/chartColorUtils";
-import { buildValueMappingCache, lookupValueMappingFull } from "@/utils/dashboard/tableConfigUtils";
+import {
+  buildValueMappingCache,
+  isMissingCell,
+  lookupValueMappingFull,
+} from "@/utils/dashboard/tableConfigUtils";
 import { copyToClipboard } from "@/utils/clipboard";
 import { calculateWidthText } from "@/utils/dashboard/chartDimensionUtils";
 import { useStore } from "vuex";
@@ -749,6 +753,12 @@ export default defineComponent({
       return { columns, rows: tableRef.value?.filterRows(sorted) ?? sorted };
     };
 
+    // Re-fetched export columns carry no formatter, so it comes from the column shown on screen.
+    const displayFormat = (key: string) =>
+      ((props.data?.columns as TableColumn[] | undefined) ?? []).find(
+        (col) => (col.field ?? col.name) === key,
+      )?.format;
+
     const toCsv = (cols: TableExportColumn[], rows: TableRow[]): string => {
       const headers = cols.map((c) => c.label ?? c.name);
       const lines = [
@@ -756,7 +766,11 @@ export default defineComponent({
         ...rows.map((row) =>
           cols
             .map((c) => {
-              const val = row[c.field ?? c.name];
+              const key = c.field ?? c.name;
+              const raw = row[key];
+              // Missing cells take the displayed column's text so NULL and "" export as they display.
+              const format = isMissingCell(raw) ? displayFormat(key) : undefined;
+              const val = format ? format(raw, row) : raw;
               return `"${String(val ?? "").replace(/"/g, '""')}"`;
             })
             .join(","),

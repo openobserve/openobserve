@@ -38,7 +38,7 @@ use serde_json::{Map, Value};
 pub use summary::{
     RcaRunSummary, ShownChangeState, SummaryCard, SummaryCause, SummaryHypothesis,
     SummaryStatusChange, SummarySuspectChange, SummaryTimelineEntry, TimelineView, VerdictSoFar,
-    VerdictSoFarLabel, summary_from_record, summary_legacy, summary_live,
+    VerdictSoFarLabel, hypotheses_view, summary_from_record, summary_legacy, summary_live,
 };
 use utoipa::ToSchema;
 

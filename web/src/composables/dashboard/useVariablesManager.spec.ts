@@ -306,6 +306,69 @@ describe("useVariablesManager", () => {
       }).rejects.toThrow(/circular dependency/i);
     });
 
+    const customQueryVar = (name: string, query: string): VariableConfig => ({
+      name,
+      type: "query_values",
+      scope: "global",
+      value: null,
+      query_data: { stream_type: "logs", stream: "app", field: "", query, filter: [] },
+    });
+    const cycleErrors = (manager: ReturnType<typeof useVariablesManager>) =>
+      Object.fromEntries(manager.variablesData.global.map((v) => [v.name, v.cycleError]));
+
+    it("names both variables of a two-variable loop on each of them", async () => {
+      const manager = useVariablesManager(gt);
+      await expect(
+        manager.initialize(
+          [
+            customQueryVar("a", "SELECT x FROM app WHERE y = '$b'"),
+            customQueryVar("b", "SELECT y FROM app WHERE x = '$a'"),
+          ],
+          {},
+        ),
+      ).rejects.toThrow(/circular dependency/i);
+      expect(cycleErrors(manager)).toEqual({
+        a: "a and b depend on each other.",
+        b: "a and b depend on each other.",
+      });
+    });
+
+    it("names a variable that uses itself", async () => {
+      const manager = useVariablesManager(gt);
+      await expect(
+        manager.initialize([customQueryVar("a", "SELECT x FROM app WHERE x != '$a'")], {}),
+      ).rejects.toThrow(/circular dependency/i);
+      expect(cycleErrors(manager)).toEqual({ a: "a can't depend on itself." });
+    });
+
+    it("leaves a variable that only leads into a loop unmarked", async () => {
+      const manager = useVariablesManager(gt);
+      await expect(
+        manager.initialize(
+          [
+            customQueryVar("lead", "SELECT x FROM app WHERE y = '$a'"),
+            customQueryVar("a", "SELECT x FROM app WHERE y = '$b'"),
+            customQueryVar("b", "SELECT y FROM app WHERE x = '$a'"),
+          ],
+          {},
+        ),
+      ).rejects.toThrow(/circular dependency/i);
+      expect(cycleErrors(manager)).toEqual({
+        lead: undefined,
+        a: "a and b depend on each other.",
+        b: "a and b depend on each other.",
+      });
+    });
+
+    it("clears the loop message once the loop is fixed", async () => {
+      const manager = useVariablesManager(gt);
+      await manager
+        .initialize([customQueryVar("a", "SELECT x FROM app WHERE x != '$a'")], {})
+        .catch(() => undefined);
+      await manager.initialize([customQueryVar("a", "SELECT x FROM app")], {});
+      expect(cycleErrors(manager)).toEqual({ a: undefined });
+    });
+
     it("should ignore invalid cross-scope dependencies when parent not found", async () => {
       const manager = useVariablesManager(gt);
       const config: VariableConfig[] = [

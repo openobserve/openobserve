@@ -9613,6 +9613,7 @@
       "promqlFiltersAndOnly": "تدعم مرشحات PromQL عامل AND فقط. أزل OR والمجموعات، أو انتقل إلى SQL.",
       "cappedHint": "عرض أول {count} من القيم",
       "cappedAllHint": "يشمل «الجميع» أيضًا القيم غير المدرجة",
+      "metricsTruncatedHint": "لم يتم التحقق من بعض المقاييس. اكتب اسم مقياس لعرض جميع القيم.",
       "metric": "المقياس",
       "label": "التسمية",
       "metricSelectTooltip": "اختر مقياسًا أو استخدم متغيرًا مثل $metricVariable لاختياره بناءً على قيمة أخرى.",

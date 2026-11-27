@@ -124,6 +124,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="ai-toolset-mcp-timeout"
         />
         <AssistantToolsetSecretRows :form="form" :rows="headers" />
+        <div
+          v-if="writeHeadersOn"
+          class="flex flex-col gap-2"
+          data-test="ai-toolset-autoresolve-section"
+        >
+          <div class="flex items-center gap-2">
+            <h3 class="text-text-heading text-sm font-semibold">{{ t("autoresolve.title") }}</h3>
+            <BetaBadge stage="alpha" />
+          </div>
+          <p class="text-text-secondary text-xs">
+            {{ t("autoresolve.connection.writeCredentialHelp") }}
+          </p>
+          <AssistantToolsetSecretRows
+            :form="form"
+            :rows="writeHeaders"
+            field="writeHeaders"
+            :legend="t('autoresolve.connection.writeCredential')"
+            :add-label="t('autoresolve.connection.addWriteHeader')"
+            test-id="ai-toolset-write-header"
+          />
+        </div>
       </template>
 
       <template v-if="kind === 'skill'">
@@ -181,6 +202,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { useMutation, useQuery } from "@tanstack/vue-query";
 import { computed, defineAsyncComponent, nextTick, ref, watch } from "vue";
 import { onBeforeRouteUpdate } from "vue-router";
+import { useStore } from "vuex";
+
+import config from "@/aws-exports";
+import BetaBadge from "@/components/common/BetaBadge.vue";
 
 import { askLeaveGuard, useAssistantLeaveGuard, type LeaveGuard } from "@/composables/assistant";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -203,6 +228,7 @@ import {
   keptSecretPaths,
   makeToolsetFormSchema,
   reenterReason,
+  refusedSecretPaths,
   toolsetDataOf,
   toolsetFormDefaults,
   toolsetFormOf,
@@ -273,6 +299,7 @@ const form = useOForm<ToolsetFormValues>({
 
 const kind = form.useStore((s) => s.values.kind);
 const headers = form.useStore((s): SecretRow[] => s.values.mcp.headers);
+const writeHeaders = form.useStore((s): SecretRow[] => s.values.mcp.writeHeaders);
 const values = form.useStore((s) => s.values);
 const skillContent = form.useStore((s) => s.values.skill.content ?? "");
 const typedName = form.useStore((s) => s.values.name);
@@ -280,12 +307,22 @@ const submitted = form.useStore((s) => s.submissionAttempts > 0);
 const dirty = form.useStore((s) => s.isDirty);
 
 const agentName = computed(() => (typedName.value ? agentNameOf(typedName.value) : ""));
+const store = useStore();
+// AutoResolve runs an approved change through the MCP with this credential (enterprise, feature on).
+const writeHeadersOn = computed(
+  () =>
+    kind.value === "mcp" &&
+    config.isEnterprise == "true" &&
+    store.state.zoConfig?.autoresolve_enabled === true,
+);
 const skillError = computed(
   () => submitted.value && kind.value === "skill" && !skillContent.value.trim(),
 );
 const needsRetype = computed(() => isEdit && !props.mergeSecrets && headers.value.length > 0);
 const reenter = computed<ReenterReason | "refused" | null>(
-  () => reenterReason(values.value, loaded.value, props.mergeSecrets) ?? forced.value,
+  () =>
+    reenterReason(values.value, loaded.value, props.mergeSecrets, writeHeadersOn.value) ??
+    forced.value,
 );
 
 watch(
@@ -342,13 +379,15 @@ async function requireKeptSecrets(paths: string[]) {
 async function save(values: ToolsetFormValues) {
   formError.value = "";
   if (org !== page.org.value) return;
-  const reason = reenterReason(values, loaded.value, props.mergeSecrets);
+  const reason = reenterReason(values, loaded.value, props.mergeSecrets, writeHeadersOn.value);
   if (reason) {
     forced.value = reason;
-    await requireKeptSecrets(keptSecretPaths(values));
+    await requireKeptSecrets(
+      refusedSecretPaths(values, loaded.value, props.mergeSecrets, writeHeadersOn.value),
+    );
     return;
   }
-  const data = toolsetDataOf(values, props.mergeSecrets);
+  const data = toolsetDataOf(values, props.mergeSecrets, writeHeadersOn.value);
   try {
     if (props.editId) {
       const body = { description: values.description, data };
@@ -376,7 +415,7 @@ async function showSaveError(err: unknown, values: ToolsetFormValues) {
   }
   if (res?.data?.error_code === "destination_changed") {
     forced.value = "refused";
-    await requireKeptSecrets(keptSecretPaths(values));
+    await requireKeptSecrets(keptSecretPaths(values, writeHeadersOn.value));
     return;
   }
   const message = typeof res?.data?.message === "string" ? res.data.message.slice(0, 500) : "";

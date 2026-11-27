@@ -9613,6 +9613,7 @@
       "promqlFiltersAndOnly": "Los filtros de PromQL solo admiten AND. Quita OR y los grupos, o cambia a SQL.",
       "cappedHint": "Mostrando los primeros {count} valores",
       "cappedAllHint": "«Todo» también incluye valores que no aparecen en la lista",
+      "metricsTruncatedHint": "Algunas métricas no se comprobaron. Indica una métrica para ver todos los valores.",
       "metric": "Métrica",
       "label": "Etiqueta",
       "metricSelectTooltip": "Selecciona una métrica o usa una variable como $metricVariable para elegirla a partir de otro valor.",
