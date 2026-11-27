@@ -362,7 +362,7 @@ fn anomaly_example(resolved: bool) -> NotificationContext {
         format!("a full detection run found no anomalies in window {start}\u{2013}{end}")
     } else {
         format!(
-            "{headline} | Actual 342.00, expected 60.00-136.00, since 09:50 UTC | 3 anomalies in \
+            "{headline} | Actual 342.00, expected 60.00 to 136.00, since 09:50 UTC | 3 anomalies in \
              window {start}\u{2013}{end}"
         )
     };

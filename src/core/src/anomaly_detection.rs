@@ -4377,7 +4377,7 @@ fn value_anomaly_body(
     parts.join(" | ")
 }
 
-/// "Actual X, expected L-U, since HH:MM UTC", or the fragments of it the run has.
+/// "Actual X, expected L to U, since HH:MM UTC", or the fragments of it the run has.
 #[cfg(feature = "enterprise")]
 fn reading_line(
     ctx: &o2_enterprise::enterprise::anomaly_detection::types::AnomalyAlertContext,
@@ -4386,7 +4386,7 @@ fn reading_line(
     if let Some(actual) = ctx.worst_actual_value {
         parts.push(format!("Actual {actual:.2}"));
         if let (Some(lower), Some(upper)) = (ctx.worst_expected_lower, ctx.worst_expected_upper) {
-            parts.push(format!("expected {lower:.2}-{upper:.2}"));
+            parts.push(format!("expected {lower:.2} to {upper:.2}"));
         }
     }
     if let Some(us) = ctx.first_anomaly_us {
@@ -8623,7 +8623,7 @@ mod tests {
             let body = super::super::anomaly_alert_body(&c);
             assert_eq!(
                 body,
-                "app_logs rose 240.0% above expected | Actual 612.00, expected 150.00-210.00, \
+                "app_logs rose 240.0% above expected | Actual 612.00, expected 150.00 to 210.00, \
                  since 00:15 UTC | 3 anomalies in window 2024-01-01 00:00 UTC\u{2013}2024-01-01 \
                  01:00 UTC"
             );
@@ -8660,6 +8660,22 @@ mod tests {
                 "app_logs is anomalous | 3 anomalies in window 2024-01-01 00:00 \
                  UTC\u{2013}2024-01-01 01:00 UTC"
             );
+        }
+
+        /// o2-enterprise#3763: "-18.12-25.25" read as one number; the range now says "to".
+        #[test]
+        fn the_expected_range_reads_lower_to_upper_for_any_sign() {
+            let mut c = ctx(AnomalyAlertKind::Value);
+            c.worst_actual_value = Some(40.0);
+            c.worst_expected_lower = Some(0.0);
+            c.worst_expected_upper = Some(25.25);
+            let body = super::super::anomaly_alert_body(&c);
+            assert!(body.contains("expected 0.00 to 25.25"), "{body}");
+            c.worst_expected_lower = Some(-5.0);
+            c.worst_expected_upper = Some(3.0);
+            let body = super::super::anomaly_alert_body(&c);
+            assert!(body.contains("expected -5.00 to 3.00"), "{body}");
+            assert!(!body.contains("-5.00-"), "{body}");
         }
 
         #[test]
@@ -9769,7 +9785,7 @@ mod tests {
                 .map(|(l, v)| (l.as_str(), v.as_str()))
                 .collect();
             assert!(
-                fields.contains(&("Expected", "120.40-157.20")),
+                fields.contains(&("Expected", "120.40 to 157.20")),
                 "{fields:?}"
             );
             assert!(fields.contains(&("Change", "+49.9%")), "{fields:?}");

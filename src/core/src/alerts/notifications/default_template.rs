@@ -36,7 +36,7 @@ pub const DEFAULT_CONTENT_TEMPLATE_NAME: &str = infra::table::templates::DEFAULT
 
 /// A result column of the same name fills a field first, so these show for an anomaly only.
 const ANOMALY_FIELDS: [(&str, &str); 3] = [
-    ("Expected", "{expected_lower}-{expected_upper}"),
+    ("Expected", "{expected_lower} to {expected_upper}"),
     ("Change", "{value_change_percent}%"),
     ("Started", "{anomaly_started}"),
 ];
@@ -88,8 +88,19 @@ const MAIN_FIELDS: [(&str, &str); 17] = [
     ("Time", "{alert_trigger_time_utc}"),
 ];
 
+/// The anomaly Expected field before o2-enterprise#3763, whose "L-U" misread a negative lower.
+const PRIOR_EXPECTED_FIELD: (&str, &str) = ("Expected", "{expected_lower}-{expected_upper}");
+
+/// `FIELDS` as it was before o2-enterprise#3763: a saved copy of it is still the default.
+const PRIOR_FIELDS: [(&str, &str); 20] = {
+    let mut fields = FIELDS;
+    fields[6] = PRIOR_EXPECTED_FIELD;
+    fields
+};
+
 /// The fields a send of `kind` renders, and whether they are the default's, whose selection
-/// applies; an anomaly through a copy of main's default gets the current default's fields.
+/// applies; an anomaly through a copy of main's default gets the current default's fields, and
+/// every kind through a copy of the pre-#3763 default gets them too.
 pub fn fields_for(
     fields: &[ContentField],
     kind: NotificationKind,
@@ -98,7 +109,9 @@ pub fn fields_for(
     if same_list(fields, &FIELDS) {
         return (Cow::Borrowed(fields), true);
     }
-    if kind == NotificationKind::Anomaly && same_list(fields, &MAIN_FIELDS) {
+    if same_list(fields, &PRIOR_FIELDS)
+        || (kind == NotificationKind::Anomaly && same_list(fields, &MAIN_FIELDS))
+    {
         return (Cow::Owned(compiled_default_content().fields), true);
     }
     (Cow::Borrowed(fields), false)
@@ -291,7 +304,7 @@ mod tests {
             },
             ContentField {
                 label: "Expected".into(),
-                value: "{expected_lower}-{expected_upper}".into(),
+                value: "{expected_lower} to {expected_upper}".into(),
                 show_when: None,
             },
         ];
@@ -333,6 +346,54 @@ mod tests {
         );
         let (_, default) = fields_for(&main_copy.fields, NotificationKind::Alert);
         assert!(!default, "another kind renders the copy as written");
+    }
+
+    /// o2-enterprise#3763: a saved copy of the default with the old "L-U" Expected field is
+    /// still the default for every kind, so it renders "L to U" and keeps the kind selection.
+    #[test]
+    fn a_copy_of_the_pre_3763_default_renders_the_current_default() {
+        assert_eq!(
+            FIELDS[6], ANOMALY_FIELDS[0],
+            "PRIOR_FIELDS swaps the Expected slot"
+        );
+        assert_eq!(
+            PRIOR_FIELDS
+                .iter()
+                .zip(&FIELDS)
+                .filter(|(prior, now)| prior != now)
+                .count(),
+            1
+        );
+        let field = |(label, value): &(&str, &str)| ContentField {
+            label: (*label).into(),
+            value: (*value).into(),
+            show_when: None,
+        };
+        let prior_copy = ContentSpec {
+            fields: PRIOR_FIELDS.iter().map(field).collect(),
+            ..compiled_default_content()
+        };
+        for kind in [
+            NotificationKind::Alert,
+            NotificationKind::Anomaly,
+            NotificationKind::Incident,
+            NotificationKind::Synthetics,
+            NotificationKind::OnCall,
+            NotificationKind::Downtime,
+        ] {
+            let ctx = example_context(kind, false);
+            let got = resolve_content(&prior_copy, &ctx, "slack").fields;
+            let want = resolve_content(&compiled_default_content(), &ctx, "slack").fields;
+            assert_eq!(got, want, "{kind:?}");
+        }
+        let ctx = example_context(NotificationKind::Anomaly, false);
+        let fields = resolve_content(&prior_copy, &ctx, "slack").fields;
+        let expected = fields.iter().find(|(label, _)| label == "Expected");
+        assert_eq!(
+            expected.map(|(_, value)| value.as_str()),
+            Some("60.00 to 136.00")
+        );
+        assert!(!fields.iter().any(|(label, _)| label == "Score"));
     }
 
     #[test]
