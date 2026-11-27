@@ -192,6 +192,23 @@ describe("DashboardTraceExplorer", () => {
     expect(wrapper.find("[data-test='trace-explorer-next-page']").attributes("disabled")).toBe("");
   });
 
+  it("an empty page after an exactly full last page names no range and keeps Previous", async () => {
+    stream.hits = Array.from({ length: 25 }, (_, i) => rawTrace(`t${i}`, 100 * MIN - i));
+    mountExplorer();
+    await flushPromises();
+    stream.hits = [];
+    await wrapper.find("[data-test='trace-explorer-next-page']").trigger("click");
+    await flushPromises();
+    expect(wrapper.find("[data-test='trace-explorer-page-range']").text()).toBe(
+      "Nothing on this page",
+    );
+    const prev = wrapper.find("[data-test='trace-explorer-prev-page']");
+    expect(prev.attributes("disabled")).toBeUndefined();
+    await prev.trigger("click");
+    await flushPromises();
+    expect(lastRequest().queryReq.from).toBe(0);
+  });
+
   it("applies correlation filters, and shows no Applied row", async () => {
     mountExplorer({ filters: [{ field: "service_name", value: "pt-checkout" }] });
     await flushPromises();
@@ -315,6 +332,22 @@ describe("DashboardTraceExplorer", () => {
         builder().vm.$emit("update:query", "service_name = 'pay'");
         builder().vm.$emit("submit");
         expect(fetchQueryDataWithHttpStream.mock.calls.length).toBe(before + 1);
+        vi.advanceTimersByTime(1000);
+        expect(fetchQueryDataWithHttpStream.mock.calls.length).toBe(before + 1);
+        expect(lastRequest().queryReq.filter).toBe("service_name = 'pay'");
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("the header's Run cancels a pending chip auto-run, so one click sends one search", async () => {
+      autoRun(true);
+      await openFilter();
+      vi.useFakeTimers();
+      try {
+        const before = fetchQueryDataWithHttpStream.mock.calls.length;
+        builder().vm.$emit("update:query", "service_name = 'pay'");
+        await wrapper.find("[data-test='trace-explorer-run']").trigger("click");
         vi.advanceTimersByTime(1000);
         expect(fetchQueryDataWithHttpStream.mock.calls.length).toBe(before + 1);
         expect(lastRequest().queryReq.filter).toBe("service_name = 'pay'");

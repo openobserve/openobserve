@@ -40,7 +40,9 @@ const shown = computed(() =>
 );
 const countText = computed(() => {
   if (known.value) return "";
-  const start = props.page * props.pageSize + (props.rows ? 1 : 0);
+  // A page past an exactly full last page has no range to name.
+  if (!props.rows) return t("panel.logExplorer.pagerEmptyPage");
+  const start = props.page * props.pageSize + 1;
   const end = props.page * props.pageSize + props.rows;
   return props.counting
     ? t("panel.logExplorer.pagerCounting", { start, end })

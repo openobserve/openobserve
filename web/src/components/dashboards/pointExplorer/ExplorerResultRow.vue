@@ -8,6 +8,7 @@ import { onBeforeUnmount, ref } from "vue";
 import type { I18nText } from "@/types/i18n";
 import { useI18nTyped } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
@@ -64,14 +65,17 @@ onBeforeUnmount(cancelPendingOpen);
     @dblclick="cancelPendingOpen"
     @keydown.enter.self.prevent="emit('open')"
   >
-    <!-- Same look as DashboardLogDrawer's scoped .dld-expand-btn rule, which cannot reach this component. -->
-    <button
-      class="dld-expand-btn text-text-secondary hover:bg-surface-subtle hover:text-text-body rounded-default flex shrink-0 cursor-pointer items-center justify-center border-0 bg-transparent p-0.5 transition-colors duration-100"
+    <!-- size-5! keeps the 25px row the 20px chevron gave it. -->
+    <OButton
+      variant="ghost-neutral"
+      size="icon-chip"
+      class="dld-expand-btn text-text-secondary hover:text-text-body size-5! p-0.5!"
       :aria-label="expanded ? t('common.collapse') : t('common.expand')"
+      :aria-expanded="expanded"
       @click.stop="emit('toggle')"
     >
       <OIcon :name="expanded ? 'expand-less' : 'expand-more'" size="xs" />
-    </button>
+    </OButton>
     <span class="text-text-secondary shrink-0 text-xs whitespace-nowrap tabular-nums">{{
       time
     }}</span>
@@ -82,13 +86,16 @@ onBeforeUnmount(cancelPendingOpen);
     >
       <LogsHighLighting :data="record" :show-braces="true" />
     </OTruncatedText>
-    <span
-      class="text-text-secondary hover:text-accent flex w-8 shrink-0 cursor-pointer items-center justify-center"
+    <OButton
+      variant="ghost-neutral"
+      size="icon-chip"
+      class="text-text-secondary hover:text-accent h-5! w-8!"
+      :aria-label="openLabel"
       :data-test="openDataTest"
       @click.stop="emit('open')"
     >
       <OIcon name="chevron-right" size="sm" />
       <OTooltip :content="openLabel" />
-    </span>
+    </OButton>
   </div>
 </template>

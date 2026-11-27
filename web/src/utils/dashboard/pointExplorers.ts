@@ -14,6 +14,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { fieldPredicate, type FieldFilter } from "@/utils/dashboard/chartPointExplore";
+import { resolveBrowserTimezone } from "@/utils/timezone";
+import { gt } from "@/types/i18n";
 
 const ONE_MINUTE_US = 60_000_000;
 
@@ -110,5 +112,40 @@ export const explorerErrorText = (e: unknown): string => {
     .replace(/^(?:invalid filter(?: expression)?:\s*)+/i, "")
     .replace(/^sql\b/i, "SQL")
     .trim();
-  return text || "Search failed";
+  return text || String(gt("panel.logExplorer.searchFailed"));
 };
+
+const EXPLORER_DATE: Intl.DateTimeFormatOptions = {
+  year: "numeric",
+  month: "short",
+  day: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+};
+const EXPLORER_CLOCK: Intl.DateTimeFormatOptions = {
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+};
+
+const formatIn = (ts: unknown, timezone: string, options: Intl.DateTimeFormatOptions): string => {
+  if (!ts) return "—";
+  const value = Number(ts);
+  const date = new Date(value > 1e13 ? value / 1000 : value);
+  const zone = resolveBrowserTimezone(timezone);
+  try {
+    return date.toLocaleString(undefined, { ...options, timeZone: zone || undefined });
+  } catch {
+    // An unknown zone name falls back to the browser's, rather than showing nothing.
+    return date.toLocaleString(undefined, options);
+  }
+};
+
+/** An event's time (µs or ms) in the app's timezone, as the explorers list and title it. */
+export const explorerTime = (ts: unknown, timezone: string): string =>
+  formatIn(ts, timezone, EXPLORER_DATE);
+
+/** The clock time alone, for the explorers' histogram axis and surrounding events. */
+export const explorerClock = (ts: unknown, timezone: string): string =>
+  formatIn(ts, timezone, EXPLORER_CLOCK);

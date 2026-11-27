@@ -109,6 +109,55 @@ describe("useExplorerDetailKeys", () => {
     expect(escape.defaultPrevented).toBe(false);
   });
 
+  it("arrows inside a tab list, menu, listbox, radio group or slider stay with that widget", () => {
+    const handlers = setup();
+    const host = html(
+      "<div role='tablist'><button role='tab' id='tab'></button></div>" +
+        "<div role='menu'><div role='menuitem' id='item' tabindex='0'></div></div>" +
+        "<div role='listbox'><div role='option' id='opt'></div></div>" +
+        "<div role='radiogroup'><div role='radio' id='radio'></div></div>" +
+        "<div role='slider' id='slider' tabindex='0'></div>",
+    );
+    for (const id of ["tab", "item", "opt", "radio", "slider"]) {
+      press("ArrowRight", host.querySelector(`#${id}`)!);
+      press("ArrowLeft", host.querySelector(`#${id}`)!);
+    }
+    expect(handlers.next).not.toHaveBeenCalled();
+    expect(handlers.prev).not.toHaveBeenCalled();
+  });
+
+  it("an arrow a widget already handled does not step the item too", () => {
+    const handlers = setup();
+    const host = html("<div id='w' tabindex='0'></div>");
+    const widget = host.querySelector("#w")!;
+    widget.addEventListener("keydown", (e) => e.preventDefault());
+    press("ArrowRight", widget);
+    expect(handlers.next).not.toHaveBeenCalled();
+  });
+
+  it("Escape in an open menu only closes it; the next Escape goes back to the list", () => {
+    const handlers = setup();
+    const host = html(
+      "<button id='trigger' aria-haspopup='menu' aria-expanded='true'></button>" +
+        "<div role='menu'><div role='menuitem' id='item' tabindex='0'></div></div>",
+    );
+    press("Escape", host.querySelector("#item")!);
+    press("Escape", host.querySelector("#trigger")!);
+    expect(handlers.back).not.toHaveBeenCalled();
+    host.remove();
+    press("Escape");
+    expect(handlers.back).toHaveBeenCalledTimes(1);
+  });
+
+  it("an Escape a widget already used does not go back too", () => {
+    const handlers = setup();
+    const host = html("<div id='w' tabindex='0'></div>");
+    const widget = host.querySelector("#w")!;
+    widget.addEventListener("keydown", (e) => e.preventDefault());
+    press("Escape", widget);
+    expect(handlers.back).not.toHaveBeenCalled();
+  });
+
   it("does nothing while no detail is open, so Escape still closes the drawer", () => {
     const handlers = setup(false);
     const escape = press("Escape");
@@ -299,6 +348,16 @@ describe("the drawer steps back from an open item before it closes", () => {
     expect(itemOpen.value).toBe(false);
     expect(drawerOpen.value).toBe(true);
     expect(document.activeElement).not.toBe(field);
+  });
+
+  it("Escape in a field whose popup is open (aria-expanded) only closes the popup", () => {
+    const { back, itemOpen } = mountHost();
+    const field = wrapper!.find("[data-test='detail-field']").element as HTMLInputElement;
+    field.setAttribute("aria-haspopup", "listbox");
+    field.setAttribute("aria-expanded", "true");
+    field.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    expect(back).not.toHaveBeenCalled();
+    expect(itemOpen.value).toBe(true);
   });
 
   it("an Escape an open suggest list stops in the field stays there", () => {

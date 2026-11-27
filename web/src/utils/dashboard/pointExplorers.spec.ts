@@ -17,7 +17,9 @@ import { describe, expect, it } from "vitest";
 import {
   hasFullPage,
   eventSecondWindow,
+  explorerClock,
   explorerErrorText,
+  explorerTime,
   explorerSql,
   whereOfExplorerSql,
   labelsOnMetric,
@@ -150,5 +152,42 @@ describe("explorerErrorText: the traces endpoint", () => {
     expect(
       explorerErrorText({ response: { data: { error: "field x: invalid filter value" } } }),
     ).toBe("field x: invalid filter value");
+  });
+});
+
+describe("explorerTime / explorerClock", () => {
+  // 2026-03-18 23:30:15 UTC, in microseconds as events carry it.
+  const ts = Date.UTC(2026, 2, 18, 23, 30, 15) * 1000;
+
+  it("reads an event's time in the app's timezone, not the browser's", () => {
+    const opts: Intl.DateTimeFormatOptions = {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    };
+    const at = (timeZone: string) =>
+      new Date(ts / 1000).toLocaleString(undefined, { ...opts, timeZone });
+    expect(explorerTime(ts, "UTC")).toBe(at("UTC"));
+    expect(explorerTime(ts, "Asia/Kolkata")).toBe(at("Asia/Kolkata"));
+    expect(explorerTime(ts, "Asia/Kolkata")).not.toBe(explorerTime(ts, "UTC"));
+    expect(explorerTime(ts, "Browser Time (Asia/Tokyo)")).toBe(at("Asia/Tokyo"));
+  });
+
+  it("gives the clock alone, and a dash for no time", () => {
+    const clock = new Date(ts / 1000).toLocaleString(undefined, {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      timeZone: "UTC",
+    });
+    expect(explorerClock(ts, "UTC")).toBe(clock);
+    expect(explorerTime(0, "UTC")).toBe("—");
+  });
+
+  it("an unknown zone falls back to the browser's instead of throwing", () => {
+    expect(() => explorerTime(ts, "Not/AZone")).not.toThrow();
   });
 });

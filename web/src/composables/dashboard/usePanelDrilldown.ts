@@ -793,6 +793,13 @@ export function usePanelDrilldown({
       ? panelData.value?.options?.series?.[params.seriesIndex]
       : undefined;
 
+  // A PromQL pie slice or plain h-bar is one series of its own, so its tags sit on the data item.
+  const pointTag = (params: any, key: "_labels" | "_panelQueryIndex" | "_resultIndex") => {
+    const item = params?.data;
+    const own = item && typeof item === "object" && !Array.isArray(item) ? item[key] : undefined;
+    return own ?? pointSeries(params)?.[key];
+  };
+
   const pointQueryIndex = (params: any): number | null => {
     const queries = panelSchema.value?.queries ?? [];
     if (panelSchema.value?.type === "funnel") {
@@ -805,7 +812,7 @@ export function usePanelDrilldown({
         queries.findIndex((q: any) => !q?.config?.hide),
       );
     }
-    const index = pointSeries(params)?._panelQueryIndex;
+    const index = pointTag(params, "_panelQueryIndex");
     return typeof index === "number" && queries[index] ? index : 0;
   };
 
@@ -912,6 +919,16 @@ export function usePanelDrilldown({
     };
   };
 
+  // A stacked bar's value is a bare number, so its bucket's time comes from the series (seconds).
+  const promqlPointUs = (params: any): number | null => {
+    const times = pointSeries(params)?._timestamps;
+    if (Array.isArray(times)) {
+      const seconds = Number(times[params?.dataIndex ?? -1]);
+      return Number.isFinite(seconds) ? seconds * 1_000_000 : null;
+    }
+    return getUTCTimestampFromZonedTimestamp(params?.value?.[0], store.state.timezone);
+  };
+
   const pointTimeRange = async (
     params: any,
     family: PointFamily,
@@ -924,15 +941,16 @@ export function usePanelDrilldown({
   }> => {
     const { range, shiftUs } = pointQueryRange(resultIndex);
     if (family === "category") return range ?? calculateTimeRange(null, intervalMicro.value);
+    // A PromQL stacked bar names its bucket by the time it carries; see promqlPointUs below.
+    const stackedPromqlTime =
+      panelSchema.value?.queryType === "promql" && Array.isArray(pointSeries(params)?._timestamps);
     // An h-bar label is the raw histogram key, which no shift has moved.
-    if (isHorizontalBarChart(panelSchema.value.type)) {
+    if (isHorizontalBarChart(panelSchema.value.type) && !stackedPromqlTime) {
       return calculateTimeRange(labelTimestamp(params?.name), intervalMicro.value);
     }
     // A PromQL point is computed from the samples in the look-back before it, not a bucket after it.
     const pointUs =
-      family === "time" && panelSchema.value?.queryType === "promql"
-        ? getUTCTimestampFromZonedTimestamp(params?.value?.[0], store.state.timezone)
-        : null;
+      family === "time" && panelSchema.value?.queryType === "promql" ? promqlPointUs(params) : null;
     if (pointUs !== null) {
       const expression = executedQuery(queryIndex, resultIndex);
       // Each selector's own offset moves the samples it reads back (or forward, when negative).
@@ -1116,16 +1134,19 @@ export function usePanelDrilldown({
       pointExplore.value = null;
       return false;
     }
-    // A funnel's results are indexed by panel query; other charts' series carry their own result index.
+    // A funnel's results are indexed by panel query; other charts' series carry their own result index
+    // (a PromQL time shift runs as a result of its own, which _queryIndex leaves out).
     const resultIndex =
-      schema.type === "funnel" ? queryIndex : (pointSeries(params)?._queryIndex ?? 0);
+      schema.type === "funnel"
+        ? queryIndex
+        : (pointTag(params, "_resultIndex") ?? pointSeries(params)?._queryIndex ?? 0);
     const query = schema.queries?.[queryIndex];
     const isPromql = schema.queryType === "promql";
     const customColumns =
       !isPromql && query?.customQuery ? await customQueryColumns(queryIndex) : undefined;
     const rows = data.value?.[resultIndex];
     const seriesLabels: Record<string, string> | undefined = isPromql
-      ? (pointSeries(params)?._labels ?? {})
+      ? (pointTag(params, "_labels") ?? {})
       : undefined;
     const filters = pointGroupFilters(
       query,

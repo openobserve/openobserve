@@ -173,7 +173,10 @@ function search() {
 }
 onBeforeUnmount(cancelRunning);
 
+// The chip bar's pending auto-run, if any; a run from here supersedes it, so one click sends one search.
+const filterBarRef = ref<InstanceType<typeof ExplorerFilterBar> | null>(null);
 function runQuery() {
+  filterBarRef.value?.cancelPendingRun();
   page.value = 0;
   search();
 }
@@ -190,11 +193,14 @@ function goToPage(next: number) {
   search();
 }
 const hasNextPage = computed(() => hasFullPage(hits.value.length, PAGE_SIZE));
+// A page past an exactly full last page has no range to name; Previous stays to go back.
 const pageRange = computed(() =>
-  t("panel.traceExplorer.pageRange", {
-    from: page.value * PAGE_SIZE + 1,
-    to: page.value * PAGE_SIZE + hits.value.length,
-  }),
+  hits.value.length
+    ? t("panel.traceExplorer.pageRange", {
+        from: page.value * PAGE_SIZE + 1,
+        to: page.value * PAGE_SIZE + hits.value.length,
+      })
+    : t("panel.logExplorer.pagerEmptyPage"),
 );
 
 function onDateChange(range: { startTime: number; endTime: number }) {
@@ -299,6 +305,7 @@ const detailTitle = computed(() =>
       >
         <ExplorerFilterBar
           v-if="showFilter"
+          ref="filterBarRef"
           :chips-query="whereText"
           own-kind="where"
           :own-value="whereText"

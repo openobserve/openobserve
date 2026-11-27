@@ -44,16 +44,14 @@ describe("ExplorerResultRow", () => {
     const button = mountRow().find("button.dld-expand-btn");
     expect(button.classes()).toEqual(
       expect.arrayContaining([
-        "flex",
         "items-center",
         "justify-center",
-        "p-0.5",
+        "size-5!",
+        "p-0.5!",
         "border-0",
         "bg-transparent",
-        "cursor-pointer",
         "text-text-secondary",
         "hover:text-text-body",
-        "hover:bg-surface-subtle",
       ]),
     );
   });
@@ -69,6 +67,18 @@ describe("ExplorerResultRow", () => {
         "hover:bg-surface-subtle",
       ]),
     );
+  });
+
+  it("both chevrons are named buttons a keyboard can reach and press", async () => {
+    const row = mountRow(true);
+    const [expand, open] = row.findAll("button");
+    expect(expand.attributes("aria-label")).toBe("Collapse");
+    expect(expand.attributes("aria-expanded")).toBe("true");
+    expect(open.attributes("aria-label")).toBe("Open");
+    expect(open.attributes("data-test")).toBe("row-open");
+    expect(open.attributes("tabindex")).not.toBe("-1");
+    await open.trigger("click");
+    expect(row.emitted("open")).toHaveLength(1);
   });
 
   it("the left chevron toggles the JSON and never opens the detail", async () => {

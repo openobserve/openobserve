@@ -131,6 +131,8 @@ describe("DashboardLogDrawer filters", () => {
       props: { stream: "app", field: "", value: "", startTime: 1, endTime: 2, ...props },
       global: {
         renderStubDefaultSlot: true,
+        // The real filter bar: the drawer calls its cancelPendingRun before each run.
+        stubs: { ExplorerFilterBar: false },
         plugins: [
           i18n,
           createStore({
@@ -282,10 +284,14 @@ describe("DashboardLogDrawer filters", () => {
     expect(wrapper.find('[data-test="log-explorer-applied"]').exists()).toBe(false);
   });
 
-  it("table cell path: an empty cell is IS NULL and a number stays bare", async () => {
-    mountWith({ field: "level", value: "" });
+  it("table cell path: a NULL cell is IS NULL, an empty one = '', and a number stays bare", async () => {
+    mountWith({ field: "level", value: null });
     await flushPromises();
     expect(firstSql()).toBe(`SELECT * FROM "app" WHERE level IS NULL ORDER BY _timestamp DESC`);
+    fetchQueryDataWithHttpStream.mockClear();
+    mountWith({ field: "level", value: "" });
+    await flushPromises();
+    expect(firstSql()).toBe(`SELECT * FROM "app" WHERE level = '' ORDER BY _timestamp DESC`);
     fetchQueryDataWithHttpStream.mockClear();
     mountWith({ field: "code", value: 404 });
     await flushPromises();
@@ -417,6 +423,21 @@ describe("DashboardLogDrawer streaming search", () => {
     await state(wrapper).goToPage(3);
     expect(countCalls()).toHaveLength(1);
     expect(state(wrapper).total).toBe(500);
+  });
+
+  it("an empty page past an exactly full last page names no range, so never 'N-(N-1)'", async () => {
+    stream.reply = (req, h) => {
+      h.data(req, hits(rowsOf(req.queryReq.query.from === 0 ? 100 : 0)));
+      h.complete(req, {});
+    };
+    stream.count = (_req, _h) => {};
+    const wrapper = mountIt();
+    await flushPromises();
+    await state(wrapper).goToPage(1);
+    await flushPromises();
+    const controls = wrapper.findComponent({ name: "TablePaginationControls" });
+    expect(controls.props("countText")).toBe("Nothing on this page");
+    expect(controls.props("isFirstPage")).toBe(false);
   });
 
   it("no rows: the total is 0 and there is no pager", async () => {

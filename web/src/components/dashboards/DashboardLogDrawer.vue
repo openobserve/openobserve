@@ -20,11 +20,14 @@ import ExplorerResultsPager from "@/components/dashboards/pointExplorer/Explorer
 import ExplorerResultRow from "@/components/dashboards/pointExplorer/ExplorerResultRow.vue";
 import ExplorerFilterBar from "@/components/dashboards/pointExplorer/ExplorerFilterBar.vue";
 import {
+  explorerClock,
   explorerErrorText,
   explorerSql,
+  explorerTime,
   whereOfExplorerSql,
 } from "@/utils/dashboard/pointExplorers";
 import ExplorerQueryError from "@/components/dashboards/pointExplorer/ExplorerQueryError.vue";
+import { provideTraceLinksInNewTab } from "@/plugins/traces/composables/useTraceNavigation";
 import useStreams from "@/composables/useStreams";
 import { toFilterFields } from "@/utils/query/filterBar";
 import {
@@ -67,7 +70,8 @@ const props = defineProps<{
   stream: string;
   streamType?: string;
   field: string;
-  value: string | number;
+  // A table cell's raw value: NULL filters IS NULL, an empty string = ''.
+  value: string | number | null;
   startTime: number; // microseconds
   endTime: number; // microseconds
   baseWhere?: string; // panel's own WHERE, AND-combined with the clicked cell
@@ -82,6 +86,9 @@ const isLogs = computed(() => (props.mode ?? "logs") === "logs");
 const openedFromPoint = computed(() => props.filters !== undefined);
 
 const emit = defineEmits<{ (e: "sendToAiChat", value: unknown, append?: boolean): void }>();
+
+// Trace links in any explorer's detail (View trace in the correlated Logs tab) open in a new tab.
+provideTraceLinksInNewTab(ref(true));
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -562,30 +569,9 @@ function copyEventLink() {
 }
 
 // ── Formatters ────────────────────────────────────────────────────────────────
-function fmtTs(ts: unknown): string {
-  if (!ts) return "—";
-  const raw = Number(ts);
-  const ms = raw > 1e13 ? raw / 1000 : raw;
-  return new Date(ms).toLocaleString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  });
-}
-
-function fmtTsShort(ts: unknown): string {
-  if (!ts) return "—";
-  const raw = Number(ts);
-  const ms = raw > 1e13 ? raw / 1000 : raw;
-  return new Date(ms).toLocaleTimeString(undefined, {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  });
-}
+// Times read in the app's timezone, as the rest of the dashboard shows them.
+const fmtTs = (ts: unknown): string => explorerTime(ts, store.state.timezone);
+const fmtTsShort = (ts: unknown): string => explorerClock(ts, store.state.timezone);
 
 function fmtRelTime(tsMicros: number, refMicros: number): string {
   const diffMs = (tsMicros - refMicros) / 1_000;
@@ -656,7 +642,10 @@ async function loadEvents() {
   customSql.value = explorerSql(props.stream, defaultWhere());
   await runSql(activeSql(), 0, true);
 }
+// The chip bar's pending auto-run, if any; a run from here supersedes it, so one click sends one search.
+const filterBarRef = ref<InstanceType<typeof ExplorerFilterBar> | null>(null);
 async function runQuery() {
+  filterBarRef.value?.cancelPendingRun();
   page.value = 0;
   await runSql(activeSql(), 0, true);
 }
@@ -852,6 +841,7 @@ function openInLogs() {
         </div>
         <ExplorerFilterBar
           v-if="showSql"
+          ref="filterBarRef"
           :chips-query="chipsQuery"
           own-kind="sql"
           :own-value="activeSql()"

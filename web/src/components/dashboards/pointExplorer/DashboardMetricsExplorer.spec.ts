@@ -374,6 +374,27 @@ describe("DashboardMetricsExplorer", () => {
       expect(sqlOf(searches().at(-1))).toBe(sql("pod = 'b'"));
     });
 
+    it("the header's Run cancels a pending chip auto-run, so one click sends one search", async () => {
+      (store.state.zoConfig as any).auto_query_enabled = true;
+      localStorage.setItem("oo_toggle_auto_run", "true");
+      mountExplorer();
+      await flushPromises();
+      await openArea();
+      vi.useFakeTimers();
+      try {
+        const before = searches().length;
+        wrapper.findComponent({ name: "SqlFilterBuilder" }).vm.$emit("update:query", "pod = 'b'");
+        await wrapper.find("[data-test='metrics-explorer-run']").trigger("click");
+        vi.advanceTimersByTime(1000);
+        expect(searches()).toHaveLength(before + 1);
+        expect(sqlOf(searches().at(-1))).toBe(sql("pod = 'b'"));
+      } finally {
+        vi.useRealTimers();
+        (store.state.zoConfig as any).auto_query_enabled = false;
+        localStorage.removeItem("oo_toggle_auto_run");
+      }
+    });
+
     it("with nothing stored it opens on the full SQL, as the Logs page does", async () => {
       localStorage.removeItem(KEY);
       mountExplorer();

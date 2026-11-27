@@ -44,8 +44,12 @@ export function useExplorerCorrelation(options: {
   } = useServiceCorrelation();
   const { locked: correlationLocked } = useLicenseLock("correlation");
 
+  // Each event and each fetch is a new request; an older one's answer, error or cleanup is dropped.
+  let request = 0;
+
   // Fresh correlation per event (mirrors the Logs page reset on row change).
   watch(options.selected, () => {
+    request += 1;
     correlationDashboardProps.value = null;
     correlationLoading.value = false;
     correlationError.value = null;
@@ -55,6 +59,8 @@ export function useExplorerCorrelation(options: {
   // Lazy correlation fetch — replicated from SearchResult.vue's openCorrelationFromLog.
   async function openCorrelation(eventData: any) {
     if (correlationFetchInProgress.value || correlationLocked.value) return;
+    request += 1;
+    const call = request;
     try {
       correlationFetchInProgress.value = true;
       correlationLoading.value = true;
@@ -72,6 +78,7 @@ export function useExplorerCorrelation(options: {
         start: startTimeMicros,
         end: endTimeMicros,
       });
+      if (call !== request) return;
       if (!result) {
         correlationError.value = correlationNoMatch.value
           ? t("logs.searchResult.noMatchingService")
@@ -115,13 +122,16 @@ export function useExplorerCorrelation(options: {
         timeRange: { startTime: startTimeMicros, endTime: endTimeMicros },
       };
     } catch (err: any) {
+      if (call !== request) return;
       correlationError.value = t("logs.searchResult.correlationError", {
         error: err?.message || err,
       });
       correlationDashboardProps.value = null;
     } finally {
-      correlationLoading.value = false;
-      correlationFetchInProgress.value = false;
+      if (call === request) {
+        correlationLoading.value = false;
+        correlationFetchInProgress.value = false;
+      }
     }
   }
 

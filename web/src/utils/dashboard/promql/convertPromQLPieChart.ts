@@ -13,7 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { PromQLChartConverter, ProcessedPromQLData } from "./shared/types";
+import {
+  PromQLChartConverter,
+  ProcessedPromQLData,
+  pointTags,
+  type PointTags,
+} from "./shared/types";
 import { applyAggregation } from "./shared/dataProcessor";
 import { buildTooltip } from "./shared/axisBuilder";
 import { buildPieChartConfig } from "./shared/gridBuilder";
@@ -48,11 +53,13 @@ export class PieConverter implements PromQLChartConverter {
     let chartMax = -Infinity;
 
     // Collect all values first to determine min/max
-    const seriesDataCollection: Array<{
-      name: string;
-      value: number;
-      rawValues: Array<[number, string]>;
-    }> = [];
+    const seriesDataCollection: Array<
+      {
+        name: string;
+        value: number;
+        rawValues: Array<[number, string]>;
+      } & PointTags
+    > = [];
 
     processedData.forEach((queryData) => {
       const instant = queryData.queryConfig?.query_type === "instant";
@@ -69,6 +76,7 @@ export class PieConverter implements PromQLChartConverter {
           name: seriesData.name,
           value,
           rawValues: seriesData.values,
+          ...pointTags(queryData, seriesData.metric),
         });
 
         extras.legends.push(seriesData.name);
@@ -103,6 +111,9 @@ export class PieConverter implements PromQLChartConverter {
         name: seriesData.name,
         value: seriesData.value,
         itemStyle: color ? { color } : undefined,
+        _labels: seriesData._labels,
+        _panelQueryIndex: seriesData._panelQueryIndex,
+        _resultIndex: seriesData._resultIndex,
       });
     });
 

@@ -1045,6 +1045,42 @@ describe("PanelSchemaRenderer", () => {
       );
     });
 
+    it("a point lookup that fails opens the menu as if no point were clicked: Create alert only", async () => {
+      asBuild("oss");
+      await mountPanel({ allowAlertCreation: true });
+      let failing = false;
+      wrapper.vm.panelData = {
+        options: { series: [{ originalSeriesName: "cart" }] },
+        get extras() {
+          if (failing) throw new Error("lookup failed");
+          return { isTimeSeries: true };
+        },
+      };
+      await flushPromises();
+      const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+      onTestFinished(() => errors.mockRestore());
+      failing = true;
+      const opened = wrapper.vm.onChartDomContextMenu({
+        x: 10,
+        y: 10,
+        value: 3,
+        seriesIndex: 0,
+        dataIndex: 0,
+        point: pointClick,
+      });
+      failing = false;
+      await expect(opened).resolves.toBeUndefined();
+      await flushPromises();
+      await vi.waitFor(() =>
+        expect(wrapper.find('[data-test="alert-context-menu"]').exists()).toBe(true),
+      );
+      const menu = wrapper.find('[data-test="alert-context-menu"]');
+      expect(menu.find('[data-test="alert-context-menu-above"]').exists()).toBe(true);
+      expect(menu.find('[data-test="point-menu-item-view-logs"]').exists()).toBe(false);
+      expect(wrapper.vm.pointExplore).toBeNull();
+      expect(errors).not.toHaveBeenCalled();
+    });
+
     it("right-click where alerts cannot be made lists only the View rows", async () => {
       asBuild("oss");
       await rightClickPoint({ allowAlertCreation: false });

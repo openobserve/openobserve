@@ -1150,6 +1150,8 @@ export const convertPromQLData = async (
                 // Position among the rendered queries; exemplar markers take the colour of their query's first series.
                 // A shifted series is never a query's first series.
                 ...(nameSuffixes[index] ? {} : { _queryIndex: index }),
+                // The executed result it came from, shifted ones included: its time range and expression.
+                _resultIndex: index,
                 _panelQueryIndex: parentQueryIndex[index],
                 _seriesRole: seriesRoles[index],
                 // The point menu scopes a click to the series by its labels.

@@ -18,6 +18,7 @@ import { NULL_BREAKDOWN_VALUE, OTHERS_BREAKDOWN_VALUE } from "@/utils/dashboard/
 import {
   correlationConfigured,
   fieldPredicate,
+  filtersSummary,
   filtersWhere,
   funnelStageQuery,
   isTimeXField,
@@ -118,14 +119,17 @@ describe("pointGroupFilters", () => {
     ]);
   });
 
-  it("pie: the clicked slice; an empty slice is a null value", () => {
+  it("pie: the clicked slice; a blank slice is NULL from a NULL row and '' from an empty one", () => {
     const query = { fields: { x: [builder("x_axis_1", "service")], breakdown: [] } };
     const pie = { type: "pie" };
     expect(pointGroupFilters(query, pie, "category", { name: "cart" }, [])).toEqual([
       { field: "service", value: "cart" },
     ]);
-    expect(pointGroupFilters(query, pie, "category", { name: "" }, [])).toEqual([
+    expect(pointGroupFilters(query, pie, "category", { name: "" }, [{ x_axis_1: null }])).toEqual([
       { field: "service", value: null },
+    ]);
+    expect(pointGroupFilters(query, pie, "category", { name: "" }, [{ x_axis_1: "" }])).toEqual([
+      { field: "service", value: "" },
     ]);
   });
 
@@ -383,11 +387,32 @@ describe("correlationConfigured", () => {
 });
 
 describe("fieldPredicate / filtersWhere", () => {
-  it("escapes quotes, leaves numbers bare and turns empty into IS NULL", () => {
+  it("escapes quotes, leaves numbers bare, NULL is IS NULL and an empty string stays = ''", () => {
     expect(fieldPredicate({ field: "user", value: "o'brien" })).toBe("user = 'o''brien'");
     expect(fieldPredicate({ field: "code", value: 500 })).toBe("code = 500");
     expect(fieldPredicate({ field: "svc", value: null })).toBe("svc IS NULL");
-    expect(fieldPredicate({ field: "svc", value: "" })).toBe("svc IS NULL");
+    expect(fieldPredicate({ field: "svc", value: "" })).toBe("svc = ''");
+  });
+
+  it("the '(empty)' and '(null)' breakdown series filter apart, in SQL and in the menu summary", () => {
+    const query = {
+      fields: {
+        x: [builder("x_axis_1", "service")],
+        breakdown: [builder("breakdown_1", "region")],
+      },
+    };
+    const rows = [
+      { x_axis_1: "cart", breakdown_1: null },
+      { x_axis_1: "cart", breakdown_1: "" },
+    ];
+    const click = (seriesValue: string) =>
+      pointGroupFilters(query, { type: "bar" }, "category", { name: "cart", seriesValue }, rows);
+    const empty = click("");
+    const nulls = click(NULL_BREAKDOWN_VALUE);
+    expect(filtersWhere("", empty)).toBe("service = 'cart' AND region = ''");
+    expect(filtersWhere("", nulls)).toBe("service = 'cart' AND region IS NULL");
+    expect(filtersSummary(empty)).toBe("service=cart, region=''");
+    expect(filtersSummary(nulls)).toBe("service=cart, region IS NULL");
   });
 
   it("wraps the panel WHERE and ANDs every condition after it", () => {

@@ -445,7 +445,8 @@ const addSearchTerm = (
     const displayValue =
       exactNsValue !== undefined
         ? String(exactNsValue)
-        : field === "span_kind" && !searchObj.meta.sqlMode
+        : // A host that owns the columns (a dashboard) never runs in the Traces page's SQL mode.
+          field === "span_kind" && (ownsColumns.value || !searchObj.meta.sqlMode)
           ? (SPAN_KIND_MAP[String(fieldValue)] ?? String(fieldValue))
           : String(fieldValue);
     applyFilter(`${field} ${operator} '${escapeSingleQuotes(displayValue)}'`);

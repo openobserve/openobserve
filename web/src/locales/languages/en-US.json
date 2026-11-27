@@ -10529,6 +10529,8 @@
       "noEvents": "No events match this filter",
       "pagerCounting": "{start}-{end} of …",
       "pagerRange": "{start}-{end}",
+      "pagerEmptyPage": "Nothing on this page",
+      "searchFailed": "Search failed",
       "queryFailed": "The query could not run",
       "filterHint": "Click to explore related logs",
       "timestamp": "Timestamp",

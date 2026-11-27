@@ -885,6 +885,18 @@ describe("TracesSearchResultList", () => {
       expect(sharedSearchObj.data.stream.addToFilter).toBe("");
     });
 
+    it("labels span_kind for its own filter even while the Traces page is in SQL mode", async () => {
+      (sharedSearchObj.meta as any).sqlMode = true;
+      try {
+        wrapper = mountHosted();
+        const cellActions = wrapper.findComponent({ name: "CellActions" });
+        await cellActions.vm.$emit("add-search-term", "span_kind", "2", "include");
+        expect(wrapper.emitted("add-filter")).toEqual([["span_kind = 'Server'"]]);
+      } finally {
+        (sharedSearchObj.meta as any).sqlMode = false;
+      }
+    });
+
     it("keeps its row selection out of the Traces page's navigation", () => {
       sharedSearchObj.meta.resultGrid.navigation.lastOpenedId = "t1";
       sharedSearchObj.meta.resultGrid.navigation.selectionActive = false;

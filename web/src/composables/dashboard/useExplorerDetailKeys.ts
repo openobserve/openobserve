@@ -18,6 +18,13 @@ import { inject, onBeforeUnmount, onMounted, type InjectionKey } from "vue";
 const TYPING_SELECTOR =
   "input, textarea, select, [contenteditable]:not([contenteditable='false']), .monaco-editor";
 
+// Widgets that move between their own items with the arrow keys.
+const ARROW_WIDGET_SELECTOR =
+  "[role='tablist'], [role='menu'], [role='menubar'], [role='listbox'], [role='radiogroup'], [role='slider']";
+// Escape from inside an open menu, listbox or popover, or from the trigger it is open on, closes only it.
+const OPEN_POPUP_SELECTOR =
+  "[role='menu'], [role='listbox'], [data-reka-popper-content-wrapper], [aria-haspopup][aria-expanded='true']";
+
 /** Whether a key event was typed into a text field or code editor, which owns its own keys. */
 export const isTypingTarget = (target: EventTarget | null): boolean =>
   target instanceof Element && !!target.closest(TYPING_SELECTOR);
@@ -64,38 +71,49 @@ export function useExplorerDetailKeys(handlers: {
   next: () => void;
   back: () => void;
 }): (e: KeyboardEvent) => void {
+  // Noted before any widget runs: closing a popup unmounts it before the key bubbles back up.
+  let popupOpenAtKey = false;
+  const notePopup = (e: KeyboardEvent) => {
+    if (e.key !== "Escape") return;
+    const target = e.target instanceof Element ? e.target : null;
+    popupOpenAtKey = !!target?.closest(OPEN_POPUP_SELECTOR);
+  };
+  // Bubble phase, after the item's own widgets: a key one of them used is left to it.
   const onKeydown = (e: KeyboardEvent) => {
-    if (!handlers.isOpen() || isTypingTarget(e.target)) return;
-    if (e.key === "ArrowLeft") {
+    if (!handlers.isOpen() || isTypingTarget(e.target) || e.defaultPrevented) return;
+    if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+      const target = e.target instanceof Element ? e.target : null;
+      if (target?.closest(ARROW_WIDGET_SELECTOR)) return;
       e.preventDefault();
-      handlers.prev();
-    } else if (e.key === "ArrowRight") {
+      if (e.key === "ArrowLeft") handlers.prev();
+      else handlers.next();
+    } else if (e.key === "Escape" && !popupOpenAtKey) {
       e.preventDefault();
-      handlers.next();
-    } else if (e.key === "Escape") {
-      // Return to the list instead of letting the drawer close.
-      e.preventDefault();
-      e.stopPropagation();
       handlers.back();
     }
   };
-  // Capture phase, so the drawer's own Escape handler never sees a key the detail used.
-  onMounted(() => window.addEventListener("keydown", onKeydown, true));
-  onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown, true));
+  onMounted(() => {
+    window.addEventListener("keydown", notePopup, true);
+    window.addEventListener("keydown", onKeydown);
+  });
+  onBeforeUnmount(() => {
+    window.removeEventListener("keydown", notePopup, true);
+    window.removeEventListener("keydown", onKeydown);
+  });
 
   // The drawer's ×, Escape and outside click ask here first, so they step back to the list.
   const host = inject(EXPLORER_BACK_KEY, null);
   const unregister = host?.register({ isOpen: handlers.isOpen, back: handlers.back });
   onBeforeUnmount(() => unregister?.());
 
-  // A field inside the open item (a JSON value, the Table tab's search, a span's inputs) gets one
-  // Escape back to the list too; an open dropdown or suggest list stops the key before it gets here.
+  // An Escape from inside the open item that no widget used goes back before the drawer sees it; a
+  // suggest list stops the key in its field, and a portaled menu's keys never pass through this root.
   return (e: KeyboardEvent) => {
-    if (e.key === "Escape" && handlers.isOpen() && isTypingTarget(e.target)) {
+    if (e.key === "Escape" && handlers.isOpen() && !e.defaultPrevented && !popupOpenAtKey) {
       e.preventDefault();
       e.stopPropagation();
       const active = document.activeElement;
-      if (active instanceof HTMLElement) active.blur();
+      if (isTypingTarget(active) && active instanceof HTMLElement) active.blur();
       handlers.back();
       return;
     }

@@ -26,6 +26,7 @@ import { type FieldFilter } from "@/utils/dashboard/chartPointExplore";
 import {
   explorerErrorText,
   explorerSql,
+  explorerTime,
   labelsOnMetric,
   metricsSql,
   sampleLabels,
@@ -173,7 +174,10 @@ async function loadMetric() {
   customSql.value = metricsSql(metric.value, appliedLabels.value);
   await runSql(effectiveSql(), 0, true);
 }
+// The chip bar's pending auto-run, if any; a run from here supersedes it, so one click sends one search.
+const filterBarRef = ref<InstanceType<typeof ExplorerFilterBar> | null>(null);
 function runQuery() {
+  filterBarRef.value?.cancelPendingRun();
   page.value = 0;
   void runSql(effectiveSql(), 0, true);
 }
@@ -269,19 +273,8 @@ function copySampleLink() {
   if (selected.value) copyText(metricsPageHref(sampleLabels(selected.value)));
 }
 
-function fmtTs(ts: unknown): string {
-  if (!ts) return "—";
-  const value = Number(ts);
-  const ms = value > 1e13 ? value / 1000 : value;
-  return new Date(ms).toLocaleString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  });
-}
+// Times read in the app's timezone, as the rest of the dashboard shows them.
+const fmtTs = (ts: unknown): string => explorerTime(ts, store.state.timezone);
 </script>
 
 <template>
@@ -308,6 +301,7 @@ function fmtTs(ts: unknown): string {
       >
         <ExplorerFilterBar
           v-if="showSql"
+          ref="filterBarRef"
           :chips-query="chipsQuery"
           own-kind="sql"
           :own-value="effectiveSql()"

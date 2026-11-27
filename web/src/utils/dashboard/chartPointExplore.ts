@@ -311,17 +311,21 @@ export const groupFieldColumn = (
   return field.column ?? null;
 };
 
-// A clicked label is always text; the row it came from keeps the value's own type.
+// A clicked label is always text; the row it came from keeps the value's own type. An empty label is
+// an empty string when a row holds one, else a NULL row drawn blank.
 const rowValue = (rows: any[] | undefined, alias: string, label: unknown): unknown => {
   const text = String(label ?? "");
-  const row = (rows ?? []).find((r) => String(getDataValue(r, alias) ?? "") === text);
-  return row ? getDataValue(row, alias) : label;
+  const all = rows ?? [];
+  const value = (r: any) => getDataValue(r, alias);
+  const row =
+    all.find((r) => value(r) !== null && value(r) !== undefined && String(value(r)) === text) ??
+    (text === "" ? all.find((r) => value(r) === null || value(r) === undefined) : undefined);
+  return row ? value(row) : label;
 };
 
 const toFilterValue = (value: unknown): string | number | null => {
-  // A NULL breakdown series is named by its stand-in, never a value of the field.
-  if (value === null || value === undefined || value === "" || value === NULL_BREAKDOWN_VALUE)
-    return null;
+  // A NULL breakdown series is named by its stand-in; "" stays a value, as the chart keeps "(empty)" apart.
+  if (value === null || value === undefined || value === NULL_BREAKDOWN_VALUE) return null;
   return typeof value === "number" ? value : String(value);
 };
 
@@ -329,7 +333,8 @@ const toFilterValue = (value: unknown): string | number | null => {
 export const seriesLabelFilters = (labels: Record<string, string>): FieldFilter[] =>
   Object.entries(labels)
     .filter(([label]) => label !== "__name__")
-    .map(([field, value]) => ({ field, value: toFilterValue(value) }));
+    // Prometheus treats an empty label value as an absent label.
+    .map(([field, value]) => ({ field, value: value === "" ? null : toFilterValue(value) }));
 
 const PROMQL_WORDS = new Set([
   "by",
@@ -417,9 +422,9 @@ export const pointGroupFilters = (
 
 const escSql = (value: string | number): string => String(value).replace(/'/g, "''");
 
-/** One condition as SQL: IS NULL for empty, unquoted for numbers, an escaped literal otherwise. */
+/** One condition as SQL: IS NULL for NULL, unquoted for numbers, an escaped literal otherwise. */
 export const fieldPredicate = ({ field, value }: FieldFilter): string => {
-  if (value === null || value === undefined || value === "") return `${field} IS NULL`;
+  if (value === null || value === undefined) return `${field} IS NULL`;
   if (typeof value === "number") return `${field} = ${value}`;
   return `${field} = '${escSql(value)}'`;
 };
@@ -567,5 +572,11 @@ export const sliceBounds = (
 /** The filters as `field=value` pairs for a one-line summary. */
 export const filtersSummary = (filters: FieldFilter[]): string =>
   filters
-    .map((f) => (f.value === null ? `${f.field} IS NULL` : `${f.field}=${f.value}`))
+    .map((f) =>
+      f.value === null
+        ? `${f.field} IS NULL`
+        : f.value === ""
+          ? `${f.field}=''`
+          : `${f.field}=${f.value}`,
+    )
     .join(", ");

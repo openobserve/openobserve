@@ -2154,12 +2154,15 @@ export default defineComponent({
       if (props.panelSchema.type !== "table" || props.panelSchema.queryType === "promql") return;
       const field = String(query.cell_field ?? "");
       const rawValue = String(query.cell_value ?? "");
-      const value: string | number =
-        String(query.cell_vtype) === "number" &&
-        rawValue !== "" &&
-        Number.isFinite(Number(rawValue))
-          ? Number(rawValue)
-          : rawValue;
+      // A NULL cell went into the URL as "null" with type "object"; it must filter IS NULL again.
+      const value: string | number | null =
+        String(query.cell_vtype) === "object" && rawValue === "null"
+          ? null
+          : String(query.cell_vtype) === "number" &&
+              rawValue !== "" &&
+              Number.isFinite(Number(rawValue))
+            ? Number(rawValue)
+            : rawValue;
       const stream = String(query.cell_stream ?? "");
       const stype = String(query.cell_stype ?? "logs");
       const t0 = Number(query.cell_t0 ?? 0);
@@ -2652,10 +2655,18 @@ export default defineComponent({
         openContextMenu(event, payload, false);
         return;
       }
-      return explorePoint(point).then((hasPoint) => {
-        // A newer right-click owns the menu.
-        if (request === contextMenuRequest) openContextMenu(event, payload, hasPoint);
-      });
+      return explorePoint(point).then(
+        (hasPoint) => {
+          // A newer right-click owns the menu.
+          if (request === contextMenuRequest) openContextMenu(event, payload, hasPoint);
+        },
+        () => {
+          // A failed point lookup leaves the menu as if no point were clicked: the alert items stay.
+          if (request !== contextMenuRequest) return;
+          pointExplore.value = null;
+          openContextMenu(event, payload, false);
+        },
+      );
     };
     // A correlation miss can empty the rows after the menu opened; with no alert items left, it closes.
     watch(pointExploreItems, (items) => {
@@ -2763,7 +2774,7 @@ export default defineComponent({
     const cellDrawer = ref<{
       open: boolean;
       field: string;
-      value: string | number;
+      value: string | number | null;
       stream: string;
       streamType: string;
       startTime: number;
@@ -2861,7 +2872,7 @@ export default defineComponent({
 
     function openCellDrawer(params: {
       field: string;
-      value: string | number;
+      value: string | number | null;
       stream: string;
       streamType: string;
       startTime: number;
@@ -2949,7 +2960,7 @@ export default defineComponent({
 
       openCellDrawer({
         field: realField,
-        value: value as string | number,
+        value: (value ?? null) as string | number | null,
         stream,
         streamType,
         startTime: metaStartMicros || selStartMicros,
