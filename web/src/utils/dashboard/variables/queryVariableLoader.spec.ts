@@ -26,6 +26,7 @@ vi.mock("@/services/metrics", () => ({ default: { labelValues, labels } }));
 vi.mock("@/services/search", () => ({ default: { metrics_query: metricsQuery } }));
 
 import {
+  clearMetricScanCache,
   getQueryVariableErrorMessage,
   loadQueryVariableValues,
   QueryVariableCancelledError,
@@ -53,6 +54,7 @@ describe("loadQueryVariableValues — PromQL", () => {
     labelValues.mockReset();
     labels.mockReset();
     metricsQuery.mockReset();
+    clearMetricScanCache();
   });
 
   it("label_values(label) asks /label/{label}/values without a matcher", async () => {
@@ -160,6 +162,131 @@ describe("loadQueryVariableValues — PromQL", () => {
       baseParams({ query: "label_values(job)", maxRecords: 1, search: "y" }),
     );
     expect(result.options.map((o) => o.value)).toEqual(["y9"]);
+  });
+
+  it("serves search updates from one cached scan across metrics", async () => {
+    const names = Array.from({ length: 200 }, (_, i) => `m${String(i).padStart(3, "0")}`);
+    labelValues.mockImplementation(async ({ label, match }: { label: string; match?: string }) => {
+      if (label === "__name__") return promOk(names);
+      if (!match) return { data: { status: "error", error: "match[] must specify a metric" } };
+      return promOk([`job-${match}`]);
+    });
+    const params = baseParams({ query: "label_values(job)", maxRecords: 1000 });
+    const loaded = await loadQueryVariableValues(params);
+    expect(loaded.options).toHaveLength(200);
+    for (let i = 0; i < 10; i++) {
+      const result = await loadQueryVariableValues({ ...params, search: `m${i}` });
+      expect(result.options.every((o) => o.value.includes(`m${i}`))).toBe(true);
+    }
+    // The unscoped lookup, the metric names, then one lookup per metric.
+    expect(labelValues).toHaveBeenCalledTimes(202);
+  });
+
+  it("stops the scan once a value past the cap is found and resumes it for a search", async () => {
+    const names = Array.from({ length: 40 }, (_, i) => `m${i}`);
+    labelValues.mockImplementation(async ({ label, match }: { label: string; match?: string }) => {
+      if (label === "__name__") return promOk(names);
+      if (!match) return { data: { status: "error", error: "match[] must specify a metric" } };
+      return promOk([`job-${match}`]);
+    });
+    const params = baseParams({ query: "label_values(job)", maxRecords: 5 });
+    const loaded = await loadQueryVariableValues(params);
+    expect(loaded.capped).toBe(true);
+    expect(labelValues).toHaveBeenCalledTimes(10);
+
+    const found = await loadQueryVariableValues({ ...params, search: "m39" });
+    expect(found.options.map((o) => o.value)).toEqual(["job-m39"]);
+    expect(found.capped).toBe(false);
+    expect(labelValues).toHaveBeenCalledTimes(42);
+  });
+
+  it("marks the scan capped when the label exists only past the scanned metric names", async () => {
+    const names = Array.from({ length: 203 }, (_, i) => `m${String(i + 1).padStart(3, "0")}`);
+    labelValues.mockImplementation(async ({ label, match }: { label: string; match?: string }) => {
+      if (label === "__name__") return promOk(names);
+      if (!match) return { data: { status: "error", error: "match[] must specify a metric" } };
+      if (Number(match.slice(1)) <= 200) throw new Error("label not found");
+      return promOk([`job-${match}`]);
+    });
+    const result = await loadQueryVariableValues(baseParams({ query: "label_values(job)" }));
+    expect(result.options).toEqual([]);
+    expect(result.capped).toBe(true);
+    expect(result.metricsTruncated).toBe(true);
+  });
+
+  it("does not mark the scan capped when every metric name was read", async () => {
+    labelValues.mockImplementation(async ({ label, match }: { label: string; match?: string }) => {
+      if (label === "__name__") return promOk(["a", "b"]);
+      if (!match) return { data: { status: "error", error: "match[] must specify a metric" } };
+      return promOk([match]);
+    });
+    const result = await loadQueryVariableValues(baseParams({ query: "label_values(job)" }));
+    expect(result.capped).toBe(false);
+  });
+
+  it("retries the unscoped lookup once the cached scan expires", async () => {
+    let unscopedFails = true;
+    labelValues.mockImplementation(async ({ label, match }: { label: string; match?: string }) => {
+      if (label === "__name__") return promOk(["a"]);
+      if (!match) {
+        if (unscopedFails) throw new Error("transient");
+        return promOk(["direct"]);
+      }
+      return promOk(["scanned"]);
+    });
+    const now = vi.spyOn(Date, "now").mockReturnValue(1_000_000);
+    try {
+      const params = baseParams({ query: "label_values(job)" });
+      await loadQueryVariableValues(params);
+      unscopedFails = false;
+      const cached = await loadQueryVariableValues(params);
+      expect(cached.options.map((o) => o.value)).toEqual(["scanned"]);
+      const unscopedCalls = () => labelValues.mock.calls.filter(([args]) => !args.match).length;
+      // The unscoped lookup and the metric names.
+      expect(unscopedCalls()).toBe(2);
+
+      now.mockReturnValue(1_000_000 + 60_001);
+      const fresh = await loadQueryVariableValues(params);
+      expect(fresh.options.map((o) => o.value)).toEqual(["direct"]);
+      expect(fresh.metricsTruncated).toBeFalsy();
+      expect(unscopedCalls()).toBe(3);
+    } finally {
+      now.mockRestore();
+    }
+  });
+
+  it("shares one metric-name lookup between concurrent loads", async () => {
+    labelValues.mockImplementation(async ({ label, match }: { label: string; match?: string }) => {
+      if (label === "__name__") return promOk(["a", "b"]);
+      if (!match) return { data: { status: "error", error: "match[] must specify a metric" } };
+      return promOk([`job-${match}`]);
+    });
+    const params = baseParams({ query: "label_values(job)" });
+    const [first, second] = await Promise.all([
+      loadQueryVariableValues(params),
+      loadQueryVariableValues(params),
+    ]);
+    expect(first.options.map((o) => o.value)).toEqual(["job-a", "job-b"]);
+    expect(second.options.map((o) => o.value)).toEqual(["job-a", "job-b"]);
+    const nameCalls = labelValues.mock.calls.filter(([args]) => args.label === "__name__");
+    expect(nameCalls).toHaveLength(1);
+  });
+
+  it("does not cache a failed metric-name lookup", async () => {
+    let namesFail = true;
+    labelValues.mockImplementation(async ({ label, match }: { label: string; match?: string }) => {
+      if (label === "__name__") {
+        if (namesFail) throw new Error("names down");
+        return promOk(["a"]);
+      }
+      if (!match) return { data: { status: "error", error: "match[] must specify a metric" } };
+      return promOk(["job-a"]);
+    });
+    const params = baseParams({ query: "label_values(job)" });
+    await expect(loadQueryVariableValues(params)).rejects.toThrow("names down");
+    namesFail = false;
+    const result = await loadQueryVariableValues(params);
+    expect(result.options.map((o) => o.value)).toEqual(["job-a"]);
   });
 
   it("label_names() reads /labels", async () => {
@@ -469,6 +596,7 @@ describe("loadQueryVariableValues — PromQL cancellation", () => {
     labelValues.mockReset();
     labels.mockReset();
     metricsQuery.mockReset();
+    clearMetricScanCache();
   });
 
   it("sends the caller's signal with every metrics request", async () => {
@@ -501,6 +629,31 @@ describe("loadQueryVariableValues — PromQL cancellation", () => {
     ).rejects.toBeInstanceOf(QueryVariableCancelledError);
     // The unscoped lookup, the metric names, then one batch of eight.
     expect(labelValues).toHaveBeenCalledTimes(10);
+  });
+
+  it("loads its own scan when another caller cancels the shared one", async () => {
+    const controller = new AbortController();
+    let nameCalls = 0;
+    labelValues.mockImplementation(async ({ label, match }: { label: string; match?: string }) => {
+      if (label === "__name__") {
+        nameCalls += 1;
+        if (nameCalls === 1) controller.abort();
+        return promOk(["a"]);
+      }
+      if (!match) return { data: { status: "error", error: "match[] must specify a metric" } };
+      return promOk(["job-a"]);
+    });
+    const [cancelled, kept] = await Promise.allSettled([
+      loadQueryVariableValues(
+        baseParams({ query: "label_values(job)", signal: controller.signal }),
+      ),
+      loadQueryVariableValues(baseParams({ query: "label_values(job)" })),
+    ]);
+    expect(cancelled.status).toBe("rejected");
+    expect(kept.status === "fulfilled" && kept.value.options.map((o) => o.value)).toEqual([
+      "job-a",
+    ]);
+    expect(nameCalls).toBe(2);
   });
 
   it("does not fall back to the scan when the first lookup was cancelled", async () => {

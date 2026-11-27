@@ -9613,6 +9613,7 @@
       "promqlFiltersAndOnly": "PromQL 筛选条件仅支持 AND。请删除 OR 和分组，或切换到 SQL。",
       "cappedHint": "显示前 {count} 个值",
       "cappedAllHint": "“全部”也会匹配未列出的值",
+      "metricsTruncatedHint": "部分指标未勾选。输入指标名称可查看所有值。",
       "metric": "指标",
       "label": "标签",
       "metricSelectTooltip": "选择一个指标，或使用 $metricVariable 之类的变量根据其他值进行选择。",

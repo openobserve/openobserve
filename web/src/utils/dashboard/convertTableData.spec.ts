@@ -566,6 +566,77 @@ describe("convertTableData", () => {
     expect(result.columns).toHaveLength(2);
   });
 
+  describe("NULL vs empty-string cells", () => {
+    const rowsWithMissing = [
+      [
+        { timestamp: "alpha", value: 1 },
+        { timestamp: null, value: null },
+        { timestamp: "", value: 3 },
+        { value: 4 },
+      ],
+    ];
+
+    it("formats NULL and empty-string cells to two different labels", () => {
+      const result = convertTableData(mockPanelSchema, rowsWithMissing, mockStore);
+      const format = result.columns[0].format;
+
+      expect(format(null)).toBe("(null)");
+      expect(format(undefined)).toBe("(null)");
+      expect(format("")).toBe("(empty)");
+      expect(format("alpha")).toBe("alpha");
+    });
+
+    it("labels a NULL numeric cell (null)", () => {
+      const result = convertTableData(mockPanelSchema, rowsWithMissing, mockStore);
+
+      expect(result.columns[1].align).toBe("right");
+      expect(result.columns[1].format(null)).toBe("(null)");
+    });
+
+    it("lets the panel's no-value replacement win over the default labels", () => {
+      mockPanelSchema.config.no_value_replacement = "N/A";
+      const result = convertTableData(mockPanelSchema, rowsWithMissing, mockStore);
+
+      expect(result.columns[0].format(null)).toBe("N/A");
+      expect(result.columns[0].format("")).toBe("N/A");
+      expect(result.columns[1].format(null)).toBe("N/A");
+    });
+
+    it("lets a special null mapping win over the default label", () => {
+      mockPanelSchema.config.mappings = [{ type: "special", match: "null", text: "missing" }];
+      const result = convertTableData(mockPanelSchema, rowsWithMissing, mockStore);
+
+      expect(result.columns[0].format(null)).toBe("missing");
+      expect(result.columns[0].format("")).toBe("(empty)");
+    });
+
+    it("keeps NULL distinct from empty string in transposed tables", () => {
+      mockPanelSchema.config.table_transpose = true;
+      const result = convertTableData(
+        mockPanelSchema,
+        [
+          [
+            { timestamp: "a", value: null },
+            { timestamp: "b", value: "" },
+            { timestamp: null, value: 5 },
+            { timestamp: "", value: 6 },
+          ],
+        ],
+        mockStore,
+      );
+      const colA = result.columns.find((c: { field: string }) => c.field === "a");
+      const colB = result.columns.find((c: { field: string }) => c.field === "b");
+      const row = result.rows[0];
+
+      expect(colA.format(row.a)).toBe("(null)");
+      expect(colB.format(row.b)).toBe("(empty)");
+      expect(result.columns.find((c: { field: string }) => c.field === "null").label).toBe(
+        "(null)",
+      );
+      expect(result.columns.find((c: { field: string }) => c.field === "").label).toBe("(empty)");
+    });
+  });
+
   // Test 10: Complex edge case scenarios
   it("should handle data with no x or y fields", () => {
     const schemaWithoutFields = {
@@ -860,5 +931,51 @@ describe("convertMultiQueryTableData – column ordering", () => {
       "q1_y",
       "q2_y",
     ]);
+  });
+});
+
+describe("convertMultiQueryTableData – NULL and empty cells", () => {
+  const store = { state: { timezone: "UTC" } };
+  const panelSchema = (config: Record<string, unknown> = {}) => ({
+    type: "table",
+    config,
+    queries: [
+      { fields: { x: [{ alias: "svc" }], y: [{ alias: "hits" }] } },
+      { fields: { x: [{ alias: "svc" }], y: [{ alias: "errors" }] } },
+    ],
+  });
+  const data = [[{ hits: 3 }, { svc: "", hits: 4 }], [{ svc: "api", errors: 1 }]];
+  const cell = (
+    result: {
+      rows: Record<string, unknown>[];
+      columns: { name: string; format: (value: unknown, row: unknown) => unknown }[];
+    },
+    rowIdx: number,
+    name: string,
+  ) => {
+    const col = result.columns.find((c) => c.name === name);
+    const row = result.rows[rowIdx];
+    return col?.format(row[name], row);
+  };
+
+  it("labels a missing value of the row's own query as (null) or (empty)", () => {
+    const result = convertMultiQueryTableData(panelSchema(), data, store);
+    expect(cell(result, 0, "svc")).toBe("(null)");
+    expect(cell(result, 1, "svc")).toBe("(empty)");
+  });
+
+  it("keeps a column from another query blank", () => {
+    const result = convertMultiQueryTableData(panelSchema(), data, store);
+    expect(cell(result, 0, "errors")).toBeUndefined();
+    expect(cell(result, 2, "hits")).toBeUndefined();
+  });
+
+  it("uses the panel's no-value text when it is set", () => {
+    const result = convertMultiQueryTableData(
+      panelSchema({ no_value_replacement: "-" }),
+      data,
+      store,
+    );
+    expect(cell(result, 0, "svc")).toBe("-");
   });
 });

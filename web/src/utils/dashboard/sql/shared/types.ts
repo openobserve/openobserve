@@ -62,6 +62,8 @@ export interface SQLContext {
   // Closure-based helpers
   /** Returns axis data array for the given field alias. */
   getAxisDataFromKey: (key: string) => any[];
+  /** The field's values as the rows hold them, before NULL and "" get their display names. */
+  getRawAxisDataFromKey: (key: string | undefined) => unknown[];
   /** Builds series array for the current chart type. */
   getSeries: (seriesConfig?: Record<string, any>) => any[];
   /** Returns annotation mark-line config. */
