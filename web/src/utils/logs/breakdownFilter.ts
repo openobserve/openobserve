@@ -18,6 +18,9 @@ const STRING_TYPES = ["String", "Utf8", "LargeUtf8", "Utf8View"];
 
 // Only a string column holds "", and '' against another type fails the query,
 // so a non-string field checks NULL alone; an unknown type keeps both checks.
+export const mayHoldEmptyString = (fieldType?: string): boolean =>
+  !fieldType || STRING_TYPES.includes(fieldType);
+
 export const emptyValueConditions = (
   field: string,
   action: "include" | "exclude",
@@ -26,7 +29,7 @@ export const emptyValueConditions = (
 ): string[] => {
   const quoted = quote(field);
   const isNull = action === "include" ? `${quoted} is null` : `${quoted} is not null`;
-  if (fieldType && !STRING_TYPES.includes(fieldType)) return [isNull];
+  if (!mayHoldEmptyString(fieldType)) return [isNull];
   return [isNull, action === "include" ? `${quoted} = ''` : `${quoted} != ''`];
 };
 

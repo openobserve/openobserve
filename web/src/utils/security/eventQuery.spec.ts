@@ -57,6 +57,13 @@ describe("filterClause", () => {
   it("treats an unknown op as equality rather than dropping the filter", () => {
     expect(filterClause({ field: "a", op: "??", value: "1" })).toBe(`"a" = '1'`);
   });
+
+  it("matches a missing value with IS NULL and IS NOT NULL", () => {
+    expect(filterClause({ field: "user", op: "is_null", value: "null" })).toBe(`"user" IS NULL`);
+    expect(filterClause({ field: "user", op: "is_not_null", value: "null" })).toBe(
+      `"user" IS NOT NULL`,
+    );
+  });
 });
 
 describe("whereParts", () => {
@@ -80,6 +87,23 @@ describe("whereParts", () => {
 
   it("ignores severity when the stream has none", () => {
     expect(whereParts({ ...base, severity: [4] })).toEqual([]);
+  });
+
+  it("ORs the included values of one field and ANDs everything else (S16)", () => {
+    const filters = [
+      { field: "user", op: "=", value: "a" },
+      { field: "host", op: "!=", value: "h" },
+      { field: "user", op: "=", value: "b" },
+      { field: "user", op: "is_null", value: "null" },
+      { field: "user", op: "!=", value: "c" },
+      { field: "port", op: "=", value: "22" },
+    ];
+    expect(whereParts({ ...base, filters })).toEqual([
+      `("user" = 'a' OR "user" = 'b' OR "user" IS NULL)`,
+      `("host" != 'h' OR "host" IS NULL)`,
+      `("user" != 'c' OR "user" IS NULL)`,
+      `"port" = '22'`,
+    ]);
   });
 });
 

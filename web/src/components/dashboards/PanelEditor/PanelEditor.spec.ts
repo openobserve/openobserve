@@ -177,9 +177,9 @@ vi.mock("@/components/dashboards/addPanel/ChartSelection.vue", () => ({
   },
 }));
 
-vi.mock("@/components/dashboards/addPanel/PanelFieldList.vue", () => ({
+vi.mock("@/components/dashboards/addPanel/DashboardFieldPanel.vue", () => ({
   default: {
-    name: "PanelFieldList",
+    name: "DashboardFieldPanel",
     template: '<div class="field-list-mock">FieldList</div>',
   },
 }));

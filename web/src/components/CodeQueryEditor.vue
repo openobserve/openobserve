@@ -546,6 +546,8 @@ export default defineComponent({
     const editorRef: any = ref();
     let editorObj: any = null;
     let chordAction: { dispose(): void } | null = null;
+    // Monaco starts its selection at 1:1, so until the user has focused the editor that caret is not theirs.
+    let editorHadFocus = false;
     // Monaco is a large chunk; until it mounts the query is drawn as plain text so it is readable at once.
     const editorReady = ref(false);
     const previewLines = computed(() => {
@@ -1161,6 +1163,7 @@ export default defineComponent({
           },
         });
       editorObj.onDidFocusEditorWidget(() => {
+        editorHadFocus = true;
         emit("focus");
       });
 
@@ -1431,6 +1434,47 @@ export default defineComponent({
         ]);
         editorObj.pushUndoStop();
       });
+    };
+
+    // Inserts at the live selection, so a caret at offset 0 is honoured, or at the end before the editor was ever focused; leaves the caret after the text.
+    const insertAtCursor = (text: string): boolean => {
+      const selection = editorObj?.getSelection?.();
+      const model = editorObj?.getModel?.();
+      if (!monaco || !selection || !model) return false;
+      const lastLine = model.getLineCount();
+      const end = {
+        startLineNumber: lastLine,
+        startColumn: model.getLineMaxColumn(lastLine),
+        endLineNumber: lastLine,
+        endColumn: model.getLineMaxColumn(lastLine),
+      };
+      // Collapsed to the selection's end so adding a field never overwrites the text the user selected.
+      const afterSelection = {
+        startLineNumber: selection.endLineNumber,
+        startColumn: selection.endColumn,
+        endLineNumber: selection.endLineNumber,
+        endColumn: selection.endColumn,
+      };
+      asProgrammatic(() => {
+        editorObj.pushUndoStop();
+        editorObj.executeEdits(
+          "insert-at-cursor",
+          [{ range: editorHadFocus ? afterSelection : end, text }],
+          (inverse: MonacoEditor.editor.IValidEditOperation[]) => {
+            const end = inverse[0].range;
+            return [
+              new monaco.Selection(
+                end.endLineNumber,
+                end.endColumn,
+                end.endLineNumber,
+                end.endColumn,
+              ),
+            ];
+          },
+        );
+        editorObj.pushUndoStop();
+      });
+      return true;
     };
 
     /**
@@ -2294,6 +2338,7 @@ export default defineComponent({
       },
       setValue,
       replaceValue,
+      insertAtCursor,
       resetEditorLayout,
       disableSuggestionPopup,
       triggerAutoComplete,

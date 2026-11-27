@@ -136,7 +136,7 @@ function groupedAssembly(
     name: f.name,
     ftsKey: false,
     isSchemaField: true,
-    group: resolveFieldGroup(f.name, f.type, semanticIndex, dynamicPrefixes),
+    group: resolveFieldGroup(f.name, semanticIndex, dynamicPrefixes),
     showValues: true,
     isInterestingField: false,
     dataType: f.type,
@@ -276,7 +276,7 @@ describe("stage breakdown — 50k fields", () => {
   bench("stage 2: resolveFieldGroup only (50k calls)", () => {
     const dp = discoverPrefixes(names50k);
     for (const f of fields50k) {
-      resolveFieldGroup(f.name, f.type, semanticIndex, dp);
+      resolveFieldGroup(f.name, semanticIndex, dp);
     }
   });
 
@@ -284,7 +284,7 @@ describe("stage breakdown — 50k fields", () => {
     const dp = discoverPrefixes(names50k);
     const fieldObjs = fields50k.map((f) => ({
       name: f.name,
-      group: resolveFieldGroup(f.name, f.type, semanticIndex, dp),
+      group: resolveFieldGroup(f.name, semanticIndex, dp),
     }));
     const buckets = new Map<string, any[]>();
     for (const f of fieldObjs) {

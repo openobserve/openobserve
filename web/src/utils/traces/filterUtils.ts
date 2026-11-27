@@ -1,4 +1,4 @@
-import { removeConditions } from "@/utils/query/sqlFilterBuilder";
+import { relaxConditions, removeConditions } from "@/utils/query/sqlFilterBuilder";
 
 /**
  * Shared filter utilities for the Traces feature.
@@ -13,15 +13,29 @@ const SIMPLE_CONDITION = new RegExp(
   "i",
 );
 
+// A parenthesised run of one field's conditions, which may hold one such run itself: `((f='a' OR f='b') AND f!='c')`.
+export const fieldGroupPattern = (condPat: string): string => {
+  const run = (term: string) => `\\(\\s*${term}(?:\\s+(?:OR|AND)\\s+${term})*\\s*\\)`;
+  return run(`(?:${run(condPat)}|${condPat})`);
+};
+
+/** Regex source for one condition on `fieldName`, written bare, double-quoted or stream-qualified. */
+export const fieldConditionPattern = (fieldName: string, opPat: string): string => {
+  const esc = fieldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const valPat = `(?:${SQL_STRING}|null|\\d+(?:\\.\\d+)?|true|false)`;
+  // The lookbehind stops `operation_name` from matching inside `db_operation_name`.
+  return `(?<!\\w)(?:"[^"]+"\\.)?(?:"${esc}"|${esc})\\s*${opPat}\\s*${valPat}`;
+};
+
 /**
  * Extracts the field name from a filter expression such as
  * `field='val'`, `field!='val'`, `(field='x' OR field='y')`, etc.
  */
 export const getFieldFromExpression = (expression: string): string | null => {
-  const cleaned = expression.trim().replace(/^\(\s*/, "");
+  const cleaned = expression.trim().replace(/^(?:\(\s*)+/, "");
   const match =
     cleaned.match(/^"[^"]+"\."?(\w+)"?\s*(?:=|!=|is)/i) ||
-    cleaned.match(/^(\w+)\s*(?:=|!=|>=|<=|>|<|is)/i);
+    cleaned.match(/^"?(\w+)"?\s*(?:=|!=|>=|<=|>|<|is)/i);
   return match ? match[1] : null;
 };
 
@@ -35,14 +49,10 @@ export const replaceExistingFieldCondition = (
   fieldName: string,
   newExpression: string,
 ): string | null => {
-  const esc = fieldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const valPat = `(?:${SQL_STRING}|null|\\d+(?:\\.\\d+)?|true|false)`;
-  const opPat = `(?:=|!=|>=|<=|>|<|is(?:\\s+not)?)`;
-  // The lookbehind stops `operation_name` from matching inside `db_operation_name`.
-  const condPat = `(?<!\\w)(?:"[^"]+"\\.)?${esc}\\s*${opPat}\\s*${valPat}`;
+  const condPat = fieldConditionPattern(fieldName, `(?:=|!=|>=|<=|>|<|is(?:\\s+not)?)`);
 
   // Try parenthesized multi-value group first: (field = 'x' OR/AND field = 'y')
-  const multiRegex = new RegExp(`\\(\\s*${condPat}(?:\\s+(?:OR|AND)\\s+${condPat})*\\s*\\)`, "gi");
+  const multiRegex = new RegExp(fieldGroupPattern(condPat), "gi");
   if (multiRegex.test(queryStr)) {
     return queryStr.replace(multiRegex, () => newExpression);
   }
@@ -82,22 +92,18 @@ export const removeFieldCondition = (queryStr: string, fieldName: string): strin
   return removeConditions(queryStr.trim(), (condition) => fieldPattern.test(condition));
 };
 
+/** `queryStr` with every condition on `fieldName` gone and any OR group holding one dropped whole, so the rest never narrows the rows. */
+export const relaxFieldCondition = (queryStr: string, fieldName: string): string => {
+  const esc = fieldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const fieldPattern = new RegExp(`^"?${esc}"?\\s*(?:[=!<>]|is\\b)`, "i");
+  return relaxConditions(queryStr.trim(), (condition) => fieldPattern.test(condition));
+};
+
 /**
  * Applies a single filter term to a base editor value using replace-or-append logic.
  * Returns the new editor value.
  */
-export const applyFilterTerm = (filterTerm: string, baseValue: string): string => {
-  let filter = filterTerm;
-
-  const isFilterValueNull = filter.split(/=|!=/)[1] === "'null'";
-  if (isFilterValueNull) {
-    filter = filter
-      .replace(/=|!=/, (match) => {
-        return match === "=" ? " is " : " is not ";
-      })
-      .replace(/'null'/, "null");
-  }
-
+export const applyFilterTerm = (filter: string, baseValue: string): string => {
   // The whole base value is the where clause — never split it on "|". The split
   // is quote-unaware, so a pipe inside a term such as match_all('text | error')
   // would be rejoined as "| " and silently alter the search term.
@@ -224,16 +230,13 @@ export const dropDanglingConnectors = (query: string): string => {
   return text.trim().replace(/\uE000(\d+)\uE000/g, (_m, index: string) => opaque[Number(index)]);
 };
 
-/**
- * Builds a SQL filter term from a field, value, and operator.
- * Handles null values and escapes single quotes.
- */
+/** Builds a SQL filter term; only a real null becomes `is null`, the text "null" stays a quoted value. */
 export const buildFilterTerm = (
   field: string,
-  value: string,
+  value: string | null,
   operator: "=" | "!=" = "=",
 ): string => {
-  if (value === null || value === "null") {
+  if (value === null) {
     return operator === "=" ? `${field} is null` : `${field} is not null`;
   }
   const escaped = String(value).replace(/'/g, "''");

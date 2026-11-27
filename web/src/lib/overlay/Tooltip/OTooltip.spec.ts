@@ -112,6 +112,30 @@ describe("OTooltip", () => {
       wrapper.unmount();
     });
 
+    it("marks only a non-hoverable bubble passive, so it never catches a click meant for what lies under it", async () => {
+      for (const hoverable of [false, true]) {
+        const wrapper = mount(
+          {
+            render: () =>
+              h("button", { "data-testid": "t" }, [
+                h(OTooltip, { content: "Hello", delay: 10, hoverable }),
+              ]),
+          },
+          { attachTo: document.body },
+        );
+        wrapper
+          .find('[data-testid="t"]')
+          .element.dispatchEvent(new MouseEvent("mouseenter", { bubbles: true }));
+        await new Promise((r) => setTimeout(r, 60));
+        await nextTick();
+
+        const content = document.querySelector('[data-test="o-tooltip-content"]');
+        expect(content).not.toBeNull();
+        expect(content!.hasAttribute("data-o-tooltip-passive")).toBe(!hoverable);
+        wrapper.unmount();
+      }
+    });
+
     it("closes once the pointer moves off the trigger even when mouseleave never fires", async () => {
       const wrapper = mount(
         {

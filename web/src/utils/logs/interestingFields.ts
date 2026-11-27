@@ -43,3 +43,38 @@ export const pruneInterestingFields = (
   }
   return interestingFields;
 };
+
+type FieldRow = { name: string; label?: boolean; isInterestingField?: boolean };
+
+/** The interesting subset of a grouped field list: a header stays only while a field under it is interesting. */
+export const interestingRowsOf = <T extends FieldRow>(rows: T[]): T[] => {
+  const result: T[] = [];
+  let header: T | null = null;
+  for (const row of rows) {
+    if (row.label) {
+      header = row;
+      continue;
+    }
+    if (!row.isInterestingField) continue;
+    if (header) {
+      result.push(header);
+      header = null;
+    }
+    result.push(row);
+  }
+  return result;
+};
+
+/** A stream's interesting fields as logs keeps them: the stored picks plus the defaults the user has not dropped. */
+export const storedInterestingFields = (
+  store: Record<string, string[] | undefined> | null | undefined,
+  org: string,
+  stream: string,
+  defaults: Iterable<string>,
+): string[] => {
+  const deselected = new Set(store?.[`deselect_${org}_${stream}`] ?? []);
+  return [
+    ...(store?.[`${org}_${stream}`] ?? []),
+    ...[...defaults].filter((field) => !deselected.has(field)),
+  ];
+};

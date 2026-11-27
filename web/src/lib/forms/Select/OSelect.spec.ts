@@ -642,6 +642,19 @@ describe("OSelect", () => {
       expect(tip.props("content")).toBeUndefined();
     });
 
+    it.each([true, false])(
+      "exposes the selected value on the trigger for tests, searchable %s",
+      (searchable) => {
+        wrapper = mount(OSelect, {
+          props: { modelValue: "a", searchable, options: OPTIONS },
+          attrs: { "data-test": "pick" },
+        });
+        expect(
+          wrapper.find('[data-test="pick-trigger"]').attributes("data-test-selected-value"),
+        ).toBe("a");
+      },
+    );
+
     it("wraps the native trigger value so it cuts, with no tooltip over a custom trigger", () => {
       wrapper = mount(OSelect, { props: { modelValue: "a", searchable: false, options: OPTIONS } });
       const value = wrapper.findComponent(OTruncatedText);

@@ -18,6 +18,21 @@ const OP_SYMBOL: Record<string, string> = {
   contains: "~",
   not_contains: "!~",
 };
+
+const NULL_OP_LABEL = {
+  is_null: "dashboard.filterOperators.isNull",
+  is_not_null: "dashboard.filterOperators.isNotNull",
+} as const;
+
+// Own keys only, so an operator named like an Object.prototype member is shown as written.
+const isNullOp = (op: string): op is keyof typeof NULL_OP_LABEL => Object.hasOwn(NULL_OP_LABEL, op);
+
+const symbolOf = (op: string): string => (Object.hasOwn(OP_SYMBOL, op) ? OP_SYMBOL[op] : op);
+
+const conditionText = (f: FieldFilter): string =>
+  isNullOp(f.op) ? t(NULL_OP_LABEL[f.op]) : `${symbolOf(f.op)} ${f.value}`;
+
+const EXCLUDING = new Set(["!=", "not_contains", "is_not_null"]);
 </script>
 
 <template>
@@ -25,14 +40,14 @@ const OP_SYMBOL: Record<string, string> = {
     <OTag
       v-for="(f, i) in filters"
       :key="`${f.field}-${f.op}-${f.value}`"
-      :variant="f.op === '!=' || f.op === 'not_contains' ? 'error-soft' : 'primary-soft'"
+      :variant="EXCLUDING.has(f.op) ? 'error-soft' : 'primary-soft'"
       shape="rounded"
       size="sm"
       :data-test="`security-events-filter-${i}`"
     >
       <span class="max-w-80 truncate font-mono">
         <span class="font-semibold">{{ f.field }}</span>
-        {{ OP_SYMBOL[f.op] ?? f.op }} {{ f.value }}
+        {{ conditionText(f) }}
       </span>
       <template #trailing>
         <OButton

@@ -485,7 +485,7 @@ export function compareFields(
 
 export type FilterAction = "include" | "exclude" | "gte" | "lt";
 
-// Built here, not with buildFilterTerm: that helper reads the string "null" as is null and does not quote the field.
+// Built here, not with buildFilterTerm: that helper neither quotes the field nor keeps null rows on exclude.
 export function filterTermFor(
   field: FieldComparison,
   bucket: Bucket,

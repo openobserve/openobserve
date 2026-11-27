@@ -16,6 +16,7 @@
 import { describe, expect, it } from "vitest";
 import {
   applyPromMatchers,
+  conditionValueLabel,
   filterTreeToPromMatchers,
   filterTreeToSql,
   operatorsFor,
@@ -98,6 +99,15 @@ describe("toFilterFields", () => {
   it("keeps the field list's own type for one stream", () => {
     expect(typeOf(toFilterFields(merged, [appLogs]), "code")).toBe("number");
     expect(typeOf(toFilterFields(merged), "code")).toBe("number");
+  });
+});
+
+describe("conditionValueLabel", () => {
+  it("quotes the text null so the chip does not read as a null check", () => {
+    expect(conditionValueLabel(cond("level", "in", ["null", "a"]))).toBe('"null", a');
+    expect(conditionValueLabel(cond("level", "eq", ["NULL"]))).toBe('"NULL"');
+    expect(conditionValueLabel(cond("level", "in", ["nullable"]))).toBe("nullable");
+    expect(conditionValueLabel(cond("level", "is_null"))).toBe("");
   });
 });
 

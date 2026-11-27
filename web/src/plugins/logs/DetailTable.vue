@@ -274,6 +274,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :data="tableRows"
               :columns="tableColumns"
               row-key="_rowKey"
+              row-class="group/detail-row"
               pagination="none"
               :row-height="24"
               :default-columns="false"
@@ -332,7 +333,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @select="toggleIncludeSearchTerm(row.field, row.value, 'include')"
                       >
                         <template #icon-left><EqualIcon class="size-2.5" /></template>
-                        {{ t("common.includeSearchTerm") }}
+                        {{ t("common.include") }}
                       </ODropdownItem>
                       <ODropdownItem
                         v-if="
@@ -345,7 +346,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @select="toggleExcludeSearchTerm(row.field, row.value, 'exclude')"
                       >
                         <template #icon-left><NotEqualIcon class="size-2.5" /></template>
-                        {{ t("common.excludeSearchTerm") }}
+                        {{ t("common.exclude") }}
                       </ODropdownItem>
                       <template
                         v-if="row.field !== store.state.zoConfig.timestamp_column && !embedded"
@@ -413,6 +414,58 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :show-braces="false"
                       :query-string="scopeHighlightQuery(highlightQuery, row.field)"
                     /></pre>
+                    <!-- Collapsed, not display:none, so Tab still reaches these buttons and the focus reveals them. -->
+                    <div
+                      class="-ms-2 flex max-w-0 shrink-0 items-center gap-0.5 overflow-hidden opacity-0 group-hover/detail-row:ms-0 group-hover/detail-row:max-w-none group-hover/detail-row:opacity-100 group-has-[:focus-visible]/detail-row:ms-0 group-has-[:focus-visible]/detail-row:max-w-none group-has-[:focus-visible]/detail-row:opacity-100 max-md:hidden"
+                      :data-test="`log-details-row-actions-${row.field}`"
+                    >
+                      <template
+                        v-if="
+                          isFilterableLogField(
+                            row.field,
+                            searchObj.data.stream.selectedStreamFields,
+                          )
+                        "
+                      >
+                        <OButton
+                          variant="ghost-primary"
+                          size="icon"
+                          class="size-5!"
+                          :aria-label="t('common.include')"
+                          :data-test="`log-details-row-include-${row.field}`"
+                          @click="toggleIncludeSearchTerm(row.field, row.value, 'include')"
+                        >
+                          <OIcon name="" class="h-2.5! w-2.5!"><EqualIcon /></OIcon>
+                          <OTooltip :content="t('common.include')" />
+                        </OButton>
+                        <OButton
+                          variant="ghost-primary"
+                          size="icon"
+                          class="size-5!"
+                          :aria-label="t('common.exclude')"
+                          :data-test="`log-details-row-exclude-${row.field}`"
+                          @click="toggleExcludeSearchTerm(row.field, row.value, 'exclude')"
+                        >
+                          <OIcon name="" class="h-2.5! w-2.5!"><NotEqualIcon /></OIcon>
+                          <OTooltip :content="t('common.exclude')" />
+                        </OButton>
+                      </template>
+                      <OButton
+                        v-if="row.field !== store.state.zoConfig.timestamp_column && !embedded"
+                        variant="ghost-primary"
+                        size="icon"
+                        class="size-5!"
+                        :aria-label="columnLabel(row.field)"
+                        :data-test="`log-details-row-column-${row.field}`"
+                        @click="addFieldToTable(row.field.toString())"
+                      >
+                        <OIcon
+                          :name="isTableColumn(row.field) ? 'visibility-off' : 'visibility'"
+                          size="sm"
+                        />
+                        <OTooltip :content="columnLabel(row.field)" />
+                      </OButton>
+                    </div>
                   </div>
                 </div>
               </template>
@@ -1353,6 +1406,12 @@ export default defineComponent({
       return newObj;
     };
 
+    const isTableColumn = (field: string | number) =>
+      searchObj.data.stream.selectedFields.includes(String(field));
+
+    const columnLabel = (field: string | number) =>
+      isTableColumn(field) ? t("common.removeFieldFromTable") : t("common.addFieldToTable");
+
     const addFieldToTable = (value: string) => {
       emit("add:table", value);
     };
@@ -1559,6 +1618,8 @@ export default defineComponent({
       shouldWrapValues,
       toggleWrapLogDetails,
       addFieldToTable,
+      isTableColumn,
+      columnLabel,
       getCrossLinksForField,
       openCrossLink,
       searchObj,

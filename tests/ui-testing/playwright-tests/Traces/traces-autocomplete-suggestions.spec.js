@@ -123,14 +123,9 @@ async function tryExpandField(page, pm) {
         }
     }
 
-    // Strategy 2: Click on field expansion headers in the traces field list
-    // Traces renders field rows with class 'field-expansion-item'
-    // The clickable header has class 'field-expansion-header'
-    // Using page object selector for the fields table
+    // Strategy 2: Expand field rows in the traces field list
     const fieldsTable = pm.tracesPage.getFieldsTableLocator();
     if (await fieldsTable.isVisible({ timeout: 5000 }).catch(() => false)) {
-        // Look for field expansion items directly on the page (they're inside the table)
-        // Note: .field-expansion-item is a framework component class, not a data-test selector
         const fieldHeaders = pm.tracesPage.getFieldExpansionHeaders();
         const headerCount = await fieldHeaders.count();
         testLogger.info(`Found ${headerCount} field expansion headers in traces field list`);
@@ -139,15 +134,13 @@ async function tryExpandField(page, pm) {
             // Try first few fields (skip internal fields like _timestamp)
             for (let i = 0; i < Math.min(headerCount, 10); i++) {
                 const header = fieldHeaders.nth(i);
-                const headerText = await header.textContent().catch(() => '');
+                const testId = await header.getAttribute('data-test').catch(() => '');
+                const fieldName = (testId || '').replace(/^log-search-expand-/, '').replace(/-field-btn$/, '') || `field_${i}`;
 
                 // Skip system fields
-                if (headerText.includes('_timestamp') || headerText.includes('_id') || headerText.includes('duration')) {
+                if (fieldName.includes('_timestamp') || fieldName.includes('_id') || fieldName.includes('duration')) {
                     continue;
                 }
-
-                // Extract field name from the header
-                const fieldName = headerText.trim().split(/\s+/)[0] || `field_${i}`;
                 testLogger.info(`Attempting to expand field: ${fieldName}`);
 
                 // Start listening for values API before clicking
@@ -174,11 +167,7 @@ async function tryExpandField(page, pm) {
             }
         }
     } else {
-        testLogger.info('Fields table not visible, trying fallback selectors');
-        // Fallback: try finding expansion items anywhere on the page
-        const anyExpansionItems = pm.tracesPage.getFieldExpansionItems();
-        const count = await anyExpansionItems.count();
-        testLogger.info(`Fallback: found ${count} field-expansion-item elements on page`);
+        testLogger.info('Fields table not visible');
     }
 
     // Strategy 3: Fallback - try clicking directly on field names

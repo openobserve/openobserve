@@ -23,6 +23,7 @@ import {
   unescapeSqlLiteral,
   splitOnAnd,
   removeConditions,
+  relaxConditions,
 } from "./sqlFilterBuilder";
 
 // Values here are arbitrary log/trace field data.
@@ -249,5 +250,26 @@ describe("removeConditions", () => {
     const query = `"a(b" = 'x' AND c = 1`;
     expect(removeConditions(query, (condition) => condition.startsWith("c "))).toBe(`"a(b" = 'x'`);
     expect(removeConditions(query, (condition) => condition.startsWith(`"a(b"`))).toBe("c = 1");
+  });
+});
+
+describe("relaxConditions", () => {
+  const isA = (condition: string) => /^a\s*(=|!=|is\b)/i.test(condition);
+
+  it("drops a whole OR group that holds the target, since its other branch would narrow the rows", () => {
+    expect(relaxConditions("a='1' OR b='2'", isA)).toBe("");
+    expect(relaxConditions("c='3' AND (a='1' OR b='2')", isA)).toBe("c='3'");
+    expect(relaxConditions("(a='1' OR b='2') AND c='3' AND d='4'", isA)).toBe("c='3' AND d='4'");
+  });
+
+  it("drops only the target inside an AND and keeps an OR group that does not hold it", () => {
+    expect(relaxConditions("a='1' AND b='2'", isA)).toBe("b='2'");
+    expect(relaxConditions("(b='2' OR c='3') AND a='1'", isA)).toBe("(b='2' OR c='3')");
+    expect(relaxConditions("b='2' OR c='3'", isA)).toBe("b='2' OR c='3'");
+  });
+
+  it("recurses into AND groups and returns the clause untouched when nothing matches", () => {
+    expect(relaxConditions("(a='1' AND b='2') AND c='3'", isA)).toBe("(b='2') AND c='3'");
+    expect(relaxConditions("b='2' AND c='3'", isA)).toBe("b='2' AND c='3'");
   });
 });

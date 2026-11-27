@@ -13,8 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { mount, flushPromises } from "@vue/test-utils";
+import { afterEach, describe, expect, it, beforeEach, vi } from "vitest";
+import { mount as baseMount, flushPromises } from "@vue/test-utils";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
@@ -45,6 +45,25 @@ vi.mock("@/utils/alerts/alertSqlUtils", () => ({
   getParser: vi.fn().mockReturnValue(null),
 }));
 
+vi.mock("@/composables/useFieldGrouping", async () => {
+  const { ref } = await import("vue");
+  return {
+    default: () => ({
+      contextLoaded: ref(false),
+      loadGroupingContext: vi.fn().mockResolvedValue(undefined),
+      groupFields: (fields: unknown[]) => fields,
+    }),
+  };
+});
+
+const streamsMock = vi.hoisted(() => ({
+  getStream: vi.fn().mockResolvedValue(null),
+}));
+
+vi.mock("@/composables/useStreams", () => ({
+  default: () => ({ getStream: streamsMock.getStream }),
+}));
+
 vi.mock("@/aws-exports", () => ({
   default: { isEnterprise: "false", isCloud: "false", isAiEnabled: "false" },
 }));
@@ -60,6 +79,31 @@ import {
   resetEditorProposalsForTests,
 } from "@/composables/assistant/useEditorProposal";
 import { contextRegistry } from "@/composables/contextProviders/registry";
+import type { FieldPanelSource, PanelField } from "@/components/common/fieldPanel/fieldPanel.types";
+
+const sidebarVm = (w: { vm: unknown }) =>
+  w.vm as {
+    fieldSource: FieldPanelSource;
+    handleFieldListEvent: (event: string, value: string) => void;
+  };
+
+// Each test's dialog is unmounted after it, so watchers and timers of earlier mounts do not pile up across the file.
+const mounted: { unmount: () => void }[] = [];
+const mount: typeof baseMount = ((...args: Parameters<typeof baseMount>) => {
+  const wrapper = baseMount(...args);
+  mounted.push(wrapper);
+  return wrapper;
+}) as typeof baseMount;
+
+afterEach(() => {
+  mounted.splice(0).forEach((wrapper) => wrapper.unmount());
+});
+
+const fieldPanelStub = {
+  name: "StreamFieldPanel",
+  props: ["source", "capabilities"],
+  template: '<div data-test="stream-field-panel-stub" />',
+};
 
 const childEditorStub = {
   template: '<div class="stub-editor"></div>',
@@ -73,7 +117,10 @@ const unifiedEditorStub = {
   emits: ["update:query", "blur"],
 };
 
-async function mountComp(props: Record<string, any> = {}) {
+async function mountComp(
+  props: Record<string, any> = {},
+  extraStubs: Record<string, unknown> = {},
+) {
   return mount(QueryEditorDialog, {
     props: {
       modelValue: true,
@@ -96,6 +143,7 @@ async function mountComp(props: Record<string, any> = {}) {
     global: {
       plugins: [i18n, store],
       stubs: {
+        StreamFieldPanel: fieldPanelStub,
         CodeQueryEditor: childEditorStub,
         QueryEditor: childEditorStub,
         UnifiedQueryEditor: unifiedEditorStub,
@@ -104,10 +152,37 @@ async function mountComp(props: Record<string, any> = {}) {
           props: ["name", "label", "isExpanded"],
           emits: ["update:isExpanded"],
         },
+        ...extraStubs,
       },
     },
   });
 }
+
+describe("QueryEditorDialog - defined schema", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  const definedSchema = (w: Awaited<ReturnType<typeof mountComp>>) =>
+    w.findComponent({ name: "StreamFieldPanel" }).props("source").definedSchemaFields.value;
+
+  it("hands the field panel the stream's defined schema from the streams cache, without its schema", async () => {
+    streamsMock.getStream.mockResolvedValue({ settings: { defined_schema_fields: ["level"] } });
+    const w = await mountComp();
+    await flushPromises();
+    expect(streamsMock.getStream).toHaveBeenCalledWith("my-stream", "logs", false);
+    expect(definedSchema(w)).toEqual(["level"]);
+  });
+
+  it("has no defined schema when the stream has none or is not cached", async () => {
+    streamsMock.getStream.mockResolvedValue({ settings: {} });
+    const w = await mountComp();
+    await flushPromises();
+    expect(definedSchema(w)).toBeNull();
+    streamsMock.getStream.mockRejectedValue(new Error("not found"));
+    await w.setProps({ streamName: "other" });
+    await flushPromises();
+    expect(definedSchema(w)).toBeNull();
+  });
+});
 
 describe("QueryEditorDialog - rendering", () => {
   beforeEach(() => vi.clearAllMocks());
@@ -170,6 +245,175 @@ describe("QueryEditorDialog - initial state", () => {
   it("expandCombinedOutput defaults to true", async () => {
     const w = await mountComp();
     expect((w.vm as any).expandCombinedOutput).toBe(true);
+  });
+});
+
+describe("QueryEditorDialog - field panel", () => {
+  // The real drawer teleports its body; an inline stub keeps the panel queryable.
+  const inlineDrawer = {
+    name: "ODrawer",
+    props: ["open", "size", "showClose", "bleed"],
+    template: '<div><slot name="header-left" /><slot name="header-right" /><slot /></div>',
+  };
+
+  it("renders the field panel on the SQL and PromQL tabs", async () => {
+    const wrapper = mount(QueryEditorDialog, {
+      props: {
+        modelValue: true,
+        tab: "sql",
+        sqlQuery: "",
+        promqlQuery: "",
+        vrlFunction: "",
+        streamName: "my-stream",
+        streamType: "logs",
+        columns: [{ label: "host", value: "host" }],
+        period: 10,
+        multiTimeRange: [],
+        savedFunctions: [],
+        sqlQueryErrorMsg: "",
+      },
+      global: {
+        plugins: [i18n, store],
+        stubs: {
+          ODrawer: inlineDrawer,
+          CodeQueryEditor: childEditorStub,
+          QueryEditor: childEditorStub,
+          UnifiedQueryEditor: unifiedEditorStub,
+          O2AIChat: { template: "<div />" },
+          StreamFieldPanel: fieldPanelStub,
+        },
+      },
+    });
+    await flushPromises();
+    expect(wrapper.find('[data-test="query-editor-dialog-field-panel"]').exists()).toBe(true);
+    const grid = wrapper.find('[data-test="query-editor-dialog-field-panel"]').element
+      .parentElement as HTMLElement;
+    expect([...grid.classList]).toEqual(
+      expect.arrayContaining(["flex-col", "md:grid", "md:grid-cols-[20fr_45fr_35fr]"]),
+    );
+    const toggle = wrapper.find('[data-test="query-editor-dialog-fields-toggle"]');
+    const body = () =>
+      wrapper.find('[data-test="stream-field-panel-stub"]').element.parentElement as HTMLElement;
+    expect(toggle.classes()).toContain("md:hidden");
+    expect(toggle.attributes("aria-expanded")).toBe("false");
+    expect(body().classList).toContain("max-md:hidden");
+    await toggle.trigger("click");
+    expect(toggle.attributes("aria-expanded")).toBe("true");
+    expect(body().classList).toContain("max-md:h-[70vh]");
+    const panel = () => wrapper.findComponent({ name: "StreamFieldPanel" });
+    expect(panel().props("capabilities").valueFilters).toBe(true);
+    await wrapper.setProps({ tab: "promql" });
+    expect(wrapper.find('[data-test="query-editor-dialog-field-panel"]').exists()).toBe(true);
+    expect(panel().props("capabilities").valueFilters).toBe(false);
+  });
+
+  describe("on the PromQL tab", () => {
+    const caretEditor = (insertAtCursor: (text: string) => boolean, value: () => string) => ({
+      UnifiedQueryEditor: {
+        template: "<div />",
+        methods: { insertAtCursor, getValue: value, setValue: vi.fn() },
+      },
+    });
+
+    it("inserts the bare label name at the editor caret", async () => {
+      let text = "sum(rate(m[5m])) by ()";
+      const insert = vi.fn((piece: string) => {
+        text = text.replace("by ()", `by (${piece})`);
+        return true;
+      });
+      const wrapper = await mountComp(
+        { tab: "promql", streamType: "metrics", promqlQuery: text },
+        caretEditor(insert, () => text),
+      );
+      sidebarVm(wrapper).fieldSource.addFilter("job=''");
+      expect(insert).toHaveBeenCalledWith(" job ");
+      expect(wrapper.emitted("update:promqlQuery")?.at(-1)).toEqual([
+        "sum(rate(m[5m])) by ( job )",
+      ]);
+      expect(wrapper.emitted("update:sqlQuery")).toBeUndefined();
+    });
+
+    it("appends the label when the editor was never focused", async () => {
+      const wrapper = await mountComp(
+        { tab: "promql", streamType: "metrics", promqlQuery: "up" },
+        caretEditor(
+          () => false,
+          () => "up",
+        ),
+      );
+      sidebarVm(wrapper).fieldSource.addFilter("job=''");
+      expect(wrapper.emitted("update:promqlQuery")?.at(-1)).toEqual(["up job "]);
+    });
+
+    it("never rewrites the SQL on a field intent", async () => {
+      const wrapper = await mountComp({ tab: "promql", sqlQuery: 'SELECT * FROM "s"' });
+      sidebarVm(wrapper).handleFieldListEvent("remove-field", "host");
+      expect(wrapper.emitted("update:sqlQuery")).toBeUndefined();
+      expect(wrapper.emitted("update:promqlQuery")).toBeUndefined();
+    });
+
+    it("does not narrow values by the SQL left on the other tab", async () => {
+      const wrapper = await mountComp({
+        tab: "promql",
+        sqlQuery: `SELECT * FROM "s" WHERE host = 'a'`,
+      });
+      const request = sidebarVm(wrapper).fieldSource.valuesRequest({ name: "job" } as PanelField);
+      expect(request.whereClause).toBe("");
+    });
+  });
+
+  it("writes a sidebar filter into the SQL WHERE clause", async () => {
+    const wrapper = await mountComp({ tab: "sql", sqlQuery: 'SELECT * FROM "s"' });
+    sidebarVm(wrapper).fieldSource.addFilter("host='a'");
+    expect(wrapper.emitted("update:sqlQuery")?.at(-1)).toEqual([
+      "SELECT * FROM \"s\" WHERE host='a'",
+    ]);
+  });
+
+  it("reads the whole WHERE, not a text match cut short by a keyword in a literal", async () => {
+    const wrapper = await mountComp({
+      tab: "sql",
+      sqlQuery: `SELECT * FROM "s" WHERE msg = 'no limit' AND host = 'a'`,
+    });
+    const vm = wrapper.vm as unknown as { fieldListWhereClause: string };
+    expect(vm.fieldListWhereClause).toBe(`msg = 'no limit' AND host = 'a'`);
+  });
+
+  it.each([
+    [
+      "adds a pick next to a keyword inside a literal and keeps the trailing clauses",
+      `SELECT * FROM "s" WHERE msg = 'no limit' AND host = 'a' ORDER BY _timestamp LIMIT 10`,
+      "add-field",
+      "level='error'",
+      `SELECT * FROM "s" WHERE msg = 'no limit' AND host = 'a' and level='error' ORDER BY _timestamp LIMIT 10`,
+    ],
+    [
+      "removes the last condition together with its WHERE",
+      `SELECT * FROM "s" WHERE host = 'a' ORDER BY _timestamp`,
+      "remove-field",
+      "host",
+      `SELECT * FROM "s" ORDER BY _timestamp`,
+    ],
+    [
+      "adds a WHERE before the trailing clauses when there is none",
+      `SELECT * FROM "s" ORDER BY _timestamp`,
+      "add-field",
+      "host='a'",
+      `SELECT * FROM "s" WHERE host='a' ORDER BY _timestamp`,
+    ],
+  ])("%s", async (_name, sqlQuery, event, value, expected) => {
+    const wrapper = await mountComp({ tab: "sql", sqlQuery });
+    sidebarVm(wrapper).handleFieldListEvent(event, value);
+    expect(wrapper.emitted("update:sqlQuery")?.at(-1)).toEqual([expected]);
+  });
+
+  it("reads the time range at request time instead of freezing it", async () => {
+    const wrapper = await mountComp({ tab: "sql", period: 10 });
+    const first = sidebarVm(wrapper).fieldSource.valuesRequest({ name: "host" } as PanelField);
+    await new Promise((resolve) => setTimeout(resolve, 2));
+    const second = sidebarVm(wrapper).fieldSource.valuesRequest({ name: "host" } as PanelField);
+    expect(second.endTime).toBeGreaterThan(first.endTime);
+    expect(second.endTime - second.startTime).toBe(10 * 60 * 1000000);
   });
 });
 
@@ -432,6 +676,7 @@ describe("QueryEditorDialog - ODrawer Migration", () => {
       global: {
         plugins: [i18n, store],
         stubs: {
+          StreamFieldPanel: fieldPanelStub,
           ODrawer: ODrawerStub,
           CodeQueryEditor: childEditorStub,
           QueryEditor: childEditorStub,
@@ -597,6 +842,7 @@ describe("QueryEditorDialog - autocomplete wiring reaches the editor", () => {
       global: {
         plugins: [i18n, store],
         stubs: {
+          StreamFieldPanel: fieldPanelStub,
           UnifiedQueryEditor: editorStubDef,
           // ODrawer is the dialog root; without a slot-rendering stub none of
           // its content (including the editor) mounts.
@@ -701,7 +947,8 @@ describe("QueryEditorDialog with the revamped assistant", () => {
       }),
     };
     setRuntimeHandle(runtime as never);
-    const wrapper = mount(QueryEditorDialog, {
+    // These tests unmount and clear the body themselves, so the file-wide unmount must not see them.
+    const wrapper = baseMount(QueryEditorDialog, {
       props: {
         modelValue,
         tab: "sql",

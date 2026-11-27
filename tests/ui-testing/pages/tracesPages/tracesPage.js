@@ -196,7 +196,7 @@ export class TracesPage {
     // Index List / Field List
     this.streamSelect = '[data-test="log-search-index-list-select-stream"]';
     this.fieldSearchInput = '[data-test="log-search-index-list-field-search-input"]';
-    this.fieldsTable = '[data-test="log-search-index-list-fields-table"]';
+    this.fieldsTable = '[data-test="traces-search-index-list"]';
 
     // Span Components
     this.spanBlock = '[data-test="span-block"]';
@@ -1165,18 +1165,20 @@ export class TracesPage {
 
   /**
    * Expand field in field list.
-   * Source: web/src/components/common/FieldExpansion.vue
+   * Source: web/src/components/common/fieldPanel/FieldPanelRow.vue
    *   data-test="log-search-expand-{field.name}-field-btn"
    * @param {string} fieldName - Name of field to expand
-   * @returns {boolean} True if expanded successfully
+   * @param {number} [timeout] - How long to wait for the field row to show up
+   * @returns {boolean} True once the field's expansion is open
    */
-  async expandTraceField(fieldName) {
+  async expandTraceField(fieldName, timeout = 3000) {
     const expandButton = this.page.locator(`[data-test="log-search-expand-${fieldName}-field-btn"]`);
+    const expansion = this.page.locator(`[data-test="o-field-list-expansion-${fieldName}"]`);
 
     try {
-      await expect(expandButton).toBeVisible({ timeout: 3000 });
+      await expect(expandButton).toBeVisible({ timeout });
       await expandButton.click();
-      await this.page.waitForTimeout(1000);
+      await expect(expansion).toBeVisible({ timeout: 10000 });
       return true;
     } catch {
       return false;
@@ -1184,19 +1186,34 @@ export class TracesPage {
   }
 
   /**
-   * Add a field=value filter to the query via the field expansion's
-   * "Add to filter" button. Source: FieldExpansion.vue
-   *   data-test="log-search-index-list-add-{field.name}-field-btn"
-   * @param {string} fieldName - Name of field
-   * @returns {boolean} True if added successfully
+   * Wait until the field list has rendered a given field row.
+   * @param {string} fieldName - A field every traces stream lists
+   * @param {number} [timeout] - CI-sized wait for the stream's fields to load
    */
-  async selectFieldValue(fieldName) {
-    const addBtn = this.page.locator(`[data-test="log-search-index-list-add-${fieldName}-field-btn"]`).first();
+  async waitForTraceFieldList(fieldName = 'service_name', timeout = 20000) {
+    await expect(
+      this.page.locator(`[data-test="log-search-expand-${fieldName}-field-btn"]`),
+    ).toBeVisible({ timeout });
+  }
+
+  /**
+   * Include a value of an expanded field as a filter by ticking it in the field's values list.
+   * Source: web/src/components/common/FieldValuesPanel.vue
+   *   data-test="field-values-panel-checkbox-{fieldName}-{value}"
+   * @param {string} fieldName - Name of a field already expanded with expandTraceField
+   * @param {string} [value] - Value to include; the first listed value when omitted
+   * @param {number} [timeout] - CI-sized wait for the values stream to list the value
+   * @returns {boolean} True if the value was ticked
+   */
+  async selectFieldValue(fieldName, value, timeout = 20000) {
+    const prefix = `field-values-panel-checkbox-${fieldName}-`;
+    const checkbox = value === undefined
+      ? this.page.locator(`[data-test^="${prefix}"]`).first()
+      : this.page.locator(`[data-test="${prefix}${value}"]`);
 
     try {
-      await expect(addBtn).toBeVisible({ timeout: 3000 });
-      await addBtn.click();
-      await this.page.waitForTimeout(1000);
+      await expect(checkbox).toBeVisible({ timeout });
+      await checkbox.click();
       return true;
     } catch {
       return false;
@@ -2934,19 +2951,10 @@ export class TracesPage {
 
   /**
    * Get field expansion headers in the traces field list
-   * (.field-expansion-item is a framework component class, not a data-test hook)
    * @returns {Locator}
    */
   getFieldExpansionHeaders() {
-    return this.page.locator('.field-expansion-item .field-expansion-header');
-  }
-
-  /**
-   * Get field expansion items anywhere on the page (fallback locator)
-   * @returns {Locator}
-   */
-  getFieldExpansionItems() {
-    return this.page.locator('.field-expansion-item');
+    return this.page.locator(`${this.fieldsTable} [data-test^="log-search-expand-"][data-test$="-field-btn"]`);
   }
 
   /**

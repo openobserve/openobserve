@@ -397,6 +397,8 @@ const useSqlSuggestions = () => {
   const buildFieldKeywords = (fields: any[]) =>
     fields
       .filter((f) => f.name !== store.state.zoConfig.timestamp_column)
+      // Group header rows ride along in field lists; they are labels, not columns.
+      .filter((f) => !f.label && !f.isGroup)
       // buildFieldEntry carries the column type into `detail`; it used to be
       // dropped on the floor even though every caller already supplies it.
       .map((f) => buildFieldEntry(f));

@@ -146,6 +146,10 @@ vi.mock("@/composables/useTraces", () => ({
     tracesParser: { value: { astify: vi.fn(() => ({ where: null })) } },
     ...sqlTexts(),
   }),
+  DEFAULT_TRACE_COLUMNS: {
+    spans: ["service_name", "operation_name", "duration", "span_status"],
+    traces: ["service_name", "operation_name", "duration", "spans", "status", "service_latency"],
+  },
 }));
 
 // The real two-text state over the mock searchObj, like the module singleton it stands for.
@@ -188,7 +192,7 @@ vi.mock("@/composables/queryHistory/useRecentSearches", () => ({
 
 const stubs = {
   "search-bar": true,
-  "index-list": true,
+  StreamFieldPanel: true,
   "search-result": { template: "<div />", methods: { getDashboardData: () => {} } },
   "service-graph": true,
   "services-catalog": true,

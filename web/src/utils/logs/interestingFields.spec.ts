@@ -19,6 +19,8 @@ import {
   schemaBackedFieldNames,
   selectableInterestingFields,
   pruneInterestingFields,
+  interestingRowsOf,
+  storedInterestingFields,
 } from "./interestingFields";
 
 const SCHEMA_FIELD = { name: "level", isSchemaField: true };
@@ -112,5 +114,47 @@ describe("pruneInterestingFields", () => {
     const interesting = ["level"];
     pruneInterestingFields(interesting, undefined);
     expect(interesting).toEqual([]);
+  });
+});
+
+describe("interestingRowsOf", () => {
+  const header = (group: string) => ({ name: group, label: true, group });
+  const row = (name: string, interesting: boolean) => ({ name, isInterestingField: interesting });
+
+  it("keeps a header only while a field under it is interesting, in the list's order", () => {
+    const rows = [
+      header("a"),
+      row("a1", false),
+      row("a2", true),
+      header("b"),
+      row("b1", false),
+      header("c"),
+      row("c1", true),
+      row("c2", true),
+    ];
+    expect(interestingRowsOf(rows).map((r) => r.name)).toEqual(["a", "a2", "c", "c1", "c2"]);
+  });
+
+  it("returns an empty list when nothing is interesting", () => {
+    expect(interestingRowsOf([header("a"), row("a1", false)])).toEqual([]);
+  });
+});
+
+describe("storedInterestingFields", () => {
+  it("joins the stream's stored picks with the defaults it has not dropped", () => {
+    const store = {
+      org_app: ["level"],
+      deselect_org_app: ["host"],
+      org_other: ["status"],
+    };
+    expect(storedInterestingFields(store, "org", "app", ["host", "service"])).toEqual([
+      "level",
+      "service",
+    ]);
+  });
+
+  it("falls back to the defaults for a stream with nothing stored, or no store at all", () => {
+    expect(storedInterestingFields({}, "org", "app", ["service"])).toEqual(["service"]);
+    expect(storedInterestingFields(null, "org", "app", [])).toEqual([]);
   });
 });

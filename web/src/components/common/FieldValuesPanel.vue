@@ -16,8 +16,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div data-test="field-values-panel-container" class="py-2 text-xs">
-    <!-- Value search input — only when fetched count hits the limit -->
-    <div v-if="showValueSearch" class="value-search-container mb-1">
+    <div
+      v-if="showValueSearch"
+      class="value-search-container pe-page-edge mb-1 ps-[calc(var(--spacing-page-edge)+0.375rem)]"
+    >
       <div class="value-search-input-wrap">
         <OSearchInput
           v-model="valueSearchTerm"
@@ -29,33 +31,60 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <!-- Filter mode toggle + selection count -->
+    <div
+      v-if="info && !showMultiSelect"
+      class="pe-page-edge flex justify-end py-1 ps-[calc(var(--spacing-page-edge)+0.375rem)]"
+    >
+      <OIcon
+        name="info-outline"
+        size="xs"
+        class="text-text-secondary"
+        :data-test="info.testId"
+        :aria-label="info.text"
+        role="img"
+      >
+        <OTooltip :content="info.text" />
+      </OIcon>
+    </div>
+
     <div
       v-if="showMultiSelect"
-      class="filter-mode-bar border-card-glass-border flex items-center justify-between border-b px-2 py-1"
+      class="filter-mode-bar border-card-glass-border pe-page-edge flex items-center justify-between border-b py-1 ps-[calc(var(--spacing-page-edge)+0.375rem)]"
       data-test="field-values-panel-filter-mode-bar"
     >
       <div class="flex items-center gap-1">
         <span
           v-if="selectedValues.length > 0"
-          class="selection-count text-3! text-3xs text-accent font-medium"
+          class="selection-count text-3xs text-accent font-medium"
           data-test="field-values-panel-selection-count"
         >
           {{ selectedValues.length }} {{ t("search.selectedLabel") }}
         </span>
-        <span v-else class="selection-hint text-3! text-3xs text-text-secondary">{{
+        <span v-else class="selection-hint text-3xs text-text-secondary">{{
           t("search.selectToFilter")
         }}</span>
+        <OIcon
+          v-if="info"
+          name="info-outline"
+          size="xs"
+          class="text-text-secondary"
+          :data-test="info.testId"
+          :aria-label="info.text"
+          role="img"
+        >
+          <OTooltip :content="info.text" />
+        </OIcon>
         <OButton
           v-if="selectedValues.length > 0"
           variant="ghost"
           size="icon"
-          :title="t('search.clearSelection')"
+          :aria-label="t('search.clearSelection')"
           class="selection-clear-btn"
           @click="clearSelection"
           data-test="field-values-panel-clear-selection-btn"
         >
           <OIcon name="close" size="xs" />
+          <OTooltip :content="t('search.clearSelection')" />
         </OButton>
       </div>
       <div
@@ -66,8 +95,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :variant="filterMode === 'include' ? 'primary' : 'ghost-muted'"
           size="icon-chip"
           class="filter-mode-btn rounded-none! [transition:background_0.15s,color_0.15s]"
-          :disabled="filterMode !== 'include' && isModeToggleDisabled"
-          :title="t('search.includeModeHint')"
+          :aria-label="t('search.includeModeHint')"
+          :aria-pressed="filterMode === 'include'"
           @click="setFilterMode('include')"
           data-test="field-values-panel-include-mode-btn"
         >
@@ -75,25 +104,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon name="" class="m-0.5! h-2.5! w-2.5!">
             <EqualIcon />
           </OIcon>
+          <OTooltip :content="t('search.includeModeHint')" />
         </OButton>
         <OButton
           :variant="filterMode === 'exclude' ? 'filter-exclude' : 'ghost-muted'"
           size="icon-chip"
           class="filter-mode-btn rounded-none! [transition:background_0.15s,color_0.15s]"
-          :disabled="filterMode !== 'exclude' && isModeToggleDisabled"
-          :title="t('search.excludeModeHint')"
+          :aria-label="t('search.excludeModeHint')"
+          :aria-pressed="filterMode === 'exclude'"
           @click="setFilterMode('exclude')"
           data-test="field-values-panel-exclude-mode-btn"
         >
           <OIcon name="" class="m-0.5! h-2.5! w-2.5!">
             <NotEqualIcon />
           </OIcon>
+          <OTooltip :content="t('search.excludeModeHint')" />
         </OButton>
       </div>
     </div>
 
-    <!-- Scrollable values area -->
-    <div class="max-h-64 overflow-y-auto">
+    <div
+      ref="valuesListRef"
+      class="max-h-64 overflow-y-auto transition-opacity"
+      :class="refreshing ? 'opacity-60' : ''"
+      :aria-busy="refreshing || undefined"
+      data-test="field-values-panel-scroll"
+      @scroll.passive="resumeAutoLoad"
+    >
       <!-- Loading state (only shown when there are no interim cached results) -->
       <div v-show="fieldValues?.isLoading && !displayValues.length" class="relative h-15 py-1 ps-3">
         <!-- scrim off: this box is empty while loading, so there is nothing to
@@ -126,9 +163,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Selected values with no count data available (synthetic fallback) -->
       <div
         v-if="
-          displayValues.length > 0 &&
-          (displayValues[0] as any)?.synthetic &&
-          !fieldValues?.isLoading
+          displayValues.length > 0 && 'synthetic' in displayValues[0] && !fieldValues?.isLoading
         "
         class="text-o2-text-secondary ps-3 pb-1 text-xs italic"
         data-test="field-values-panel-no-count-msg"
@@ -136,89 +171,136 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("search.noDataInRangeHint") }}
       </div>
 
-      <!-- Field values list -->
       <ul class="m-0 flex list-none flex-col p-0" data-test="field-values-panel-values-list">
-        <li v-for="value in displayValues" :key="value.key" class="py-1">
-          <label
-            class="hover:bg-muted/50 flex cursor-pointer items-center gap-1 px-2 py-1"
-            :data-test="`logs-search-subfield-add-${fieldName}-${value.key}`"
+        <li
+          v-for="(value, index) in displayValues"
+          :key="value.key"
+          class="group hover:bg-muted/50 pe-page-edge flex items-center ps-[calc(var(--spacing-page-edge)+0.375rem)]"
+          @focusin="index === displayValues.length - 1 && loadFromFocus()"
+        >
+          <!-- A div, not a label: a label would hand clicks on the count to the copy button inside it. -->
+          <div
+            class="flex min-h-7 min-w-0 flex-1 items-center gap-1 py-0.5"
+            :class="showMultiSelect ? 'cursor-pointer' : ''"
+            :data-test="`logs-search-subfield-add-${fieldName}-${testToken(value.key)}`"
+            @click="showMultiSelect && toggleValue(value.key)"
           >
-            <!-- Checkbox for multi-select — uses :model-value + @update to
-                 separate user-initiated changes from parent-sync updates,
-                 preventing re-emit loops when the parent reflects query state. -->
             <OCheckbox
               v-if="showMultiSelect"
-              :model-value="selectedValues"
-              :value="value.key"
+              :model-value="selectedSet.has(value.key)"
               :color="filterMode === 'exclude' ? 'negative' : 'primary'"
               size="xs"
               class="shrink-0"
-              @update:model-value="handleUserCheckboxChange"
+              :aria-label="raw(value.label ?? value.key)"
+              :data-test="`field-values-panel-checkbox-${fieldName}-${testToken(value.key)}`"
+              @update:model-value="toggleValue(value.key)"
               @click.stop
             />
-
-            <div
-              class="flex min-w-0 flex-row flex-wrap justify-between ps-1"
-              :class="showMultiSelect ? 'w-[calc(100%-1.5rem)]' : 'w-full'"
+            <!-- The checkbox already names the full value, so the cut text is no second Tab stop. -->
+            <span class="flex min-w-0 flex-1 items-center gap-0.5">
+              <OTruncatedText
+                truncate="middle"
+                :text="value.label ?? value.key"
+                :focusable="!showMultiSelect"
+                fit-parent
+                tooltip-class="whitespace-pre-wrap break-all"
+                class="text-field-list-label-text min-w-0 shrink ps-1"
+                data-test="field-values-panel-value-text"
+              />
+              <OButton
+                variant="ghost"
+                size="icon-xs"
+                class="size-5! shrink-0 opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 group-has-[:focus-visible]:opacity-100 max-md:opacity-100"
+                :aria-label="
+                  copiedKey === value.key ? t('common.copied') : t('common.copyToClipboard')
+                "
+                :data-test="`field-values-panel-copy-${fieldName}-${testToken(value.key)}`"
+                :data-copied="copiedKey === value.key ? 'true' : undefined"
+                @click.stop.prevent="copyValue(value.key, value.label ?? value.key)"
+              >
+                <OIcon :name="copiedKey === value.key ? 'check' : 'content-copy'" size="xs" />
+                <OTooltip :content="t('common.copyToClipboard')" />
+              </OButton>
+            </span>
+            <span
+              v-if="value.count !== null"
+              :title="String(value.count)"
+              class="w-12 shrink-0 text-right tabular-nums"
+              data-test="field-values-panel-value-count"
+              >{{ formatLargeNumber(value.count) }}</span
             >
-              <div
-                :title="value.key"
-                class="text-field-list-label-text text-3! w-[calc(100%-3.125rem)] pe-1 break-words whitespace-pre-wrap"
-              >
-                {{ value.label ?? value.key }}
-              </div>
-              <div
-                v-if="value.count != null"
-                :title="String(value.count)"
-                class="text-3! contents truncate pe-0 text-right"
-                :class="showMultiSelect ? 'w-[3.125rem]' : ''"
-              >
-                {{ formatLargeNumber(value.count) }}
-              </div>
-            </div>
-          </label>
+          </div>
         </li>
       </ul>
+
+      <div ref="sentinelRef" aria-hidden="true" data-test="field-values-panel-load-more-sentinel" />
+
+      <div
+        v-if="isLoadingMore"
+        class="flex flex-col"
+        aria-hidden="true"
+        data-test="field-values-panel-load-more-skeleton"
+      >
+        <div
+          v-for="row in 3"
+          :key="row"
+          class="pe-page-edge flex items-center gap-1 py-1 ps-[calc(var(--spacing-page-edge)+0.375rem)]"
+        >
+          <OSkeleton v-if="showMultiSelect" type="rect" class="rounded-default h-3 w-3 shrink-0" />
+          <OSkeleton type="text" class="ms-1 flex-1" />
+          <OSkeleton type="text" class="w-8 shrink-0" />
+        </div>
+      </div>
+
+      <div
+        v-if="fieldValues?.errMsg && displayValues.length && !loadMoreBusy"
+        class="text-status-error-text pe-page-edge py-1 ps-[calc(var(--spacing-page-edge)+0.375rem)] text-xs"
+        role="alert"
+        data-test="field-values-panel-load-error"
+      >
+        {{ fieldValues.errMsg }}
+      </div>
     </div>
 
-    <!-- View more values / loading more indicator -->
     <div
-      v-if="isLoadingMore || (fieldValues?.hasMore && !fieldValues?.isLoading)"
-      class="border-card-glass-border flex w-full justify-center border-t px-1 pt-1"
+      class="sr-only"
+      role="status"
+      aria-live="polite"
+      data-test="field-values-panel-load-more-status"
     >
-      <button
-        class="text-accent text-2xs rounded-default hover:bg-interactive-hover-bg inline-flex cursor-pointer items-center gap-1 border-0 bg-transparent px-1 py-0.5 font-[inherit] transition-opacity duration-150 hover:opacity-80 disabled:cursor-default disabled:opacity-50"
-        :disabled="isLoadingMore"
-        @click="handleLoadMoreClick"
-        :data-test="`log-search-subfield-load-more-${fieldName}`"
-      >
-        <OSpinner variant="dots" v-if="isLoadingMore" size="xs" />
-        <span v-else>{{ t("search.viewMoreValues") }}</span>
-      </button>
+      {{ isLoadingMore ? t("search.loadingMoreValues") : "" }}
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from "vue";
-import { useI18nTyped } from "@/types/i18n";
-import { useDebounceFn, watchDebounced } from "@vueuse/core";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { useDebounceFn } from "@vueuse/core";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import { formatLargeNumber } from "@/utils/zincutils";
+import { copyToClipboard } from "@/utils/clipboard";
+import { toast } from "@/lib/feedback/Toast/useToast";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
-import type { CheckboxModelValue } from "@/lib/forms/Checkbox/OCheckbox.types";
+import { valueKeyLabel } from "@/components/common/fieldPanel/valueFilterExpression";
+
+type FilterMode = "include" | "exclude";
 
 interface FieldValues {
   isLoading: boolean;
-  values: { key: string; count: number; label?: string }[];
+  values: { key: string; count: number; label?: I18nText }[];
   errMsg?: string;
   hasMore?: boolean;
+  generation?: number;
+  settled?: number;
 }
 
 interface Props {
@@ -229,6 +311,8 @@ interface Props {
   theme?: string;
   activeIncludeValues?: string[];
   activeExcludeValues?: string[];
+  /** Scope note for these values, shown behind an info icon. */
+  info?: { text: I18nText; testId?: string } | null;
 }
 
 const { t } = useI18nTyped();
@@ -240,47 +324,47 @@ const props = withDefaults(defineProps<Props>(), {
 });
 
 const emit = defineEmits<{
-  "add-multiple-search-terms": [fieldName: string, values: string[], action: string];
+  "set-value-filters": [fieldName: string, include: string[], exclude: string[]];
   "remove-field-filter": [fieldName: string];
   "load-more-values": [fieldName: string];
   "search-field-values": [fieldName: string, searchTerm: string];
 }>();
 
-/**
- * Filter mode (include / exclude). Initialised from the current query state
- * and kept in sync with the active filter props so that it always reflects
- * which operator (= / !=) the user's selection is using.
- */
-const filterMode = ref<"include" | "exclude">(
-  (props.activeExcludeValues?.length ?? 0) > 0 ? "exclude" : "include",
+const initialMode = (): FilterMode =>
+  (props.activeExcludeValues?.length ?? 0) > 0 ? "exclude" : "include";
+
+/** One operator for every ticked value of the field; switching it flips them all. */
+const filterMode = ref<FilterMode>(initialMode());
+
+const activeValues = (): string[] => [
+  ...new Set([...(props.activeIncludeValues ?? []), ...(props.activeExcludeValues ?? [])]),
+];
+
+const selectedValues = ref<string[]>(activeValues());
+const selectedSet = computed(() => new Set(selectedValues.value));
+
+// Set by a mode switch until its debounced query goes out; a tick, clear or reset supersedes it.
+let modeChangePending = false;
+
+const sameValues = (a: string[], b: string[]): boolean =>
+  a.length === b.length && a.every((value, index) => value === b[index]);
+
+const matchesQuery = (): boolean =>
+  filterMode.value === initialMode() && sameValues(selectedValues.value, activeValues());
+
+// A re-render passes new arrays with the same values; only a real query change re-syncs, so a pending switch survives.
+watch(
+  () => [props.activeIncludeValues ?? [], props.activeExcludeValues ?? []] as const,
+  ([include, exclude], [prevInclude, prevExclude]) => {
+    if (sameValues(include, prevInclude) && sameValues(exclude, prevExclude)) return;
+    modeChangePending = false;
+    selectedValues.value = activeValues();
+    if (include.length + exclude.length > 0) filterMode.value = initialMode();
+  },
 );
 
-/**
- * Union of all values that are currently active in the query (both included
- * and excluded). Used to initialise selectedValues and keep it in sync when
- * the parent query changes.
- */
-const allActiveValues = computed(() => [
-  ...(props.activeIncludeValues ?? []),
-  ...(props.activeExcludeValues ?? []),
-]);
-
-/**
- * Drives the multi-select checkboxes. Initialised from allActiveValues so
- * previously filtered values appear pre-checked when the panel opens.
- * Kept in sync via the watcher below as the parent query changes.
- */
-const selectedValues = ref<string[]>(allActiveValues.value);
 const valueSearchTerm = ref("");
-const cachedValues = ref<{ key: string; count: number; label?: string }[]>([]);
-
-// Sync selectedValues whenever the parent's active query changes so that
-// checkboxes always reflect the current filter state.
-// NOTE: This updates selectedValues.value directly and does NOT call
-// handleUserCheckboxChange, so no spurious emits occur on parent sync.
-watch(allActiveValues, (newVals) => {
-  selectedValues.value = newVals;
-});
+const cachedValues = ref<{ key: string; count: number; label?: I18nText }[]>([]);
 
 // Cache original values whenever they arrive with no active search term.
 watch(
@@ -311,9 +395,10 @@ const displayValues = computed(() => {
   // they remain visible and removable (count: null signals no data available).
   if (selectedValues.value.length > 0 && !props.fieldValues?.isLoading) {
     return selectedValues.value.map(
-      (v): { key: string; count: number; label?: string; synthetic: boolean } => ({
+      (v): { key: string; count: number | null; label?: I18nText; synthetic: boolean } => ({
         key: v,
-        count: null as unknown as number,
+        count: null,
+        label: valueKeyLabel(v),
         synthetic: true,
       }),
     );
@@ -322,129 +407,225 @@ const displayValues = computed(() => {
   return [];
 });
 
+// A refetch keeps the old values until the new ones land, so they are marked busy instead of emptied.
+const refreshing = computed(() => !!props.fieldValues?.isLoading && displayValues.value.length > 0);
+
 // Show search box whenever there are values to search.
 const showValueSearch = computed(
   () => cachedValues.value.length > 0 || (props.fieldValues?.values?.length ?? 0) > 0,
 );
 
-watchDebounced(
-  valueSearchTerm,
-  (term) => {
-    emit("search-field-values", props.fieldName, term ?? "");
-  },
-  { debounce: 300 },
-);
+// Internal keys start with NUL (the missing value is NUL + "null"), which a test-id selector cannot carry.
+const testToken = (key: string): string =>
+  key.startsWith("\u0000") ? `__${key.replaceAll("\u0000", "")}__` : key;
 
-/**
- * Debounced emission for mode changes. The UI toggle updates immediately
- * (instant feedback) but the API call is consolidated so that rapid
- * include→exclude→include clicks only fire one search at the end, preventing
- * a brief "no events found" flash (from an intermediate result set) that
- * would reset the field-list scroll position.
- */
-const debouncedEmitModeChange = useDebounceFn((mode: "include" | "exclude") => {
-  if (selectedValues.value.length > 0) {
-    emit("add-multiple-search-terms", props.fieldName, [...selectedValues.value], mode);
+const emitSelection = () => {
+  if (selectedValues.value.length === 0) {
+    emit("remove-field-filter", props.fieldName);
+    return;
   }
+  const values = [...selectedValues.value];
+  if (filterMode.value === "exclude") emit("set-value-filters", props.fieldName, [], values);
+  else emit("set-value-filters", props.fieldName, values, []);
+};
+
+// Rapid flips send one query, so an intermediate result never resets the list.
+const emitModeChange = useDebounceFn(() => {
+  if (!modeChangePending) return;
+  modeChangePending = false;
+  if (!matchesQuery()) emitSelection();
 }, 300);
 
-/**
- * Called when the user explicitly clicks the include/exclude toggle.
- * Updates filterMode immediately for instant visual feedback, then
- * debounces the actual query emission to avoid rapid successive API calls.
- * This is the ONLY path that should emit add-multiple-search-terms for
- * a mode change — the prop-sync watcher below only updates the ref silently.
- */
-const setFilterMode = (mode: "include" | "exclude") => {
+const setFilterMode = (mode: FilterMode) => {
+  if (filterMode.value === mode) return;
   filterMode.value = mode;
-  debouncedEmitModeChange(mode);
+  if (selectedValues.value.length === 0) return;
+  modeChangePending = true;
+  emitModeChange();
 };
 
-// Keep filterMode in sync with the external filter state.
-// When props change after a query re-run (or after reset() is called with
-// stale props), this corrects the toggle without triggering a new emission.
-watch(
-  () => ({
-    exc: props.activeExcludeValues?.length ?? 0,
-    inc: props.activeIncludeValues?.length ?? 0,
-  }),
-  ({ exc, inc }) => {
-    if (exc > 0) {
-      filterMode.value = "exclude";
-    } else if (inc > 0) {
-      filterMode.value = "include";
-    }
-    // When both are zero (no active filters) keep the current mode so the
-    // user's last preference is preserved for the next checkbox interaction.
-  },
-  { deep: true },
-);
-
-/**
- * Called only on explicit user checkbox interaction (never on parent sync).
- * Immediately emits the updated selection with the current filter mode,
- * or emits remove-field-filter when all values are unchecked.
- */
-const handleUserCheckboxChange = (value: CheckboxModelValue) => {
-  // Array (group) mode: OCheckbox emits the current selection as primitives.
-  const newValues = Array.isArray(value) ? value.map(String) : [];
-  selectedValues.value = newValues;
-  if (newValues.length === 0) {
-    emit("remove-field-filter", props.fieldName);
-  } else {
-    emit("add-multiple-search-terms", props.fieldName, [...newValues], filterMode.value);
-  }
+const toggleValue = (key: string) => {
+  modeChangePending = false;
+  selectedValues.value = selectedSet.value.has(key)
+    ? selectedValues.value.filter((value) => value !== key)
+    : [...selectedValues.value, key];
+  emitSelection();
 };
 
-/**
- * Clears all selected values and removes the field filter from the query.
- */
 const clearSelection = () => {
+  modeChangePending = false;
   selectedValues.value = [];
   emit("remove-field-filter", props.fieldName);
 };
 
-// Only block the non-active toggle when a request is in-flight with active
-// selections — prevents out-of-order responses without blocking the user
-// when there's nothing selected (no API call would be triggered anyway).
-const isModeToggleDisabled = computed(
-  () => !!(props.fieldValues?.isLoading && selectedValues.value.length > 0),
+// The check swaps in on the button itself, as dashboard table cells do, so no bubble covers the value.
+const copiedKey = ref<string | null>(null);
+let copiedTimer: ReturnType<typeof setTimeout> | null = null;
+
+const copyValue = async (key: string, text: string) => {
+  if (!(await copyToClipboard(text, t, { silent: true }))) {
+    toast({ variant: "error", message: t("common.copyError") });
+    return;
+  }
+  copiedKey.value = key;
+  if (copiedTimer) clearTimeout(copiedTimer);
+  copiedTimer = setTimeout(() => {
+    copiedKey.value = null;
+  }, 2000);
+};
+
+onBeforeUnmount(() => {
+  if (copiedTimer) clearTimeout(copiedTimer);
+});
+
+const valuesListRef = ref<HTMLElement | null>(null);
+// Set once a search was sent, so clearing a term that never left the input sends nothing.
+let searchSent = false;
+let scrollBeforeSearch: number | null = null;
+let scrollToRestore: number | null = null;
+
+const emitSearch = useDebounceFn((term: string) => {
+  if (!term || term !== valueSearchTerm.value) return;
+  searchSent = true;
+  emit("search-field-values", props.fieldName, term);
+}, 300);
+
+// Clearing is sent at once: the source puts the earlier list back without a request.
+watch(valueSearchTerm, (term, previous) => {
+  if (term) {
+    if (!previous) scrollBeforeSearch = valuesListRef.value?.scrollTop ?? 0;
+    emitSearch(term);
+    return;
+  }
+  const restoreTo = scrollBeforeSearch;
+  scrollBeforeSearch = null;
+  // A term cleared before it was sent never changed the list, so there is no scroll to put back.
+  if (!searchSent) return;
+  scrollToRestore = restoreTo;
+  searchSent = false;
+  emit("search-field-values", props.fieldName, "");
+});
+
+watch(
+  () => props.fieldValues?.values,
+  (values) => {
+    const el = valuesListRef.value;
+    if (scrollToRestore === null || valueSearchTerm.value || props.fieldValues?.isLoading) return;
+    if (!el || !values?.length) return;
+    el.scrollTop = scrollToRestore;
+    scrollToRestore = null;
+  },
+  { flush: "post" },
 );
 
 const isLoadingMore = ref(false);
-let valuesCountBeforeLoadMore = 0;
+// The fetch generation current when the page was asked for; the load-more is the next one.
+let generationBeforeLoadMore = 0;
+// A failed or declined page stops auto-loading until the user scrolls or the list is refetched, so it never retries in a loop.
+let autoLoadPaused = false;
+// Tied counts can bring full pages of values already shown, so a run of such pages also waits for the user to scroll.
+const MAX_EMPTY_AUTO_LOADS = 3;
+let lengthBeforeLoadMore = 0;
+let emptyAutoLoads = 0;
 
-const handleLoadMoreClick = () => {
-  valuesCountBeforeLoadMore = props.fieldValues?.values?.length ?? 0;
+// A fetch still streaming may yet change the list, so the next page waits for it to settle.
+const fetchPending = computed(() => {
+  const state = props.fieldValues;
+  return state?.generation !== undefined && state.settled !== state.generation;
+});
+
+const loadMoreBusy = computed(() => isLoadingMore.value || fetchPending.value);
+
+const canLoadMore = (): boolean =>
+  !!props.fieldValues?.hasMore && !props.fieldValues?.isLoading && !loadMoreBusy.value;
+
+const loadNextPage = () => {
+  if (!canLoadMore()) return;
+  generationBeforeLoadMore = props.fieldValues?.generation ?? 0;
+  lengthBeforeLoadMore = props.fieldValues?.values?.length ?? 0;
   isLoadingMore.value = true;
   emit("load-more-values", props.fieldName);
+  // A source that declines the page starts no fetch, so no settle would ever end the wait.
+  void nextTick(() => {
+    if ((props.fieldValues?.generation ?? 0) === generationBeforeLoadMore) {
+      isLoadingMore.value = false;
+      autoLoadPaused = true;
+    }
+  });
 };
 
-// Clear isLoadingMore only once values have actually grown — early
-// streaming chunks can arrive empty yet flip isLoading to false.
+// Focus on the last row is the keyboard's way to the end of the list, so it asks even after a failure.
+const loadFromFocus = () => {
+  autoLoadPaused = false;
+  loadNextPage();
+};
+
+const sentinelRef = ref<HTMLElement | null>(null);
+let sentinelObserver: IntersectionObserver | null = null;
+
+// Observing again yields a fresh entry, so a sentinel still in view after a page lands loads the next one.
+const observeSentinel = () => {
+  const sentinel = sentinelRef.value;
+  if (!sentinelObserver || !sentinel) return;
+  sentinelObserver.unobserve(sentinel);
+  sentinelObserver.observe(sentinel);
+};
+
+const resumeAutoLoad = () => {
+  if (!autoLoadPaused) return;
+  autoLoadPaused = false;
+  emptyAutoLoads = 0;
+  observeSentinel();
+};
+
+onMounted(() => {
+  if (typeof IntersectionObserver === "undefined" || !valuesListRef.value) return;
+  sentinelObserver = new IntersectionObserver(
+    (entries) => {
+      if (entries[entries.length - 1]?.isIntersecting && !autoLoadPaused) loadNextPage();
+    },
+    { root: valuesListRef.value },
+  );
+  observeSentinel();
+});
+
+onBeforeUnmount(() => {
+  sentinelObserver?.disconnect();
+  sentinelObserver = null;
+});
+
 watch(
-  () => props.fieldValues?.values?.length,
-  (newLen) => {
-    if (isLoadingMore.value && (newLen ?? 0) > valuesCountBeforeLoadMore) {
-      nextTick(() => {
-        isLoadingMore.value = false;
-      });
-    }
+  () => [
+    displayValues.value.length,
+    loadMoreBusy.value,
+    props.fieldValues?.hasMore,
+    props.fieldValues?.isLoading,
+  ],
+  observeSentinel,
+  { flush: "post" },
+);
+
+// A fetch the panel did not ask for (new query, value search) brings a new list, so auto-loading may resume.
+watch(
+  () => props.fieldValues?.generation,
+  () => {
+    if (isLoadingMore.value) return;
+    autoLoadPaused = false;
+    emptyAutoLoads = 0;
   },
 );
 
-/**
- * Resets the panel to match the current active filter state.
- * Called by the parent (via defineExpose) when the expansion panel closes, so
- * stale user selections don't persist the next time the panel is opened.
- */
-const reset = () => {
-  selectedValues.value = allActiveValues.value;
-  valueSearchTerm.value = "";
-  cachedValues.value = [];
-  filterMode.value = (props.activeExcludeValues?.length ?? 0) > 0 ? "exclude" : "include";
-  isLoadingMore.value = false;
-};
-
-defineExpose({ reset });
+// One stream can grow the list while others are still running, so only the end of the whole fetch ends the wait; a newer fetch that superseded it counts too.
+watch(
+  () => props.fieldValues?.settled,
+  (settled) => {
+    if (!isLoadingMore.value || settled === undefined || settled <= generationBeforeLoadMore) {
+      return;
+    }
+    isLoadingMore.value = false;
+    const grew = (props.fieldValues?.values?.length ?? 0) > lengthBeforeLoadMore;
+    emptyAutoLoads = grew ? 0 : emptyAutoLoads + 1;
+    if (props.fieldValues?.errMsg || emptyAutoLoads >= MAX_EMPTY_AUTO_LOADS) autoLoadPaused = true;
+  },
+);
 </script>

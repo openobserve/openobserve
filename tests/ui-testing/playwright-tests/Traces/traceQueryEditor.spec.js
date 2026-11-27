@@ -27,7 +27,7 @@ test.describe("Trace Query Editor testcases", () => {
     // Select the default stream as data is ingested for it only
     await pm.tracesPage.isStreamSelectVisible()
     await pm.tracesPage.selectTraceStream('default');
-    await page.waitForTimeout(2000);
+    await pm.tracesPage.waitForTraceFieldList();
 
 
     testLogger.info('Test setup completed for trace query editor');
@@ -92,47 +92,35 @@ test.describe("Trace Query Editor testcases", () => {
     // Initial setup and search
     await pm.tracesPage.setupTraceSearch();
 
-    // Expand status_code field
-    const expanded = await pm.tracesPage.expandTraceField('status_code');
+    // Probes below use a short timeout, so wait for the stream's fields to render first
+    await pm.tracesPage.waitForTraceFieldList('service_name');
+
+    // Expand a field that every trace carries, then include one of its listed values
+    let field = 'status_code';
+    let expanded = await pm.tracesPage.expandTraceField(field);
+    if (!expanded) {
+      field = 'service_name';
+      expanded = await pm.tracesPage.expandTraceField(field);
+    }
 
     if (expanded) {
-      // Select status_code='2' value
-      const selected = await pm.tracesPage.selectFieldValue('status_code', '2');
+      const selected = await pm.tracesPage.selectFieldValue(field);
+      expect(selected).toBeTruthy();
 
-      if (selected) {
-        // Verify filter appears in query editor using page object
-        const editorContent = await pm.tracesPage.getQueryEditorContent();
+      // Ticking the value writes the field's condition into the query editor
+      await expect.poll(() => pm.tracesPage.getQueryEditorContent(), { timeout: 20000 }).toContain(field);
+      testLogger.info(`${field} filter applied from the field's values list`);
 
-        if (editorContent.includes('status_code=')) {
-          testLogger.info('Status code filter successfully applied');
-        }
-
-        // Run query with filter
-        await pm.tracesPage.runSearch();
-        await page.waitForTimeout(2000);
-
-        // Verify query was applied
-        expect(editorContent.includes('status_code') || selected).toBeTruthy();
-      } else {
-        testLogger.info('Could not select status_code value - field may not have value 2');
-        // Verify expansion worked
-        expect(expanded).toBeTruthy();
-      }
+      await pm.tracesPage.runSearch();
+      const status = await pm.tracesPage.waitForSearchCompletion(20000);
+      expect(status.completed, 'Filtered search must finish').toBeTruthy();
+      expect(status.error, `Filtered search failed: ${status.errorMessage}`).toBeFalsy();
+      expect(await pm.tracesPage.getQueryEditorContent()).toContain(field);
     } else {
-      // Try alternative field - service_name
-      const serviceExpanded = await pm.tracesPage.expandTraceField('service_name');
-
-      if (serviceExpanded) {
-        await pm.tracesPage.selectFieldValue('service_name', 'api-gateway');
-        await pm.tracesPage.runSearch();
-        await page.waitForTimeout(2000);
-        expect(serviceExpanded).toBeTruthy();
-      } else {
-        // Verify search still works
-        const hasResults = await pm.tracesPage.hasTraceResults();
-        const noResults = await pm.tracesPage.isNoResultsVisible();
-        expect(hasResults || noResults).toBeTruthy();
-      }
+      // Verify search still works
+      const hasResults = await pm.tracesPage.hasTraceResults();
+      const noResults = await pm.tracesPage.isNoResultsVisible();
+      expect(hasResults || noResults).toBeTruthy();
     }
   });
 

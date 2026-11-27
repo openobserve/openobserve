@@ -21,7 +21,7 @@
  *   2. Dot-namespace prefix  ("aws.region" → "aws")
  *   3. Underscore-namespace prefix — dynamically discovered from the field set
  *      (any prefix shared by ≥ MIN_PREFIX_FIELDS fields qualifies)
- *   4. Data-type bucket  (string / number / boolean)
+ *   4. Other  (the type icon on each row already says its type)
  */
 
 import { gt } from "@/types/i18n";
@@ -36,9 +36,6 @@ export type StreamType = "logs" | "traces" | "metrics" | string;
 
 export const CATEGORY = {
   PINNED: "pinned",
-  TYPE_STRING: "type_string",
-  TYPE_NUMBER: "type_number",
-  TYPE_BOOLEAN: "type_boolean",
   OTHER: "other",
 } as const;
 
@@ -50,15 +47,6 @@ export type Category = (typeof CATEGORY)[keyof typeof CATEGORY];
 const CATEGORY_LABELS: Record<string, string> = {
   get [CATEGORY.PINNED]() {
     return gt("common.keyFields");
-  },
-  get [CATEGORY.TYPE_STRING]() {
-    return gt("common.typeString");
-  },
-  get [CATEGORY.TYPE_NUMBER]() {
-    return gt("common.typeNumber");
-  },
-  get [CATEGORY.TYPE_BOOLEAN]() {
-    return gt("common.typeBoolean");
   },
   get [CATEGORY.OTHER]() {
     return gt("common.other");
@@ -160,26 +148,6 @@ export function discoverPrefixes(
 }
 
 // ---------------------------------------------------------------------------
-// Data-type bucket (tier 4)
-// ---------------------------------------------------------------------------
-
-function dataTypeBucket(dataType: string): string {
-  const t = (dataType || "").toLowerCase();
-  if (
-    t === "int64" ||
-    t === "float64" ||
-    t === "int32" ||
-    t === "float32" ||
-    t === "double" ||
-    t === "long" ||
-    t === "integer"
-  )
-    return CATEGORY.TYPE_NUMBER;
-  if (t === "bool" || t === "boolean") return CATEGORY.TYPE_BOOLEAN;
-  return CATEGORY.TYPE_STRING;
-}
-
-// ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
@@ -187,13 +155,11 @@ function dataTypeBucket(dataType: string): string {
  * Resolve the group key for a field.
  *
  * @param fieldName       - raw field name
- * @param dataType        - schema type string (e.g. "Utf8", "Int64")
  * @param index           - pre-built SemanticIndex, or null
  * @param dynamicPrefixes - set returned by discoverPrefixes(), or null
  */
 export function resolveFieldGroup(
   fieldName: string,
-  dataType: string,
   index: SemanticIndex | null,
   dynamicPrefixes: Set<string> | null = null,
 ): string {
@@ -220,8 +186,7 @@ export function resolveFieldGroup(
   if (dynamicPrefixes?.has(canonicalise(lower, index?.grouping)))
     return canonicalise(lower, index?.grouping);
 
-  // 3. Data-type bucket
-  return dataTypeBucket(dataType);
+  return CATEGORY.OTHER;
 }
 
 /**
@@ -242,18 +207,12 @@ export function getGroupLabel(groupKey: string, index: SemanticIndex | null): st
 /**
  * Sort order for a group key.
  * Semantic index groups come first (API order), dynamic groups in the middle,
- * data-type buckets trail at the end.
+ * the Other group trails at the end.
  */
 export function groupSortOrder(groupKey: string, index: SemanticIndex | null): number {
   if (groupKey === CATEGORY.PINNED) return -1;
 
-  const TAIL: Record<string, number> = {
-    [CATEGORY.TYPE_STRING]: 990,
-    [CATEGORY.TYPE_NUMBER]: 991,
-    [CATEGORY.TYPE_BOOLEAN]: 992,
-    [CATEGORY.OTHER]: 999,
-  };
-  if (groupKey in TAIL) return TAIL[groupKey];
+  if (groupKey === CATEGORY.OTHER) return 999;
 
   if (index) {
     const pos = index.groupOrder.indexOf(groupKey);
@@ -305,7 +264,7 @@ export function applyFieldGrouping(
   for (const f of fields) {
     if (f.label) continue; // skip existing label rows
 
-    const resolvedGroup = resolveFieldGroup(f.name, f.dataType || "", index, dynamicPrefixes);
+    const resolvedGroup = resolveFieldGroup(f.name, index, dynamicPrefixes);
     const lower = f.name.toLowerCase();
     const semanticGroup = index.fieldToGroup.get(lower) ?? null;
     const us = lower.indexOf("_");
@@ -326,6 +285,10 @@ export function applyFieldGrouping(
   const sortedGroups = Array.from(groupBuckets.keys()).sort(
     (a, b) => groupSortOrder(a, index) - groupSortOrder(b, index),
   );
+  // A lone Other header names nothing, so the list stays flat.
+  if (sortedGroups.length === 1 && sortedGroups[0] === CATEGORY.OTHER) {
+    return groupBuckets.get(CATEGORY.OTHER)!;
+  }
 
   const result: FieldObj[] = [];
   for (const groupKey of sortedGroups) {
@@ -350,47 +313,66 @@ export function applyFieldGrouping(
   return result;
 }
 
-/**
- * Decide whether semantic field grouping should be applied.
- *
- * Grouping is suppressed when multiple streams are selected because the
- * multi-stream layout uses per-stream label rows (group: streamName) and
- * semantic re-grouping would discard those headers.
- */
-export function shouldApplyFieldGrouping(opts: {
-  semanticIndex: SemanticIndex | null;
-  streamCount: number;
-  udsActive: boolean;
-  udsFieldLimit: number;
-  totalSchemaFieldCount: number;
-}): boolean {
-  if (!opts.semanticIndex) return false;
-  if (opts.streamCount !== 1) return false;
-  if (opts.udsActive) return true;
-  return true;
+export interface StreamGroupLabels {
+  common: string;
+  stream: (name: string) => string;
 }
 
-/**
- * Filter `fields` according to group-collapse state.
- *
- * Rules:
- * - Label (header) rows are always kept.
- * - When `filterTerm` is non-empty, bypass collapse entirely so the table
- *   filter-method can match fields inside collapsed groups.
- * - When a field's group is not tracked in `expandGroupRows`, it is visible
- *   (flat / ungrouped list behaviour).
- * - Otherwise the field is visible only when its group is expanded.
- */
-export function applyCollapseFilter(
+const COMMON_GROUP = "common";
+
+// Prefixed so a stream named like the common group still gets its own group and collapse state.
+const streamGroupKey = (stream: string): string => `stream:${stream}`;
+
+// Without a semantic index a key field is one the org names, or one whose prefix names a key group.
+function isKeyFieldName(name: string, keyFieldSet: Set<string>, keyGroupSet: Set<string>): boolean {
+  const lower = name.toLowerCase();
+  const us = lower.indexOf("_");
+  const rawPrefix = us > 0 ? lower.slice(0, us) : "";
+  return keyFieldSet.has(lower) || (rawPrefix !== "" && keyGroupSet.has(rawPrefix));
+}
+
+function headerRow(group: string, name: string): FieldObj {
+  return {
+    name,
+    label: true,
+    ftsKey: false,
+    isSchemaField: false,
+    showValues: false,
+    group,
+    isExpanded: false,
+    streams: [],
+    isInterestingField: false,
+    dataType: "",
+  } as FieldObj;
+}
+
+/** Multi-stream layout: "Common fields" (in two or more selected streams) first, then one group per stream with its own fields. */
+export function applyStreamGrouping(
   fields: FieldObj[],
-  expandGroupRows: Record<string, boolean>,
-  filterTerm: string,
+  streams: string[],
+  keyFieldSet: Set<string>,
+  keyGroupSet: Set<string>,
+  labels: StreamGroupLabels,
 ): FieldObj[] {
-  if (filterTerm) return fields;
-  return fields.filter((row) => {
-    if (row.label === true) return true;
-    const group = row.group;
-    if (group === undefined || !(group in expandGroupRows)) return true;
-    return expandGroupRows[group] !== false;
-  });
+  const rows = fields.filter((f) => !f.label);
+  const shared = (f: FieldObj) => streams.filter((stream) => f.streams.includes(stream)).length > 1;
+  const common = rows.filter(shared);
+  const keyed = common.filter((f) => isKeyFieldName(f.name, keyFieldSet, keyGroupSet));
+  const rest = common.filter((f) => !isKeyFieldName(f.name, keyFieldSet, keyGroupSet));
+  const result: FieldObj[] = [];
+  if (common.length) {
+    result.push(
+      headerRow(COMMON_GROUP, labels.common),
+      ...[...keyed, ...rest].map((f) => ({ ...f, group: COMMON_GROUP })),
+    );
+  }
+  const placed = new Set(common.map((f) => f.name));
+  for (const stream of streams) {
+    const own = rows.filter((f) => !placed.has(f.name) && f.streams.includes(stream));
+    if (!own.length) continue;
+    own.forEach((f) => placed.add(f.name));
+    const group = streamGroupKey(stream);
+    result.push(headerRow(group, labels.stream(stream)), ...own.map((f) => ({ ...f, group })));
+  }
+  return result;
 }

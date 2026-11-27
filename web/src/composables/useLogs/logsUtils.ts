@@ -56,6 +56,7 @@ import {
 } from "@/composables/useLogs/useLogsUrl";
 import { activePermalink, columnsFromUrl } from "@/composables/useLogs/useLogPermalink";
 import { resolveCalendarPeriod } from "@/utils/dashboard/calendarPeriods";
+import { columnName } from "@/components/common/fieldPanel/activeFilterValues";
 import { copyAnomalyLinkParams } from "@/utils/alerts/anomalyLinkParams";
 
 interface SQLColumn {
@@ -104,6 +105,42 @@ export const removeFieldFromWhereAST = (whereNode: any, fieldName: string): any 
   }
 
   return whereNode;
+};
+
+interface WhereTree {
+  operator?: string;
+  left?: WhereTree & { type?: string; column?: unknown };
+  right?: WhereTree;
+}
+
+const whereNodeColumn = (node: WhereTree): string | null =>
+  node.left?.type === "column_ref" ? columnName(node.left.column) : null;
+
+const whereMentionsField = (node: WhereTree | null | undefined, fieldName: string): boolean => {
+  if (!node) return false;
+  const operator = node.operator?.toUpperCase();
+  if (operator === "AND" || operator === "OR") {
+    return whereMentionsField(node.left, fieldName) || whereMentionsField(node.right, fieldName);
+  }
+  return whereNodeColumn(node) === fieldName;
+};
+
+/** The WHERE tree without `fieldName`'s conditions, an OR holding one dropped whole, so a values query is never narrowed by the rest of that OR. */
+export const relaxFieldInWhereAST = <T extends WhereTree>(
+  whereNode: T | null | undefined,
+  fieldName: string,
+): T | null => {
+  if (!whereNode) return null;
+  const operator = whereNode.operator?.toUpperCase();
+  if (operator === "OR") return whereMentionsField(whereNode, fieldName) ? null : whereNode;
+  if (operator === "AND") {
+    const left = relaxFieldInWhereAST(whereNode.left, fieldName);
+    const right = relaxFieldInWhereAST(whereNode.right, fieldName);
+    if (left === null) return right as T | null;
+    if (right === null) return left as T;
+    return { ...whereNode, left, right };
+  }
+  return whereNodeColumn(whereNode) === fieldName ? null : whereNode;
 };
 
 const aggregateNamesByCatalog = new WeakMap<ServerQueryFunction[], Set<string>>();
@@ -346,7 +383,6 @@ export const logsUtils = () => {
     return Boolean(parsedSQL?.with && Array.isArray(parsedSQL.with) && parsedSQL.with.length > 0);
   };
 
-  // Todo: Duplicate function in IndexList.vue same for removeTraceId
   /**
    * Adds a trace ID to the search request trace-ID collection, skipping duplicates.
    *

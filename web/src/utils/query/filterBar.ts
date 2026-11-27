@@ -696,9 +696,15 @@ export const nodePath = (root: FilterGroup, id: string, prefix = ""): string | n
   return null;
 };
 
+// A bare `null` reads as a null check, so the text value is quoted on the chip.
+const chipValueText = (value: string): string =>
+  value.toLowerCase() === "null" ? `"${value}"` : value;
+
 /** The value shown on a chip: `a, b` for lists, nothing for null checks. */
 export const conditionValueLabel = (condition: FilterCondition): string =>
-  OPERATORS[condition.operator].arity === "none" ? "" : condition.values.join(", ");
+  OPERATORS[condition.operator].arity === "none"
+    ? ""
+    : condition.values.map(chipValueText).join(", ");
 
 const mixedTypeFields = (schemas: { name?: string; type?: string }[][]): Set<string> => {
   const types = new Map<string, FilterFieldType>();

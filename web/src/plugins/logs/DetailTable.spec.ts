@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, beforeEach, vi, afterEach, Mock } from "vitest";
-import { mount, flushPromises } from "@vue/test-utils";
+import { mount, flushPromises, type DOMWrapper } from "@vue/test-utils";
 import { copyToClipboard } from "@/utils/clipboard";
 import { nextTick } from "vue";
 
@@ -23,6 +23,8 @@ import config from "@/aws-exports";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
+import EqualIcon from "@/components/icons/EqualIcon.vue";
+import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 
 const assistantEnv = await vi.hoisted(async () => ({
   gate: (await import("vue")).ref("available"),
@@ -460,6 +462,91 @@ describe("DetailTable Component", () => {
 
     jsonPreview.vm.$emit("copy", { test: "value" });
     expect(mockCopyToClipboard).not.toHaveBeenCalled();
+  });
+
+  it("names the value actions with the field list's words and icons (U7)", async () => {
+    wrapper.unmount();
+    wrapper = mount(DetailTable, {
+      attachTo: "#app",
+      props: defaultProps,
+      global: {
+        ...globalMountOptions,
+        stubs: {
+          ...globalMountOptions.stubs,
+          ODropdown: { template: '<div><slot name="trigger" /><slot /></div>' },
+          ODropdownItem: {
+            template:
+              '<div class="menu-item" :data-test="$attrs[\'data-test\']" :data-icon="$attrs[\'icon-left\']"><slot name="icon-left" /><slot /></div>',
+          },
+        },
+      },
+    });
+    await flushPromises();
+    const items = wrapper.findAll(".menu-item").map((item: DOMWrapper<Element>) => ({
+      text: item.text(),
+      icon: item.attributes("data-icon"),
+    }));
+    expect(items.length).toBeGreaterThan(0);
+    expect(items).toEqual(
+      expect.arrayContaining([
+        { text: "Include", icon: undefined },
+        { text: "Exclude", icon: undefined },
+        { text: "Add field to the table", icon: "visibility" },
+      ]),
+    );
+    const include = wrapper.find('[data-test="log-details-include-field-btn"]');
+    const exclude = wrapper.find('[data-test="log-details-exclude-field-btn"]');
+    expect(include.findComponent(EqualIcon).exists()).toBe(true);
+    expect(exclude.findComponent(NotEqualIcon).exists()).toBe(true);
+  });
+
+  it("offers include, exclude and the column eye at the row's end, revealed like the field list's strip (X6)", async () => {
+    await flushPromises();
+    const field = "kubernetes_container_name";
+    const strip = wrapper.find(`[data-test="log-details-row-actions-${field}"]`);
+    expect(strip.classes()).toEqual(
+      expect.arrayContaining([
+        "max-w-0",
+        "opacity-0",
+        "group-hover/detail-row:max-w-none",
+        "group-hover/detail-row:opacity-100",
+        "group-has-[:focus-visible]/detail-row:max-w-none",
+        "group-has-[:focus-visible]/detail-row:opacity-100",
+      ]),
+    );
+    expect(strip.classes()).not.toContain("hidden");
+    await wrapper.find(`[data-test="log-details-row-include-${field}"]`).trigger("click");
+    await wrapper.find(`[data-test="log-details-row-exclude-${field}"]`).trigger("click");
+    await wrapper.find(`[data-test="log-details-row-column-${field}"]`).trigger("click");
+    expect(wrapper.emitted()["add:searchterm"]).toEqual([
+      [field, "ziox", "include"],
+      [field, "ziox", "exclude"],
+    ]);
+    expect(wrapper.emitted()["add:table"]).toEqual([[field]]);
+    expect(wrapper.find('[data-test="log-details-row-column-_timestamp"]').exists()).toBe(false);
+  });
+
+  it.each([false, true])(
+    "keeps the row actions beside the value instead of over it, wrap=%s",
+    async (wrap) => {
+      wrapper.vm.shouldWrapValues = wrap;
+      await flushPromises();
+      const field = "kubernetes_container_name";
+      const strip = wrapper.find(`[data-test="log-details-row-actions-${field}"]`);
+      const value = wrapper.find(`[data-test="log-detail-${field}-value"]`);
+      expect(strip.element.parentElement).toBe(value.element.parentElement);
+      expect(value.element.nextElementSibling).toBe(strip.element);
+      expect(strip.classes()).toContain("shrink-0");
+      expect(strip.classes()).not.toContain("absolute");
+      expect(value.classes()).toEqual(expect.arrayContaining(["min-w-0", "flex-1"]));
+      expect(value.classes()).toContain(wrap ? "whitespace-pre-wrap" : "text-ellipsis");
+    },
+  );
+
+  it("leaves small screens to the row menu, which holds the same actions", async () => {
+    await flushPromises();
+    const strip = wrapper.find('[data-test="log-details-row-actions-kubernetes_container_name"]');
+    expect(strip.classes()).toContain("max-md:hidden");
   });
 
   it("should emit add:table when addFieldToTable called", () => {

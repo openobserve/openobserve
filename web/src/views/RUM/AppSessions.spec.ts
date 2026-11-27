@@ -69,6 +69,17 @@ vi.mock("@/composables/useQuery", () => ({
   default: () => mockQueryFunctions,
 }));
 
+vi.mock("@/composables/useFieldGrouping", async () => {
+  const { ref } = await import("vue");
+  return {
+    default: () => ({
+      contextLoaded: ref(false),
+      loadGroupingContext: vi.fn().mockResolvedValue(undefined),
+      groupFields: (fields: unknown[]) => fields,
+    }),
+  };
+});
+
 vi.mock("@/composables/useStreams", () => ({
   default: () => mockStreams,
 }));
@@ -230,12 +241,10 @@ describe("AppSessions.vue", () => {
             props: ["query", "editorId", "debounceTime", "filterMode"],
             emits: ["update:query"],
           },
-          SearchFieldList: {
-            name: "SearchFieldList",
-            template:
-              '<div data-test="field-list" v-bind="$attrs" @event-emitted="$emit(\'event-emitted\', $event)"></div>',
-            props: ["fields", "timeStamp", "streamName", "query", "baseFilter"],
-            emits: ["event-emitted"],
+          StreamFieldPanel: {
+            name: "StreamFieldPanel",
+            template: '<div data-test="field-list"></div>',
+            props: ["capabilities", "source"],
           },
           FrustrationBadge: {
             template: '<div data-test-stub="frustration-badge" v-bind="$attrs"></div>',
@@ -627,8 +636,9 @@ describe("AppSessions.vue", () => {
 
     // Sessions are listed regardless of replay availability, so the filter never names session_has_replay.
     it("filters the sidebar's field values to the rows the list itself groups into sessions", () => {
-      const fieldList = wrapper.findComponent({ name: "SearchFieldList" });
-      expect(fieldList.props("baseFilter")).toBe("session_id IS NOT NULL AND session_id <> ''");
+      expect(wrapper.vm.fieldListBaseFilter).toBe("session_id IS NOT NULL AND session_id <> ''");
+      const panel = wrapper.findComponent({ name: "StreamFieldPanel" });
+      expect(panel.props("source")).toBe(wrapper.vm.fieldSource);
     });
 
     it.each([
@@ -654,9 +664,9 @@ describe("AppSessions.vue", () => {
     // The base filter used to be concatenated into `query`, which made the
     // sidebar read it back as an active exclude filter and show session_id /
     // session_has_replay permanently ticked.
-    it("should keep the base filter out of the sidebar query prop", () => {
-      const fieldList = wrapper.findComponent({ name: "SearchFieldList" });
-      expect(fieldList.props("query")).not.toContain("session_has_replay");
+    it("should keep the base filter out of the sidebar's checked values", () => {
+      expect(wrapper.vm.fieldSource.activeExcludeValues.value.session_id).toBeUndefined();
+      expect(wrapper.vm.fieldSource.activeIncludeValues.value.session_has_replay).toBeUndefined();
     });
 
     it("falls back to a constant has_replay instead of referencing session_has_replay when the org's schema lacks it (o2-enterprise#2799)", async () => {
@@ -810,7 +820,7 @@ describe("AppSessions.vue", () => {
             DateTime: { template: "<div></div>" },
             SyntaxGuide: { template: "<div></div>" },
             QueryEditor: { template: "<div></div>" },
-            SearchFieldList: { template: "<div></div>" },
+            StreamFieldPanel: { template: "<div></div>" },
             FrustrationBadge: { template: "<div></div>" },
             SessionLocationColumn: { template: "<div></div>" },
             NoData: { template: "<div></div>" },
@@ -964,7 +974,7 @@ describe("AppSessions.vue", () => {
             DateTime: { template: "<div></div>" },
             SyntaxGuide: { template: "<div></div>" },
             QueryEditor: { template: "<div></div>" },
-            SearchFieldList: { template: "<div></div>" },
+            StreamFieldPanel: { template: "<div></div>" },
             FrustrationBadge: { template: "<div></div>" },
             SessionLocationColumn: { template: "<div></div>" },
             NoData: { template: "<div></div>" },
@@ -990,7 +1000,7 @@ describe("AppSessions.vue", () => {
             DateTime: { template: "<div></div>" },
             SyntaxGuide: { template: "<div></div>" },
             QueryEditor: { template: "<div></div>" },
-            SearchFieldList: { template: "<div></div>" },
+            StreamFieldPanel: { template: "<div></div>" },
             FrustrationBadge: { template: "<div></div>" },
             SessionLocationColumn: { template: "<div></div>" },
             NoData: { template: "<div></div>" },
@@ -1170,11 +1180,9 @@ describe("AppSessions.vue", () => {
         props: ["query", "editorId", "debounceTime"],
         emits: ["update:query"],
       },
-      SearchFieldList: {
-        template:
-          '<div data-test="field-list" v-bind="$attrs" @event-emitted="$emit(\'event-emitted\', $event)"></div>',
-        props: ["fields", "timeStamp", "streamName"],
-        emits: ["event-emitted"],
+      StreamFieldPanel: {
+        template: '<div data-test="field-list"></div>',
+        props: ["capabilities", "source"],
       },
       FrustrationBadge: {
         template: '<div data-test-stub="frustration-badge" v-bind="$attrs"></div>',
@@ -1718,7 +1726,7 @@ describe("AppSessions.vue — re-applies a changed URL filter on activation (D-4
           DateTime: { template: "<div />" },
           SyntaxGuide: { template: "<div />" },
           QueryEditor: { template: "<div />" },
-          SearchFieldList: { template: "<div />" },
+          StreamFieldPanel: { template: "<div />" },
           NoData: { template: "<div />" },
         },
       },

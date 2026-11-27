@@ -28,6 +28,9 @@
 @utility bg-gradient-ai-faint {
   background-image: var(--color-gradient-ai-faint);
 }
+@utility bg-gradient-field-list-actions {
+  background-image: var(--color-gradient-field-list-actions);
+}
 @utility bg-gradient-brand-ribbon {
   background-image: var(--color-gradient-brand-ribbon);
 }
