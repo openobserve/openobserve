@@ -17,6 +17,7 @@ import { formatInTimeZone } from "date-fns-tz";
 import { getDataValue } from "@/utils/dashboard/aliasUtils";
 import { NULL_BREAKDOWN_VALUE, OTHERS_BREAKDOWN_VALUE } from "@/utils/dashboard/sqlProcessData";
 import type { I18nText } from "@/types/i18n";
+import { drawnQueryIndex } from "@/utils/dashboard/chartTypeGroups";
 
 /** One `field = value` condition; a null value matches rows where the field is empty. */
 export interface FieldFilter {
@@ -512,22 +513,18 @@ export const correlationConfigured = (isEnterprise: unknown, zoConfig: any): boo
 export const isPathChart = (type: unknown): boolean =>
   typeof type === "string" && PATH_TYPES.includes(type);
 
-/** The one query whose rows name the clicked funnel stage; null when none or several do. */
+/** The query a funnel stage came from: the one query the funnel draws, if its rows name the stage. */
 export const funnelStageQuery = (schema: any, data: unknown[], stage: unknown): number | null => {
   // A NULL stage matches only NULL values, and "" only empty strings, as the funnel groups them.
   const matches = (value: unknown) =>
     stage === null
       ? value === null || value === undefined
       : value != null && String(value) === String(stage ?? "");
-  // A funnel adds every query's stages into one series, so the stage name is all that says which query it came from.
-  const owners = (schema?.queries ?? []).flatMap((query: any, index: number) => {
-    const field = query?.fields?.x?.[0];
-    const rows = data?.[index];
-    if (query?.config?.hide || !field || !Array.isArray(rows)) return [];
-    const named = rows.some((row: any) => matches(getDataValue(row, field.alias)));
-    return named ? [index] : [];
-  });
-  return owners.length === 1 ? owners[0] : null;
+  const drawn = drawnQueryIndex(schema?.queries);
+  const field = schema?.queries?.[drawn]?.fields?.x?.[0];
+  const rows = data?.[drawn];
+  if (!field || !Array.isArray(rows)) return null;
+  return rows.some((row: any) => matches(getDataValue(row, field.alias))) ? drawn : null;
 };
 
 /** Whether a treemap or sunburst tile can offer any row of the point menu. */

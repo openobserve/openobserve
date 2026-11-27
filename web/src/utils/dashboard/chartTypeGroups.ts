@@ -54,6 +54,10 @@ export type OneQueryType = (typeof ONE_QUERY_TYPES)[number];
 export const isOneQueryChart = (type: unknown): type is OneQueryType =>
   typeof type === "string" && (ONE_QUERY_TYPES as readonly string[]).includes(type);
 
+/** The query a one-query chart draws: its first visible one, or -1 when every query is hidden. */
+export const drawnQueryIndex = (queries: { config?: { hide?: boolean } }[] | undefined): number =>
+  (queries ?? []).findIndex((query) => !query?.config?.hide);
+
 /** Visible queries a one-query chart leaves undrawn. */
 export const undrawnQueryCount = (queries: { config?: { hide?: boolean } }[] | undefined): number =>
   Math.max((queries ?? []).filter((query) => !query?.config?.hide).length - 1, 0);

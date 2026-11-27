@@ -737,8 +737,9 @@ describe("usePanelDrilldown point menu", () => {
       value: 1,
     });
 
-    it("a stage from the second query opens that query's stream and stage field", async () => {
+    it("a hidden first query leaves the stages to the second, drawn query", async () => {
       const deps = funnelDeps();
+      deps.panelSchema.value.queries[0].config = { hide: true };
       const api = (lastApi = usePanelDrilldown(deps as any));
       await api.explorePoint(stageClick("Purchased"));
 
@@ -762,14 +763,18 @@ describe("usePanelDrilldown point menu", () => {
       });
     });
 
-    it("a stage both queries return opens no point section", async () => {
+    it("an undrawn query with the same stage names never takes the stage from the drawn one", async () => {
       const deps = funnelDeps();
       deps.data.value[1].push({ x_axis_1: "Visited", y_axis_1: 5 });
       const api = (lastApi = usePanelDrilldown(deps as any));
       await api.explorePoint(stageClick("Visited"));
 
-      expect(api.pointExplore.value).toBeNull();
-      expect(menuOpen(deps)).toBe(false);
+      expect(api.pointExplore.value?.target).toMatchObject({
+        queryIndex: 0,
+        stream: "web_events",
+        filters: [{ field: "step", value: "Visited" }],
+      });
+      expect(menuOpen(deps)).toBe(true);
     });
   });
 

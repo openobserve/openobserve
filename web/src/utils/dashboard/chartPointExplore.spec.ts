@@ -306,24 +306,23 @@ describe("funnelStageQuery", () => {
   });
   const schema = { queries: [stageQuery("x_axis_1"), stageQuery("x_axis_1")] };
 
-  it("returns the one query whose rows name the stage", () => {
-    const data = [[{ x_axis_1: "Visited" }], [{ x_axis_1: "Purchased" }]];
-    expect(funnelStageQuery(schema, data, "Purchased")).toBe(1);
+  it("resolves every stage to the drawn query, even when an undrawn one names it too", () => {
+    const data = [[{ x_axis_1: "Visited" }], [{ x_axis_1: "Visited" }]];
     expect(funnelStageQuery(schema, data, "Visited")).toBe(0);
   });
 
-  it("returns null when several queries or none name the stage", () => {
-    const data = [[{ x_axis_1: "Visited" }], [{ x_axis_1: "Visited" }]];
-    expect(funnelStageQuery(schema, data, "Visited")).toBeNull();
-    expect(funnelStageQuery(schema, data, "Missing")).toBeNull();
+  it("is the second query when the first is hidden, since the funnel draws that one", () => {
+    const hidden = {
+      queries: [stageQuery("x_axis_1", { config: { hide: true } }), stageQuery("x_axis_1")],
+    };
+    const data = [[{ x_axis_1: "Visited" }], [{ x_axis_1: "Purchased" }]];
+    expect(funnelStageQuery(hidden, data, "Purchased")).toBe(1);
+    expect(funnelStageQuery(hidden, data, "Visited")).toBeNull();
   });
 
-  it("ignores a hidden query, whose stages the funnel does not draw", () => {
-    const hidden = {
-      queries: [stageQuery("x_axis_1"), stageQuery("x_axis_1", { config: { hide: true } })],
-    };
-    const data = [[{ x_axis_1: "Visited" }], [{ x_axis_1: "Visited" }]];
-    expect(funnelStageQuery(hidden, data, "Visited")).toBe(0);
+  it("is null for a stage the drawn query does not name", () => {
+    const data = [[{ x_axis_1: "Visited" }], [{ x_axis_1: "Purchased" }]];
+    expect(funnelStageQuery(schema, data, "Purchased")).toBeNull();
   });
 
   it("matches a numeric stage the way the funnel names it", () => {
