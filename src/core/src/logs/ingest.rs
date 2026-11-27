@@ -383,7 +383,7 @@ async fn ingest_inner(
         bulk_plan,
     )
     .await;
-    // JsonColumnar::plan already refuses the fast path under enterprise, before this is consulted.
+    // JsonColumnar::plan already refuses the fast path for streams SDR acts on.
     let needs_json_records = extend_json.is_some() || needs.json_records(&stream_name);
     let StreamRecordNeeds {
         executable_pipelines,
@@ -959,6 +959,17 @@ pub(super) async fn resolve_stream_name(org_id: &str, in_stream_name: &str) -> R
     } else {
         format_stream_name(in_stream_name.to_string())
     })
+}
+
+/// Whether SDR rewrites or counts this stream's records, which it reads only as JSON.
+/// Fails toward JSON: without the pattern manager the fail-open evidence counts the JSON records.
+#[cfg(feature = "enterprise")]
+pub(super) async fn sdr_acts_on(org_id: &str, stream_name: &str) -> bool {
+    should_apply_sdr(org_id, stream_name)
+        && match get_pattern_manager().await {
+            Ok(manager) => manager.has_stream_associations(org_id, StreamType::Logs, stream_name),
+            Err(_) => true,
+        }
 }
 
 /// A body is an array of records or a single record.
