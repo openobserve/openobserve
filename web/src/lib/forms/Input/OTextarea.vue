@@ -95,9 +95,11 @@ function resizeTextarea() {
 const autogrowStyle = computed(() => {
   if (!props.autogrow) return undefined;
   const capped = !!props.maxRows && props.maxRows > 0;
+  const floored = !!props.minRows && props.minRows > 0;
   return {
     overflow: capped ? "auto" : "hidden",
     maxHeight: capped ? `calc(${props.maxRows}lh + 1rem)` : undefined,
+    minHeight: floored ? `calc(${props.minRows}lh + 1rem)` : undefined,
   };
 });
 

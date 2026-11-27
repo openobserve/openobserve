@@ -85,6 +85,42 @@ describe("RcaVerdictSummary", () => {
     it("no paging advice, no chip", () => {
       expect(byTest(mountSummary(), "rca-verdict-page").exists()).toBe(false);
     });
+
+    it("the band chip says the band and why: the claim, what the evidence allows, the caps", () => {
+      const base = rcaRunSummary();
+      const summary = rcaRunSummary({
+        card: {
+          ...base.card,
+          band: "medium",
+          confidence: {
+            claimed: "high",
+            evidence: "high",
+            evidence_reason: "2 decisive sources (logs + traces)",
+            caps: ["change history not reachable"],
+          },
+        },
+      });
+      const wrapper = mountSummary({ summary });
+
+      expect(byTest(wrapper, "rca-verdict-band").text()).toBe("Medium confidence");
+      expect(byTest(wrapper, "rca-verdict-band").attributes("data-band")).toBe("medium");
+      expect(byTest(wrapper, "rca-confidence-claimed").text()).toBe("High");
+      expect(byTest(wrapper, "rca-confidence-evidence").text()).toBe(
+        "High · 2 decisive sources (logs + traces)",
+      );
+      expect(byTest(wrapper, "rca-confidence-caps").text()).toBe("change history not reachable");
+    });
+
+    it("a card without a band reads a dash and has no why", () => {
+      const summary = rcaRunSummary();
+      delete summary.card.band;
+      delete summary.card.confidence;
+      const wrapper = mountSummary({ summary });
+
+      expect(byTest(wrapper, "rca-verdict-band").text()).toBe("— confidence");
+      expect(byTest(wrapper, "rca-verdict-band").attributes("data-band")).toBe("none");
+      expect(byTest(wrapper, "rca-verdict-band-info").exists()).toBe(false);
+    });
   });
 
   describe("AI sentence", () => {

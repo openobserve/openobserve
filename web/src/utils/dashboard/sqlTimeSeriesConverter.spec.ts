@@ -450,3 +450,163 @@ describe("xAxis min/max with comparison timeGap", () => {
     });
   });
 });
+
+describe("xAxis min keeps a bucket keyed before the query start", () => {
+  // 2025-06-01 07:06:00 UTC → 10:06:00 UTC, in microseconds
+  const startTimeUs = Date.UTC(2025, 5, 1, 7, 6) * 1000;
+  const endTimeUs = Date.UTC(2025, 5, 1, 10, 6) * 1000;
+  const bucket0600Ms = Date.UTC(2025, 5, 1, 6, 0);
+
+  function makeRangeMetadata(startUs: number, endUs: number) {
+    return { queries: [{ startTime: startUs, endTime: endUs, timeRangeGap: { seconds: 0 } }] };
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("auto SQL: 2-hour bucket keyed 06:00 with query start 07:06 stays on the axis", () => {
+    const options = makeOptions(["2025-06-01T06:00:00", "2025-06-01T08:00:00"]);
+    options.series = [{ name: "s1", data: [688, 2312] }];
+    const panelSchema = makePanelSchema("bar", false, [makeHistogramField()]);
+
+    applyAutoSQLTimeSeries(
+      options,
+      panelSchema,
+      makeStore(),
+      makeRangeMetadata(startTimeUs, endTimeUs),
+      {
+        value: null,
+      },
+    );
+
+    expect(options.xAxis[0].min).toBeLessThanOrEqual(bucket0600Ms);
+    expect(options.xAxis[0].max).toBe(endTimeUs / 1000);
+    expect(options.series[0].data[0]).toEqual([bucket0600Ms, 688]);
+  });
+
+  it("auto SQL: 1-day bucket over a 6-hour range is not clipped", () => {
+    const options = makeOptions(["2025-06-01T00:00:00"]);
+    options.series = [{ name: "s1", data: [3000] }];
+    const panelSchema = makePanelSchema("bar", false, [makeHistogramField()]);
+    const start = Date.UTC(2025, 5, 1, 4, 6) * 1000;
+
+    applyAutoSQLTimeSeries(options, panelSchema, makeStore(), makeRangeMetadata(start, endTimeUs), {
+      value: null,
+    });
+
+    expect(options.xAxis[0].min).toBe(Date.UTC(2025, 5, 1, 0, 0));
+    expect(options.series[0].data[0]).toEqual([Date.UTC(2025, 5, 1, 0, 0), 3000]);
+  });
+
+  it("auto SQL: keeps the query start when every bucket is inside the range", () => {
+    const options = makeOptions(["2025-06-01T08:00:00", "2025-06-01T09:00:00"]);
+    const panelSchema = makePanelSchema("line", false, [makeHistogramField()]);
+
+    applyAutoSQLTimeSeries(
+      options,
+      panelSchema,
+      makeStore(),
+      makeRangeMetadata(startTimeUs, endTimeUs),
+      {
+        value: null,
+      },
+    );
+
+    expect(options.xAxis[0].min).toBe(startTimeUs / 1000);
+  });
+
+  it("auto SQL: ignores a null point keyed before the query start", () => {
+    const options = makeOptions(["2025-06-01T06:00:00", "2025-06-01T08:00:00"]);
+    options.series = [{ name: "s1", data: [null, 5] }];
+    const panelSchema = makePanelSchema("line", false, [makeHistogramField()]);
+
+    applyAutoSQLTimeSeries(
+      options,
+      panelSchema,
+      makeStore(),
+      makeRangeMetadata(startTimeUs, endTimeUs),
+      {
+        value: null,
+      },
+    );
+
+    expect(options.xAxis[0].min).toBe(startTimeUs / 1000);
+  });
+
+  it("auto SQL: raw timestamp x values in microseconds before the start widen the axis", () => {
+    const options = makeOptions([bucket0600Ms * 1000, Date.UTC(2025, 5, 1, 8, 0) * 1000]);
+    const panelSchema = makePanelSchema("line", false, [makeTimestampField()]);
+
+    applyAutoSQLTimeSeries(
+      options,
+      panelSchema,
+      makeStore(),
+      makeRangeMetadata(startTimeUs, endTimeUs),
+      {
+        value: null,
+      },
+    );
+
+    expect(options.xAxis[0].min).toBe(bucket0600Ms);
+  });
+
+  it("custom SQL: 2-hour bucket keyed 06:00 with query start 07:06 stays on the axis", () => {
+    vi.mocked(dateTimeUtils.isTimeSeries).mockReturnValue(true);
+    const options = makeOptions(["2025-06-01T06:00:00", "2025-06-01T08:00:00"]);
+    options.series = [{ name: "s1", data: [688, 2312] }];
+    const panelSchema = makePanelSchema("bar", true);
+
+    applyCustomSQLTimeSeries(
+      options,
+      panelSchema,
+      makeStore(),
+      makeRangeMetadata(startTimeUs, endTimeUs),
+      {
+        value: null,
+      },
+    );
+
+    expect(options.xAxis[0].min).toBeLessThanOrEqual(bucket0600Ms);
+    expect(options.series[0].data[0]).toEqual([bucket0600Ms, 688]);
+  });
+
+  it("custom SQL: 1-day bucket over a 6-hour range is not clipped", () => {
+    vi.mocked(dateTimeUtils.isTimeSeries).mockReturnValue(true);
+    const options = makeOptions(["2025-06-01T00:00:00"]);
+    options.series = [{ name: "s1", data: [3000] }];
+    const panelSchema = makePanelSchema("bar", true);
+    const start = Date.UTC(2025, 5, 1, 4, 6) * 1000;
+
+    applyCustomSQLTimeSeries(
+      options,
+      panelSchema,
+      makeStore(),
+      makeRangeMetadata(start, endTimeUs),
+      {
+        value: null,
+      },
+    );
+
+    expect(options.xAxis[0].min).toBe(Date.UTC(2025, 5, 1, 0, 0));
+  });
+
+  it("custom SQL: timestamp x values before the start widen the axis", () => {
+    vi.mocked(dateTimeUtils.isTimeSeries).mockReturnValue(false);
+    vi.mocked(dateTimeUtils.isTimeStamp).mockReturnValue(true);
+    const options = makeOptions([bucket0600Ms * 1000, Date.UTC(2025, 5, 1, 8, 0) * 1000]);
+    const panelSchema = makePanelSchema("line", true);
+
+    applyCustomSQLTimeSeries(
+      options,
+      panelSchema,
+      makeStore(),
+      makeRangeMetadata(startTimeUs, endTimeUs),
+      {
+        value: null,
+      },
+    );
+
+    expect(options.xAxis[0].min).toBe(bucket0600Ms);
+  });
+});

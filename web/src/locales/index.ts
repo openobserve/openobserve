@@ -21,7 +21,7 @@ import { setBadgeTranslator } from "@/lib/core/Badge/badgeI18n";
 // Only the fallback locale (en-us) is bundled into the main chunk. Every other
 // language is code-split and loaded on demand via loadLocaleMessages() so we
 // don't ship every locale file to every user on first load.
-import enLocale from "./languages/en-US.json?without=serviceVersions";
+import enLocale from "./languages/en-US.json?without=serviceVersions,autoresolve";
 
 // Maps an i18n locale code to its source file name (without extension).
 // Exported so tests can assert it stays in sync with the files on disk — an
@@ -127,8 +127,14 @@ export const loadLocaleMessages = async (locale: string): Promise<void> => {
 
 /** Merges the en-US blocks the entry chunk leaves out; the app awaits it before the first render. */
 export const loadLazyLocaleBlocks = async (): Promise<void> => {
-  const serviceVersions = await import("./languages/en-US.json?block=serviceVersions");
-  i18n.global.mergeLocaleMessage("en-us", { serviceVersions: serviceVersions.default });
+  const [serviceVersions, autoresolve] = await Promise.all([
+    import("./languages/en-US.json?block=serviceVersions"),
+    import("./languages/en-US.json?block=autoresolve"),
+  ]);
+  i18n.global.mergeLocaleMessage("en-us", {
+    serviceVersions: serviceVersions.default,
+    autoresolve: autoresolve.default,
+  });
 };
 
 // The `siem` namespace ships as its own chunk per locale so the entry does not carry it.

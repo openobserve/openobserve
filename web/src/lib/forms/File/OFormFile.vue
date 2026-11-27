@@ -25,23 +25,20 @@ if (import.meta.env.DEV && !form) {
   <component v-if="form" :is="form.Field" :name="props.name">
     <template #default="{ field }">
       <div class="flex flex-col gap-1">
-        <!-- OFile owns the error rendering: passing BOTH :error and
-             :error-message makes it surface the canonical error span carrying
-             the `<data-test>-error` id (mirrors OFormInput → OInput). Rendering
-             a second error node here would duplicate the message AND leave the
-             one E2E selectors target (`-error`) unrendered. -->
+        <!-- OFile owns the error node: passing :error and :error-message surfaces the canonical
+             `<data-test>-error` span E2E selectors target, so no second node is rendered here. -->
         <OFile
           v-bind="$attrs"
           :label="props.label"
-          :placeholder="props.placeholder"
           :multiple="props.multiple"
           :accept="props.accept"
-          :max-file-size="props.maxFileSize"
-          :drop-zone="props.dropZone"
+          :max-size="props.maxSize"
+          :max-files="props.maxFiles"
+          :validate="props.validate"
           :help-text="props.helpText"
           :disabled="props.disabled"
+          :disabled-reason="props.disabledReason"
           :required="props.required"
-          :size="props.size"
           :id="props.id"
           :name="props.name"
           :model-value="field.state.value"
@@ -58,9 +55,6 @@ if (import.meta.env.DEV && !form) {
         >
           <template v-if="$slots.label" #label>
             <slot name="label" />
-          </template>
-          <template v-if="$slots.hint" #hint>
-            <slot name="hint" />
           </template>
         </OFile>
       </div>

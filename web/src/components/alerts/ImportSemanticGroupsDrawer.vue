@@ -36,22 +36,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="jsonFile"
           :label="t('correlation.selectJsonFile')"
           accept=".json"
+          :validate="validateSemanticGroupsFile"
           @update:model-value="loadFile"
+          @clear="clearFile"
           data-test="semantic-groups-import-file-drawer"
-        >
-          <template v-slot:prepend>
-            <OIcon name="cloud-upload" size="sm" />
-          </template>
-          <template v-slot:append>
-            <OIcon
-              v-if="jsonFile"
-              name="close"
-              size="sm"
-              @click.stop="clearFile"
-              class="cursor-pointer"
-            />
-          </template>
-        </OFile>
+        />
       </div>
 
       <!-- Loading State -->
@@ -219,7 +208,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Empty State -->
       <div v-else class="empty-state p-4 text-center">
-        <OIcon name="cloud-upload" class="mb-3 size-16!" />
         <div class="text-text-muted mb-2 text-xl font-semibold">
           {{ t("correlation.uploadAJsonFile") }}
         </div>
@@ -322,6 +310,7 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OFile from "@/lib/forms/File/OFile.vue";
 import { type FileValue } from "@/lib/forms/File/OFile.types";
 import alertsService from "@/services/alerts";
+import { createSemanticGroupsFileValidator } from "@/components/alerts/semanticGroupsFile";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -330,6 +319,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { raw, useI18nTyped } from "@/types/i18n";
 
 const { t } = useI18nTyped();
+const validateSemanticGroupsFile = createSemanticGroupsFileValidator(t);
 
 interface SemanticGroup {
   id: string;
@@ -395,7 +385,11 @@ const hasSelectedChanges = computed(() => {
 const loadFile = async (value: FileValue) => {
   // OFile single-mode emits File | null
   const file = value as File | null;
-  if (!file) return;
+  // A refused or removed file leaves no value; the previous file's diff must not stay applicable.
+  if (!file) {
+    clearFile();
+    return;
+  }
 
   isLoading.value = true;
   try {

@@ -33,11 +33,14 @@ use config::utils::{
 use infra::table::org_ai_toolsets::{HealthOutcome, OrgToolset};
 use o2_enterprise::enterprise::ai::toolsets::{
     DestinationChanged, McpData, ToolsetCreateRequest, ToolsetKind, ToolsetListResponse,
-    ToolsetResponse, ToolsetUpdateRequest, merge_redacted, push::normalize_tool_name,
-    validate_data,
+    ToolsetResponse, ToolsetUpdateRequest, drop_write_header_names, keep_stored_write_headers,
+    merge_redacted, push::normalize_tool_name, validate_data,
 };
 use openobserve_api_common::extractors::Headers;
-use openobserve_core::auth::{UserEmail, check_permissions};
+use openobserve_core::{
+    auth::{UserEmail, check_permissions, is_ofga_object_visible},
+    autoresolve::approve::{APPROVE_OBJECT_TYPE, permitted_connections, rbac_on},
+};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -219,13 +222,18 @@ impl ToolsetUse {
 pub async fn create(
     Path(org_id): Path<String>,
     Headers(user_email): Headers<UserEmail>,
-    Json(body): Json<ToolsetCreateRequest>,
+    Json(mut body): Json<ToolsetCreateRequest>,
 ) -> Response {
     if let Err(e) = validate_data(body.kind, &body.data) {
         return MetaHttpResponse::bad_request(e);
     }
     if let Err(refusal) = admit_url(body.kind, body.data.as_ref()).await {
         return refusal;
+    }
+    if body.kind == ToolsetKind::Mcp
+        && let Some(data) = body.data.as_mut()
+    {
+        drop_write_header_names(data);
     }
 
     let data_str = body
@@ -304,7 +312,9 @@ pub async fn get(
     match infra::table::org_ai_toolsets::get(&org_id, &id).await {
         Ok(Some(t)) => {
             let mut toolsets = [ToolsetResponse::from_toolset(t)];
-            hide_mcp_urls(&org_id, &user_email.user_id, &mut toolsets).await;
+            let writer = toolsets[0].kind == ToolsetKind::Mcp
+                && may_update_every_toolset(&org_id, &user_email.user_id).await;
+            hide_mcp_urls(&org_id, &user_email.user_id, &mut toolsets, writer).await;
             let [toolset] = toolsets;
             Json(toolset).into_response()
         }
@@ -326,6 +336,8 @@ pub struct ListQuery {
     pub kind: Option<String>,
     /// Maximum number of results to return; a negative value is rejected with 400.
     pub limit: Option<u64>,
+    /// `list` (default) or `update`: list only the toolsets the caller holds that permission on.
+    pub permission: Option<String>,
 }
 
 #[utoipa::path(
@@ -335,18 +347,22 @@ pub struct ListQuery {
     tag = "AI",
     operation_id = "ListAiToolsets",
     summary = "List AI toolsets",
-    description = "Lists AI toolsets for the org with optional filtering. Only available in enterprise deployments.",
+    description = "Lists the org's AI toolsets the caller may list (or update), with optional filtering. \
+                   Org admins, and deployments without role-based access, get every toolset; a caller \
+                   with no grant gets an empty list. `can_create` says whether the caller may create \
+                   toolsets. Only available in enterprise deployments.",
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("name"   = Option<String>, Query, description = "Substring filter on name (case-insensitive)"),
         ("kind"   = Option<String>, Query, description = "Exact filter on kind: mcp | skill | generic"),
-        ("limit"  = Option<u64>,   Query, description = "Maximum number of results"),
+        ("limit"  = Option<u64>,   Query, description = "Maximum number of results, counted after the permission filter"),
+        ("permission" = Option<String>, Query, description = "list (default): toolsets the caller may list; update: toolsets the caller may update"),
     ),
     security(("Authorization" = [])),
     responses(
         (status = 200, description = "List of toolsets", content_type = "application/json", body = ToolsetListResponse),
-        (status = 400, description = "Invalid query parameters, such as a negative limit"),
-        (status = 403, description = "Feature not supported", content_type = "application/json"),
+        (status = 400, description = "Invalid query parameters, such as a negative limit or an unknown permission"),
+        (status = 403, description = "Feature not supported, or the permissions could not be read", content_type = "application/json"),
     ),
     extensions(("x-o2-ratelimit" = json!({"module": "AI", "operation": "list"})), ("x-o2-mcp" = json!({"enabled": false})))
 )]
@@ -355,19 +371,32 @@ pub async fn list(
     Query(params): Query<ListQuery>,
     Headers(user_email): Headers<UserEmail>,
 ) -> Response {
+    let permission = match params.permission.as_deref() {
+        None | Some("list") => "LIST",
+        Some("update") => "PUT",
+        Some(_) => return MetaHttpResponse::bad_request("permission must be list or update"),
+    };
+    let permitted = match permitted_connections(&org_id, &user_email.user_id, permission).await {
+        Ok(permitted) => permitted,
+        Err(e) => return MetaHttpResponse::forbidden(e),
+    };
+    let writer = may_update_every_toolset(&org_id, &user_email.user_id).await;
     let filter = infra::table::org_ai_toolsets::ListFilter {
         name: params.name,
         kind: params.kind,
     };
-    match infra::table::org_ai_toolsets::list(&org_id, filter, params.limit).await {
+    let db_limit = params.limit.filter(|_| permitted.is_none());
+    match infra::table::org_ai_toolsets::list(&org_id, filter, db_limit).await {
         Ok(toolsets) => {
+            let toolsets = permitted_page(&org_id, toolsets, permitted.as_deref(), params.limit);
             let mut res = ToolsetListResponse {
                 toolsets: toolsets
                     .into_iter()
                     .map(ToolsetResponse::from_toolset)
                     .collect(),
+                can_create: !rbac_on() || writer,
             };
-            hide_mcp_urls(&org_id, &user_email.user_id, &mut res.toolsets).await;
+            hide_mcp_urls(&org_id, &user_email.user_id, &mut res.toolsets, writer).await;
             Json(res).into_response()
         }
         Err(e) => MetaHttpResponse::internal_error(e),
@@ -429,10 +458,18 @@ pub async fn update(
         .data
         .map(|incoming| merge_secrets(&org_id, &id, kind, existing.data.as_deref(), incoming))
         .transpose();
-    let data = match merged {
+    let mut data = match merged {
         Ok(data) => data,
         Err(changed) => return destination_changed(&changed),
     };
+    // `write_headers` keeps its stored values where the body sends `***` or leaves it out, never
+    // for a changed destination.
+    if kind == Some(ToolsetKind::Mcp)
+        && let Some(data) = data.as_mut()
+        && let Err(changed) = keep_stored_write_headers(existing.data.as_deref(), data)
+    {
+        return destination_changed(&changed);
+    }
     if data.is_some()
         && let Some(kind) = kind
         && let Err(e) = validate_data(kind, &data)
@@ -500,6 +537,13 @@ pub async fn delete(Path(path): Path<(String, String)>) -> Response {
 
     if let Err(e) = infra::table::org_ai_toolsets::remove(&org_id, &id).await {
         return MetaHttpResponse::internal_error(e);
+    }
+    // A later toolset can never reuse the id, so a failed cleanup only leaves unreachable grants.
+    if o2_openfga::config::get_config().enabled {
+        use o2_openfga::authorizer::authz::{remove_object_grants, remove_ownership};
+        let object = openobserve_core::autoresolve::approve::connection_object(&id);
+        remove_object_grants(&org_id, &object).await;
+        remove_ownership(&org_id, &object, "", "").await;
     }
 
     (
@@ -832,25 +876,70 @@ fn destination_changed(changed: &DestinationChanged) -> Response {
         .into_response()
 }
 
+/// The first `limit` of `toolsets` that `permitted` lets the caller see; `None` permits every one.
+fn permitted_page(
+    org_id: &str,
+    toolsets: Vec<OrgToolset>,
+    permitted: Option<&[String]>,
+    limit: Option<u64>,
+) -> Vec<OrgToolset> {
+    let limit = limit.map_or(usize::MAX, |l| usize::try_from(l).unwrap_or(usize::MAX));
+    toolsets
+        .into_iter()
+        .filter(|t| is_ofga_object_visible(org_id, APPROVE_OBJECT_TYPE, &t.id, permitted))
+        .take(limit)
+        .collect()
+}
+
+/// Whether the caller holds Update on every toolset of the org, as creating one requires.
+async fn may_update_every_toolset(org_id: &str, user_id: &str) -> bool {
+    check_permissions(
+        org_id,
+        org_id,
+        user_id,
+        "ai_toolsets",
+        "PUT",
+        None,
+        true,
+        false,
+        false,
+    )
+    .await
+}
+
 /// An MCP URL can carry its key in the userinfo, path or query; only toolset writers see it whole.
-async fn hide_mcp_urls(org_id: &str, user_id: &str, toolsets: &mut [ToolsetResponse]) {
-    if !toolsets.iter().any(|t| t.kind == ToolsetKind::Mcp)
-        || check_permissions(
-            org_id,
+async fn hide_mcp_urls(
+    org_id: &str,
+    user_id: &str,
+    toolsets: &mut [ToolsetResponse],
+    updates_every_toolset: bool,
+) {
+    if updates_every_toolset || !toolsets.iter().any(|t| t.kind == ToolsetKind::Mcp) {
+        return;
+    }
+    let mcp: Vec<&mut ToolsetResponse> = toolsets
+        .iter_mut()
+        .filter(|t| t.kind == ToolsetKind::Mcp)
+        .collect();
+    // An Update grant on one toolset alone lets its holder edit it, and a save sends the URL.
+    let may_edit = futures::future::join_all(mcp.iter().map(|toolset| {
+        check_permissions(
+            &toolset.id,
             org_id,
             user_id,
             "ai_toolsets",
             "PUT",
             None,
+            false,
+            false,
             true,
-            false,
-            false,
         )
-        .await
-    {
-        return;
-    }
-    for toolset in toolsets.iter_mut().filter(|t| t.kind == ToolsetKind::Mcp) {
+    }))
+    .await;
+    for (toolset, may_edit) in mcp.into_iter().zip(may_edit) {
+        if may_edit {
+            continue;
+        }
         if let Some(url) = toolset.data.as_mut().and_then(|d| d.get_mut("url"))
             && let Some(raw) = url.as_str()
         {
@@ -1158,5 +1247,46 @@ mod tests {
             usage.results(tail.as_bytes()),
             vec![("t1".to_string(), true)]
         );
+    }
+
+    #[test]
+    fn list_keeps_permitted_toolsets_then_applies_the_limit() {
+        let toolset = |id: &str| OrgToolset {
+            id: id.to_string(),
+            org: "acme".to_string(),
+            name: id.to_string(),
+            kind: "mcp".to_string(),
+            description: None,
+            data: None,
+            created_by: String::new(),
+            created_at: 0,
+            updated_at: 0,
+            enabled: true,
+            status_state: None,
+            status_since: None,
+            last_error: None,
+            last_used_at: None,
+        };
+        let granted = |objects: &[&str]| objects.iter().map(|o| o.to_string()).collect::<Vec<_>>();
+        let one = granted(&["ai_toolsets:t2"]);
+        let two = granted(&["ai_toolsets:t3", "ai_toolsets:t2", "ai_toolsets:other"]);
+        let all = granted(&["ai_toolsets:_all_acme"]);
+        let other_org = granted(&["ai_toolsets:_all_beta"]);
+        type Case<'a> = (&'a str, Option<&'a [String]>, Option<u64>, &'a [&'a str]);
+        #[rustfmt::skip]
+        let cases: [Case; 6] = [
+            ("no filter", None, None, &["t1", "t2", "t3"]),
+            ("one toolset granted", Some(&one), None, &["t2"]),
+            ("limit counts after the filter", Some(&two), Some(1), &["t2"]),
+            ("every toolset of the org", Some(&all), Some(2), &["t1", "t2"]),
+            ("another org's grant", Some(&other_org), None, &[]),
+            ("no grant", Some(&[]), None, &[]),
+        ];
+        for (case, permitted, limit, want) in cases {
+            let toolsets = ["t1", "t2", "t3"].map(toolset).to_vec();
+            let got = permitted_page("acme", toolsets, permitted, limit);
+            let got: Vec<&str> = got.iter().map(|t| t.id.as_str()).collect();
+            assert_eq!(got, want, "{case}");
+        }
     }
 }

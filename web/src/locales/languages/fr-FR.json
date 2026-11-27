@@ -9613,6 +9613,7 @@
       "promqlFiltersAndOnly": "Les filtres PromQL ne prennent en charge que AND. Supprimez OR et les groupes, ou passez à SQL.",
       "cappedHint": "Affichage des {count} premières valeurs",
       "cappedAllHint": "« Tout » inclut aussi les valeurs non listées",
+      "metricsTruncatedHint": "Certaines métriques n'ont pas été vérifiées. Indiquez le nom d'une métrique pour afficher toutes les valeurs.",
       "metric": "Indicateur",
       "label": "Libellé",
       "metricSelectTooltip": "Sélectionnez un indicateur ou utilisez une variable comme $metricVariable pour le choisir à partir d'une autre valeur.",
@@ -16504,6 +16505,13 @@
       "logoLightLabel": "Logo personnalisé (mode clair)",
       "logoLightHelp": "Affiché en mode clair. PNG, JPG, GIF ou BMP, jusqu'à 150 × 30 px.",
       "logoDarkLabel": "Logo personnalisé (mode sombre)",
+      "logoTitle": "Logo personnalisé",
+      "logoHelp": "Affiché dans l'en-tête de l'application. PNG, JPG, GIF, BMP, WEBP ou SVG, jusqu'à 150 × 30 px.",
+      "logoLightTitle": "Mode clair",
+      "logoDarkTitle": "Mode sombre",
+      "logoSaved": "Enregistré",
+      "logoNotSaved": "Non enregistré",
+      "logoDimensions": "{width} × {height} px",
       "logoDarkHelp": "Affiché en mode sombre. PNG, JPG, GIF ou BMP, jusqu'à 150 × 30 px."
     },
     "modelPricingEditor": {
@@ -24186,8 +24194,19 @@
       "clear": "Effacer"
     },
     "file": {
-      "removeFile": "Supprimer le fichier",
-      "clearAll": "Tout effacer"
+      "removeNamed": "Supprimer {name}",
+      "attachPrompt": "Déposez un fichier pour le joindre, ou {browse}",
+      "attachPromptMultiple": "Déposez des fichiers pour les joindre, ou {browse}",
+      "browseLink": "parcourez",
+      "supports": "Fichiers acceptés {types}",
+      "dropFileToAttach": "Déposez le fichier à joindre",
+      "dropFilesToAttach": "Déposez les fichiers à joindre",
+      "typeRejected": "Seuls les fichiers {allowed} sont acceptés",
+      "sizeRejected": "{size} dépasse la limite de {max}",
+      "countRejected": "Seulement {count} fichier à la fois | Seulement {count} fichiers à la fois",
+      "invalidJson": "JSON non valide : {detail}",
+      "invalidImage": "Ce n'est pas un fichier image valide",
+      "unavailable": "Le téléversement de fichiers n'est pas disponible"
     },
     "date": {
       "openCalendar": "Ouvrir le calendrier",

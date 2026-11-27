@@ -170,8 +170,13 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 167: add approval_scope to ai_actions.
 // 168: add oncall_policies.saved_by_person, set once a person saves the ladder.
 // 169: add incident_integrations.oncall_team, the team an external alert source pages.
-// 170: add llm_annotation_queue_items.source_stream.
-pub const DB_SCHEMA_VERSION: u64 = 170;
+// 170: create autoresolve, autoresolve_runs and autoresolve_steps.
+// 171: create autoresolve_corrections, and add plan_corrections, person_verdict and
+//      added_connections to autoresolve_runs.
+// 172: add autoresolve_runs.plan_history.
+// 173: add incident_id to autoresolve_runs, with one live run per incident.
+// 174: add llm_annotation_queue_items.source_stream.
+pub const DB_SCHEMA_VERSION: u64 = 174;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -2037,12 +2042,6 @@ pub struct Search {
         help = "Maximum memory size in MB for the bloom-filter footer cache. The cache holds the suffix bytes of each `.bf` (footer + tail of body) so subsequent prune calls skip the suffix-range GET. `.bf` body bytes are not cached here — they go through the regular file_data cache."
     )]
     pub bloom_footer_cache_max_size: usize,
-    #[env_config(
-        name = "ZO_INVERTED_INDEX_SKIP_THRESHOLD",
-        default = 35,
-        help = "If the inverted index returns row_id more than this threshold(%), it will skip the inverted index."
-    )]
-    pub inverted_index_skip_threshold: usize,
     #[env_config(
         name = "ZO_INVERTED_INDEX_TOPN_MAX_GROUP_NUM",
         default = 1000,
@@ -5537,9 +5536,6 @@ fn check_inverted_index_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.search.inverted_index_result_cache_max_entry_size == 0 {
         cfg.search.inverted_index_result_cache_max_entry_size = 20480;
     }
-    if cfg.search.inverted_index_skip_threshold == 0 {
-        cfg.search.inverted_index_skip_threshold = 35;
-    }
     if cfg.limit.inverted_index_min_token_length == 0 {
         cfg.limit.inverted_index_min_token_length = 2;
     }
@@ -6675,12 +6671,10 @@ mod tests {
     fn test_check_inverted_index_config_defaults() {
         let mut cfg = Config::default();
         cfg.search.inverted_index_result_cache_max_entry_size = 0;
-        cfg.search.inverted_index_skip_threshold = 0;
         cfg.limit.inverted_index_min_token_length = 0;
         cfg.limit.inverted_index_max_token_length = 0;
         check_inverted_index_config(&mut cfg).unwrap();
         assert_eq!(cfg.search.inverted_index_result_cache_max_entry_size, 20480);
-        assert_eq!(cfg.search.inverted_index_skip_threshold, 35);
         assert_eq!(cfg.limit.inverted_index_min_token_length, 2);
         assert_eq!(cfg.limit.inverted_index_max_token_length, 64);
     }
