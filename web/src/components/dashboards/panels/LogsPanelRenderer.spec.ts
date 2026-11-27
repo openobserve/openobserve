@@ -93,13 +93,13 @@ describe("LogsPanelRenderer", () => {
   it("renders through the logs table with a timestamp and message column, newest first", async () => {
     await mountPanel();
     const columns = table().props("columns") as any[];
-    expect(columns.map((col) => col.id)).toEqual(["_timestamp", "message"]);
+    expect(columns.map((col) => col.id)).toEqual(["_logs_panel_time", "message"]);
     expect(String(columns[0].header)).toContain("UTC");
     expect(columns[0].size).toBe(236);
     const data = table().props("data") as any[];
     expect(data.map((row) => row.level)).toEqual(["info", "error"]);
     expect(columns[0].accessorFn(data[0])).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}$/);
-    expect(table().props("pinnedFirstColumn")).toBe("_timestamp");
+    expect(table().props("pinnedFirstColumn")).toBe("_logs_panel_time");
   });
 
   it("leaves the empty state to the panel so no second No Data message stacks under it", async () => {
@@ -178,7 +178,57 @@ describe("LogsPanelRenderer", () => {
     });
     await flushPromises();
     const columns = table().props("columns") as any[];
-    expect(columns.map((col) => col.id)).toEqual(["_timestamp", "source"]);
+    expect(columns.map((col) => col.id)).toEqual(["_logs_panel_time", "source"]);
     expect(columns[1].accessorFn({ code: 7 })).toBe('{"code":7}');
+  });
+
+  describe("configured fields with no usable values", () => {
+    const notices = () =>
+      wrapper!.findAll('[data-test^="dashboard-logs-panel-field-notice-"]').map((n) => n.text());
+
+    it("leaves the time cell empty and warns when the time field holds no timestamps", async () => {
+      await mountPanel({ logs_time_field: "status" }, [
+        { ...rows[0], status: 200 },
+        { ...rows[1], status: 500 },
+      ]);
+      const [timeColumn] = table().props("columns") as any[];
+      const data = table().props("data") as any[];
+      expect(data.map((row) => row.status)).toEqual([200, 500]);
+      expect(timeColumn.accessorFn(data[0])).toBe("");
+      expect(notices()).toEqual(['Time field "status" has no valid timestamps']);
+    });
+
+    it("shows the message in its own column when it is also the time field", async () => {
+      await mountPanel({ logs_time_field: "message" }, [
+        { ...rows[0], message: "pt row 48 (newest is 59)" },
+        { ...rows[1], message: "pt row 49 (newest is 59)" },
+      ]);
+      const [timeColumn, messageColumn] = table().props("columns") as any[];
+      expect(timeColumn.id).not.toBe(messageColumn.id);
+      const firstRowTime = wrapper!.find(
+        '[data-test="dashboard-logs-panel-cell-_logs_panel_time"]',
+      );
+      expect(firstRowTime.text()).toBe("");
+      expect(notices()).toEqual(['Time field "message" has no valid timestamps']);
+      expect((table().props("data") as any[]).map((row) => row.message)).toEqual([
+        "pt row 48 (newest is 59)",
+        "pt row 49 (newest is 59)",
+      ]);
+    });
+
+    it("warns once per configured field that is missing from the rows", async () => {
+      await mountPanel({ logs_message_field: "nosuchfield", logs_level_field: "lvl" });
+      expect(notices()).toEqual([
+        'Level field "lvl" has no values in the results',
+        'Message field "nosuchfield" has no values in the results',
+      ]);
+    });
+
+    it("never warns about fields it detected on its own", async () => {
+      await mountPanel({}, [{ code: 7 }]);
+      expect(wrapper!.find('[data-test="dashboard-logs-panel-field-notices"]').exists()).toBe(
+        false,
+      );
+    });
   });
 });

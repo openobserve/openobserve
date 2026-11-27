@@ -39,10 +39,26 @@ export interface LogsPanelFields {
   message: string | null;
 }
 
+export type LogsPanelFieldRole = keyof LogsPanelFields;
+
+/** A configured field that gave no usable value in any returned row. */
+export interface LogsPanelFieldIssue {
+  role: LogsPanelFieldRole;
+  field: string;
+}
+
 export interface LogsPanelData {
   rows: LogsPanelRow[];
   fields: LogsPanelFields;
+  fieldIssues: LogsPanelFieldIssue[];
 }
+
+// Real log times are far later; anything earlier is a misread column (a status code read as seconds).
+const EARLIEST_LOG_TIME = Date.UTC(2000, 0, 1);
+const YEAR_MS = 365 * 24 * 3600 * 1000;
+// Date.parse reads any text with a number as a date ("row 49" is 2049), so only date-shaped strings are parsed.
+const DATE_STRING =
+  /^(\d{4}-\d{2}-\d{2})(?:([ T])(\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?))?(Z|[+-]\d{2}:?\d{2})?$/i;
 
 const setField = (value: unknown): string | null =>
   typeof value === "string" && value.trim() ? value.trim() : null;
@@ -55,8 +71,7 @@ const firstPresent = (rows: Record<string, unknown>[], names: readonly string[])
   return null;
 };
 
-/** Epoch numbers in s, ms, µs or ns and date strings, as milliseconds. */
-export const toEpochMillis = (value: unknown): number | null => {
+const parseEpochMillis = (value: unknown): number | null => {
   if (value === null || value === undefined || value === "") return null;
   if (typeof value === "number" || (typeof value === "string" && /^\d+(\.\d+)?$/.test(value))) {
     const numeric = Number(value);
@@ -67,10 +82,23 @@ export const toEpochMillis = (value: unknown): number | null => {
     return numeric * 1e3;
   }
   if (typeof value === "string") {
-    const parsed = Date.parse(value.includes("T") || value.endsWith("Z") ? value : `${value}Z`);
+    const match = DATE_STRING.exec(value.trim());
+    if (!match) return null;
+    const [, date, separator, time, zone] = match;
+    // A space-separated time with no zone is the backend's UTC format.
+    const parsed = Date.parse(
+      time ? `${date}T${time}${zone ?? (separator === " " ? "Z" : "")}` : `${date}${zone ?? ""}`,
+    );
     return Number.isFinite(parsed) ? parsed : null;
   }
   return null;
+};
+
+/** Epoch numbers in s, ms, µs or ns and date strings, as milliseconds; null when not a plausible log time. */
+export const toEpochMillis = (value: unknown): number | null => {
+  const millis = parseEpochMillis(value);
+  const latest = Date.now() + YEAR_MS;
+  return millis !== null && millis >= EARLIEST_LOG_TIME && millis <= latest ? millis : null;
 };
 
 /** The time, level and message columns: the configured ones, else the first well-known name the rows carry. */
@@ -96,6 +124,27 @@ const levelOf = (row: Record<string, unknown>, field: string | null): LogSeverit
   );
 };
 
+const hasValue = (value: unknown) => value !== null && value !== undefined && value !== "";
+
+// Only fields the user configured are checked; an auto-detected field was found in the rows already.
+const findFieldIssues = (config: any, rows: LogsPanelRow[]): LogsPanelFieldIssue[] => {
+  if (!rows.length) return [];
+  const configured: [LogsPanelFieldRole, unknown][] = [
+    ["time", config?.logs_time_field],
+    ["level", config?.logs_level_field],
+    ["message", config?.logs_message_field],
+  ];
+  return configured.flatMap(([role, setting]) => {
+    const field = setField(setting);
+    if (!field) return [];
+    const usable =
+      role === "time"
+        ? rows.some((row) => row.time !== null)
+        : rows.some((row) => hasValue(row.source?.[field]));
+    return usable ? [] : [{ role, field }];
+  });
+};
+
 /** Log lines from the first visible query's rows, ordered by time per `logs_order`. */
 export const convertLogsPanelData = (panelSchema: any, data: any, store: any): LogsPanelData => {
   const queryIndex = (panelSchema?.queries ?? []).findIndex((query: any) => !query?.config?.hide);
@@ -114,5 +163,5 @@ export const convertLogsPanelData = (panelSchema: any, data: any, store: any): L
     if (a.time === null || b.time === null) return a.time === null ? (b.time === null ? 0 : 1) : -1;
     return (a.time - b.time) * direction;
   });
-  return { rows, fields };
+  return { rows, fields, fieldIssues: findFieldIssues(panelSchema?.config, rows) };
 };
