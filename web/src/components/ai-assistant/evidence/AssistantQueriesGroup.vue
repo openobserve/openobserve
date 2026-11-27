@@ -218,7 +218,8 @@ import AssistantStepRowHead, { type StepRow } from "./AssistantStepRowHead.vue";
 import { clockRangeText, explorerLabel, queryFragments, rangeText, stepLine } from "./evidenceText";
 import { OPEN_STEP_EVENT } from "./revealStep";
 
-const ROW_CLASS = "min-h-7 w-full px-0 py-0 hover:bg-surface-subtle max-md:min-h-11";
+// Important: OCollapsible's own px-2 would otherwise indent expandable rows past plain ones.
+const ROW_CLASS = "min-h-7 w-full px-0! py-0! hover:bg-surface-subtle max-md:min-h-11";
 
 // The request flow reads the org's members, so it loads only when the line offers Ask an admin.
 const AssistantAskAdminPopover = defineAsyncComponent(
