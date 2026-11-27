@@ -95,7 +95,11 @@ export default defineComponent({
         editedAlert.value = await fetchAlertRead(
           queryClient,
           org,
-          alertDetailQuery(org, alertId, route.query.folder as string | undefined),
+          alertDetailQuery(
+            org,
+            alertId,
+            typeof route.query.folder === "string" ? route.query.folder : undefined,
+          ),
         );
         isUpdated.value = true;
       } catch (error) {

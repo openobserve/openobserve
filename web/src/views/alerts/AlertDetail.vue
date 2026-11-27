@@ -992,7 +992,7 @@ const fetchAlert = async () => {
     const res = await alertsService.get_by_alert_id(
       request.org,
       request.id,
-      route.query.folder as string | undefined,
+      request.folder || undefined,
     );
     if (!isCurrentDetailRequest(request)) return;
     alert.value = res.data;

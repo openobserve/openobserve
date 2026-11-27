@@ -3348,6 +3348,27 @@ describe("AlertList - ODialog/ODrawer migration", () => {
     );
   });
 
+  it("duplicateAlert keeps the row's folder when the dialog's folder picker changes mid-load", async () => {
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+
+    const row = {
+      ...wrapper.vm.filteredResults[0],
+      folder_name: { id: "team-b" },
+      stream_type: "logs",
+    };
+    const pending = wrapper.vm.duplicateAlert(row);
+    wrapper.vm.folderIdToBeCloned = "destination";
+    await pending;
+    await flushPromises();
+
+    expect(alertsSvc.get_by_alert_id).toHaveBeenCalledWith(
+      expect.anything(),
+      row.alert_id,
+      "team-b",
+    );
+  });
+
   it("clone dialog emits click:primary -> invokes submitForm", async () => {
     const wrapper: any = await mountAlertList();
     await waitData(wrapper);

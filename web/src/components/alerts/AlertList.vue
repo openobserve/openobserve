@@ -3642,7 +3642,9 @@ export default defineComponent({
       if (isSloRow(row)) return;
       toBeClonedID.value = row.alert_id;
       toBeCloneAlertName.value = row.name;
-      folderIdToBeCloned.value = rowFolderId(row);
+      // The dialog's folder picker rewrites folderIdToBeCloned with the destination while the source loads.
+      const sourceFolderId = rowFolderId(row);
+      folderIdToBeCloned.value = sourceFolderId;
       toBeClonedIsAnomaly.value = row.type === "anomaly";
       toBeClonedIsComposite.value = row.alert_type === "Composite";
       // Pre-fill from the original alert's row — composite rows carry no
@@ -3678,7 +3680,7 @@ export default defineComponent({
       // Anomaly and composite rows use the /clone endpoint — no need to pre-fetch full data
       if (needsSource) {
         try {
-          const source = await getAlertById(row.alert_id, folderIdToBeCloned.value);
+          const source = await getAlertById(row.alert_id, sourceFolderId);
           // getAlertById hands back the cached detail, and submitForm renames the copy and drops its id.
           if (request === cloneSourceRequest)
             toBeClonedAlert.value = structuredClone(toRaw(source));
