@@ -1015,6 +1015,12 @@ describe("IncidentList.vue", () => {
         replace.mockRestore();
       });
 
+      it("ignores a sort the server does not know", async () => {
+        const replace = await remount({ sort: "phase:desc" });
+        expect(lastParams().sort).toBeUndefined();
+        replace.mockRestore();
+      });
+
       it("is dropped when it belongs to another sort", async () => {
         const cursor = await leavePageTwo("resolved");
         const replace = await remount({ cursor, sort: "title:asc" });

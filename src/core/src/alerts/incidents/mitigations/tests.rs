@@ -612,6 +612,10 @@ async fn mitigation_claims_are_idempotent_and_closed_incidents_refuse_writes() {
                 },
             )
         };
+        assert!(matches!(
+            claim("ana", &"k".repeat(65)).await,
+            Err(MitigationError::BadRequest(TOO_LONG))
+        ));
         let a = claim("ana", "deploy:1").await.unwrap();
         assert_eq!(
             claim("ana", "deploy:1").await.unwrap().expires_at,
@@ -1079,4 +1083,30 @@ async fn confirm_for_test(
         50,
     )
     .await
+}
+
+#[test]
+fn mitigation_text_past_its_cap_is_refused() {
+    assert!(request(None, None).validate().is_ok());
+    let long = |n: usize| "x".repeat(n);
+    let cases: [fn(&mut RecordRequest, String); 6] = [
+        |r, v| r.summary = v,
+        |r, v| r.kind = v,
+        |r, v| r.option_key = Some(v),
+        |r, v| r.command = Some(v),
+        |r, v| r.source_ref = Some(v),
+        |r, v| r.observed_ref = Some(v),
+    ];
+    for (set, cap) in cases.into_iter().zip([2000, 64, 64, 4096, 512, 512]) {
+        let mut at_cap = request(None, None);
+        set(&mut at_cap, long(cap));
+        assert!(at_cap.validate().is_ok(), "{cap} chars is allowed");
+        let mut past = request(None, None);
+        set(&mut past, long(cap + 1));
+        assert!(
+            matches!(past.validate(), Err(MitigationError::BadRequest(TOO_LONG))),
+            "{} chars is refused",
+            cap + 1
+        );
+    }
 }

@@ -47,6 +47,13 @@ use utoipa::ToSchema;
 const MINUTE: i64 = 60_000_000;
 const REPLAY_WINDOW: i64 = 10 * MINUTE;
 const MAX_PER_ATTEMPT: usize = 5;
+// Each value lands in the incident timeline, which every read of the incident returns.
+const MAX_SUMMARY_CHARS: usize = 2000;
+const MAX_KEY_CHARS: usize = 64;
+const MAX_REF_CHARS: usize = 512;
+const MAX_COMMAND_CHARS: usize = 4096;
+const TOO_LONG: &str =
+    "A summary is at most 2000 characters, a kind or option key 64, a ref 512 and a command 4096";
 
 #[derive(Clone, Debug, Deserialize, ToSchema)]
 #[serde(deny_unknown_fields)]
@@ -76,6 +83,15 @@ impl RecordRequest {
         }
         if self.summary.trim().is_empty() || self.kind.trim().is_empty() {
             return Err(MitigationError::BadRequest("Provide summary and kind"));
+        }
+        if too_long(Some(&self.summary), MAX_SUMMARY_CHARS)
+            || too_long(Some(&self.kind), MAX_KEY_CHARS)
+            || too_long(self.option_key.as_deref(), MAX_KEY_CHARS)
+            || too_long(self.command.as_deref(), MAX_COMMAND_CHARS)
+            || too_long(self.source_ref.as_deref(), MAX_REF_CHARS)
+            || too_long(self.observed_ref.as_deref(), MAX_REF_CHARS)
+        {
+            return Err(MitigationError::BadRequest(TOO_LONG));
         }
         if self
             .expect_effect_secs
@@ -737,6 +753,11 @@ async fn claim_with(
             "Provide option_key and summary",
         ));
     }
+    if too_long(Some(&request.option_key), MAX_KEY_CHARS)
+        || too_long(Some(&request.summary), MAX_SUMMARY_CHARS)
+    {
+        return Err(MitigationError::BadRequest(TOO_LONG));
+    }
     let txn = db.begin().await?;
     let row = get_locked(&txn, org, id).await?;
     authorize_case(&row, actor).await?;
@@ -990,6 +1011,10 @@ fn applied<'a>(events: &'a [IncidentEvent], mut attempt: &'a str) -> Option<&'a 
         }
     }
     None
+}
+
+fn too_long(value: Option<&str>, max: usize) -> bool {
+    value.is_some_and(|value| value.chars().count() > max)
 }
 
 #[cfg(test)]

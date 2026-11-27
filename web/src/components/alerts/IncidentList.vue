@@ -480,6 +480,9 @@ const isSeverityKey = (key: string): key is SeverityKey =>
 const PAGE_SIZES = [20, 50, 100, 200];
 /** The server's order when the request names no sort. */
 const DEFAULT_SORT = "last_alert_at:desc";
+/** Columns the server sorts on; any other name is a 400 that no page change clears. */
+const SORT_COLUMNS = ["last_alert_at", "first_alert_at", "severity", "alert_count", "title"];
+const isSortColumn = (name?: string): name is string => !!name && SORT_COLUMNS.includes(name);
 /** URL keys the list owns (design spec 2.6); any other key on the route is left alone. */
 const URL_KEYS = ["sev", "q", "sort", "cursor", "assignee", "service", "from", "to"] as const;
 
@@ -533,7 +536,8 @@ export default defineComponent({
       startTime: queryMicros("from"),
       endTime: queryMicros("to"),
     });
-    const urlSort = queryText("sort")?.split(":");
+    const urlSortParts = queryText("sort")?.split(":");
+    const urlSort = isSortColumn(urlSortParts?.[0]) ? urlSortParts : undefined;
     const urlSeverities = (queryText("sev") ?? "").split(",").filter(isSeverityKey);
 
     const searchQuery = ref(queryText("q") ?? "");
@@ -565,7 +569,7 @@ export default defineComponent({
     // A size saved before the cursor pager may be 250 or 500, past the server's 200.
     const pageSize = ref(PAGE_SIZES.find((size) => size >= viewState.pageSize) ?? 200);
     const pageSizeOptions = PAGE_SIZES.map((size) => ({ label: raw(String(size)), value: size }));
-    const sortBy = ref(urlSort?.[0] ?? viewState.sortBy);
+    const sortBy = ref(urlSort?.[0] ?? (isSortColumn(viewState.sortBy) ? viewState.sortBy : ""));
     const sortOrder = ref<"asc" | "desc">(
       urlSort ? (urlSort[1] === "asc" ? "asc" : "desc") : viewState.sortOrder,
     );

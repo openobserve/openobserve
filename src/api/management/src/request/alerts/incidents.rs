@@ -68,7 +68,7 @@ pub struct ListIncidentsQuery {
     /// `next_cursor` of the previous page, read under the same sort
     #[serde(default)]
     pub cursor: Option<String>,
-    /// Maximum number of results, 1 to 200
+    /// Maximum number of results; values above 200 are served as 200
     #[serde(default = "default_limit")]
     pub limit: u64,
     /// Rows skipped after the cursor; kept for clients that page by offset
@@ -3268,9 +3268,6 @@ fn list_page_query(
 ) -> Result<infra::table::alert_incidents::ListPageQuery, String> {
     use infra::table::alert_incidents::{ListCursor, ListPageQuery, ListSort};
 
-    if !(1..=MAX_LIST_LIMIT).contains(&query.limit) {
-        return Err(format!("limit must be between 1 and {MAX_LIST_LIMIT}"));
-    }
     let mut statuses = Vec::new();
     for status in comma_list(query.status.as_deref()) {
         match status.as_str() {
@@ -3328,7 +3325,8 @@ fn list_page_query(
         sort,
         after,
         offset: query.offset,
-        limit: query.limit,
+        // Clamped, not refused: callers written before the cap still send larger pages.
+        limit: query.limit.clamp(1, MAX_LIST_LIMIT),
         ..Default::default()
     })
 }
@@ -3483,17 +3481,22 @@ mod tests {
     }
 
     #[test]
+    fn list_clamps_the_page_size_instead_of_refusing_it() {
+        let limit = |n: u64| {
+            list_page_query(&list_query(serde_json::json!({"limit": n})), "me@acme.io")
+                .unwrap()
+                .limit
+        };
+        assert_eq!((limit(1000), limit(201), limit(0)), (200, 200, 1));
+    }
+
+    #[test]
     fn list_refuses_what_it_cannot_serve() {
         use infra::table::alert_incidents::{ListCursor, SortKey};
 
         let refused = |params: serde_json::Value| {
             list_page_query(&list_query(params), "me@acme.io").unwrap_err()
         };
-        assert_eq!(
-            refused(serde_json::json!({"limit": 201})),
-            "limit must be between 1 and 200"
-        );
-        refused(serde_json::json!({"limit": 0}));
         refused(serde_json::json!({"status": "closed"}));
         refused(serde_json::json!({"severity": "P5"}));
         refused(serde_json::json!({"assigned_to": "someone@acme.io"}));
