@@ -773,6 +773,42 @@ mod tests {
         assert_eq!(result.unwrap(), 0); // Should return 0 when filename conversion fails
     }
 
+    #[tokio::test]
+    async fn test_generate_tantivy_index_stream_schema_vs_parquet_schema() {
+        // `continent` is configured and in the stream schema but absent from the file,
+        // so the index must still carry it, filled with empty values.
+        let batch = create_test_batch(10, true, false, true);
+        let stream = create_test_stream(vec![batch.clone()]).await;
+        let mut stream_fields = batch.schema().fields().to_vec();
+        stream_fields.push(Arc::new(Field::new("continent", DataType::Utf8, true)));
+        let stream_schema = Arc::new(Schema::new(stream_fields));
+
+        let index = generate_tantivy_index(
+            RamDirectory::create(),
+            stream,
+            &[],
+            &["continent".to_string(), "status".to_string()],
+            stream_schema,
+        )
+        .await
+        .unwrap()
+        .unwrap();
+
+        let schema = index.schema();
+        let continent = schema.get_field("continent").unwrap();
+        assert!(schema.get_field("status").is_ok());
+        let searcher = index.reader().unwrap().searcher();
+        assert_eq!(searcher.num_docs(), 10);
+        let count = |value: &str| {
+            let term = tantivy::Term::from_field_text(continent, value);
+            let query =
+                tantivy::query::TermQuery::new(term, tantivy::schema::IndexRecordOption::Basic);
+            searcher.search(&query, &tantivy::collector::Count).unwrap()
+        };
+        assert_eq!(count("asia"), 0);
+        assert_eq!(count(""), 10);
+    }
+
     // Note: Full testing of create_tantivy_index with storage operations would require
     // mocking the storage layer, which is complex for unit tests. The main logic is
     // tested in generate_tantivy_index. Integration tests would be more appropriate
