@@ -10590,7 +10590,12 @@
         "contextHint": "Eventos próximos a este timestamp",
         "contextTooltip": "Outros eventos deste stream nos 3 minutos antes e depois deste evento — mostra o que mais estava a acontecer no mesmo momento.",
         "contextEmpty": "Nenhum evento circundante encontrado"
-      }
+      },
+      "pagerCounting": "{start}-{end} de …",
+      "pagerRange": "{start}-{end}",
+      "pagerEmptyPage": "Nada nesta página",
+      "searchFailed": "A pesquisa falhou",
+      "queryFailed": "Não foi possível executar a consulta"
     },
     "addJoin": "Adicionar junção",
     "removeJoin": "Remover junção",
@@ -10618,7 +10623,38 @@
     "wellSubgroup": "Subgrupo",
     "wellSize": "Tamanho",
     "wellCategory": "Categoria",
-    "value": "Valor"
+    "value": "Valor",
+    "pointExplore": {
+      "viewLogs": "Ver logs",
+      "viewTraces": "Ver traces",
+      "viewMetrics": "Ver métricas",
+      "slice": "{start}–{end}",
+      "wholeRange": "Intervalo completo {start}–{end}",
+      "detail": "{slice} · {filters}",
+      "withNote": "{detail} · {note}",
+      "seriesNotFiltered": "série não filtrada",
+      "panelFilterNotApplied": "filtro do painel não aplicado",
+      "tracesForService": "Traces do serviço {service} · {slice}",
+      "metricsForService": "Métricas do serviço {service} · {slice}",
+      "findingService": "A encontrar o serviço para este ponto…"
+    },
+    "traceExplorer": {
+      "title": "Explorador de traces",
+      "filter": "Filtro",
+      "openInTraces": "Abrir em Traces",
+      "noTraces": "Nenhum trace neste intervalo",
+      "pageRange": "{from}–{to}",
+      "prevTrace": "Trace anterior",
+      "nextTrace": "Trace seguinte"
+    },
+    "metricsExplorer": {
+      "title": "Explorador de métricas",
+      "openInMetrics": "Abrir em Métricas",
+      "openSample": "Abrir amostra",
+      "prevSample": "Amostra anterior",
+      "nextSample": "Amostra seguinte",
+      "noSamples": "Nenhuma amostra corresponde a este filtro"
+    }
   },
   "home": {
     "alertsOverviewSection": "Secção de visão geral de alertas",

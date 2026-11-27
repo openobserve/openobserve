@@ -10590,7 +10590,12 @@
         "contextHint": "이 타임스탬프 근처의 이벤트",
         "contextTooltip": "이 이벤트 전후 3분 동안 이 스트림의 다른 이벤트 — 같은 순간에 어떤 일이 일어났는지 보여줍니다.",
         "contextEmpty": "주변 이벤트를 찾을 수 없습니다"
-      }
+      },
+      "pagerCounting": "{start}-{end} / …",
+      "pagerRange": "{start}-{end}",
+      "pagerEmptyPage": "이 페이지에 아무것도 없습니다",
+      "searchFailed": "검색 실패",
+      "queryFailed": "쿼리를 실행할 수 없습니다"
     },
     "addJoin": "조인 추가",
     "removeJoin": "조인 제거",
@@ -10618,7 +10623,38 @@
     "wellSubgroup": "하위 그룹",
     "wellSize": "크기",
     "wellCategory": "범주",
-    "value": "값"
+    "value": "값",
+    "pointExplore": {
+      "viewLogs": "로그 보기",
+      "viewTraces": "트레이스 보기",
+      "viewMetrics": "메트릭 보기",
+      "slice": "{start}–{end}",
+      "wholeRange": "전체 범위 {start}–{end}",
+      "detail": "{slice} · {filters}",
+      "withNote": "{detail} · {note}",
+      "seriesNotFiltered": "시리즈가 필터링되지 않음",
+      "panelFilterNotApplied": "패널 필터가 적용되지 않음",
+      "tracesForService": "서비스 {service}의 트레이스 · {slice}",
+      "metricsForService": "서비스 {service}의 메트릭 · {slice}",
+      "findingService": "이 지점의 서비스를 찾는 중…"
+    },
+    "traceExplorer": {
+      "title": "트레이스 탐색기",
+      "filter": "필터",
+      "openInTraces": "트레이스에서 열기",
+      "noTraces": "이 슬라이스에 트레이스가 없습니다",
+      "pageRange": "{from}–{to}",
+      "prevTrace": "이전 트레이스",
+      "nextTrace": "다음 트레이스"
+    },
+    "metricsExplorer": {
+      "title": "메트릭 탐색기",
+      "openInMetrics": "메트릭에서 열기",
+      "openSample": "샘플 열기",
+      "prevSample": "이전 샘플",
+      "nextSample": "다음 샘플",
+      "noSamples": "이 필터와 일치하는 샘플이 없습니다"
+    }
   },
   "home": {
     "alertsOverviewSection": "알림 개요 섹션",

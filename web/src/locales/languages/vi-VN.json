@@ -10590,7 +10590,12 @@
         "contextHint": "Sự kiện gần dấu thời gian này",
         "contextTooltip": "Các sự kiện khác từ stream này trong 3 phút trước và sau sự kiện này — cho biết điều gì khác đang diễn ra tại cùng thời điểm.",
         "contextEmpty": "Không tìm thấy sự kiện xung quanh"
-      }
+      },
+      "pagerCounting": "{start}-{end} trên …",
+      "pagerRange": "{start}-{end}",
+      "pagerEmptyPage": "Không có gì trên trang này",
+      "searchFailed": "Tìm kiếm thất bại",
+      "queryFailed": "Không thể chạy truy vấn"
     },
     "addJoin": "Thêm kết nối",
     "removeJoin": "Xóa kết nối",
@@ -10618,7 +10623,38 @@
     "wellSubgroup": "Nhóm con",
     "wellSize": "Kích thước",
     "wellCategory": "Danh mục",
-    "value": "Giá trị"
+    "value": "Giá trị",
+    "pointExplore": {
+      "viewLogs": "Xem nhật ký",
+      "viewTraces": "Xem trace",
+      "viewMetrics": "Xem chỉ số",
+      "slice": "{start}–{end}",
+      "wholeRange": "Toàn bộ khoảng {start}–{end}",
+      "detail": "{slice} · {filters}",
+      "withNote": "{detail} · {note}",
+      "seriesNotFiltered": "chuỗi không được lọc",
+      "panelFilterNotApplied": "bộ lọc panel không được áp dụng",
+      "tracesForService": "Trace cho dịch vụ {service} · {slice}",
+      "metricsForService": "Chỉ số cho dịch vụ {service} · {slice}",
+      "findingService": "Đang tìm dịch vụ cho điểm này…"
+    },
+    "traceExplorer": {
+      "title": "Trình khám phá trace",
+      "filter": "Bộ lọc",
+      "openInTraces": "Mở trong Trace",
+      "noTraces": "Không có trace trong khoảng này",
+      "pageRange": "{from}–{to}",
+      "prevTrace": "Trace trước",
+      "nextTrace": "Trace tiếp theo"
+    },
+    "metricsExplorer": {
+      "title": "Trình khám phá chỉ số",
+      "openInMetrics": "Mở trong Chỉ số",
+      "openSample": "Mở mẫu",
+      "prevSample": "Mẫu trước",
+      "nextSample": "Mẫu tiếp theo",
+      "noSamples": "Không có mẫu nào khớp với bộ lọc này"
+    }
   },
   "home": {
     "alertsOverviewSection": "Phần tổng quan cảnh báo",

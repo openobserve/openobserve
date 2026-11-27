@@ -10590,7 +10590,12 @@
         "contextHint": "此时间戳附近的事件",
         "contextTooltip": "此事件前后 3 分钟内来自此流的其他事件 — 显示同一时刻还有其他哪些事件发生。",
         "contextEmpty": "未找到周边事件"
-      }
+      },
+      "pagerCounting": "{start}-{end}，共 …",
+      "pagerRange": "{start}-{end}",
+      "pagerEmptyPage": "此页无内容",
+      "searchFailed": "搜索失败",
+      "queryFailed": "查询无法运行"
     },
     "addJoin": "添加连接",
     "removeJoin": "移除连接",
@@ -10618,7 +10623,38 @@
     "wellSubgroup": "子分组",
     "wellSize": "大小",
     "wellCategory": "类别",
-    "value": "值"
+    "value": "值",
+    "pointExplore": {
+      "viewLogs": "查看日志",
+      "viewTraces": "查看追踪",
+      "viewMetrics": "查看指标",
+      "slice": "{start}–{end}",
+      "wholeRange": "整个范围 {start}–{end}",
+      "detail": "{slice} · {filters}",
+      "withNote": "{detail} · {note}",
+      "seriesNotFiltered": "序列未过滤",
+      "panelFilterNotApplied": "未应用面板过滤器",
+      "tracesForService": "服务 {service} 的追踪 · {slice}",
+      "metricsForService": "服务 {service} 的指标 · {slice}",
+      "findingService": "正在查找此数据点对应的服务…"
+    },
+    "traceExplorer": {
+      "title": "追踪浏览器",
+      "filter": "过滤器",
+      "openInTraces": "在追踪中打开",
+      "noTraces": "此时间片内没有追踪",
+      "pageRange": "{from}–{to}",
+      "prevTrace": "上一个追踪",
+      "nextTrace": "下一个追踪"
+    },
+    "metricsExplorer": {
+      "title": "指标浏览器",
+      "openInMetrics": "在指标中打开",
+      "openSample": "打开样本",
+      "prevSample": "上一个样本",
+      "nextSample": "下一个样本",
+      "noSamples": "没有样本符合此过滤器"
+    }
   },
   "home": {
     "alertsOverviewSection": "告警概览部分",

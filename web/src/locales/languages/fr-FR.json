@@ -10590,7 +10590,12 @@
         "contextHint": "Événements proches de cet horodatage",
         "contextTooltip": "Autres événements de ce flux dans les 3 minutes avant et après cet événement — montre ce qui se passait d'autre au même moment.",
         "contextEmpty": "Aucun événement environnant trouvé"
-      }
+      },
+      "pagerCounting": "{start}-{end} sur …",
+      "pagerRange": "{start}-{end}",
+      "pagerEmptyPage": "Aucun élément sur cette page",
+      "searchFailed": "Échec de la recherche",
+      "queryFailed": "La requête n'a pas pu être exécutée"
     },
     "addJoin": "Ajouter Rejoindre",
     "removeJoin": "Supprimer Rejoindre",
@@ -10618,7 +10623,38 @@
     "wellSubgroup": "Sous-groupe",
     "wellSize": "Taille",
     "wellCategory": "Catégorie",
-    "value": "Valeur"
+    "value": "Valeur",
+    "pointExplore": {
+      "viewLogs": "Voir les logs",
+      "viewTraces": "Voir les traces",
+      "viewMetrics": "Voir les métriques",
+      "slice": "{start}–{end}",
+      "wholeRange": "Plage complète {start}–{end}",
+      "detail": "{slice} · {filters}",
+      "withNote": "{detail} · {note}",
+      "seriesNotFiltered": "séries non filtrées",
+      "panelFilterNotApplied": "filtre du panneau non appliqué",
+      "tracesForService": "Traces pour le service {service} · {slice}",
+      "metricsForService": "Métriques pour le service {service} · {slice}",
+      "findingService": "Recherche du service pour ce point…"
+    },
+    "traceExplorer": {
+      "title": "Explorateur de traces",
+      "filter": "Filtrer",
+      "openInTraces": "Ouvrir dans Traces",
+      "noTraces": "Aucune trace dans cet intervalle",
+      "pageRange": "{from}–{to}",
+      "prevTrace": "Trace précédente",
+      "nextTrace": "Trace suivante"
+    },
+    "metricsExplorer": {
+      "title": "Explorateur de métriques",
+      "openInMetrics": "Ouvrir dans Métriques",
+      "openSample": "Ouvrir l'échantillon",
+      "prevSample": "Échantillon précédent",
+      "nextSample": "Échantillon suivant",
+      "noSamples": "Aucun échantillon ne correspond à ce filtre"
+    }
   },
   "home": {
     "alertsOverviewSection": "Section d'aperçu des alertes",

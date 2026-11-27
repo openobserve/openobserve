@@ -10588,7 +10588,12 @@
         "contextHint": "Events near this timestamp",
         "contextTooltip": "Other events from this stream in the 3 minutes before and after this event — shows what else was happening at the same moment in time.",
         "contextEmpty": "No surrounding events found"
-      }
+      },
+      "pagerCounting": "{start}-{end} จาก …",
+      "pagerRange": "{start}-{end}",
+      "pagerEmptyPage": "ไม่มีรายการในหน้านี้",
+      "searchFailed": "การค้นหาล้มเหลว",
+      "queryFailed": "ไม่สามารถเรียกใช้คิวรีได้"
     },
     "addJoin": "Add Join",
     "removeJoin": "Remove Join",
@@ -10616,7 +10621,38 @@
     "wellSubgroup": "กลุ่มย่อย",
     "wellSize": "ขนาด",
     "wellCategory": "หมวดหมู่",
-    "value": "ค่า"
+    "value": "ค่า",
+    "pointExplore": {
+      "viewLogs": "ดูล็อก",
+      "viewTraces": "ดูเทรซ",
+      "viewMetrics": "ดูเมทริกซ์",
+      "slice": "{start}–{end}",
+      "wholeRange": "ช่วงทั้งหมด {start}–{end}",
+      "detail": "{slice} · {filters}",
+      "withNote": "{detail} · {note}",
+      "seriesNotFiltered": "ซีรีส์ยังไม่ได้ถูกกรอง",
+      "panelFilterNotApplied": "ยังไม่ได้นำตัวกรองของพาเนลไปใช้",
+      "tracesForService": "เทรซสำหรับบริการ {service} · {slice}",
+      "metricsForService": "เมทริกซ์สำหรับบริการ {service} · {slice}",
+      "findingService": "กำลังค้นหาบริการสำหรับจุดนี้…"
+    },
+    "traceExplorer": {
+      "title": "ตัวสำรวจเทรซ",
+      "filter": "ตัวกรอง",
+      "openInTraces": "เปิดในเทรซ",
+      "noTraces": "ไม่มีเทรซในช่วงเวลาประเมินนี้",
+      "pageRange": "{from}–{to}",
+      "prevTrace": "เทรซก่อนหน้า",
+      "nextTrace": "เทรซถัดไป"
+    },
+    "metricsExplorer": {
+      "title": "ตัวสำรวจเมทริกซ์",
+      "openInMetrics": "เปิดในเมทริกซ์",
+      "openSample": "เปิดตัวอย่าง",
+      "prevSample": "ตัวอย่างก่อนหน้า",
+      "nextSample": "ตัวอย่างถัดไป",
+      "noSamples": "ไม่มีตัวอย่างที่ตรงกับตัวกรองนี้"
+    }
   },
   "home": {
     "alertsOverviewSection": "Alerts overview section",

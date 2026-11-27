@@ -10590,7 +10590,12 @@
         "contextHint": "Zdarzenia w pobliżu tego znacznika czasu",
         "contextTooltip": "Inne zdarzenia z tego strumienia w ciągu 3 minut przed i po tym zdarzeniu — pokazują, co jeszcze działo się w tym samym czasie.",
         "contextEmpty": "Nie znaleziono otaczających zdarzeń"
-      }
+      },
+      "pagerCounting": "{start}-{end} z …",
+      "pagerRange": "{start}-{end}",
+      "pagerEmptyPage": "Brak wyników na tej stronie",
+      "searchFailed": "Wyszukiwanie nie powiodło się",
+      "queryFailed": "Nie udało się uruchomić zapytania."
     },
     "addJoin": "Dodaj złączenie",
     "removeJoin": "Usuń złączenie",
@@ -10618,7 +10623,38 @@
     "wellSubgroup": "Podgrupa",
     "wellSize": "Rozmiar",
     "wellCategory": "Kategoria",
-    "value": "Wartość"
+    "value": "Wartość",
+    "pointExplore": {
+      "viewLogs": "Wyświetl logi",
+      "viewTraces": "Wyświetl trace",
+      "viewMetrics": "Wyświetl metryki",
+      "slice": "{start}–{end}",
+      "wholeRange": "Cały zakres {start}–{end}",
+      "detail": "{slice} · {filters}",
+      "withNote": "{detail} · {note}",
+      "seriesNotFiltered": "serie nieprzefiltrowane",
+      "panelFilterNotApplied": "filtr panelu nie został zastosowany",
+      "tracesForService": "Trace dla usługi {service} · {slice}",
+      "metricsForService": "Metryki dla usługi {service} · {slice}",
+      "findingService": "Wyszukiwanie usługi dla tego punktu…"
+    },
+    "traceExplorer": {
+      "title": "Eksplorator trace",
+      "filter": "Filtr",
+      "openInTraces": "Otwórz w Trace",
+      "noTraces": "Brak trace w tym przedziale",
+      "pageRange": "{from}–{to}",
+      "prevTrace": "Poprzedni trace",
+      "nextTrace": "Następny trace"
+    },
+    "metricsExplorer": {
+      "title": "Eksplorator metryk",
+      "openInMetrics": "Otwórz w Metrykach",
+      "openSample": "Otwórz próbkę",
+      "prevSample": "Poprzednia próbka",
+      "nextSample": "Następna próbka",
+      "noSamples": "Brak próbek pasujących do tego filtra"
+    }
   },
   "home": {
     "alertsOverviewSection": "Sekcja przeglądu alertów",

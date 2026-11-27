@@ -10590,7 +10590,12 @@
         "contextHint": "Gebeurtenissen nabij dit tijdstempel",
         "contextTooltip": "Andere gebeurtenissen uit deze stream in de 3 minuten voor en na deze gebeurtenis — toont wat er op hetzelfde moment nog meer gebeurde.",
         "contextEmpty": "Geen omringende gebeurtenissen gevonden"
-      }
+      },
+      "pagerCounting": "{start}-{end} van …",
+      "pagerRange": "{start}-{end}",
+      "pagerEmptyPage": "Niets op deze pagina",
+      "searchFailed": "Zoeken mislukt",
+      "queryFailed": "De query kon niet worden uitgevoerd"
     },
     "addJoin": "Join toevoegen",
     "removeJoin": "Join verwijderen",
@@ -10618,7 +10623,38 @@
     "wellSubgroup": "Subgroep",
     "wellSize": "Grootte",
     "wellCategory": "Categorie",
-    "value": "Waarde"
+    "value": "Waarde",
+    "pointExplore": {
+      "viewLogs": "Logs bekijken",
+      "viewTraces": "Traces bekijken",
+      "viewMetrics": "Metrieken bekijken",
+      "slice": "{start}–{end}",
+      "wholeRange": "Volledig bereik {start}–{end}",
+      "detail": "{slice} · {filters}",
+      "withNote": "{detail} · {note}",
+      "seriesNotFiltered": "reeksen niet gefilterd",
+      "panelFilterNotApplied": "panelfilter niet toegepast",
+      "tracesForService": "Traces voor service {service} · {slice}",
+      "metricsForService": "Metrieken voor service {service} · {slice}",
+      "findingService": "Service voor dit punt zoeken…"
+    },
+    "traceExplorer": {
+      "title": "Traces Explorer",
+      "filter": "Filter",
+      "openInTraces": "Openen in Traces",
+      "noTraces": "Geen traces in deze slice",
+      "pageRange": "{from}–{to}",
+      "prevTrace": "Vorige trace",
+      "nextTrace": "Volgende trace"
+    },
+    "metricsExplorer": {
+      "title": "Metrics Explorer",
+      "openInMetrics": "Openen in Metrieken",
+      "openSample": "Sample openen",
+      "prevSample": "Vorige sample",
+      "nextSample": "Volgende sample",
+      "noSamples": "Geen samples voldoen aan dit filter"
+    }
   },
   "home": {
     "alertsOverviewSection": "Sectie overzicht van alarmen",
