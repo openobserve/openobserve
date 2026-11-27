@@ -88,11 +88,8 @@ pub async fn ingest(
     body: Bytes,
     user_email: &str,
 ) -> Result<HecResponse> {
-    if check_ingestion_allowed(org_id, StreamType::Logs, None)
-        .await
-        .is_err()
-    {
-        return Ok(HecStatus::InvalidIndex.into());
+    if let Err(e) = check_ingestion_allowed(org_id, StreamType::Logs, None).await {
+        return refusal_response(e, HecStatus::InvalidIndex);
     }
 
     let cfg = get_config();
@@ -108,23 +105,14 @@ pub async fn ingest(
 
     let user = IngestUser::from_user_email(user_email.to_string());
     let streams: Vec<(String, Vec<json::Value>)> = parsed.streams.into_iter().collect();
-    // Admission checks for every group before the first write; the response shape
-    // for a rejection is unchanged (still `Custom(_, 400)`).
     if let Err(e) = preflight_streams(org_id, &streams, &user).await {
-        // A 503 error, not a `Custom(_, 400)` status: HEC clients drop a 400 and retry a 503.
-        #[cfg(feature = "enterprise")]
-        if crate::ingestion::is_sdr_fail_closed_refusal(&e) {
-            return Err(e);
-        }
-        return Ok(HecStatus::Custom(e.to_string(), 400).into());
+        let status = HecStatus::Custom(e.to_string(), 400);
+        return refusal_response(e, status);
     }
     if let Err(e) = ingest_prepared(thread_id, org_id, streams, user).await {
-        // Fail-closed refusal is a 503 so HEC clients retry; written groups are re-sent.
-        #[cfg(feature = "enterprise")]
-        if crate::ingestion::is_sdr_fail_closed_refusal(&e) {
-            return Err(e);
-        }
-        return Ok(HecStatus::Custom(e.to_string(), 400).into());
+        // A 503 is retried, so the groups written before it are sent again.
+        let status = HecStatus::Custom(e.to_string(), 400);
+        return refusal_response(e, status);
     }
 
     Ok(HecStatus::Success.into())
@@ -344,6 +332,15 @@ fn stream_rejection(stream: &str, user: &IngestUser) -> Option<String> {
         ));
     }
     None
+}
+
+/// HEC clients drop a 400 and retry a 503, so a `ResourceError` (an overload or the SDR refusal)
+/// is returned as the error for the handler to answer 503; any other refusal gets `status`.
+fn refusal_response(e: Error, status: HecStatus) -> Result<HecResponse> {
+    if matches!(e, Error::ResourceError(_)) {
+        return Err(e);
+    }
+    Ok(status.into())
 }
 
 /// Deserialize a whole body as a stream of JSON values.
@@ -990,5 +987,15 @@ mod tests {
                 .await
                 .is_err()
         );
+    }
+
+    #[test]
+    fn an_overload_refusal_is_the_error_and_any_other_refusal_keeps_its_status() {
+        let overload = Error::ResourceError("MemoryTableOverflowError".to_string());
+        let result = refusal_response(overload, HecStatus::InvalidIndex);
+        assert!(matches!(result, Err(Error::ResourceError(_))), "{result:?}");
+        let refused = Error::IngestionError("not an ingester".to_string());
+        let resp = refusal_response(refused, HecStatus::InvalidIndex).unwrap();
+        assert_eq!((resp.code, resp.text.as_str()), (400, "Incorrect index"));
     }
 }
