@@ -64,16 +64,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :class="skeletonHeight(i)"
       />
     </div>
-    <span v-else class="text-text-muted text-xs" data-test="pattern-volume-cell-empty">—</span>
+    <div v-else class="flex h-6 items-center gap-1" data-test="pattern-volume-cell-empty">
+      <span
+        class="text-text-muted text-xs"
+        :class="{ 'cursor-help underline decoration-dotted underline-offset-4': issueText }"
+      >
+        {{ raw("—") }}
+        <OTooltip v-if="issueText" :content="issueText" max-width="22rem" />
+      </span>
+      <OButton
+        v-if="entry?.failure === 'retryable'"
+        variant="ghost-primary"
+        size="xs"
+        data-test="pattern-volume-cell-retry"
+        @click.stop="cache?.retry(pattern)"
+      >
+        {{ t("common.retry") }}
+      </OButton>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, inject, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { compactCount, formatBucketDuration } from "./patternUtils";
 import {
   PATTERN_VOLUME_CACHE,
+  volumeIssueKey,
   type PatternVolumeCache,
   type PatternVolumeEntry,
 } from "./usePatternVolume";
@@ -110,6 +130,11 @@ let observer: IntersectionObserver | null = null;
 const hasBeenVisible = ref(false);
 
 const entry = computed<PatternVolumeEntry | undefined>(() => cache?.get(props.pattern));
+
+const issueText = computed(() => {
+  const issue = volumeIssueKey(entry.value);
+  return issue ? t(issue) : undefined;
+});
 
 // Report the volume upward as it lands, and clear it when the cache is dropped
 // so the row never shows figures from a window that's no longer displayed.
