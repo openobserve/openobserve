@@ -91,7 +91,7 @@
         :disabled="props.disableAi"
         @click="onAiToggleClick"
         :aria-label="t('search.aiModeIconAlt')"
-        class="rounded-default border-card-glass-border! absolute! top-0.75 z-100 h-7.5! min-h-7.5! w-7.5! min-w-7.5! border!"
+        class="rounded-default absolute! top-0.75 z-100 h-7.5! min-h-7.5! w-7.5! min-w-7.5!"
         :class="props.hasExpandButton ? 'right-9.5' : 'right-1'"
       >
         <AssistantSpark :size="16" :muted="props.disableAi" />
