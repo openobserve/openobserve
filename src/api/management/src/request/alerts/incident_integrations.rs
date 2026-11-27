@@ -25,7 +25,7 @@ use axum::{extract::Path, response::Response};
 use openobserve_api_common::extractors::Headers;
 #[cfg(feature = "enterprise")]
 use openobserve_core::auth::UserEmail;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 
 use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 
@@ -44,6 +44,10 @@ pub struct CreateIntegrationPayload {
     /// `IncidentIntegrationRecord::destinations`.
     #[serde(default)]
     pub destinations: Vec<String>,
+    /// Id of the on-call team this source's new incidents page, ahead of routing; blank means
+    /// none.
+    #[serde(default)]
+    pub oncall_team: Option<String>,
 }
 
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
@@ -52,13 +56,17 @@ pub struct SetEnabledPayload {
     pub enabled: bool,
 }
 
-/// PATCH payload for updating an integration's name and/or destinations.
-/// Both fields are optional — only the fields present are updated.
+/// PATCH payload for updating an integration's name, destinations and/or on-call team.
+/// Every field is optional — only the fields present are updated.
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
 #[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
 pub struct UpdateIntegrationPayload {
     pub name: Option<String>,
     pub destinations: Option<Vec<String>>,
+    /// On-call team id; absent keeps the stored team, `null` or blank clears it back to routing.
+    #[serde(default, deserialize_with = "present")]
+    #[schema(value_type = Option<String>)]
+    pub oncall_team: Option<Option<String>>,
 }
 
 #[derive(Debug, Serialize, utoipa::ToSchema)]
@@ -75,6 +83,8 @@ pub struct IntegrationResponse {
     #[schema(value_type = Object)]
     pub config: serde_json::Value,
     pub destinations: Vec<String>,
+    /// Id of the on-call team this source pages, if set.
+    pub oncall_team: Option<String>,
     pub created_by: String,
     pub created_at: i64,
     pub updated_at: i64,
@@ -99,6 +109,7 @@ impl IntegrationResponse {
             enabled: record.enabled,
             config: record.config,
             destinations: record.destinations,
+            oncall_team: record.oncall_team,
             created_by: record.created_by,
             created_at: record.created_at,
             updated_at: record.updated_at,
@@ -181,6 +192,12 @@ pub(crate) fn validate_name(name: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// The team a payload names, with a blank one meaning none. [pure]
+#[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
+fn named_team(team: Option<&str>) -> Option<&str> {
+    team.map(str::trim).filter(|t| !t.is_empty())
+}
+
 #[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
 fn write_error_response(e: infra::errors::Error) -> Response {
     match e {
@@ -189,6 +206,11 @@ fn write_error_response(e: infra::errors::Error) -> Response {
         }
         e => MetaHttpResponse::internal_error(e),
     }
+}
+
+/// Tells an `oncall_team` left out (keep the stored team) from an explicit `null` (clear it).
+fn present<'de, D: Deserializer<'de>>(d: D) -> Result<Option<Option<String>>, D::Error> {
+    Option::<String>::deserialize(d).map(Some)
 }
 
 #[cfg(feature = "enterprise")]
@@ -287,6 +309,7 @@ async fn can_write_integrations(org_id: &str, user_id: &str) -> bool {
     request_body(content = CreateIntegrationPayload, description = "Request body", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = IntegrationResponse),
+        (status = 400, description = "Invalid name or source type, or an `oncall_team` that is not an on-call team in this organization", content_type = "application/json", body = MetaHttpResponse),
         (status = 409, description = "Name already exists in the org", content_type = "application/json", body = MetaHttpResponse),
     ),
     extensions(
@@ -305,6 +328,10 @@ pub async fn create_integration(
     if let Err(e) = validate_create(&payload) {
         return MetaHttpResponse::bad_request(e);
     }
+    let oncall_team = named_team(payload.oncall_team.as_deref()).map(str::to_string);
+    if let Err(resp) = super::validate_oncall_team(&org_id, oncall_team.as_deref()).await {
+        return resp;
+    }
 
     let now = chrono::Utc::now().timestamp_micros();
     let record = infra::table::incident_integrations::IncidentIntegrationRecord {
@@ -316,6 +343,7 @@ pub async fn create_integration(
         enabled: true,
         config: payload.config.unwrap_or_else(|| serde_json::json!({})),
         destinations: payload.destinations,
+        oncall_team,
         created_by: user_email.user_id,
         created_at: now,
         updated_at: now,
@@ -385,6 +413,7 @@ pub async fn set_integration_enabled(
     request_body(content = UpdateIntegrationPayload, description = "Request body", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
+        (status = 400, description = "Invalid name, or an `oncall_team` that is not an on-call team in this organization", content_type = "application/json", body = MetaHttpResponse),
         (status = 409, description = "Name already exists in the org", content_type = "application/json", body = MetaHttpResponse),
     ),
     extensions(
@@ -405,12 +434,22 @@ pub async fn update_integration(
     {
         return MetaHttpResponse::bad_request(e);
     }
+    let oncall_team = payload
+        .oncall_team
+        .as_ref()
+        .map(|t| named_team(t.as_deref()));
+    if let Some(team) = oncall_team
+        && let Err(resp) = super::validate_oncall_team(&org_id, team).await
+    {
+        return resp;
+    }
 
     match infra::table::incident_integrations::update(
         &org_id,
         &integration_id,
         payload.name.as_deref(),
         payload.destinations.as_deref(),
+        oncall_team,
     )
     .await
     {
@@ -587,6 +626,7 @@ pub async fn list_integrations(_path: Path<String>) -> Response {
     request_body(content = CreateIntegrationPayload, description = "Request body", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = IntegrationResponse),
+        (status = 400, description = "Invalid name or source type, or an `oncall_team` that is not an on-call team in this organization", content_type = "application/json", body = MetaHttpResponse),
         (status = 409, description = "Name already exists in the org", content_type = "application/json", body = MetaHttpResponse),
     ),
     extensions(
@@ -665,6 +705,7 @@ pub async fn rotate_integration_token(_path: Path<(String, String)>) -> Response
     request_body(content = UpdateIntegrationPayload, description = "Request body", content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = MetaHttpResponse),
+        (status = 400, description = "Invalid name, or an `oncall_team` that is not an on-call team in this organization", content_type = "application/json", body = MetaHttpResponse),
         (status = 409, description = "Name already exists in the org", content_type = "application/json", body = MetaHttpResponse),
     ),
     extensions(
@@ -736,6 +777,7 @@ mod tests {
             source_type: source_type.map(String::from),
             config: None,
             destinations: Vec::new(),
+            oncall_team: None,
         }
     }
 
@@ -823,6 +865,27 @@ mod tests {
         let p: UpdateIntegrationPayload = serde_json::from_str(json).unwrap();
         assert_eq!(p.name, None);
         assert_eq!(p.destinations, None);
+        assert_eq!(p.oncall_team, None);
+    }
+
+    #[test]
+    fn an_update_tells_a_team_left_out_from_a_null_or_blank_one_and_clears_both() {
+        for (json, sent, stored) in [
+            (r#"{}"#, None, None),
+            (r#"{"oncall_team":null}"#, Some(None), Some(None)),
+            (r#"{"oncall_team":""}"#, Some(Some("")), Some(None)),
+            (r#"{"oncall_team":"  "}"#, Some(Some("  ")), Some(None)),
+            (
+                r#"{"oncall_team":" sre "}"#,
+                Some(Some(" sre ")),
+                Some(Some("sre")),
+            ),
+        ] {
+            let p: UpdateIntegrationPayload = serde_json::from_str(json).unwrap();
+            assert_eq!(p.oncall_team.as_ref().map(Option::as_deref), sent, "{json}");
+            let team = p.oncall_team.as_ref().map(|t| named_team(t.as_deref()));
+            assert_eq!(team, stored, "{json}");
+        }
     }
 
     #[test]
@@ -836,6 +899,7 @@ mod tests {
             enabled: true,
             config: serde_json::json!({}),
             destinations: vec![],
+            oncall_team: None,
             created_by: "a@b.c".to_string(),
             created_at: 1,
             updated_at: 1,
@@ -945,5 +1009,114 @@ mod tests {
             write_error_response(Error::DbError(DbError::SeaORMError("boom".to_string()))).status(),
             StatusCode::INTERNAL_SERVER_ERROR
         );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn an_integrations_team_must_be_the_orgs_and_blank_clears_it() {
+        use axum::{
+            Router,
+            body::Body,
+            http::{Request, StatusCode},
+            routing,
+        };
+        use sea_orm::{ConnectionTrait, Schema};
+        use tower::ServiceExt;
+
+        std::fs::create_dir_all(&config::get_config().common.data_db_dir).unwrap();
+        let conn = infra::db::get_orm_client_rw().await;
+        let backend = conn.get_database_backend();
+        let schema = Schema::new(backend);
+        for mut table in [
+            schema.create_table_from_entity(infra::table::entity::oncall_teams::Entity),
+            schema.create_table_from_entity(infra::table::entity::incident_integrations::Entity),
+        ] {
+            conn.execute(backend.build(table.if_not_exists()))
+                .await
+                .unwrap();
+        }
+        let org = format!("o{}", config::ider::generate().to_lowercase());
+        let own = infra::table::oncall_teams::create(&org, "sre", "UTC", None)
+            .await
+            .unwrap();
+        let other = infra::table::oncall_teams::create(&format!("{org}-other"), "sre", "UTC", None)
+            .await
+            .unwrap();
+        let app = Router::new()
+            .route(
+                "/v2/{org_id}/incidents/integrations",
+                routing::post(create_integration),
+            )
+            .route(
+                "/v2/{org_id}/incidents/integrations/{integration_id}",
+                routing::patch(update_integration),
+            );
+        let send = |method: &str, uri: String, body: String| {
+            let request = Request::builder()
+                .method(method)
+                .uri(uri)
+                .header("content-type", "application/json")
+                .header("user_id", "owner@example.com")
+                .body(Body::from(body))
+                .unwrap();
+            let app = app.clone();
+            async move {
+                let response = app.oneshot(request).await.unwrap();
+                let status = response.status();
+                let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+                    .await
+                    .unwrap();
+                (status, String::from_utf8(body.to_vec()).unwrap())
+            }
+        };
+        let stored = || async {
+            let records = infra::table::incident_integrations::list_by_org(&org)
+                .await
+                .unwrap();
+            assert_eq!(records.len(), 1);
+            records[0].oncall_team.clone()
+        };
+        let create = format!("/v2/{org}/incidents/integrations");
+        for team in [
+            r#""no-such-team""#.to_string(),
+            format!(r#""{}""#, other.id),
+        ] {
+            let body = format!(r#"{{"name":"grafana","oncall_team":{team}}}"#);
+            let (status, text) = send("POST", create.clone(), body).await;
+            assert_eq!(status, StatusCode::BAD_REQUEST, "{team}: {text}");
+            assert!(text.contains("is not an on-call team"), "{team}: {text}");
+        }
+        let body = format!(r#"{{"name":"grafana","oncall_team":"{}"}}"#, own.id);
+        let (status, text) = send("POST", create, body).await;
+        assert_eq!(status, StatusCode::OK, "{text}");
+        let created: serde_json::Value = serde_json::from_str(&text).unwrap();
+        assert_eq!(created["oncall_team"], own.id.as_str());
+        assert_eq!(stored().await.as_deref(), Some(own.id.as_str()));
+
+        let patch = format!(
+            "/v2/{org}/incidents/integrations/{}",
+            created["id"].as_str().unwrap()
+        );
+        let (status, text) = send(
+            "PATCH",
+            patch.clone(),
+            r#"{"oncall_team":"no-such-team"}"#.into(),
+        )
+        .await;
+        assert_eq!(status, StatusCode::BAD_REQUEST, "{text}");
+        let (status, _) = send("PATCH", patch.clone(), r#"{"name":"renamed"}"#.into()).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(
+            stored().await.as_deref(),
+            Some(own.id.as_str()),
+            "left out keeps it"
+        );
+        for clear in [r#"{"oncall_team":""}"#, r#"{"oncall_team":null}"#] {
+            let body = format!(r#"{{"oncall_team":"{}"}}"#, own.id);
+            assert_eq!(send("PATCH", patch.clone(), body).await.0, StatusCode::OK);
+            let (status, text) = send("PATCH", patch.clone(), clear.to_string()).await;
+            assert_eq!(status, StatusCode::OK, "{clear}: {text}");
+            assert_eq!(stored().await, None, "{clear}");
+        }
     }
 }
