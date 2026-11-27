@@ -947,7 +947,8 @@ describe("QueryEditorDialog with the revamped assistant", () => {
       }),
     };
     setRuntimeHandle(runtime as never);
-    const wrapper = mount(QueryEditorDialog, {
+    // These tests unmount and clear the body themselves, so the file-wide unmount must not see them.
+    const wrapper = baseMount(QueryEditorDialog, {
       props: {
         modelValue,
         tab: "sql",
