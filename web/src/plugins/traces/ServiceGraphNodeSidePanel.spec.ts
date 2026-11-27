@@ -1039,6 +1039,44 @@ describe("ServiceGraphNodeSidePanel", () => {
       expect(b64DecodeUnicode(query.query)).toContain("='frontend'");
     });
 
+    it("drops a logs answer that lands after the service changed, and lets the new service ask", async () => {
+      const logsFor = (stream: string) => ({
+        data: {
+          service_name: "frontend",
+          matched_dimensions: {},
+          additional_dimensions: {},
+          related_streams: {
+            logs: [{ stream_name: stream, stream_type: "logs", filters: {} }],
+            metrics: [],
+            traces: [],
+            profiles: [],
+          },
+        },
+      });
+      let answerOld: (value: unknown) => void = () => {};
+      vi.mocked(correlateStreams)
+        .mockImplementationOnce(() => new Promise((resolve) => (answerOld = resolve)) as any)
+        .mockResolvedValueOnce(logsFor("other_logs") as any);
+      await wrapper
+        .find('[data-test="service-graph-node-panel-view-related-logs-btn"]')
+        .trigger("click");
+      await flushPromises();
+
+      await wrapper.setProps({
+        selectedNode: { ...baseNode, id: "other-service", name: "other-service" },
+      });
+      await clickLogs();
+      expect(routerPushMock).toHaveBeenCalledTimes(1);
+      expect(routerPushMock.mock.calls[0][0].query.stream).toBe("other_logs");
+
+      answerOld(logsFor("frontend_logs"));
+      await flushPromises();
+      expect(routerPushMock).toHaveBeenCalledTimes(1);
+      expect(wrapper.find('[data-test="service-graph-node-panel-logs-empty"]').exists()).toBe(
+        false,
+      );
+    });
+
     it("clears the empty state when the selected service changes", async () => {
       withLogsStreams({}, {});
       await clickLogs();

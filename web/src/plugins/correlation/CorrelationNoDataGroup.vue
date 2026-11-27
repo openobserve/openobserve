@@ -25,6 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       size="chip"
       class="text-text-secondary w-full justify-start gap-1.5 px-2 text-xs"
       :aria-expanded="open"
+      :aria-controls="listId"
       data-test="telemetry-correlation-no-data-group-toggle"
       @click="emit('update:open', !open)"
     >
@@ -32,29 +33,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span>{{ t("correlation.noDataInScope") }}</span>
       <OTag type="fieldTag" class="ms-1">{{ streams.length }}</OTag>
     </OButton>
-    <template v-if="open">
-      <p class="text-text-secondary m-0 px-2 ps-7 pb-1 text-xs">
-        {{ t("correlation.noDataInScopeReason") }}
-      </p>
-      <div
-        v-for="stream in streams"
-        :key="stream.stream_name"
-        data-test="telemetry-correlation-metric-stream-item"
-        class="hover:bg-surface-subtle flex cursor-pointer items-center gap-2 px-2 py-1"
-        @click="emit('toggle', stream)"
-      >
-        <div class="flex shrink-0 items-center">
-          <OCheckbox
-            :model-value="selectedNames.has(stream.stream_name)"
-            size="xs"
-            @update:model-value="emit('toggle', stream)"
-          />
+    <div :id="listId">
+      <template v-if="open">
+        <p class="text-text-secondary m-0 px-2 ps-7 pb-1 text-xs">
+          {{ t("correlation.noDataInScopeReason") }}
+        </p>
+        <div
+          v-for="stream in streams"
+          :key="stream.stream_name"
+          data-test="telemetry-correlation-metric-stream-item"
+          class="hover:bg-surface-subtle flex cursor-pointer items-center gap-2 px-2 py-1"
+          @click="emit('toggle', stream)"
+        >
+          <div class="flex shrink-0 items-center">
+            <OCheckbox
+              :model-value="selectedNames.has(stream.stream_name)"
+              size="xs"
+              @update:model-value="emit('toggle', stream)"
+            />
+          </div>
+          <OTruncatedText class="text-text-secondary! min-w-0 flex-1 cursor-pointer text-sm">{{
+            stream.stream_name
+          }}</OTruncatedText>
         </div>
-        <OTruncatedText class="text-text-secondary! min-w-0 flex-1 cursor-pointer text-sm">{{
-          stream.stream_name
-        }}</OTruncatedText>
-      </div>
-    </template>
+      </template>
+    </div>
   </div>
 </template>
 
@@ -64,6 +67,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import { useId } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import type { StreamInfo } from "@/services/service_streams";
 
@@ -72,6 +76,8 @@ defineProps<{
   selectedNames: Set<string>;
   open: boolean;
 }>();
+
+const listId = useId();
 
 const emit = defineEmits<{
   "update:open": [value: boolean];

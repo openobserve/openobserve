@@ -96,27 +96,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
           </OTooltip>
         </span>
+        <OButton
+          v-if="droppedCount > 0"
+          ref="droppedTriggerRef"
+          variant="ghost"
+          size="chip"
+          class="text-text-secondary shrink-0 text-xs underline decoration-dotted underline-offset-2"
+          aria-haspopup="dialog"
+          :aria-expanded="droppedOpen"
+          data-test="correlation-event-header-dropped"
+          @mouseenter="droppedOpen = true"
+          @mouseleave="droppedOpen = false"
+          @focus="droppedOpen = true"
+          @blur="droppedOpen = false"
+          @click="droppedOpen = true"
+          >{{ t("correlation.droppedCount", { count: droppedCount }, droppedCount) }}</OButton
+        >
         <OPopover
           v-if="droppedCount > 0"
           v-model:open="droppedOpen"
+          :anchor="droppedTriggerEl"
           side="bottom"
           align="start"
           :aria-label="t('correlation.droppedTitle')"
           @open-auto-focus="(e: Event) => e.preventDefault()"
+          @pointer-down-outside="keepOpenOnTrigger"
+          @focus-outside="keepOpenOnTrigger"
         >
-          <template #trigger>
-            <OButton
-              variant="ghost"
-              size="chip"
-              class="text-text-secondary shrink-0 text-xs underline decoration-dotted underline-offset-2"
-              data-test="correlation-event-header-dropped"
-              @mouseenter="droppedOpen = true"
-              @mouseleave="droppedOpen = false"
-              @focus="droppedOpen = true"
-              @blur="droppedOpen = false"
-              >{{ t("correlation.droppedCount", { count: droppedCount }, droppedCount) }}</OButton
-            >
-          </template>
           <div
             class="flex max-w-[min(26rem,calc(100vw-1.5rem))] flex-col gap-2 p-3"
             data-test="correlation-event-header-dropped-popover"
@@ -318,6 +324,14 @@ const activeSubjectBadge = computed(
 
 const droppedCount = computed(() => props.droppedDimensions?.length ?? 0);
 const droppedOpen = ref(false);
+const droppedTriggerRef = ref<{ $el: Element } | null>(null);
+const droppedTriggerEl = computed(() => droppedTriggerRef.value?.$el ?? null);
+
+// The trigger sits outside the popover, so its own clicks and focus must not dismiss it.
+const keepOpenOnTrigger = (event: Event) => {
+  const target = event.target;
+  if (target instanceof Node && droppedTriggerEl.value?.contains(target)) event.preventDefault();
+};
 
 const hasChips = computed(
   () => (props.contextChips?.length ?? 0) > 0 || droppedCount.value > 0 || showSubjectSection.value,

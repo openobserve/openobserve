@@ -26,7 +26,30 @@ describe("pickBestGuessLogsStream", () => {
   it("picks the largest stream that has the field", async () => {
     const hasField = vi.fn(async (n: string) => n !== "big");
     expect(await pickBestGuessLogsStream({ streams, recent: [], hasField })).toBe("mid");
-    expect(hasField.mock.calls.map((c) => c[0])).toEqual(["big", "mid"]);
+    expect(hasField.mock.calls.map((c) => c[0])).toEqual(["big", "mid", "small"]);
+  });
+
+  it("keeps priority order when a lower-ranked read answers first", async () => {
+    const hasField = vi.fn(
+      (n: string) => new Promise<boolean>((r) => setTimeout(() => r(true), n === "big" ? 20 : 0)),
+    );
+    expect(await pickBestGuessLogsStream({ streams, recent: [], hasField })).toBe("big");
+  });
+
+  it("reads at most `concurrency` schemas at once and stops at the first hit", async () => {
+    let inFlight = 0;
+    let peak = 0;
+    const many = Array.from({ length: 9 }, (_, i) => ({ name: `s${i}`, storageSize: 9 - i }));
+    const hasField = vi.fn(async (n: string) => {
+      inFlight++;
+      peak = Math.max(peak, inFlight);
+      await Promise.resolve();
+      inFlight--;
+      return n === "s5";
+    });
+    expect(await pickBestGuessLogsStream({ streams: many, recent: [], hasField })).toBe("s5");
+    expect(peak).toBe(4);
+    expect(hasField).toHaveBeenCalledTimes(8);
   });
 
   it("checks recently opened streams first", async () => {

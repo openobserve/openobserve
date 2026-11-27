@@ -80,7 +80,7 @@ export function correlatedByKeys(
     .map((entry) => entry.key);
 }
 
-/** Dimensions the server dropped on every stream of a tab; one applied anywhere is a chip, not a drop. */
+/** Dimensions the server dropped on any stream of a tab; one applied on another stream is a chip, not a drop. */
 export function droppedDimensions(streams: StreamInfo[], groups: FieldAlias[]): DroppedDimension[] {
   const byId = new Map<string, DroppedDimension>();
   for (const key of streams.flatMap((stream) => stream.dropped_dimensions ?? [])) {

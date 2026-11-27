@@ -74,7 +74,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :agents-loaded="agentsLoaded"
       @filter-mode-change="onFilterModeChange"
       @update:selected-agent-stream="selectedAgentStream = $event"
-      @agent-pick="modeExplicit = true"
+      @agent-pick="
+        modeExplicit = true;
+        onAgentPicked();
+      "
       @stream-change="onStreamChange"
     >
       <template #trailing>
@@ -337,9 +340,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
 
-      <!-- Dashboard content — scrollable panel area. Horizontal padding lives
-         here (inside the scroll container) so the scrollbar sits at the
-         content-area edge with content padded away from it. -->
       <div v-else-if="largeStreamBytes !== null" class="px-page-edge flex-1 overflow-y-auto pb-3">
         <KpiCardRow :columns="5" class="mt-2.5 mb-2.5">
           <div
@@ -357,7 +357,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span
               class="text-text-muted text-2xl leading-none font-bold max-lg:text-lg"
               data-test="llm-insights-not-run"
-              >{{ raw("—") }}</span
+              ><span aria-hidden="true">{{ raw("—") }}</span
+              ><span class="sr-only">{{ t("aiObservability.largeStream.notRun") }}</span></span
             >
           </div>
         </KpiCardRow>
@@ -944,12 +945,15 @@ const scopeClause = computed(() =>
   [agentFilterClause.value, filterClause.value].filter(Boolean).join(" AND "),
 );
 
-// --- Large-stream notice ------------------------------------------------------
 const scopeBarRef = ref<{ openAgentPicker: () => void } | null>(null);
 const searchBarRef = ref<{ focus: () => void } | null>(null);
 const streamStats = ref<Record<string, StreamSizeStats>>({});
 // Streams flagged as LLM-only never need the notice: every span there is one the page reads.
 const llmOnlyStreams = ref<string[]>([]);
+// "Pick an agent" holds the page in Agent mode until the user chooses one in the picker.
+const awaitingAgentPick = ref(false);
+// The window the last load ran over, so the notice and the hold judge the same range.
+const insightsWindow = ref({ start: props.startTime, end: props.endTime });
 const largeStreamGate = useLargeStreamGate(
   () => store.state.selectedOrganization?.identifier ?? "",
   () => largeStreamThreshold(store.state.zoConfig),
@@ -959,7 +963,7 @@ function largeStreamHold(start: number, end: number): number | null {
   const stream = effectiveStream.value;
   return largeStreamGate.heldBytes({
     mode: filterMode.value,
-    agentSelected: !!selectedAgent.value,
+    agentSelected: !!selectedAgent.value && !awaitingAgentPick.value,
     searchQuery: searchQuery.value,
     stream,
     agentStreams: llmOnlyStreams.value,
@@ -969,20 +973,34 @@ function largeStreamHold(start: number, end: number): number | null {
   });
 }
 
-const largeStreamBytes = computed(() => largeStreamHold(props.startTime, props.endTime));
+const largeStreamBytes = computed(() =>
+  largeStreamHold(insightsWindow.value.start, insightsWindow.value.end),
+);
 const largeStreamSize = computed(() =>
   raw(largeStreamBytes.value === null ? "" : formatSizeFromMB(largeStreamBytes.value / 1024 ** 2)),
 );
 
 function runLargeStreamAnyway() {
   largeStreamGate.runAnyway(effectiveStream.value);
-  loadInsights();
+  awaitingAgentPick.value = false;
+  loadInsights(insightsWindow.value.start, insightsWindow.value.end);
 }
 
 async function pickAgentForLargeStream() {
-  await onFilterModeChange("agent");
+  awaitingAgentPick.value = true;
+  await (filterMode.value === "agent" ? loadInsights() : onFilterModeChange("agent"));
   await nextTick();
   scopeBarRef.value?.openAgentPicker();
+}
+
+async function onAgentPicked() {
+  if (!awaitingAgentPick.value) return;
+  awaitingAgentPick.value = false;
+  await nextTick();
+  // A changed agent reloads through the identity watcher; re-picking the same one needs a load here.
+  if (agentIdentityKey(selectedAgent.value) !== loadedAgentKey) return;
+  switching.value = true;
+  loadInsights();
 }
 
 function applySearch(query: string) {
@@ -1650,6 +1668,7 @@ async function loadInsights(
     const start = startTime ?? props.startTime;
     const end = endTime ?? props.endTime;
     if (!start || !end) return;
+    insightsWindow.value = { start, end };
     // Stream-mode reads `effectiveStream` from `activeStream`, which is only set
     // once the stream list loads — so make sure that's done before we fetch,
     // regardless of whether this call raced ahead of the mount's stream load.
@@ -1687,7 +1706,7 @@ async function loadInsights(
       // Default to the first agent when nothing valid is selected (fresh entry
       // to the tab, or the previously-picked agent is gone for this window).
       // Seeding by name resolves the whole cascade.
-      if (!selectedAgent.value && agents.value.length > 0) {
+      if (!selectedAgent.value && agents.value.length > 0 && !awaitingAgentPick.value) {
         selectAgentByName(agents.value[0].name);
       }
       // Persist the resolved agent variant so a reload restores the same selection.
@@ -1751,6 +1770,7 @@ async function loadInsights(
 // the other Monitor pages, so the agents list no longer picks the mode.
 function onFilterModeChange(mode: boolean | AcceptableValue | AcceptableValue[]) {
   const next = mode === "agent" ? "agent" : "stream";
+  if (next === "stream") awaitingAgentPick.value = false;
   if (next === filterMode.value) return;
   filterMode.value = next;
   modeExplicit.value = true;

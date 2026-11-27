@@ -14,7 +14,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, vi } from "vitest";
-import { findNoDataMetricStreams, metricExistenceSql } from "./metricDataCheck";
+import { findNoDataMetricStreams, metricExistenceSql, metricProbeTargets } from "./metricDataCheck";
+import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import type { StreamInfo } from "@/services/service_streams";
 
 const stream = (name: string, has_data?: boolean): StreamInfo => ({
@@ -102,5 +103,57 @@ describe("findNoDataMetricStreams", () => {
       },
     });
     expect(result).toBeNull();
+  });
+});
+
+describe("metricProbeTargets", () => {
+  const groups = [{ id: "k8s-pod", display: "Pod", fields: ["k8s_pod_name", "pod_name"] }];
+  const served: StreamInfo = {
+    stream_name: "cpu",
+    stream_type: "metrics",
+    filters: { k8s_pod_name: "p1" },
+    has_data: false,
+  };
+  const schemas = { cpu: { schema: [{ name: "k8s_pod_name" }] } };
+
+  it("keeps the server's answer when the chart runs the served filters", () => {
+    const [target] = metricProbeTargets([served], (s) => s, {
+      matchedDimensions: {},
+      semanticGroups: groups,
+      metricSchemas: schemas,
+    });
+    expect(target.where).toContain("'p1'");
+    expect(target.stream.has_data).toBe(false);
+  });
+
+  it("probes with the subject override the chart applies once the schema is loaded", () => {
+    const [target] = metricProbeTargets([served], (s) => s, {
+      matchedDimensions: { "k8s-pod": "p2" },
+      semanticGroups: groups,
+      metricSchemas: schemas,
+    });
+    expect(target.where).toContain("'p2'");
+    expect(target.where).not.toContain("'p1'");
+    expect(target.stream.has_data).toBeUndefined();
+  });
+
+  it("applies no override before the schema loads, as the chart does", () => {
+    const [target] = metricProbeTargets([served], (s) => s, {
+      matchedDimensions: { "k8s-pod": "p2" },
+      semanticGroups: groups,
+      metricSchemas: {},
+    });
+    expect(target.where).toContain("'p1'");
+    expect(target.stream.has_data).toBe(false);
+  });
+
+  it("probes the charted copy when its filters differ from the served ones", () => {
+    const [target] = metricProbeTargets(
+      [served],
+      (s) => ({ ...s, filters: { k8s_pod_name: SELECT_ALL_VALUE } }),
+      { matchedDimensions: {}, semanticGroups: groups, metricSchemas: schemas },
+    );
+    expect(target.where).toBe("");
+    expect(target.stream.has_data).toBeUndefined();
   });
 });

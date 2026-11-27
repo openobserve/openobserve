@@ -1132,6 +1132,62 @@ describe("TelemetryCorrelationDashboard.vue", () => {
       expect(probe?.[0].pageType).toBe("metrics");
     });
 
+    const answerProbes = (rows: (sql: string) => "rows" | "empty" | "partial") =>
+      mockFetchQueryDataWithHttpStream.mockImplementation((payload: any, handlers: any) => {
+        const sql: string = payload?.queryReq?.query?.sql ?? "";
+        const answer = rows(sql);
+        const results =
+          answer === "partial"
+            ? { hits: [], is_partial: true }
+            : { hits: answer === "rows" ? [{ _timestamp: 1 }] : [] };
+        handlers.data(payload, { type: "search_response_hits", content: { results } });
+        handlers.complete();
+      });
+    const selectedNames = () =>
+      wrapper.vm.selectedMetricStreams.map((s: any) => s.stream_name).sort();
+
+    it("counts only listed streams in the footer total", async () => {
+      wrapper = createWrapper({
+        externalActiveTab: "metrics",
+        metricStreams: withData([true, true, false]),
+      });
+      await flushPromises();
+
+      expect(wrapper.vm.listedMetricCount).toBe(2);
+      expect(wrapper.vm.listedSelectedCount).toBe(wrapper.vm.selectedMetricStreams.length);
+    });
+
+    it("recomputes on a range change, bringing back a stream that now has data", async () => {
+      answerProbes((sql) => (sql.includes('"cpu_usage"') ? "empty" : "rows"));
+      wrapper = createWrapper({
+        externalActiveTab: "metrics",
+        metricStreams: withData([undefined, undefined, undefined]),
+      });
+      await flushPromises();
+      expect(selectedNames()).not.toContain("cpu_usage");
+      expect([...wrapper.vm.noDataStreamNames]).toEqual(["cpu_usage"]);
+
+      answerProbes(() => "rows");
+      await wrapper.setProps({
+        timeRange: { startTime: SOURCE_TS - 2 * FIVE_MIN_US, endTime: SOURCE_TS + FIVE_MIN_US },
+      });
+      await flushPromises();
+      expect(selectedNames()).toContain("cpu_usage");
+      expect(wrapper.vm.noDataStreamNames.size).toBe(0);
+    });
+
+    it("keeps a stream listed when its probe answer is partial", async () => {
+      answerProbes((sql) => (sql.includes('"cpu_usage"') ? "partial" : "rows"));
+      wrapper = createWrapper({
+        externalActiveTab: "metrics",
+        metricStreams: withData([undefined, undefined, undefined]),
+      });
+      await flushPromises();
+
+      expect(wrapper.vm.noDataStreamNames.has("cpu_usage")).toBe(false);
+      expect(selectedNames()).toContain("cpu_usage");
+    });
+
     it("shows the every-metric-empty state, whose action expands the group", async () => {
       wrapper = createWrapper({
         externalActiveTab: "metrics",

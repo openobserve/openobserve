@@ -23,10 +23,12 @@ export interface BestGuessLogsStreamInput {
   recent: string[];
   hasField: (stream: string) => Promise<boolean>;
   maxChecks?: number;
+  concurrency?: number;
 }
 
 // Each candidate costs one schema read, so the walk stops after a handful.
 const DEFAULT_MAX_CHECKS = 10;
+const DEFAULT_CONCURRENCY = 4;
 
 /** Recently opened streams first, then the largest; the first one whose schema has the field wins. */
 export async function pickBestGuessLogsStream(
@@ -37,12 +39,14 @@ export async function pickBestGuessLogsStream(
     .sort((a, b) => b.storageSize - a.storageSize)
     .map((s) => s.name);
   const ordered = [...new Set([...input.recent.filter((n) => known.has(n)), ...bySize])];
-  for (const name of ordered.slice(0, input.maxChecks ?? DEFAULT_MAX_CHECKS)) {
-    try {
-      if (await input.hasField(name)) return name;
-    } catch {
-      // A stream whose schema cannot be read is skipped, not fatal.
-    }
+  const candidates = ordered.slice(0, input.maxChecks ?? DEFAULT_MAX_CHECKS);
+  const batch = Math.max(1, input.concurrency ?? DEFAULT_CONCURRENCY);
+  for (let i = 0; i < candidates.length; i += batch) {
+    const names = candidates.slice(i, i + batch);
+    // A stream whose schema cannot be read is skipped, not fatal.
+    const hits = await Promise.all(names.map((name) => input.hasField(name).catch(() => false)));
+    const hit = names.find((_, index) => hits[index]);
+    if (hit) return hit;
   }
   return null;
 }

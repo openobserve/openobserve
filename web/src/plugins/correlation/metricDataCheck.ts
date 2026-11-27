@@ -14,6 +14,10 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import type { StreamInfo } from "@/services/service_streams";
+import {
+  metricWhereConditions,
+  type MetricsCorrelationConfig,
+} from "@/composables/useMetricsCorrelationDashboard";
 
 export interface MetricDataCheckInput {
   streams: StreamInfo[];
@@ -23,7 +27,35 @@ export interface MetricDataCheckInput {
   signal?: AbortSignal;
 }
 
+export interface MetricProbeTarget {
+  stream: StreamInfo;
+  where: string;
+}
+
+type WhereScope = Pick<
+  MetricsCorrelationConfig,
+  "matchedDimensions" | "semanticGroups" | "metricSchemas"
+>;
+
 const DEFAULT_CONCURRENCY = 4;
+
+/** Pairs each served stream with its chart's WHERE; the server judged `has_data` on served filters only, so others are probed. */
+export function metricProbeTargets(
+  served: StreamInfo[],
+  charted: (stream: StreamInfo) => StreamInfo,
+  scope: WhereScope,
+): MetricProbeTarget[] {
+  return served.map((original) => {
+    const stream = charted(original);
+    const where = metricWhereConditions(stream, scope);
+    const servedWhere = metricWhereConditions(original, {
+      matchedDimensions: {},
+      semanticGroups: scope.semanticGroups,
+    });
+    const has_data = where === servedWhere ? original.has_data : undefined;
+    return { stream: { ...stream, has_data }, where };
+  });
+}
 
 /** SQL that asks whether a metric stream has any row under the chart's WHERE. */
 export function metricExistenceSql(streamName: string, whereConditions: string): string {

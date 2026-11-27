@@ -3223,7 +3223,12 @@ export default defineComponent({
       });
     };
 
-    const relatedLogsLoading = ref(false);
+    // The service whose logs lookup is in flight; a switch to another service never waits on it.
+    const relatedLogsPending = ref<string | null>(null);
+    const relatedLogsLoading = computed(
+      () => relatedLogsPending.value !== null && relatedLogsPending.value === buildServiceName(),
+    );
+    let relatedLogsRequest = 0;
     const logsEmptyService = ref("");
 
     watch([() => props.selectedNode?.id, () => props.visible], () => {
@@ -3278,7 +3283,9 @@ export default defineComponent({
       const serviceName = buildServiceName();
       if (!serviceName || logsLocked.value || correlationLocked.value) return;
       if (relatedLogsLoading.value) return;
-      relatedLogsLoading.value = true;
+      const request = ++relatedLogsRequest;
+      const isStale = () => request !== relatedLogsRequest || buildServiceName() !== serviceName;
+      relatedLogsPending.value = serviceName;
       logsEmptyService.value = "";
       try {
         let logStreams: StreamInfo[] = [];
@@ -3288,6 +3295,7 @@ export default defineComponent({
         } catch {
           // A failed correlation falls back to the best-guess stream, same as an empty match.
         }
+        if (isStale()) return;
         if (logStreams.length > 0) {
           const sourceStream = props.streamFilter || "default";
           const firstLogStream =
@@ -3300,6 +3308,7 @@ export default defineComponent({
           return;
         }
         const guess = await findBestGuessLogsStream();
+        if (isStale()) return;
         if (!guess) {
           logsEmptyService.value = serviceName;
           return;
@@ -3312,7 +3321,7 @@ export default defineComponent({
           }),
         });
       } finally {
-        relatedLogsLoading.value = false;
+        if (request === relatedLogsRequest) relatedLogsPending.value = null;
       }
     };
 

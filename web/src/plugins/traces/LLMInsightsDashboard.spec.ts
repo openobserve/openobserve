@@ -1147,6 +1147,41 @@ describe("LLMInsightsDashboard — large stream notice", () => {
     expect(mockFetchAll).toHaveBeenCalled();
   });
 
+  it("Pick an agent runs nothing until an agent is chosen", async () => {
+    const original = { isEnterprise: config.isEnterprise, isCloud: config.isCloud };
+    config.isEnterprise = "true";
+    config.isCloud = "false";
+    try {
+      mockGetStreams.mockResolvedValue({ list: [bigStream(300 * 1024)] });
+      mockListAgents.mockResolvedValue({
+        agents: [
+          agentAt("omp", "big", "production", "1"),
+          agentAt("bot", "big", "production", "1"),
+        ],
+      });
+      const wrapper = mountDashboard({ streamName: "big" });
+      await flushPromises();
+      await (wrapper.vm as any).refresh(START, END, false);
+      await flushPromises();
+
+      await wrapper.find('[data-test="llm-insights-large-stream-pick-agent"]').trigger("click");
+      await flushPromises();
+      const vm = wrapper.vm as any;
+      expect(vm.filterMode).toBe("agent");
+      expect(mockFetchAll).not.toHaveBeenCalled();
+      expect(wrapper.find('[data-test="llm-insights-large-stream-notice"]').exists()).toBe(true);
+
+      vm.selectedAgentName = "bot";
+      wrapper.findComponent({ name: "AiScopeBar" }).vm.$emit("agent-pick");
+      await flushPromises();
+      expect(mockFetchAll).toHaveBeenCalledTimes(1);
+      expect(wrapper.find('[data-test="llm-insights-large-stream-notice"]').exists()).toBe(false);
+    } finally {
+      config.isEnterprise = original.isEnterprise;
+      config.isCloud = original.isCloud;
+    }
+  });
+
   it.each([
     { name: "with agent mapping access", enterprise: "true", lead: "pick-agent" },
     { name: "without agent mapping access", enterprise: "false", lead: "add-filter" },
