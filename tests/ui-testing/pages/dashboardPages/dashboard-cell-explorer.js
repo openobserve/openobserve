@@ -122,8 +122,15 @@ export default class DashboardCellExplorerPage {
     await expect(this.cellDrawer).toBeHidden({ timeout: 15000 });
   }
 
+  // × on an open event steps back to the list first and keeps the drawer; the next × closes it.
   async closeDrawer() {
+    const detailOpen = await this.detailBackBtn.isVisible();
     await this.drawerCloseBtn.click();
+    if (detailOpen) {
+      await expect(this.detailBackBtn).toBeHidden({ timeout: 10000 });
+      await expect(this.cellDrawer).toBeVisible();
+      await this.drawerCloseBtn.click();
+    }
     await this.expectDrawerClosed();
   }
 

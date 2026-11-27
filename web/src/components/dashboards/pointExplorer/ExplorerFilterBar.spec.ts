@@ -21,6 +21,12 @@ import ExplorerFilterBar from "./ExplorerFilterBar.vue";
 import QueryEditor from "@/components/QueryEditor.vue";
 import { EXPLORER_FILTER_MODE_KEY } from "@/utils/dashboard/pointExplorers";
 
+// The server's function catalogue, as the query cache returns it.
+const fetchQuery = vi.hoisted(() =>
+  vi.fn(() => Promise.resolve([{ name: "approx_topk_x", signature: "(field, k)" }])),
+);
+vi.mock("@/composables/query/queryClient", () => ({ queryClient: { fetchQuery } }));
+
 // The one chips-or-own key all three explorers share, apart from the Logs/Traces pages' keys.
 const KEY = EXPLORER_FILTER_MODE_KEY;
 const PAGE_KEYS = ["o2.logs.queryInput", "o2.traces.queryInput"];
@@ -40,6 +46,7 @@ describe("ExplorerFilterBar", () => {
           filterMode: Boolean,
           fullTextSearch: Boolean,
           keywords: Array,
+          suggestions: Array,
           fieldValueResolver: Function,
           editorHeight: String,
           hideNlToggle: Boolean,
@@ -225,6 +232,21 @@ describe("ExplorerFilterBar", () => {
     // The bare condition goes out as typed.
     editor.vm.$emit("update:query", "level = 'warn'");
     expect(wrapper.emitted("update:ownValue")?.at(-1)).toEqual(["level = 'warn'"]);
+  });
+
+  it("offers the server's functions over the local ones, as the other editors do", async () => {
+    localStorage.removeItem(KEY);
+    mountBar();
+    await flushPromises();
+    const names = (
+      wrapper.findComponent({ name: "QueryEditor" }).props("suggestions") as any[]
+    ).map((entry) => entry.name);
+    expect(names).toContain("approx_topk_x");
+    expect(names).toContain("count");
+    // Fields stay the keywords, with no base keyword list.
+    expect(wrapper.findComponent({ name: "QueryEditor" }).props("keywords")).toEqual([
+      { name: "level", label: "level", kind: "Field", insertText: "level" },
+    ]);
   });
 
   it("the WHERE editor runs on its run-query (Ctrl+Enter) only, even with auto run on", async () => {

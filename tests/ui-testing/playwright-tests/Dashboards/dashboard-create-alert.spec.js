@@ -459,11 +459,11 @@ test.describe("Dashboard Create Alert testcases", () => {
   );
 
   test(
-    "should not show alert context menu on right-clicking a pie chart (non-cartesian series)",
+    "should show only the point rows, no Create alert items, on right-clicking a pie chart (non-cartesian series)",
     { tag: ["@dashboardCreateAlert", "@functional", "@P1"] },
     async ({ page }) => {
       testLogger.info(
-        "Testing no alert context menu on pie chart right-click (whitelist no-op)"
+        "Testing pie chart right-click: point rows only, no alert items"
       );
 
       const pm = new PageManager(page);
@@ -503,17 +503,17 @@ test.describe("Dashboard Create Alert testcases", () => {
         .first()
         .waitFor({ state: "hidden", timeout: 20000 });
 
-      // Pie is outside CONTEXT_MENU_SERIES_TYPES, so no menu may appear.
-      await pm.dashboardPanelEdit.rightClickChart();
+      // Pie is outside CONTEXT_MENU_SERIES_TYPES, so the menu holds no alert items, only the point's View logs.
+      await pm.dashboardPanelEdit.rightClickChartForAlert();
 
-      await pm.dashboardPanelEdit.expectAlertContextMenuHidden();
-      testLogger.info("No alert context menu after pie right-click (as expected)");
+      await pm.dashboardPanelEdit.expectPointMenuWithoutAlertItems();
+      testLogger.info("Pie right-click shows View logs and no alert items (as expected)");
 
       await pm.dashboardCreate.backToDashboardList();
       await deleteDashboard(page, dashName);
 
       testLogger.info(
-        "Test completed: No alert context menu for pie chart"
+        "Test completed: Pie chart right-click shows only the point rows"
       );
     }
   );

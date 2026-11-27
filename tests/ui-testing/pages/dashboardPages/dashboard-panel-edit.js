@@ -69,6 +69,7 @@ export default class DashboardPanel {
     this.alertContextMenu = page.locator('[data-test="alert-context-menu"]');
     this.alertContextMenuAbove = page.locator('[data-test="alert-context-menu-above"]');
     this.alertContextMenuBelow = page.locator('[data-test="alert-context-menu-below"]');
+    this.pointMenuViewLogs = page.locator('[data-test="point-menu-item-view-logs"]');
 
     // VERIFIED: Chart renderer (ChartRenderer.vue:19)
     this.chartRendererCanvas = page.locator('[data-test="chart-renderer"]');
@@ -251,12 +252,6 @@ export default class DashboardPanel {
     await chartCanvas.click({ button: "right", position });
   }
 
-  // Single right-click with no menu retry, for series types that must not open the menu.
-  async rightClickChart() {
-    const { chartCanvas, position } = await this.getChartRightClickTarget();
-    await chartCanvas.click({ button: "right", position });
-  }
-
   async getChartRightClickTarget() {
     const chartCanvas = this.chartRendererCanvas.first();
     await chartCanvas.waitFor({ state: "visible", timeout: 15000 });
@@ -282,6 +277,14 @@ export default class DashboardPanel {
   // Verify alert context menu is hidden
   async expectAlertContextMenuHidden() {
     await expect(this.alertContextMenu).not.toBeVisible({ timeout: 5000 });
+  }
+
+  // A chart with no alert series (pie) opens the menu for its point rows only: View logs, no alert items.
+  async expectPointMenuWithoutAlertItems() {
+    await expect(this.alertContextMenu).toBeVisible({ timeout: 10000 });
+    await expect(this.pointMenuViewLogs).toBeVisible({ timeout: 10000 });
+    await expect(this.alertContextMenuAbove).toHaveCount(0);
+    await expect(this.alertContextMenuBelow).toHaveCount(0);
   }
 
   // Select "above threshold" from alert context menu

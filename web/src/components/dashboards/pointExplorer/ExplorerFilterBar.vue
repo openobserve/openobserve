@@ -5,7 +5,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later -->
      "write your own" in the code editor (the WHERE condition for traces, the full SQL for logs and metrics).
      The host keeps the two in step; this bar only shows them and reports edits. -->
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -17,6 +17,11 @@ import { AUTO_RUN_STORAGE_KEY } from "@/composables/dashboard/useAutoRunToggle";
 import { isAutoRunActive } from "@/composables/useLogs/useAutoRun";
 import type { FilterField } from "@/utils/query/filterBar";
 import { EXPLORER_FILTER_MODE_KEY } from "@/utils/dashboard/pointExplorers";
+import { queryClient } from "@/composables/query/queryClient";
+import { queryFunctionsQuery } from "@/services/query_functions.queries";
+import type { ServerQueryFunction } from "@/services/query_functions";
+import { mergeServerFunctions } from "@/utils/query/serverFunctions";
+import { SQL_FUNCTIONS } from "@/utils/query/sqlCompletion";
 
 const props = defineProps<{
   /** The WHERE condition the chips show; a query they cannot draw shows the builder's banner. */
@@ -77,6 +82,21 @@ const onChipsChange = (where: string) => {
   chipsRunTimer = setTimeout(runNow, CHIPS_RUN_DELAY_MS);
 };
 onBeforeUnmount(cancelPendingRun);
+
+// Functions as the other editors offer them: the local catalogue plus the server's, without which the
+// editor falls back to the local list alone. A failed lookup keeps the local list.
+const serverFunctions = ref<ServerQueryFunction[]>([]);
+const functionSuggestions = computed(() =>
+  mergeServerFunctions(SQL_FUNCTIONS, serverFunctions.value),
+);
+onMounted(() => {
+  const org = store.state.selectedOrganization?.identifier;
+  if (!org) return;
+  queryClient
+    .fetchQuery(queryFunctionsQuery(org))
+    .then((list) => (serverFunctions.value = Array.isArray(list) ? list : []))
+    .catch(() => undefined);
+});
 
 // The WHERE editor offers the stream's fields as it types, and their values through the host's loader.
 const fieldKeywords = computed(() =>
@@ -145,6 +165,7 @@ defineExpose({ cancelPendingRun });
         :filter-mode="ownKind === 'where'"
         :full-text-search="ownKind !== 'where'"
         :keywords="ownKind === 'where' ? fieldKeywords : []"
+        :suggestions="functionSuggestions"
         :field-value-resolver="ownKind === 'where' ? resolveFieldValues : null"
         :data-test-prefix="
           ownKind === 'where' ? `${dataTestPrefix}-filter-input` : `${dataTestPrefix}-editor`
