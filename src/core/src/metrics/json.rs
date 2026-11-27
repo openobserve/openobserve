@@ -732,6 +732,36 @@ mod tests {
         assert!(parse_metric_value(&json!(null)).is_err());
     }
 
+    // The series hash reads a non-string label as empty, so the self-metric encoder has to hand
+    // `le` over as a string, or every finite bucket of a histogram lands in one series.
+    #[test]
+    fn test_self_metric_histogram_buckets_each_get_their_own_series_hash() {
+        use prometheus::{Histogram, HistogramOpts, core::Collector};
+
+        // the default buckets, which `zo_http_response_time` uses: 11 finite bounds and `+Inf`
+        let histogram =
+            Histogram::with_opts(HistogramOpts::new("zo_http_response_time", "help")).unwrap();
+        histogram.observe(0.03);
+        let records = config::utils::prom_json_encoder::JsonEncoder::new()
+            .encode_to_json(&histogram.collect())
+            .into_iter()
+            .filter(|record| record[NAME_LABEL] == "zo_http_response_time_bucket")
+            .map(|record| {
+                let json::Value::Object(row) = flatten::flatten(record).unwrap() else {
+                    unreachable!("the encoder emits objects")
+                };
+                (row, "counter")
+            })
+            .collect();
+
+        let (rows, _) = finish_rows(records).unwrap();
+        let hashes: HashSet<u64> = rows
+            .iter()
+            .map(|(row, _)| row[HASH_LABEL].as_u64().unwrap())
+            .collect();
+        assert_eq!((rows.len(), hashes.len()), (12, 12));
+    }
+
     fn create_test_metric_record(
         name: &str,
         metric_type: &str,
