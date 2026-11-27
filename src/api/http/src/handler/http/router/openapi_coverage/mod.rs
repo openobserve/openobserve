@@ -2143,7 +2143,7 @@ fn oncall_policy_priorities_are_integers() {
 
 #[cfg(feature = "enterprise")]
 #[test]
-fn the_agent_lists_toolsets_with_its_own_pinned_tool() {
+fn agent_lists_toolsets_with_its_own_pinned_tool() {
     let api = ApiDoc::openapi();
     let enabled = enabled_tool_names(&api).unwrap();
     assert!(enabled.iter().any(|name| name == "list_toolsets"));
@@ -2176,7 +2176,7 @@ fn the_agent_lists_toolsets_with_its_own_pinned_tool() {
 // A write through MCP would run as the user, past the agent write path's checks.
 #[cfg(feature = "enterprise")]
 #[test]
-fn the_agent_reads_memory_through_mcp_and_never_writes_it() {
+fn agent_reads_memory_through_mcp_and_never_writes_it() {
     let enabled = enabled_tool_names(&ApiDoc::openapi()).unwrap();
     let spec = published_spec();
     let ops = published_ops(&spec);
