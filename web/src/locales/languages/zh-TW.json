@@ -9608,6 +9608,7 @@
       "promqlFiltersAndOnly": "PromQL 篩選條件僅支援 AND。請移除 OR 與群組，或切換至 SQL。",
       "cappedHint": "顯示前 {count} 個值",
       "cappedAllHint": "「全部」也會比對未列出的值",
+      "metricsTruncatedHint": "部分指標未勾選。請輸入指標名稱以查看所有值。",
       "metric": "指標",
       "label": "標籤",
       "metricSelectTooltip": "選擇一個指標，或使用如 $metricVariable 的變數，以根據另一個值選擇。",
