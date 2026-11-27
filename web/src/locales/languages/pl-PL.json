@@ -18554,7 +18554,16 @@
     "panelTimeSeriesFor": "Szereg czasowy dla {stream}",
     "panelTimeSeriesForWithType": "Szereg czasowy dla {stream} ({type})",
     "logsPanelTitle": "Logi - {stream}",
-    "logsPanelDescription": "Skorelowane logi dla usługi {service}"
+    "logsPanelDescription": "Skorelowane logi dla usługi {service}",
+    "noDataInScope": "Brak danych w tym zakresie",
+    "noDataInScopeReason": "Żaden wiersz nie pasuje do tych filtrów w tym zakresie czasu.",
+    "droppedCount": "+{count} pominięty | +{count} pominiętych",
+    "droppedTitle": "Nie użyte jako filtry",
+    "droppedNoRows": "Brak wierszy z {value}",
+    "droppedNoField": "Pola nie ma w tych strumieniach",
+    "allNoDataTitle": "Żadna metryka nie ma danych w tym zakresie",
+    "allNoDataScope": "{scope}, {window}",
+    "allNoDataAction": "Pokaż metryki bez danych"
   },
   "search_scheduler_job": {
     "title": "Harmonogram zadań wyszukiwania",
@@ -20620,6 +20629,13 @@
       "sampleExpected": "Oczekiwane wyjście",
       "fromTrace": "Z trace span {id}",
       "openInPlaygroundFailed": "Nie udało się otworzyć tego spanu w Playground."
+    },
+    "largeStream": {
+      "notice": "{stream}: około {size} w tym zakresie, bez filtra agenta. Może potrwać kilka minut.",
+      "pickAgent": "Wybierz agenta",
+      "addFilter": "Dodaj filtr",
+      "runAnyway": "Uruchom mimo to",
+      "notRun": "Nie uruchomiono"
     }
   },
   "onlineEvals": {

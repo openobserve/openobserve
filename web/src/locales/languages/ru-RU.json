@@ -18554,7 +18554,16 @@
     "panelTimeSeriesFor": "Временные ряды для {stream}",
     "panelTimeSeriesForWithType": "Временные ряды для {stream} ({type})",
     "logsPanelTitle": "Логи - {stream}",
-    "logsPanelDescription": "Связанные логи для сервиса {service}"
+    "logsPanelDescription": "Связанные логи для сервиса {service}",
+    "noDataInScope": "Нет данных в этой области",
+    "noDataInScopeReason": "Нет строк, соответствующих этим фильтрам, в этом диапазоне времени.",
+    "droppedCount": "+{count} отброшено | +{count} отброшено",
+    "droppedTitle": "Не используются как фильтры",
+    "droppedNoRows": "Нет строк с {value}",
+    "droppedNoField": "Поля нет в этих потоках",
+    "allNoDataTitle": "Ни у одной метрики нет данных в этой области",
+    "allNoDataScope": "{scope}, {window}",
+    "allNoDataAction": "Показать метрики без данных"
   },
   "search_scheduler_job": {
     "title": "Планировщик заданий поиска",
@@ -20620,6 +20629,13 @@
       "sampleExpected": "Ожидаемый вывод",
       "fromTrace": "Из span {id} трейса",
       "openInPlaygroundFailed": "Не удалось открыть этот span в Playground"
+    },
+    "largeStream": {
+      "notice": "{stream}: около {size} в этом диапазоне, без фильтра агента. Может занять несколько минут.",
+      "pickAgent": "Выбрать агента",
+      "addFilter": "Добавить фильтр",
+      "runAnyway": "Всё равно запустить",
+      "notRun": "Не запущено"
     }
   },
   "onlineEvals": {

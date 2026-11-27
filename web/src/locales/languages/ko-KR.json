@@ -18554,7 +18554,16 @@
     "panelTimeSeriesFor": "{stream}의 시계열",
     "panelTimeSeriesForWithType": "{stream}의 시계열 ({type})",
     "logsPanelTitle": "로그 - {stream}",
-    "logsPanelDescription": "서비스 {service}의 연관 로그"
+    "logsPanelDescription": "서비스 {service}의 연관 로그",
+    "noDataInScope": "이 범위에 데이터가 없습니다",
+    "noDataInScopeReason": "이 시간 범위에서 이 필터와 일치하는 행이 없습니다.",
+    "droppedCount": "+{count}개 제외 | +{count}개 제외",
+    "droppedTitle": "필터로 사용되지 않음",
+    "droppedNoRows": "{value}인 행이 없습니다",
+    "droppedNoField": "이 스트림에 없는 필드",
+    "allNoDataTitle": "이 범위에 데이터가 있는 메트릭이 없습니다",
+    "allNoDataScope": "{scope}, {window}",
+    "allNoDataAction": "데이터가 없는 메트릭 표시"
   },
   "search_scheduler_job": {
     "title": "작업 스케줄러 검색",
@@ -20620,6 +20629,13 @@
       "sampleExpected": "기대 출력",
       "fromTrace": "트레이스 스팬 {id}에서",
       "openInPlaygroundFailed": "이 스팬을 Playground에서 열 수 없습니다."
+    },
+    "largeStream": {
+      "notice": "{stream}: 이 범위에서 약 {size}, 에이전트 필터 없음. 몇 분 걸릴 수 있습니다.",
+      "pickAgent": "에이전트 선택",
+      "addFilter": "필터 추가",
+      "runAnyway": "그래도 실행",
+      "notRun": "실행되지 않음"
     }
   },
   "onlineEvals": {

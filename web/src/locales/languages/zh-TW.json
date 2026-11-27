@@ -18549,7 +18549,16 @@
     "panelTimeSeriesFor": "{stream} 的時間序列",
     "panelTimeSeriesForWithType": "{stream} 的時間序列（{type}）",
     "logsPanelTitle": "日誌 - {stream}",
-    "logsPanelDescription": "與服務 {service} 相關聯的日誌"
+    "logsPanelDescription": "與服務 {service} 相關聯的日誌",
+    "noDataInScope": "此範圍內無資料",
+    "noDataInScopeReason": "此時間範圍內沒有符合這些篩選條件的資料列。",
+    "droppedCount": "+{count} 個已捨棄 | +{count} 個已捨棄",
+    "droppedTitle": "未用作篩選條件",
+    "droppedNoRows": "沒有值為 {value} 的資料列",
+    "droppedNoField": "這些串流中沒有此欄位",
+    "allNoDataTitle": "此範圍內沒有指標有資料",
+    "allNoDataScope": "{scope}，{window}",
+    "allNoDataAction": "顯示無資料的指標"
   },
   "search_scheduler_job": {
     "title": "搜尋工作排程器",
@@ -20615,6 +20624,13 @@
       "sampleExpected": "預期輸出",
       "fromTrace": "來自追蹤 Span {id}",
       "openInPlaygroundFailed": "無法在 Playground 中開啟此 Span。"
+    },
+    "largeStream": {
+      "notice": "{stream}：此範圍內約 {size}，沒有代理篩選。可能需要數分鐘。",
+      "pickAgent": "選擇代理",
+      "addFilter": "新增篩選條件",
+      "runAnyway": "仍要執行",
+      "notRun": "未執行"
     }
   },
   "onlineEvals": {

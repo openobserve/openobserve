@@ -18552,7 +18552,16 @@
     "panelTimeSeriesFor": "Time series for {stream}",
     "panelTimeSeriesForWithType": "Time series for {stream} ({type})",
     "logsPanelTitle": "Logs - {stream}",
-    "logsPanelDescription": "Correlated logs for service {service}"
+    "logsPanelDescription": "Correlated logs for service {service}",
+    "noDataInScope": "No data in this scope",
+    "noDataInScopeReason": "No rows match these filters in this time range.",
+    "droppedCount": "+{count} dropped | +{count} dropped",
+    "droppedTitle": "Not used as filters",
+    "droppedNoRows": "No rows with {value}",
+    "droppedNoField": "Field not on these streams",
+    "allNoDataTitle": "No metric has data in this scope",
+    "allNoDataScope": "{scope}, {window}",
+    "allNoDataAction": "Show metrics without data"
   },
   "search_scheduler_job": {
     "title": "Search Job Scheduler",
@@ -20618,6 +20627,13 @@
       "sampleExpected": "Expected Output",
       "fromTrace": "From trace span {id}",
       "openInPlaygroundFailed": "Could not open this span in the Playground"
+    },
+    "largeStream": {
+      "notice": "{stream}: about {size} in this range, no agent filter. May take minutes.",
+      "pickAgent": "Pick an agent",
+      "addFilter": "Add a filter",
+      "runAnyway": "Run anyway",
+      "notRun": "Not run"
     }
   },
   "onlineEvals": {

@@ -18554,7 +18554,16 @@
     "panelTimeSeriesFor": "سلاسل زمنية {stream}",
     "panelTimeSeriesForWithType": "السلاسل الزمنية ل {stream} ({type})",
     "logsPanelTitle": "السجلات - {stream}",
-    "logsPanelDescription": "سجلات مرتبطة بالخدمة {service}"
+    "logsPanelDescription": "سجلات مرتبطة بالخدمة {service}",
+    "noDataInScope": "لا توجد بيانات في هذا النطاق",
+    "noDataInScopeReason": "لا توجد صفوف تطابق عوامل التصفية هذه في هذا النطاق الزمني.",
+    "droppedCount": "+{count} مستبعد | +{count} مستبعدة",
+    "droppedTitle": "غير مستخدمة كعوامل تصفية",
+    "droppedNoRows": "لا توجد صفوف تحتوي على {value}",
+    "droppedNoField": "الحقل غير موجود في هذه التدفقات",
+    "allNoDataTitle": "لا يوجد مقياس به بيانات في هذا النطاق",
+    "allNoDataScope": "{scope}، {window}",
+    "allNoDataAction": "عرض المقاييس التي لا تحتوي على بيانات"
   },
   "search_scheduler_job": {
     "title": "مُجدول مهام البحث",
@@ -20620,6 +20629,13 @@
       "sampleExpected": "الإنتاج المتوقع",
       "fromTrace": "من امتداد التتبع {id}",
       "openInPlaygroundFailed": "تعذّر فتح هذا الامتداد في ساحة التجربة"
+    },
+    "largeStream": {
+      "notice": "{stream}: حوالي {size} في هذا النطاق، بدون عامل تصفية للوكيل. قد يستغرق ذلك دقائق.",
+      "pickAgent": "اختر وكيلًا",
+      "addFilter": "إضافة عامل تصفية",
+      "runAnyway": "تشغيل على أي حال",
+      "notRun": "لم يتم التشغيل"
     }
   },
   "onlineEvals": {

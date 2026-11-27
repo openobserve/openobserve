@@ -18554,7 +18554,16 @@
     "panelTimeSeriesFor": "Tijdreeks voor {stream}",
     "panelTimeSeriesForWithType": "Tijdreeks voor {stream} ({type})",
     "logsPanelTitle": "Logs - {stream}",
-    "logsPanelDescription": "Gecorreleerde logs voor service {service}"
+    "logsPanelDescription": "Gecorreleerde logs voor service {service}",
+    "noDataInScope": "Geen gegevens in dit bereik",
+    "noDataInScopeReason": "Geen rijen komen overeen met deze filters in dit tijdsbereik.",
+    "droppedCount": "+{count} weggelaten | +{count} weggelaten",
+    "droppedTitle": "Niet als filter gebruikt",
+    "droppedNoRows": "Geen rijen met {value}",
+    "droppedNoField": "Veld niet in deze streams",
+    "allNoDataTitle": "Geen metriek heeft gegevens in dit bereik",
+    "allNoDataScope": "{scope}, {window}",
+    "allNoDataAction": "Metrieken zonder gegevens tonen"
   },
   "search_scheduler_job": {
     "title": "Planner voor zoektaken",
@@ -20620,6 +20629,13 @@
       "sampleExpected": "Verwachte output",
       "fromTrace": "Van trace-span {id}",
       "openInPlaygroundFailed": "Kon deze span niet openen in de Playground."
+    },
+    "largeStream": {
+      "notice": "{stream}: ongeveer {size} in dit bereik, geen agentfilter. Kan minuten duren.",
+      "pickAgent": "Kies een agent",
+      "addFilter": "Filter toevoegen",
+      "runAnyway": "Toch uitvoeren",
+      "notRun": "Niet uitgevoerd"
     }
   },
   "onlineEvals": {

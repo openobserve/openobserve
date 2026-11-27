@@ -97,6 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :semantic-groups="semanticGroups"
       overflow-mode="responsive"
       :get-subject-button-label="getSubjectButtonLabel"
+      :dropped-dimensions="droppedTabDimensions"
     />
 
     <!-- Tabs (only in dialog mode, hidden in embedded-tabs mode) -->
@@ -256,18 +257,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </template>
                     </template>
                   </template>
-                  <div v-else class="px-2 pt-3 text-center">
+                  <div v-else-if="noDataListedStreams.length === 0" class="px-2 pt-3 text-center">
                     <OIcon name="info" size="sm" class="me-1 align-middle" />
                     {{ t("search.noResult") }}
                   </div>
+                  <CorrelationNoDataGroup
+                    v-model:open="noDataGroupOpen"
+                    :streams="noDataListedStreams"
+                    :selected-names="selectedMetricNames"
+                    @toggle="toggleMetricStream"
+                  />
                 </div>
 
                 <!-- Footer: selected count -->
-                <div class="border-card-glass-border border-t border-solid p-3 text-xs font-normal">
+                <div
+                  v-if="listedMetricCount > 0"
+                  class="border-card-glass-border border-t border-solid p-3 text-xs font-normal"
+                >
                   {{
                     t("correlation.streamsSelectedCount", {
-                      selected: selectedMetricStreams.length,
-                      total: uniqueMetricStreams.length,
+                      selected: listedSelectedCount,
+                      total: listedMetricCount,
                     })
                   }}
                 </div>
@@ -385,6 +395,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :allowAlertCreation="false"
                     searchType="dashboards"
                   />
+                  <OEmptyState
+                    v-else-if="allMetricsNoData"
+                    size="inline"
+                    icon="search-off"
+                    class="h-full"
+                    :title="t('correlation.allNoDataTitle')"
+                    :description="allNoDataDescription"
+                    data-test="telemetry-correlation-all-no-data"
+                  >
+                    <template #actions>
+                      <OButton
+                        variant="outline"
+                        size="sm"
+                        data-test="telemetry-correlation-all-no-data-show"
+                        @click="noDataGroupOpen = true"
+                        >{{ t("correlation.allNoDataAction") }}</OButton
+                      >
+                    </template>
+                  </OEmptyState>
                   <div
                     v-else-if="hasNoMetricStreams"
                     data-test="correlation-no-metric-streams"
@@ -553,6 +582,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :semantic-groups="semanticGroups"
       overflow-mode="responsive"
       :get-subject-button-label="getSubjectButtonLabel"
+      :dropped-dimensions="droppedTabDimensions"
     />
 
     <!-- Tab Panels (no tabs in embedded mode, controlled by parent) -->
@@ -711,18 +741,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </template>
                   </template>
                 </template>
-                <div v-else class="px-2 pt-3 text-center">
+                <div v-else-if="noDataListedStreams.length === 0" class="px-2 pt-3 text-center">
                   <OIcon name="info" size="sm" class="me-1 align-middle" />
                   {{ t("search.noResult") }}
                 </div>
+                <CorrelationNoDataGroup
+                  v-model:open="noDataGroupOpen"
+                  :streams="noDataListedStreams"
+                  :selected-names="selectedMetricNames"
+                  @toggle="toggleMetricStream"
+                />
               </div>
 
               <!-- Footer: selected count -->
-              <div class="border-card-glass-border border-t border-solid p-3 text-xs font-normal">
+              <div
+                v-if="listedMetricCount > 0"
+                class="border-card-glass-border border-t border-solid p-3 text-xs font-normal"
+              >
                 {{
                   t("correlation.streamsSelectedCount", {
-                    selected: selectedMetricStreams.length,
-                    total: uniqueMetricStreams.length,
+                    selected: listedSelectedCount,
+                    total: listedMetricCount,
                   })
                 }}
               </div>
@@ -840,6 +879,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   searchType="dashboards"
                   class="border-none"
                 />
+                <OEmptyState
+                  v-else-if="allMetricsNoData"
+                  size="inline"
+                  icon="search-off"
+                  class="h-full"
+                  :title="t('correlation.allNoDataTitle')"
+                  :description="allNoDataDescription"
+                  data-test="telemetry-correlation-all-no-data"
+                >
+                  <template #actions>
+                    <OButton
+                      variant="outline"
+                      size="sm"
+                      data-test="telemetry-correlation-all-no-data-show"
+                      @click="noDataGroupOpen = true"
+                      >{{ t("correlation.allNoDataAction") }}</OButton
+                    >
+                  </template>
+                </OEmptyState>
                 <div
                   v-else-if="hasNoMetricStreams"
                   data-test="correlation-no-metric-streams"
@@ -1111,6 +1169,9 @@ import { filterByIntent, pickDefaultIntent, type IntentId } from "@/utils/metric
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import DimensionFiltersBar from "./DimensionFiltersBar.vue";
 import CorrelationEventHeader from "./CorrelationEventHeader.vue";
+import CorrelationNoDataGroup from "./CorrelationNoDataGroup.vue";
+import { findNoDataMetricStreams, metricExistenceSql, metricProbeTargets } from "./metricDataCheck";
+import { streamTraceRows } from "./correlationStream";
 import TraceDetails from "@/plugins/traces/TraceDetails.vue";
 import TracesSearchResultList from "@/plugins/traces/components/TracesSearchResultList.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -1143,6 +1204,7 @@ import {
 import {
   correlatedByKeys,
   correlatedByLabel,
+  droppedDimensions,
   repeatsChip,
   useLocationDimensions,
 } from "./correlationHeader";
@@ -1214,6 +1276,7 @@ let currentTracesStreamTraceId: string | null = null;
 
 // The in-flight traces stream outlives this component otherwise; cancel it on unmount.
 onUnmounted(() => {
+  noDataCheckController?.abort();
   if (currentTracesStreamTraceId) {
     cancelStreamQueryBasedOnRequestId({
       trace_id: currentTracesStreamTraceId,
@@ -1541,6 +1604,22 @@ const uniqueMetricStreams = computed(() => {
 
   return [...base, ...extra];
 });
+
+// Streams with no rows in the tab's scope; they leave the default selection.
+const noDataStreamNames = ref<Set<string>>(new Set());
+const noDataGroupOpen = ref(false);
+let noDataCheckController: AbortController | null = null;
+let noDataCheckKey = "";
+let noDataCheckRun = 0;
+// Streams the check took out of the selection, kept so they come back once they have data.
+const autoHiddenStreams = new Map<string, StreamInfo>();
+
+const withoutNoDataStreams = (streams: StreamInfo[]) =>
+  streams.filter((s) => {
+    if (!noDataStreamNames.value.has(s.stream_name)) return true;
+    autoHiddenStreams.set(s.stream_name, s);
+    return false;
+  });
 
 // Selected metric streams — declared before chip/intent block because applyActivePill references it.
 const selectedMetricStreams = ref<StreamInfo[]>(
@@ -1894,7 +1973,10 @@ const streamsForActivePill = computed<StreamInfo[]>(() => {
 });
 
 const applyActivePill = () => {
-  selectedMetricStreams.value = applyUnstableDimensionDefaults(streamsForActivePill.value);
+  autoHiddenStreams.clear();
+  selectedMetricStreams.value = withoutNoDataStreams(
+    applyUnstableDimensionDefaults(streamsForActivePill.value),
+  );
 };
 
 let lastIntentInitKey: string | null = null;
@@ -1929,7 +2011,49 @@ const filteredMetricStreams = computed(() => {
 // Group the filtered metric streams into configured categories
 // In nested mode, also apply scope filter so the sidebar shows only pod/node streams
 const groupedFilteredMetricStreams = computed(() =>
-  groupMetricsByCategory(applyScopeFilter(filteredMetricStreams.value), effectiveGroupDefs.value),
+  groupMetricsByCategory(
+    applyScopeFilter(filteredMetricStreams.value).filter(
+      (s) => !noDataStreamNames.value.has(s.stream_name),
+    ),
+    effectiveGroupDefs.value,
+  ),
+);
+
+const noDataListedStreams = computed(() =>
+  applyScopeFilter(filteredMetricStreams.value).filter((s) =>
+    noDataStreamNames.value.has(s.stream_name),
+  ),
+);
+
+const selectedMetricNames = computed(
+  () => new Set(selectedMetricStreams.value.map((s) => s.stream_name)),
+);
+
+const listedMetricCount = computed(
+  () => uniqueMetricStreams.value.filter((s) => !noDataStreamNames.value.has(s.stream_name)).length,
+);
+const listedSelectedCount = computed(
+  () =>
+    selectedMetricStreams.value.filter((s) => !noDataStreamNames.value.has(s.stream_name)).length,
+);
+
+const allMetricsNoData = computed(() => {
+  const scoped = applyScopeFilter(uniqueMetricStreams.value);
+  return (
+    selectedMetricStreams.value.length === 0 &&
+    scoped.length > 0 &&
+    scoped.every((s) => noDataStreamNames.value.has(s.stream_name))
+  );
+});
+
+const allNoDataDescription = computed(() => {
+  const range = formatTimeRange(props.timeRange);
+  const scope = contextChips.value.map((chip) => `${chip.label} ${chip.value}`).join(", ");
+  return scope ? t("correlation.allNoDataScope", { scope, window: range }) : range;
+});
+
+const droppedTabDimensions = computed(() =>
+  droppedDimensions(tabStreams.value, semanticGroups.value),
 );
 
 // Group ALL available unique metric streams — drives which tabs are visible
@@ -1984,9 +2108,10 @@ const regenerateGroupDashboards = (config: MetricsCorrelationConfig) => {
   const next: Partial<Record<string, any>> = {};
 
   for (const gId of groupIds.value) {
-    if (grouped.byGroup[gId].length > 0) {
+    const streams = grouped.byGroup[gId] ?? [];
+    if (streams.length > 0) {
       next[gId] = generateDashboard(
-        grouped.byGroup[gId],
+        streams,
         config,
         store.state.theme,
         props.panelWidth,
@@ -2177,6 +2302,7 @@ const currentTimeObj = computed(() => {
 
 // Toggle metric stream selection
 const toggleMetricStream = (stream: StreamInfo) => {
+  autoHiddenStreams.delete(stream.stream_name);
   const index = selectedMetricStreams.value.findIndex((s) => s.stream_name === stream.stream_name);
 
   if (index > -1) {
@@ -2313,11 +2439,103 @@ const applyDimensionChanges = () => {
     ),
   }));
 
+  for (const [name, stream] of autoHiddenStreams) {
+    autoHiddenStreams.set(name, {
+      ...stream,
+      filters: applyDimensionEditsToFilters(
+        stream.filters ?? {},
+        activeDimensions.value,
+        fieldToDimensionId,
+      ),
+    });
+  }
+
   // Note: For logs, the filters are built from config.matchedDimensions in the composable
   // which we're already updating via activeDimensions
 
   // Reload the dashboard with updated filters
   loadDashboard();
+  if (initialLoadCompleted.value) void runNoDataCheck();
+};
+
+watch(uniqueMetricStreams, () => {
+  if (initialLoadCompleted.value) void runNoDataCheck();
+});
+
+watch(
+  () => props.timeRange,
+  () => {
+    if (initialLoadCompleted.value) void runNoDataCheck();
+  },
+  { deep: true },
+);
+
+// The stream as its chart would run: the selected copy, else what a toggle would add.
+const chartedMetricStream = (stream: StreamInfo) =>
+  selectedMetricStreams.value.find((s) => s.stream_name === stream.stream_name) ??
+  autoHiddenStreams.get(stream.stream_name) ??
+  applyUnstableDimensionDefaults([stream])[0];
+
+const applyNoDataResult = (names: Set<string>) => {
+  noDataStreamNames.value = names;
+  const restored = [...autoHiddenStreams.values()].filter((s) => !names.has(s.stream_name));
+  for (const s of restored) autoHiddenStreams.delete(s.stream_name);
+  const kept = withoutNoDataStreams(selectedMetricStreams.value);
+  const keptNames = new Set(kept.map((s) => s.stream_name));
+  const next = [...kept, ...restored.filter((s) => !keptNames.has(s.stream_name))];
+  if (next.length !== selectedMetricStreams.value.length || restored.length > 0) {
+    selectedMetricStreams.value = next;
+    // The empty state must not wait out the reload debounce behind charts already drawn.
+    if (next.length === 0) clearMetricDashboards();
+  }
+};
+
+const runNoDataCheck = async () => {
+  const run = ++noDataCheckRun;
+  const streams = uniqueMetricStreams.value;
+  if (streams.length === 0) {
+    noDataCheckController?.abort();
+    noDataCheckKey = "";
+    applyNoDataResult(new Set());
+    return;
+  }
+  // Subject overrides resolve against the schema, so probing before it loads would test another WHERE.
+  const metricSchemas = await fetchMetricSchemas(streams.map((s) => s.stream_name));
+  if (run !== noDataCheckRun) return;
+  const targets = metricProbeTargets(streams, chartedMetricStream, {
+    matchedDimensions: activeDimensions.value,
+    semanticGroups: semanticGroups.value,
+    metricSchemas,
+  });
+  const key = JSON.stringify([
+    targets.map((t) => [t.stream.stream_name, t.where, t.stream.has_data]),
+    props.timeRange,
+  ]);
+  if (key === noDataCheckKey) return;
+  noDataCheckKey = key;
+  noDataCheckController?.abort();
+  const controller = new AbortController();
+  noDataCheckController = controller;
+  const whereByName = new Map(targets.map((t) => [t.stream.stream_name, t.where]));
+  const found = await findNoDataMetricStreams({
+    streams: targets.map((t) => t.stream),
+    signal: controller.signal,
+    // A partial answer rejects, so a timed-out probe counts as unknown and the stream stays listed.
+    probe: async (stream) => {
+      const rows = await streamTraceRows({
+        org: currentOrgIdentifier.value,
+        sql: metricExistenceSql(stream.stream_name, whereByName.get(stream.stream_name) ?? ""),
+        startTime: props.timeRange.startTime,
+        endTime: props.timeRange.endTime,
+        size: 1,
+        signal: controller.signal,
+        streamType: "metrics",
+      });
+      return rows.length > 0;
+    },
+  });
+  if (noDataCheckController !== controller || controller.signal.aborted) return;
+  applyNoDataResult(found ?? new Set());
 };
 
 const loadDashboard = async () => {
@@ -3134,6 +3352,7 @@ watch(
         selectedMetricStreams.value = applyUnstableDimensionDefaults(selectedMetricStreams.value);
       }
 
+      void runNoDataCheck();
       await loadDashboard();
       initialLoadCompleted.value = true;
     }
@@ -3283,6 +3502,7 @@ watch(
       selectedMetricStreams.value = applyUnstableDimensionDefaults(selectedMetricStreams.value);
       if (isOpen.value) {
         loadDashboard();
+        void runNoDataCheck();
       }
     }
   },
@@ -3312,6 +3532,7 @@ watch(
       selectedMetricStreams.value = applyUnstableDimensionDefaults(selectedMetricStreams.value);
       if (isOpen.value) {
         loadDashboard();
+        void runNoDataCheck();
       }
     }
   },
