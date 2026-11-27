@@ -9613,6 +9613,7 @@
       "promqlFiltersAndOnly": "PromQL 筛选条件仅支持 AND。请删除 OR 和分组，或切换到 SQL。",
       "cappedHint": "显示前 {count} 个值",
       "cappedAllHint": "“全部”也会匹配未列出的值",
+      "metricsTruncatedHint": "部分指标未勾选。输入指标名称可查看所有值。",
       "metric": "指标",
       "label": "标签",
       "metricSelectTooltip": "选择一个指标，或使用 $metricVariable 之类的变量根据其他值进行选择。",
@@ -15419,7 +15420,9 @@
     "incidentDestination": "事件目标",
     "incidentDestinationPlaceholder": "使用组织默认",
     "incidentDestinationHint": "当此源的告警创建或加入事件时，通知发送到哪里。留空以使用组织默认——如果两者都未设置，匹配的事件将静默触发。",
+    "incidentDestinationHintOncall": "当此源的告警创建或加入事件时，除 On-Call 呼叫外，通知还会发送到哪里。留空以使用组织默认。",
     "noDestinationSet": "未设置事件目标",
+    "oncallOnly": "仅 On-Call",
     "setupStep1Title": "1. 创建 webhook",
     "setupStep1Body": "在 Grafana、Alertmanager 或任何可以 POST JSON 的工具中，创建一个 webhook 联系点/接收器。",
     "setupRemainingStepsHint": "保存此源以获取其 URL 和令牌，然后将它们粘贴到该 webhook 配置中。",
@@ -16502,6 +16505,13 @@
       "logoLightLabel": "自定义徽标（浅色模式）",
       "logoLightHelp": "在浅色模式下显示。支持 PNG、JPG、GIF 或 BMP，最大 150 × 30 px。",
       "logoDarkLabel": "自定义徽标（深色模式）",
+      "logoTitle": "自定义徽标",
+      "logoHelp": "显示在应用页眉中。支持 PNG、JPG、GIF、BMP、WEBP 或 SVG，最大 150 × 30 像素。",
+      "logoLightTitle": "浅色模式",
+      "logoDarkTitle": "深色模式",
+      "logoSaved": "已保存",
+      "logoNotSaved": "未保存",
+      "logoDimensions": "{width} × {height} 像素",
       "logoDarkHelp": "在深色模式下显示。支持 PNG、JPG、GIF 或 BMP，最大 150 × 30 px。"
     },
     "modelPricingEditor": {
@@ -24262,8 +24272,19 @@
       "clear": "清除"
     },
     "file": {
-      "removeFile": "移除文件",
-      "clearAll": "全部清除"
+      "removeNamed": "移除 {name}",
+      "attachPrompt": "拖放文件以附加，或 {browse}",
+      "attachPromptMultiple": "拖放多个文件以附加，或 {browse}",
+      "browseLink": "浏览",
+      "supports": "支持的文件 {types}",
+      "dropFileToAttach": "松开以附加文件",
+      "dropFilesToAttach": "松开以附加文件",
+      "typeRejected": "仅接受 {allowed} 文件",
+      "sizeRejected": "{size} 超过 {max} 的限制",
+      "countRejected": "一次只能 {count} 个文件 | 一次只能 {count} 个文件",
+      "invalidJson": "不是有效的 JSON:{detail}",
+      "invalidImage": "不是有效的图片文件",
+      "unavailable": "文件上传不可用"
     },
     "date": {
       "openCalendar": "打开日历",
@@ -28089,8 +28110,8 @@
     "awayMark": "标记为请假",
     "awayClear": "清除离开状态",
     "awayClearConfirm": "清除",
-    "awayClearMessage": "清除 {name} 的离开状态（{range}）？此操作会应用于所有团队。",
-    "awayConsequence": "会应用于 {name} 所在的每个团队。其班次将转给各轮值中的下一位成员（如有）。",
+    "awayClearMessage": "清除 {name} 的暂离状态吗？时间范围：{range}。此操作将应用于本组织内的所有团队。",
+    "awayConsequence": "将应用于 {name} 在本组织内所属的每个团队。其班次将转交给各轮值中的下一位（如有）。",
     "awayNextWeek": "下周，周一至周日",
     "awayTitle": "标记为请假",
     "membersAddOpen": "添加成员",
@@ -34665,7 +34686,15 @@
     "offline": "当前离线，仍可查看最近访问。",
     "sourceUnavailable": "此资源类型当前不可用",
     "emptyHelp": "输入名称或 ID 搜索资源",
-    "globalShortcut": "打开全局搜索"
+    "globalShortcut": "打开全局搜索",
+    "trigger": "搜索或跳转到…",
+    "allTypes": "全部",
+    "capped": "显示第一个匹配项。 | 显示前 {count} 个匹配项。",
+    "hintNavigate": "导航",
+    "hintOpen": "打开",
+    "hintNewTab": "在新标签页中打开",
+    "hintTypes": "按类型过滤",
+    "hintClose": "关闭"
   },
   "timeRangeInput": {
     "label": "输入时间范围",

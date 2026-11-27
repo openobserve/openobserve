@@ -9613,6 +9613,7 @@
       "promqlFiltersAndOnly": "Filtry PromQL obsługują tylko AND. Usuń OR i grupy albo przełącz na SQL.",
       "cappedHint": "Wyświetlono pierwsze {count} wartości",
       "cappedAllHint": "„Wszystkie” obejmuje też wartości spoza listy",
+      "metricsTruncatedHint": "Niektóre metryki nie zostały zaznaczone. Wpisz nazwę metryki, aby zobaczyć wszystkie wartości.",
       "metric": "Metryka",
       "label": "Etykieta",
       "metricSelectTooltip": "Wybierz metrykę lub użyj zmiennej, np. $metricVariable, aby wybrać ją na podstawie innej wartości.",
@@ -15419,7 +15420,9 @@
     "incidentDestination": "Miejsce docelowe incydentów",
     "incidentDestinationPlaceholder": "Użyj domyślnych ustawień organizacji",
     "incidentDestinationHint": "Gdzie trafiają powiadomienia, gdy alerty tego źródła tworzą lub dołączają do incydentu. Pozostaw puste, aby użyć domyślnych ustawień organizacji — jeśli żadne nie jest ustawione, pasujące incydenty będą wyzwalane po cichu.",
+    "incidentDestinationHintOncall": "Gdzie trafiają powiadomienia, oprócz powiadomień On-Call, gdy alerty tego źródła tworzą lub dołączają do incydentu. Pozostaw puste, aby użyć domyślnych ustawień organizacji.",
     "noDestinationSet": "Nie ustawiono miejsca docelowego incydentów",
+    "oncallOnly": "Tylko On-Call",
     "setupStep1Title": "1. Utwórz webhook",
     "setupStep1Body": "W Grafanie, Alertmanagerze lub dowolnym narzędziu, które potrafi wysyłać JSON metodą POST, utwórz punkt kontaktowy / odbiorcę webhooka.",
     "setupRemainingStepsHint": "Zapisz to źródło, aby uzyskać jego adres URL i token, a następnie wklej je do konfiguracji webhooka.",
@@ -16502,6 +16505,13 @@
       "logoLightLabel": "Niestandardowe logo (tryb jasny)",
       "logoLightHelp": "Wyświetlane w trybie jasnym. PNG, JPG, GIF lub BMP, do 150 × 30 px.",
       "logoDarkLabel": "Niestandardowe logo (tryb ciemny)",
+      "logoTitle": "Własne logo",
+      "logoHelp": "Wyświetlane w nagłówku aplikacji. PNG, JPG, GIF, BMP, WEBP lub SVG, do 150 × 30 px.",
+      "logoLightTitle": "Tryb jasny",
+      "logoDarkTitle": "Tryb ciemny",
+      "logoSaved": "Zapisano",
+      "logoNotSaved": "Niezapisane",
+      "logoDimensions": "{width} × {height} px",
       "logoDarkHelp": "Wyświetlane w trybie ciemnym. PNG, JPG, GIF lub BMP, do 150 × 30 px."
     },
     "modelPricingEditor": {
@@ -24262,8 +24272,19 @@
       "clear": "Wyczyść"
     },
     "file": {
-      "removeFile": "Usuń plik",
-      "clearAll": "Wyczyść wszystko"
+      "removeNamed": "Usuń {name}",
+      "attachPrompt": "Przeciągnij plik, aby załączyć, lub {browse}",
+      "attachPromptMultiple": "Przeciągnij pliki, aby załączyć, lub {browse}",
+      "browseLink": "przeglądaj",
+      "supports": "Obsługiwane pliki {types}",
+      "dropFileToAttach": "Upuść plik, aby go dołączyć",
+      "dropFilesToAttach": "Upuść pliki, aby je dołączyć",
+      "typeRejected": "Akceptowane są tylko pliki: {allowed}",
+      "sizeRejected": "{size} przekracza limit {max}",
+      "countRejected": "Tylko {count} plik naraz | Tylko {count} pliki naraz",
+      "invalidJson": "Nieprawidłowy JSON: {detail}",
+      "invalidImage": "To nie jest prawidłowy plik obrazu",
+      "unavailable": "Przesyłanie plików jest niedostępne"
     },
     "date": {
       "openCalendar": "Otwórz kalendarz",
@@ -28089,8 +28110,8 @@
     "awayMark": "Oznacz nieobecność",
     "awayClear": "Wyczyść nieobecność",
     "awayClearConfirm": "Wyczyść",
-    "awayClearMessage": "Wyczyścić nieobecność {name}, {range}? Dotyczy ona każdego zespołu.",
-    "awayConsequence": "Dotyczy każdego zespołu, do którego należy {name}. Zmiany tej osoby trafiają do następnej osoby w każdej rotacji, jeśli taka istnieje.",
+    "awayClearMessage": "Wyczyścić nieobecność {name} ({range})? Ma ona zastosowanie w każdym zespole w tej organizacji.",
+    "awayConsequence": "Dotyczy każdego zespołu, do którego należy {name} w tej organizacji. Ich zmiany przechodzą do następnej osoby w każdej rotacji, jeśli taka istnieje.",
     "awayNextWeek": "Następny tydzień, pon.–niedz.",
     "awayTitle": "Oznacz nieobecność",
     "membersAddOpen": "Dodaj członków",
@@ -34665,7 +34686,15 @@
     "offline": "Tryb offline. Ostatnie wizyty są nadal dostępne.",
     "sourceUnavailable": "Ten typ zasobu jest niedostępny",
     "emptyHelp": "Wpisz nazwę lub identyfikator",
-    "globalShortcut": "Otwórz wyszukiwanie globalne"
+    "globalShortcut": "Otwórz wyszukiwanie globalne",
+    "trigger": "Szukaj lub przejdź do…",
+    "allTypes": "Wszystkie",
+    "capped": "Wyświetlanie pierwszego dopasowania. | Wyświetlanie pierwszych dopasowań: {count}.",
+    "hintNavigate": "Nawiguj",
+    "hintOpen": "Otwórz",
+    "hintNewTab": "Otwórz w nowej karcie",
+    "hintTypes": "Filtruj według typu",
+    "hintClose": "Zamknij"
   },
   "timeRangeInput": {
     "label": "Wpisz zakres czasu",

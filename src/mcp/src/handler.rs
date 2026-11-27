@@ -21,7 +21,7 @@ use serde::Serialize;
 use super::{
     ledger::Origin,
     protocol::route_request,
-    types::{MCPRequest, MCPResponse},
+    types::{MCPRequest, MCPResponse, ToolAccess},
 };
 
 /// OAuth 2.0 Authorization Server Metadata
@@ -115,8 +115,9 @@ pub async fn handle_mcp_request(
     request: MCPRequest,
     auth_token: Option<String>,
     origin: Option<&Origin>,
+    access: ToolAccess,
 ) -> Result<MCPResponse> {
-    route_request(org_id, request, auth_token, origin).await
+    route_request(org_id, request, auth_token, origin, access).await
 }
 
 /// Handle an MCP request with streaming response
@@ -126,9 +127,10 @@ pub async fn handle_mcp_request_stream(
     request: MCPRequest,
     auth_token: Option<String>,
     origin: Option<&Origin>,
+    access: ToolAccess,
 ) -> Result<impl Stream<Item = Result<Bytes>> + use<>> {
     // Process the request
-    let response = route_request(org_id, request, auth_token, origin).await?;
+    let response = route_request(org_id, request, auth_token, origin, access).await?;
 
     // Serialize to JSON
     let json_str = serde_json::to_string(&response)?;
@@ -158,7 +160,7 @@ mod tests {
             params: json!(null),
         };
 
-        let result = handle_mcp_request("default", request, None, None).await;
+        let result = handle_mcp_request("default", request, None, None, ToolAccess::Any).await;
         assert!(result.is_ok());
 
         let response = result.unwrap();
@@ -175,7 +177,7 @@ mod tests {
             params: json!(null),
         };
 
-        let result = handle_mcp_request("default", request, None, None).await;
+        let result = handle_mcp_request("default", request, None, None, ToolAccess::Any).await;
         assert!(result.is_ok());
 
         let response = result.unwrap();
@@ -192,8 +194,14 @@ mod tests {
             params: json!(null),
         };
 
-        let result =
-            handle_mcp_request("default", request, Some("test_token".to_string()), None).await;
+        let result = handle_mcp_request(
+            "default",
+            request,
+            Some("test_token".to_string()),
+            None,
+            ToolAccess::Any,
+        )
+        .await;
         assert!(result.is_ok());
     }
 
@@ -206,7 +214,7 @@ mod tests {
             params: json!(null),
         };
 
-        let result = handle_mcp_request("default", request, None, None).await;
+        let result = handle_mcp_request("default", request, None, None, ToolAccess::Any).await;
         assert!(result.is_ok());
 
         let response = result.unwrap();
@@ -222,7 +230,8 @@ mod tests {
             params: json!(null),
         };
 
-        let result = handle_mcp_request_stream("default", request, None, None).await;
+        let result =
+            handle_mcp_request_stream("default", request, None, None, ToolAccess::Any).await;
         assert!(result.is_ok());
 
         let stream = result.unwrap();
@@ -248,7 +257,8 @@ mod tests {
             params: json!(null),
         };
 
-        let result = handle_mcp_request_stream("default", request, None, None).await;
+        let result =
+            handle_mcp_request_stream("default", request, None, None, ToolAccess::Any).await;
         assert!(result.is_ok());
 
         let stream = result.unwrap();
@@ -274,9 +284,14 @@ mod tests {
             params: json!(null),
         };
 
-        let result =
-            handle_mcp_request_stream("default", request, Some("auth_token".to_string()), None)
-                .await;
+        let result = handle_mcp_request_stream(
+            "default",
+            request,
+            Some("auth_token".to_string()),
+            None,
+            ToolAccess::Any,
+        )
+        .await;
         assert!(result.is_ok());
 
         let stream = result.unwrap();
@@ -294,7 +309,8 @@ mod tests {
             params: json!(null),
         };
 
-        let result = handle_mcp_request_stream("default", request, None, None).await;
+        let result =
+            handle_mcp_request_stream("default", request, None, None, ToolAccess::Any).await;
         assert!(result.is_ok());
 
         let stream = result.unwrap();
@@ -318,7 +334,8 @@ mod tests {
             params: json!(null),
         };
 
-        let result = handle_mcp_request_stream("default", request, None, None).await;
+        let result =
+            handle_mcp_request_stream("default", request, None, None, ToolAccess::Any).await;
         assert!(result.is_ok());
 
         let stream = result.unwrap();
@@ -342,7 +359,7 @@ mod tests {
             params: json!(null),
         };
 
-        let result = handle_mcp_request("default", request, None, None).await;
+        let result = handle_mcp_request("default", request, None, None, ToolAccess::Any).await;
         assert!(result.is_ok());
 
         let response = result.unwrap();
@@ -358,7 +375,8 @@ mod tests {
             params: json!(null),
         };
 
-        let result = handle_mcp_request_stream("default", request, None, None).await;
+        let result =
+            handle_mcp_request_stream("default", request, None, None, ToolAccess::Any).await;
         assert!(result.is_ok());
 
         let stream = result.unwrap();

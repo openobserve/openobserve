@@ -85,6 +85,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
 
+              <!-- Settings that apply to both tabs, e.g. the destination folder -->
+              <div
+                v-if="$slots['above-input']"
+                class="bg-card-glass-bg shrink-0 px-2 pt-1"
+                :data-test="`${testPrefix}-import-above-input`"
+              >
+                <slot name="above-input" />
+              </div>
+
               <!-- URL Import Tab -->
               <div
                 v-if="activeTab === 'import_json_url'"
@@ -121,30 +130,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <div class="mx-2 mt-1 flex min-h-0 flex-1 flex-col pb-2">
                   <!-- Slot for custom file input section -->
-                  <slot name="file-input-section" :jsonFiles="jsonFiles" :updateFiles="updateFiles">
+                  <slot
+                    name="file-input-section"
+                    :jsonFiles="jsonFiles"
+                    :updateFiles="updateFiles"
+                    :clearRejectedJson="clearRejectedJson"
+                  >
                     <div class="mb-1 flex w-full shrink-0">
                       <div class="w-full">
                         <OFile
                           :data-test="`${testPrefix}-import-json-file-input`"
+                          :label="t('dashboard.selectFile')"
                           v-model="jsonFiles"
-                          bottom-slots
-                          :label="t('dashboard.dropFileMsg')"
                           accept=".json"
                           multiple
-                          :helpText="t('common.jsonFilesOnlyHint')"
-                        >
-                          <template v-slot:prepend>
-                            <OIcon name="cloud-upload" size="sm" @click.stop.prevent />
-                          </template>
-                          <template v-slot:append>
-                            <OIcon
-                              name="close"
-                              size="sm"
-                              @click.stop.prevent="jsonFiles = null"
-                              class="cursor-pointer"
-                            />
-                          </template>
-                        </OFile>
+                          :validate="validateJsonFile"
+                          @rejected="clearRejectedJson"
+                        />
                       </div>
                     </div>
                   </slot>
@@ -214,8 +216,8 @@ import AppTabs from "./AppTabs.vue";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OFile from "@/lib/forms/File/OFile.vue";
+import { createJsonFileValidator } from "@/lib/forms/File/validateJsonFile";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
@@ -231,7 +233,6 @@ export default defineComponent({
     OPageHeader,
     OButton,
     OInput,
-    OIcon,
     OFile,
   },
   props: {
@@ -327,6 +328,7 @@ export default defineComponent({
   emits: ["back", "cancel", "import", "update:jsonStr", "update:jsonArray", "update:activeTab"],
   setup(props, { emit }) {
     const { t } = useI18nTyped();
+    const validateJsonFile = createJsonFileValidator(t);
     const { lgUp } = useBreakpoint();
     const stackPanes = computed(() => !lgUp.value);
 
@@ -403,6 +405,12 @@ export default defineComponent({
       url.value = newUrl;
     };
 
+    // A rejected pick must not leave the previous file's JSON in the editor to be imported.
+    const clearRejectedJson = () => {
+      jsonStr.value = "";
+      jsonArrayOfObj.value = [];
+    };
+
     const updateFiles = (files: any) => {
       jsonFiles.value = files;
     };
@@ -446,6 +454,9 @@ export default defineComponent({
         jsonStr.value = JSON.stringify(combinedJson, null, 2);
         emit("update:jsonStr", jsonStr.value);
         emit("update:jsonArray", jsonArrayOfObj.value);
+      } else if (activeTab.value === "import_json_file") {
+        // Every file removed or refused: nothing is left to import.
+        clearRejectedJson();
       }
     });
 
@@ -539,6 +550,8 @@ export default defineComponent({
     });
 
     return {
+      clearRejectedJson,
+      validateJsonFile,
       raw,
       t,
       stackPanes,

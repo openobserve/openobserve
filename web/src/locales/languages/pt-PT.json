@@ -9613,6 +9613,7 @@
       "promqlFiltersAndOnly": "Os filtros PromQL só suportam AND. Remova OR e os grupos, ou mude para SQL.",
       "cappedHint": "A mostrar os primeiros {count} valores",
       "cappedAllHint": "«Todos» também inclui valores que não estão na lista",
+      "metricsTruncatedHint": "Algumas métricas não foram verificadas. Indique uma métrica para ver todos os valores.",
       "metric": "Métrica",
       "label": "Rótulo",
       "metricSelectTooltip": "Selecione uma métrica ou use uma variável como $metricVariable para a escolher a partir de outro valor.",
@@ -15419,7 +15420,9 @@
     "incidentDestination": "Destino de incidente",
     "incidentDestinationPlaceholder": "Usar padrão da organização",
     "incidentDestinationHint": "Para onde as notificações vão quando os alertas desta fonte criam ou entram num incidente. Deixe vazio para usar o padrão da organização — sem nenhum dos dois definido, incidentes correspondentes disparam silenciosamente.",
+    "incidentDestinationHintOncall": "Para onde as notificações vão, além do aviso On-Call, quando os alertas desta fonte criam ou entram num incidente. Deixe vazio para usar o padrão da organização.",
     "noDestinationSet": "Nenhum destino de incidente definido",
+    "oncallOnly": "Apenas On-Call",
     "setupStep1Title": "1. Crie um webhook",
     "setupStep1Body": "No Grafana, Alertmanager ou qualquer ferramenta que possa enviar JSON via POST, crie um ponto de contacto / recetor de webhook.",
     "setupRemainingStepsHint": "Guarde esta fonte para obter o seu URL e token e cole-os na configuração do webhook.",
@@ -16502,6 +16505,13 @@
       "logoLightLabel": "Logótipo personalizado (modo claro)",
       "logoLightHelp": "Apresentado no modo claro. PNG, JPG, GIF ou BMP, até 150 × 30 px.",
       "logoDarkLabel": "Logótipo personalizado (modo escuro)",
+      "logoTitle": "Logótipo personalizado",
+      "logoHelp": "Apresentado no cabeçalho da aplicação. PNG, JPG, GIF, BMP, WEBP ou SVG, até 150 × 30 px.",
+      "logoLightTitle": "Modo claro",
+      "logoDarkTitle": "Modo escuro",
+      "logoSaved": "Guardado",
+      "logoNotSaved": "Não guardado",
+      "logoDimensions": "{width} × {height} px",
       "logoDarkHelp": "Apresentado no modo escuro. PNG, JPG, GIF ou BMP, até 150 × 30 px."
     },
     "modelPricingEditor": {
@@ -24262,8 +24272,19 @@
       "clear": "Limpar"
     },
     "file": {
-      "removeFile": "Remover ficheiro",
-      "clearAll": "Limpar tudo"
+      "removeNamed": "Remover {name}",
+      "attachPrompt": "Largue um ficheiro para anexar ou {browse}",
+      "attachPromptMultiple": "Largue ficheiros para anexar ou {browse}",
+      "browseLink": "procure",
+      "supports": "Ficheiros suportados {types}",
+      "dropFileToAttach": "Largue o ficheiro para anexar",
+      "dropFilesToAttach": "Largue os ficheiros para anexar",
+      "typeRejected": "Só são aceites ficheiros {allowed}",
+      "sizeRejected": "{size} excede o limite de {max}",
+      "countRejected": "Só {count} ficheiro de cada vez | Só {count} ficheiros de cada vez",
+      "invalidJson": "JSON inválido: {detail}",
+      "invalidImage": "Não é um ficheiro de imagem válido",
+      "unavailable": "O carregamento de ficheiros não está disponível"
     },
     "date": {
       "openCalendar": "Abrir calendário",
@@ -28089,8 +28110,8 @@
     "awayMark": "Marcar ausência",
     "awayClear": "Remover ausência",
     "awayClearConfirm": "Remover",
-    "awayClearMessage": "Remover a ausência de {name}, {range}? Aplica-se a todas as equipas.",
-    "awayConsequence": "Aplica-se a todas as equipas de que {name} faz parte. Os seus turnos passam para a pessoa seguinte em cada rotação, se existir.",
+    "awayClearMessage": "Limpar a ausência de {name}, {range}? Aplica-se a todas as equipas nesta organização.",
+    "awayConsequence": "Aplica-se a todas as equipas em que {name} está nesta organização. Os turnos passam para a pessoa seguinte em cada rotação, se existir.",
     "awayNextWeek": "Próxima semana, seg–dom",
     "awayTitle": "Marcar ausência",
     "membersAddOpen": "Adicionar membros",
@@ -34665,7 +34686,15 @@
     "offline": "Sem ligação. As visitas recentes continuam disponíveis.",
     "sourceUnavailable": "Este tipo de recurso está indisponível",
     "emptyHelp": "Introduza um nome ou ID para pesquisar",
-    "globalShortcut": "Abrir pesquisa global"
+    "globalShortcut": "Abrir pesquisa global",
+    "trigger": "Pesquisar ou ir para…",
+    "allTypes": "Todos",
+    "capped": "A mostrar a primeira correspondência. | A mostrar as primeiras {count} correspondências.",
+    "hintNavigate": "Navegar",
+    "hintOpen": "Abrir",
+    "hintNewTab": "Abrir num novo separador",
+    "hintTypes": "Filtrar por tipo",
+    "hintClose": "Fechar"
   },
   "timeRangeInput": {
     "label": "Introduza um intervalo de tempo",

@@ -29,6 +29,8 @@ export interface TextareaProps {
    * the screen. Ignored without `autogrow`.
    */
   maxRows?: number;
+  /** Resting height for `autogrow`, in lines; the field never shrinks below it. Ignored without `autogrow`. */
+  minRows?: number;
   /** Prevents value editing */
   readonly?: boolean;
   /** Prevents interaction */

@@ -78,6 +78,8 @@ const MCP_FORM_KEYS = new Set([
   "blocked_tools",
   "write_tools",
   "tools_verified_at",
+  "write_headers",
+  "write_header_names",
 ]);
 
 type Translate = (key: string, params?: Record<string, unknown>) => string;
@@ -102,6 +104,8 @@ export const makeToolsetFormSchema = (t: Translate, options: ToolsetSchemaOption
         blocked_tools: z.array(z.string()).nullable(),
         write_tools: z.array(z.string()).nullable(),
         extra: z.record(z.string(), z.any()),
+        /** AutoResolve's write credential; the server never returns its values. */
+        writeHeaders: z.array(secretRow).default([]),
       }),
       skill: z.object({ content: z.string() }),
     })
@@ -120,13 +124,15 @@ export const makeToolsetFormSchema = (t: Translate, options: ToolsetSchemaOption
       if (val.kind === "skill" && !val.skill.content.trim())
         issue(["skill", "content"], t("aiToolset.skillContentRequired"));
       if (val.kind !== "mcp") return;
-      val.mcp.headers.forEach((row, i) => {
-        if (!row.key.trim() || row.state === "unchanged") return;
-        if (!row.value)
-          issue(["mcp", "headers", i, "value"], t("assistant.toolsets.form.enterAgain"));
-        else if (row.value === SECRET_MASK)
-          issue(["mcp", "headers", i, "value"], t("assistant.toolsets.form.maskValue"));
-      });
+      for (const field of ["headers", "writeHeaders"] as const) {
+        val.mcp[field].forEach((row, i) => {
+          if (!row.key.trim() || row.state === "unchanged") return;
+          if (!row.value)
+            issue(["mcp", field, i, "value"], t("assistant.toolsets.form.enterAgain"));
+          else if (row.value === SECRET_MASK)
+            issue(["mcp", field, i, "value"], t("assistant.toolsets.form.maskValue"));
+        });
+      }
       for (const [param, value] of Object.entries(val.mcp.preset_params)) {
         if (!value.trim())
           issue(["mcp", "preset_params", param], t("aiToolset.presetParamRequired"));
@@ -194,6 +200,7 @@ export const toolsetFormDefaults = (): ToolsetFormValues => ({
     blocked_tools: null,
     write_tools: null,
     extra: {},
+    writeHeaders: [],
   },
   skill: { content: "" },
 });
@@ -208,6 +215,15 @@ function secretRowsOf(value: unknown, mergeSecrets: boolean): SecretRow[] {
   return Object.keys(value)
     .slice(0, 100)
     .map((key) => ({ key, value: mergeSecrets ? null : "", state, stored: key }));
+}
+
+/** The server always keeps a write header sent as the mask, so each stored name starts unchanged. */
+function writeRowsOf(names: unknown): SecretRow[] {
+  if (!Array.isArray(names)) return [];
+  return names
+    .filter((name): name is string => typeof name === "string")
+    .slice(0, 100)
+    .map((key) => ({ key, value: null, state: "unchanged", stored: key }));
 }
 
 /** The form for a stored record; the server's masked values are dropped, never shown or sent back. */
@@ -233,6 +249,7 @@ export function toolsetFormOf(record: unknown, mergeSecrets: boolean): ToolsetFo
       blocked_tools: list(data.blocked_tools),
       write_tools: list(data.write_tools),
       extra: extraOf(data),
+      writeHeaders: writeRowsOf(data.write_header_names),
     };
   } else {
     values.skill = { content: typeof data.content === "string" ? data.content : "" };
@@ -280,11 +297,13 @@ function secretMap(rows: SecretRow[], mergeSecrets: boolean): Record<string, str
   return out;
 }
 
+/** `writeHeaders`: AutoResolve is on, so the body carries its write credential; otherwise the server keeps the stored one. */
 export function toolsetDataOf(
   values: ToolsetFormValues,
   mergeSecrets: boolean,
+  writeHeaders = false,
 ): NonNullable<ToolsetCreateRequest["data"]> {
-  if (values.kind === "mcp") return mcpDataOf(values.mcp, mergeSecrets);
+  if (values.kind === "mcp") return mcpDataOf(values.mcp, mergeSecrets, writeHeaders);
   return { content: values.skill.content };
 }
 
@@ -292,6 +311,7 @@ export function toolsetDataOf(
 function mcpDataOf(
   mcp: ToolsetFormValues["mcp"],
   mergeSecrets: boolean,
+  writeHeaders: boolean,
 ): NonNullable<ToolsetCreateRequest["data"]> {
   const oauth = usesClientCredentials(mcp.auth);
   // With client credentials O2 sets `Authorization`, so a stored or empty one isn't sent.
@@ -310,34 +330,73 @@ function mcpDataOf(
   if (mcp.blocked_tools !== null) data.blocked_tools = mcp.blocked_tools;
   // An empty list would let every tool run on read-only turns, so an unknown one stays absent.
   if (mcp.write_tools !== null) data.write_tools = mcp.write_tools;
+  if (writeHeaders) data.write_headers = secretMap(mcp.writeHeaders, true);
   return data;
 }
 
 /** Why a merging server would refuse to keep the stored secrets, or `null` when it keeps them. */
 export type ReenterReason = "destination" | "secret";
 
-/** A kept secret cannot travel with a changed destination or next to a new or replaced secret. */
+const isKept = (row: SecretRow) => !!row.key.trim() && row.state === "unchanged";
+const replaces = (rows: SecretRow[]) =>
+  rows.some((row) => !!row.key.trim() && row.state !== "unchanged" && !!row.value);
+
+/** A kept secret cannot travel with a changed destination or next to a new or replaced secret.
+ * `writeHeaders`: the body carries AutoResolve's write headers, which never follow a changed destination either. */
 export function reenterReason(
   values: ToolsetFormValues,
   loaded: ToolsetFormValues | null,
   mergeSecrets: boolean,
+  writeHeaders = false,
 ): ReenterReason | null {
-  if (!mergeSecrets || !loaded || values.kind !== "mcp") return null;
-  const rows = values.mcp.headers.filter((row) => row.key.trim());
-  const authKept = values.mcp.auth.secret.state === "unchanged";
-  if (!rows.some((row) => row.state === "unchanged") && !authKept) return null;
+  if (!loaded || values.kind !== "mcp") return null;
+  const keptHeader = mergeSecrets && values.mcp.headers.some(isKept);
+  const authKept = mergeSecrets && values.mcp.auth.secret.state === "unchanged";
+  const keptWrite = writeHeaders && values.mcp.writeHeaders.some(isKept);
+  if (!keptHeader && !authKept && !keptWrite) return null;
   if (values.mcp.url.trim() !== loaded.mcp.url.trim()) return "destination";
   // A client secret is sent to the token URL, so a new one counts as a changed destination.
   if (authKept && values.mcp.auth.token_url.trim() !== loaded.mcp.auth.token_url.trim())
     return "destination";
-  return rows.some((row) => row.state !== "unchanged" && !!row.value) ? "secret" : null;
+  const headerRefused = (keptHeader || authKept) && replaces(values.mcp.headers);
+  const writeRefused = keptWrite && replaces(values.mcp.writeHeaders);
+  return headerRefused || writeRefused ? "secret" : null;
+}
+
+/** Field paths of the kept secrets the server would refuse with this save: only the list a reason applies to. */
+export function refusedSecretPaths(
+  values: ToolsetFormValues,
+  loaded: ToolsetFormValues | null,
+  mergeSecrets: boolean,
+  writeHeaders = false,
+): string[] {
+  const reason = reenterReason(values, loaded, mergeSecrets, writeHeaders);
+  if (!reason || values.kind !== "mcp") return [];
+  const refused = (field: "headers" | "writeHeaders", on: boolean) =>
+    on && (reason === "destination" || replaces(values.mcp[field]))
+      ? values.mcp[field].flatMap((row, i) =>
+          row.state === "unchanged" ? [`mcp.${field}[${i}]`] : [],
+        )
+      : [];
+  // The client secret travels with the plain headers, so it is refused whenever they are.
+  const authRefused =
+    mergeSecrets &&
+    values.mcp.auth.secret.state === "unchanged" &&
+    (reason === "destination" || replaces(values.mcp.headers));
+  return [
+    ...refused("headers", mergeSecrets),
+    ...(authRefused ? ["mcp.auth.secret"] : []),
+    ...refused("writeHeaders", writeHeaders),
+  ];
 }
 
 /** Field paths of every kept secret, which must be typed again before the server accepts the save. */
-export function keptSecretPaths(values: ToolsetFormValues): string[] {
+export function keptSecretPaths(values: ToolsetFormValues, writeHeaders = false): string[] {
   if (values.kind !== "mcp") return [];
-  const headers = values.mcp.headers.flatMap((row, i) =>
-    row.state === "unchanged" ? [`mcp.headers[${i}]`] : [],
-  );
-  return values.mcp.auth.secret.state === "unchanged" ? [...headers, "mcp.auth.secret"] : headers;
+  const kept = (field: "headers" | "writeHeaders") =>
+    values.mcp[field].flatMap((row, i) =>
+      row.state === "unchanged" ? [`mcp.${field}[${i}]`] : [],
+    );
+  const auth = values.mcp.auth.secret.state === "unchanged" ? ["mcp.auth.secret"] : [];
+  return [...kept("headers"), ...auth, ...(writeHeaders ? kept("writeHeaders") : [])];
 }

@@ -434,7 +434,7 @@ describe("useEnterpriseRoutes.ts", () => {
     // Test 37: iam + synthetics + 6 synthetics sub-routes + 7 oncall + 2 incidents + 2 autoobserve + 2 fleet + workflows = 22
     it("should have enterprise routes structure", () => {
       const routes = useEnterpriseRoutes();
-      expect(routes.length).toBe(23);
+      expect(routes.length).toBe(27);
     });
 
     // On-call and Fleet are set up before any data flows, so the empty-data gate must not block them.
@@ -485,7 +485,7 @@ describe("useEnterpriseRoutes.ts", () => {
     // Test 38: Should add all routes when both flags are true (iam + synthetics + 6 synthetics sub-routes + 7 oncall + 2 incidents + 2 autoobserve + 2 fleet + workflows + onboarding = 23)
     it("should add all routes when both flags are true", () => {
       const routes = useEnterpriseRoutes();
-      expect(routes.length).toBe(24);
+      expect(routes.length).toBe(28);
     });
 
     // Test 39: Should have all IAM children when both flags are true

@@ -28,6 +28,8 @@ export class DateTimePickerPage {
         this.panel = page.locator('#date-time-menu');
         // Reka popover content around the panel; its FocusScope gives it tabindex=-1.
         this.panelContent = page.locator('[data-o-popover-content]', { has: this.panel });
+        // The `t` shortcut opens only a mounted, visible picker root carrying this attribute.
+        this.shortcutTargetRoot = page.locator('[data-date-time-shortcut]').first();
         this.tooltipBubbles = page.locator('[data-test="o-tooltip-content"]');
 
         // Tab pair — absent when the host passes `disable-relative`.
@@ -123,6 +125,11 @@ export class DateTimePickerPage {
         await expect(this.triggerBtn).toBeVisible();
         await this.triggerBtn.click();
         await expect(this.panel).toBeVisible();
+    }
+
+    async pressPickerShortcut() {
+        await expect(this.shortcutTargetRoot).toBeVisible();
+        await this.page.keyboard.press('t');
     }
 
     async expectPickerClosed() {

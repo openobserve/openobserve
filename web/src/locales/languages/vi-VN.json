@@ -9613,6 +9613,7 @@
       "promqlFiltersAndOnly": "Bộ lọc PromQL chỉ hỗ trợ AND. Hãy xóa OR và các nhóm, hoặc chuyển sang SQL.",
       "cappedHint": "Đang hiển thị {count} giá trị đầu tiên",
       "cappedAllHint": "“Tất cả” cũng khớp với các giá trị không có trong danh sách",
+      "metricsTruncatedHint": "Một số chỉ số chưa được chọn. Nhập tên chỉ số để xem tất cả giá trị.",
       "metric": "Chỉ số",
       "label": "Nhãn",
       "metricSelectTooltip": "Chọn một chỉ số hoặc dùng biến như $metricVariable để chọn nó dựa trên giá trị khác.",
@@ -15419,7 +15420,9 @@
     "incidentDestination": "Đích sự cố",
     "incidentDestinationPlaceholder": "Sử dụng mặc định của tổ chức",
     "incidentDestinationHint": "Nơi các thông báo được gửi đến khi cảnh báo từ nguồn này tạo hoặc tham gia một sự cố. Để trống để sử dụng mặc định của tổ chức — nếu không thiết lập, các sự cố khớp sẽ kích hoạt âm thầm.",
+    "incidentDestinationHintOncall": "Nơi các thông báo được gửi đến, ngoài việc gọi On-Call, khi cảnh báo từ nguồn này tạo hoặc tham gia một sự cố. Để trống để sử dụng mặc định của tổ chức.",
     "noDestinationSet": "Chưa đặt đích sự cố",
+    "oncallOnly": "Chỉ On-Call",
     "setupStep1Title": "1. Tạo webhook",
     "setupStep1Body": "Trong Grafana, Alertmanager hoặc bất kỳ công cụ nào có thể POST JSON, hãy tạo một điểm liên hệ / bộ thu webhook.",
     "setupRemainingStepsHint": "Lưu nguồn này để lấy URL và token, sau đó dán chúng vào cấu hình webhook đó.",
@@ -16502,6 +16505,13 @@
       "logoLightLabel": "Logo tùy chỉnh (chế độ sáng)",
       "logoLightHelp": "Hiển thị ở chế độ sáng. PNG, JPG, GIF hoặc BMP, tối đa 150 × 30 px.",
       "logoDarkLabel": "Logo tùy chỉnh (chế độ tối)",
+      "logoTitle": "Logo tùy chỉnh",
+      "logoHelp": "Hiển thị trong tiêu đề ứng dụng. PNG, JPG, GIF, BMP, WEBP hoặc SVG, tối đa 150 × 30 px.",
+      "logoLightTitle": "Chế độ sáng",
+      "logoDarkTitle": "Chế độ tối",
+      "logoSaved": "Đã lưu",
+      "logoNotSaved": "Chưa lưu",
+      "logoDimensions": "{width} × {height} px",
       "logoDarkHelp": "Hiển thị ở chế độ tối. PNG, JPG, GIF hoặc BMP, tối đa 150 × 30 px."
     },
     "modelPricingEditor": {
@@ -24262,8 +24272,19 @@
       "clear": "Xóa"
     },
     "file": {
-      "removeFile": "Xóa tệp",
-      "clearAll": "Xóa tất cả"
+      "removeNamed": "Xóa {name}",
+      "attachPrompt": "Thả tệp để đính kèm, hoặc {browse}",
+      "attachPromptMultiple": "Thả các tệp để đính kèm, hoặc {browse}",
+      "browseLink": "duyệt",
+      "supports": "Tệp được hỗ trợ {types}",
+      "dropFileToAttach": "Thả tệp để đính kèm",
+      "dropFilesToAttach": "Thả các tệp để đính kèm",
+      "typeRejected": "Chỉ chấp nhận tệp {allowed}",
+      "sizeRejected": "{size} vượt quá giới hạn {max}",
+      "countRejected": "Mỗi lần chỉ {count} tệp | Mỗi lần chỉ {count} tệp",
+      "invalidJson": "Không phải JSON hợp lệ: {detail}",
+      "invalidImage": "Không phải tệp hình ảnh hợp lệ",
+      "unavailable": "Không thể tải tệp lên"
     },
     "date": {
       "openCalendar": "Mở lịch",
@@ -28089,8 +28110,8 @@
     "awayMark": "Đánh dấu vắng mặt",
     "awayClear": "Xóa vắng mặt",
     "awayClearConfirm": "Xóa",
-    "awayClearMessage": "Xóa trạng thái vắng mặt của {name}, {range}? Áp dụng cho mọi nhóm.",
-    "awayConsequence": "Áp dụng cho mọi nhóm mà {name} tham gia. Ca trực của họ sẽ chuyển cho người tiếp theo trong mỗi vòng luân phiên, nếu có.",
+    "awayClearMessage": "Xóa trạng thái vắng mặt của {name}, {range}? Áp dụng cho mọi nhóm trong tổ chức này.",
+    "awayConsequence": "Áp dụng cho mọi nhóm mà {name} tham gia trong tổ chức này. Ca trực của họ sẽ chuyển cho người tiếp theo trong mỗi vòng luân phiên, nếu có.",
     "awayNextWeek": "Tuần sau, Thứ Hai–Chủ Nhật",
     "awayTitle": "Đánh dấu vắng mặt",
     "membersAddOpen": "Thêm thành viên",
@@ -34665,7 +34686,15 @@
     "offline": "Bạn đang ngoại tuyến. Vẫn xem được truy cập gần đây.",
     "sourceUnavailable": "Loại tài nguyên này hiện không khả dụng",
     "emptyHelp": "Nhập tên hoặc ID để tìm",
-    "globalShortcut": "Mở tìm kiếm toàn cục"
+    "globalShortcut": "Mở tìm kiếm toàn cục",
+    "trigger": "Tìm kiếm hoặc chuyển đến…",
+    "allTypes": "Tất cả",
+    "capped": "Đang hiển thị kết quả khớp đầu tiên. | Đang hiển thị {count} kết quả khớp đầu tiên.",
+    "hintNavigate": "Điều hướng",
+    "hintOpen": "Mở",
+    "hintNewTab": "Mở trong tab mới",
+    "hintTypes": "Lọc theo loại",
+    "hintClose": "Đóng"
   },
   "timeRangeInput": {
     "label": "Nhập khoảng thời gian",

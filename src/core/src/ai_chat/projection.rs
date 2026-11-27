@@ -165,8 +165,8 @@ const REFUSED_PREFIX: &str = "Refused by this organization's assistant policy";
 // For the model only; a person reading the refusal gets the text without it.
 const REFUSED_ADVICE: &str = " Tell the user; do not retry.";
 
-/// Tools no projection shows; the sentinels at the end are RCA thread structure.
-pub(crate) const HIDDEN_TOOLS: [&str; 27] = [
+/// Tools no projection shows; the sentinels at the end are RCA and AutoResolve thread structure.
+pub(crate) const HIDDEN_TOOLS: [&str; 29] = [
     "tool_search",
     "toolset_read_output",
     "convert_time_to_microseconds",
@@ -194,6 +194,8 @@ pub(crate) const HIDDEN_TOOLS: [&str; 27] = [
     "record_blind_spot",
     "ask_responders",
     "acknowledge_steering",
+    "submit_plan",
+    "report_outcome",
 ];
 
 const TOOL_DESCRIPTIONS: [(&str, &str); 37] = [

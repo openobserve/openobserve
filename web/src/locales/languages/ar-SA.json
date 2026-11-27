@@ -9613,6 +9613,7 @@
       "promqlFiltersAndOnly": "تدعم مرشحات PromQL عامل AND فقط. أزل OR والمجموعات، أو انتقل إلى SQL.",
       "cappedHint": "عرض أول {count} من القيم",
       "cappedAllHint": "يشمل «الجميع» أيضًا القيم غير المدرجة",
+      "metricsTruncatedHint": "لم يتم التحقق من بعض المقاييس. اكتب اسم مقياس لعرض جميع القيم.",
       "metric": "المقياس",
       "label": "التسمية",
       "metricSelectTooltip": "اختر مقياسًا أو استخدم متغيرًا مثل $metricVariable لاختياره بناءً على قيمة أخرى.",
@@ -15419,7 +15420,9 @@
     "incidentDestination": "وجهة الحادث",
     "incidentDestinationPlaceholder": "استخدم الوضع الافتراضي للمؤسسة",
     "incidentDestinationHint": "حيث تذهب الإشعارات عندما تنشأ تنبيهات هذا المصدر أو تنضم إلى حادث. اترك فارغا لاستخدام الإعداد الافتراضي للمؤسسة — بدون أي منهما، تطلق الحوادث المطابقة بصمت.",
+    "incidentDestinationHintOncall": "حيث تذهب الإشعارات، بالإضافة إلى استدعاء On-Call، عندما تنشئ تنبيهات هذا المصدر حادثًا أو تنضم إليه. اترك فارغا لاستخدام الإعداد الافتراضي للمؤسسة.",
     "noDestinationSet": "لم يتم تعيين وجهة للحوادث",
+    "oncallOnly": "On-Call فقط",
     "setupStep1Title": "1. إنشاء webhook",
     "setupStep1Body": "في Grafana أو Alertmanager أو أي أداة يمكنها إرسال JSON عبر POST، أنشئ نقطة اتصال / مستقبِل webhook.",
     "setupRemainingStepsHint": "احفظ هذا المصدر للحصول على رابط الرابط والرمز، ثم الصقها في إعداد webhook هذا.",
@@ -16502,6 +16505,13 @@
       "logoLightLabel": "شعار مخصص (الوضع الفاتح)",
       "logoLightHelp": "يُعرض في الوضع الفاتح. PNG أو JPG أو GIF أو BMP، حتى 150 × 30 بكسل.",
       "logoDarkLabel": "شعار مخصص (الوضع الداكن)",
+      "logoTitle": "شعار مخصص",
+      "logoHelp": "يظهر في رأس التطبيق. PNG، JPG، GIF، BMP، WEBP أو SVG، حتى 150 × 30 بكسل.",
+      "logoLightTitle": "الوضع الفاتح",
+      "logoDarkTitle": "الوضع الداكن",
+      "logoSaved": "محفوظ",
+      "logoNotSaved": "غير محفوظ",
+      "logoDimensions": "{width} × {height} بكسل",
       "logoDarkHelp": "يُعرض في الوضع الداكن. PNG أو JPG أو GIF أو BMP، حتى 150 × 30 بكسل."
     },
     "modelPricingEditor": {
@@ -24262,8 +24272,19 @@
       "clear": "مسح"
     },
     "file": {
-      "removeFile": "إزالة الملف",
-      "clearAll": "مسح الكل"
+      "removeNamed": "إزالة {name}",
+      "attachPrompt": "أفلت ملفًا لإرفاقه، أو {browse}",
+      "attachPromptMultiple": "أفلت ملفات لإرفاقها، أو {browse}",
+      "browseLink": "استعرض",
+      "supports": "الملفات المدعومة {types}",
+      "dropFileToAttach": "أفلت الملف لإرفاقه",
+      "dropFilesToAttach": "أفلت الملفات لإرفاقها",
+      "typeRejected": "يُقبل فقط الملفات من نوع {allowed}",
+      "sizeRejected": "{size} يتجاوز الحد {max}",
+      "countRejected": "{count} ملف فقط في كل مرة | {count} ملفات فقط في كل مرة",
+      "invalidJson": "JSON غير صالح: {detail}",
+      "invalidImage": "ليس ملف صورة صالحًا",
+      "unavailable": "رفع الملفات غير متاح"
     },
     "date": {
       "openCalendar": "فتح التقويم",
@@ -28089,8 +28110,8 @@
     "awayMark": "تحديد كغائب",
     "awayClear": "إلغاء الغياب",
     "awayClearConfirm": "إلغاء",
-    "awayClearMessage": "هل تريد إلغاء غياب {name}، {range}؟ يُطبّق على كل فريق.",
-    "awayConsequence": "ينطبق على كل فريق يوجد فيه {name}. تنتقل مناوباته إلى الشخص التالي في كل تناوب، إن وُجد.",
+    "awayClearMessage": "هل تريد مسح غياب {name}، {range}؟ سيُطبَّق ذلك على كل فريق في هذه المؤسسة.",
+    "awayConsequence": "يُطبَّق على كل فريق يوجد فيه {name} في هذه المؤسسة. تنتقل مناوباته إلى الشخص التالي في كل تناوب، إن وُجد.",
     "awayNextWeek": "الأسبوع القادم، الاثنين–الأحد",
     "awayTitle": "تحديد كغائب",
     "membersAddOpen": "إضافة أعضاء",
@@ -34665,7 +34686,15 @@
     "offline": "أنت غير متصل. الزيارات الأخيرة لا تزال متاحة.",
     "sourceUnavailable": "نوع المورد غير متاح حاليًا",
     "emptyHelp": "أدخل اسمًا أو معرّفًا للبحث",
-    "globalShortcut": "فتح البحث العام"
+    "globalShortcut": "فتح البحث العام",
+    "trigger": "ابحث أو انتقل إلى…",
+    "allTypes": "الكل",
+    "capped": "عرض أول تطابق. | عرض أول {count} من التطابقات.",
+    "hintNavigate": "تنقّل",
+    "hintOpen": "فتح",
+    "hintNewTab": "فتح في علامة تبويب جديدة",
+    "hintTypes": "تصفية حسب النوع",
+    "hintClose": "إغلاق"
   },
   "timeRangeInput": {
     "label": "اكتب نطاقًا زمنيًا",

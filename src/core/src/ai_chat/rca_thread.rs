@@ -15,9 +15,12 @@
 
 //! The investigation thread of an RCA run, projected from its chat session.
 
+use std::collections::HashMap;
+
 use config::{
     meta::{
         alerts::rca_steering::SteerKind,
+        autoresolve::{AUTORESOLVE_TOOL_PREFIX, PLANNING_HELD_PREFIX},
         oncall::{
             confidence::{
                 KEY_ARG_MAX_BYTES, ToolsetNames, cut_bytes, is_prometheus_tool, strip_call_ref,
@@ -278,6 +281,10 @@ pub struct ThreadToolCall {
     pub key_arg: Option<String>,
     pub status: ToolCallStatus,
     pub interrupted: bool,
+    /// An AutoResolve's guard refused this change while planning, so it never ran.
+    pub held: bool,
+    /// The display name of the AutoResolve connection whose tool this is.
+    pub connection: Option<String>,
     pub started_at: Option<i64>,
     pub duration_ms: Option<i64>,
     pub result_summary: Option<String>,
@@ -402,13 +409,36 @@ pub fn project_rca_thread_with(
     show_tool_io: bool,
     toolsets: &ToolsetNames,
 ) -> RcaThread {
-    let folded = Folded::fold(events);
-    let mut builder = Builder {
+    let builder = Builder {
         active,
         show_tool_io,
         toolsets: Some(toolsets),
         ..Default::default()
     };
+    project(events, turns, builder)
+}
+
+/// The thread of an AutoResolve run; `connections` maps each connection key to its display name.
+pub fn project_autoresolve_thread(
+    events: &[DurableEvent],
+    turns: &[ai_chat_turns::Model],
+    active: bool,
+    connections: HashMap<String, String>,
+) -> RcaThread {
+    let builder = Builder {
+        active,
+        connections,
+        ..Default::default()
+    };
+    project(events, turns, builder)
+}
+
+fn project(
+    events: &[DurableEvent],
+    turns: &[ai_chat_turns::Model],
+    mut builder: Builder<'_>,
+) -> RcaThread {
+    let folded = Folded::fold(events);
     let empty = Map::new();
     for (msg_id, info) in &folded.infos {
         let Some(info) = info.as_object() else {
@@ -439,6 +469,7 @@ struct Builder<'a> {
     active: bool,
     show_tool_io: bool,
     toolsets: Option<&'a ToolsetNames>,
+    connections: HashMap<String, String>,
     started: Option<ThreadStart>,
     user_messages: Vec<ThreadUserMessage>,
     /// Steering messages in `user_messages` the agent has not read yet.
@@ -467,6 +498,19 @@ impl Builder<'_> {
         };
         self.first_ms = Some(self.first_ms.map_or(ms, |f| f.min(ms)));
         self.last_ms = Some(self.last_ms.map_or(ms, |l| l.max(ms)));
+    }
+
+    /// A connection key is normalised and holds no `_`; a deleted connection shows its key.
+    fn connection_of(&self, tool: &str) -> Option<String> {
+        let (key, _) = tool
+            .strip_prefix(AUTORESOLVE_TOOL_PREFIX)?
+            .split_once('_')?;
+        Some(
+            self.connections
+                .get(key)
+                .cloned()
+                .unwrap_or_else(|| key.to_string()),
+        )
     }
 
     fn user_message(&mut self, at: Option<i64>, parts: &Map<String, Value>) {
@@ -615,6 +659,7 @@ impl Builder<'_> {
         };
         let input = call.args();
         let call_id = call.call_id();
+        let connection = self.connection_of(call.tool);
         let (input_out, output) = if self.show_tool_io {
             (Some(Value::Object(input.clone())), raw_output(state))
         } else {
@@ -628,6 +673,8 @@ impl Builder<'_> {
                 .map_or_else(|| call.tool.to_string(), |t| call.label(t)),
             status,
             interrupted: !self.active && !matches!(call.status, "completed" | "error"),
+            held: held_while_planning(state),
+            connection,
             started_at,
             duration_ms: started_at.zip(ended_at).map(|(s, e)| (e - s) / 1000),
             result_summary,
@@ -848,6 +895,18 @@ pub(crate) fn error_text(error: Option<&Value>) -> String {
         None => "Tool execution failed".to_string(),
     };
     message.chars().take(ERROR_MAX_CHARS).collect()
+}
+
+/// The guard's refusal is the call's error; output that quotes it belongs to a read that ran.
+fn held_while_planning(state: &Map<String, Value>) -> bool {
+    state
+        .get("error")
+        .filter(|error| truthy(error))
+        .is_some_and(|error| {
+            extract_error_message(error)
+                .trim_start()
+                .starts_with(PLANNING_HELD_PREFIX)
+        })
 }
 
 fn raw_output(state: &Map<String, Value>) -> Option<String> {
@@ -1497,6 +1556,56 @@ pub(crate) mod tests {
             raw_output(state.as_object().unwrap()).as_deref(),
             Some("open [internal path]: denied")
         );
+    }
+
+    #[test]
+    fn a_change_refused_while_planning_is_held() {
+        let refusal = format!("{PLANNING_HELD_PREFIX}. Add it as a step to submit_plan.");
+        let mut s = Session::new();
+        s.message("msg_u1", "user", json!({"created": T}));
+        s.message("msg_a1", "assistant", json!({"created": T + 100}));
+        let calls = [
+            ("ar_github_merge", "error", json!({"error": refusal})),
+            (
+                "o2_search",
+                "completed",
+                json!({"output": format!("Earlier evidence: {refusal}")}),
+            ),
+            (
+                "ar_github-prod_merge",
+                "error",
+                json!({"error": "connection refused"}),
+            ),
+            ("ar_gone_merge", "completed", json!({"output": "merged"})),
+        ];
+        for (i, (tool, status, result)) in (0..).zip(calls) {
+            let id = format!("prt_t{i}");
+            s.tool(
+                "msg_a1",
+                &id,
+                tool,
+                status,
+                json!({}),
+                result,
+                200 + i,
+                300 + i,
+            );
+        }
+        let connections = [("github", "GitHub"), ("github-prod", "GitHub prod")]
+            .map(|(key, name)| (key.to_string(), name.to_string()));
+        let thread = project_autoresolve_thread(&s.events, &[], false, connections.into());
+        let calls: Vec<(bool, Option<&str>)> = thread.steps[0]
+            .tool_calls
+            .iter()
+            .map(|c| (c.held, c.connection.as_deref()))
+            .collect();
+        let want = [
+            (true, Some("GitHub")),
+            (false, None),
+            (false, Some("GitHub prod")),
+            (false, Some("gone")),
+        ];
+        assert_eq!(calls, want, "a gone connection shows its key");
     }
 
     /// The open step of a live run has no end, and its unfinished call is running.

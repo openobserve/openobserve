@@ -44,7 +44,10 @@ use o2_enterprise::enterprise::{
 };
 use o2_openfga::meta::route_permissions::{ResolvedRoute, resolve_permission};
 use openobserve_api_common::extractors::Headers;
-use openobserve_core::auth::{AuthExtractor, UserEmail, extract_auth_str_from_headers};
+use openobserve_core::{
+    auth::{AuthExtractor, UserEmail, extract_auth_str_from_headers, is_ofga_object_visible},
+    autoresolve::approve::{APPROVE_OBJECT_TYPE, permitted_connections},
+};
 use serde::Serialize;
 use utoipa::ToSchema;
 
@@ -604,7 +607,7 @@ pub async fn get_capabilities(
         HEALTH.lock().unwrap().snapshot(&org_id)
     };
     let toolsets = if permissions.toolsets {
-        toolset_summaries(&org_id).await
+        toolset_summaries(&org_id, &user_id).await
     } else {
         Vec::new()
     };
@@ -961,11 +964,24 @@ pub(crate) fn admit_test(
     Ok(())
 }
 
-/// Ids and names only: listing never decrypts a toolset's secrets.
-async fn toolset_summaries(org_id: &str) -> Vec<ToolsetSummary> {
+/// Ids and names only: listing never decrypts a toolset's secrets. Holds only the toolsets the
+/// caller may list, as the toolsets list does.
+async fn toolset_summaries(org_id: &str, user_id: &str) -> Vec<ToolsetSummary> {
+    let permitted = match permitted_connections(org_id, user_id, "LIST").await {
+        Ok(permitted) => permitted,
+        Err(e) => {
+            log::warn!(
+                "[org_id:{org_id}] capabilities could not read the AI toolsets the caller may list: {e}"
+            );
+            return Vec::new();
+        }
+    };
     match infra::table::org_ai_toolsets::list_names(org_id).await {
         Ok(toolsets) => toolsets
             .into_iter()
+            .filter(|(id, ..)| {
+                is_ofga_object_visible(org_id, APPROVE_OBJECT_TYPE, id, permitted.as_deref())
+            })
             .map(|(id, name, enabled)| ToolsetSummary { id, name, enabled })
             .collect(),
         Err(e) => {
@@ -1090,6 +1106,10 @@ mod tests {
 
     async fn permissions(role: Role) -> Permissions {
         evaluate(ORG, |route: ResolvedRoute| async move {
+            // As `route_allowed`: a bypassed route admits everyone, and its handler filters.
+            if route.bypass_check {
+                return true;
+            }
             let (object_type, object_id) = route.o2_type.split_once(':').unwrap();
             assert_eq!(object_id, ORG);
             role.grants(object_type, &route.method)
@@ -1157,7 +1177,8 @@ mod tests {
 
     async fn probe(role: Role) -> Value {
         let permissions = permissions(role).await;
-        let toolsets = if permissions.toolsets {
+        // `toolset_summaries` keeps only the toolsets the role may list.
+        let toolsets = if permissions.toolsets && role.grants("ai_toolsets", "LIST") {
             vec![ToolsetSummary {
                 id: "t1".to_string(),
                 name: "GitHub".to_string(),
@@ -1233,8 +1254,9 @@ mod tests {
             (Role::Admin, [true, true, true, true, true]),
             (Role::Editor, [true, true, false, false, true]),
             (Role::Viewer, [false, false, false, false, true]),
-            (Role::User, [false, false, false, false, false]),
-            (Role::Custom, [true, true, false, true, false]),
+            // Every member reaches the toolsets list; it holds only the toolsets each may list.
+            (Role::User, [false, false, false, false, true]),
+            (Role::Custom, [true, true, false, true, true]),
         ];
         for (role, [chat, write, share, read_shares, toolsets]) in expected {
             let want = Permissions {

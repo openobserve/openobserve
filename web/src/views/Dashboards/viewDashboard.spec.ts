@@ -88,6 +88,7 @@ vi.mock("@/utils/commons.ts", async (importOriginal) => {
     deletePanel: vi.fn().mockResolvedValue({}),
     movePanelToAnotherTab: vi.fn().mockResolvedValue({}),
     getFoldersList: vi.fn().mockReturnValue([]),
+    findDashboardFolderId: vi.fn().mockResolvedValue(null),
     generateDurationLabel: vi.fn().mockReturnValue("15m"),
     getQueryParamsForDuration: vi.fn().mockReturnValue({ period: "15m" }),
     copyToClipboard: vi.fn().mockResolvedValue({}),
@@ -131,6 +132,10 @@ const mockHistoryState: { back: string | null } = { back: null };
 const mockRouteFolder: { value: string | undefined } = { value: "default" };
 // Extra query params a test wants on the route it mounts with (cleared before every test).
 const mockExtraRouteQuery: Record<string, string> = {};
+// The route the view mounted with, so a test can navigate it while a load is awaiting.
+const mockMountedRoute: { value: { query: Record<string, string | undefined> } | null } = {
+  value: null,
+};
 
 // Comprehensive Vue composable mocks
 vi.mock("vue-router", () => ({
@@ -166,16 +171,20 @@ vi.mock("vue-router", () => ({
   onBeforeRouteUpdate: (guard: (to: RouteLike, from: RouteLike) => unknown) => {
     routeUpdateGuards.push(guard);
   },
-  useRoute: () => ({
-    params: { dashboardId: "test-dashboard-1", folderId: "default" },
-    query: {
-      dashboard: "test-dashboard-1",
-      folder: mockRouteFolder.value,
-      tab: "tab-1",
-      ...mockExtraRouteQuery,
-    },
-    path: "/dashboard/test-dashboard-1",
-  }),
+  useRoute: () => {
+    const route = {
+      params: { dashboardId: "test-dashboard-1", folderId: "default" },
+      query: {
+        dashboard: "test-dashboard-1",
+        folder: mockRouteFolder.value,
+        tab: "tab-1",
+        ...mockExtraRouteQuery,
+      },
+      path: "/dashboard/test-dashboard-1",
+    };
+    mockMountedRoute.value = route;
+    return route;
+  },
 }));
 
 // Export router mocks for use in tests
@@ -290,7 +299,7 @@ import { useHomeDashboard } from "@/composables/useHomeDashboard";
 import { gt } from "@/types/i18n";
 import ShareButton from "@/components/common/ShareButton.vue";
 import { dashboardSaveConflictState } from "@/composables/dashboard/dashboardSaveConflictState";
-import { getDashboard } from "@/utils/commons.ts";
+import { getDashboard, findDashboardFolderId } from "@/utils/commons.ts";
 import { setPickerTimezoneSource } from "@/utils/dashboard/calendarPeriods";
 import { getManager } from "@/lib/vue-shortcut-manager";
 import { DASHBOARD_FRESH_PANEL_TIME } from "@/composables/dashboard/dashboardFreshPanelTime";
@@ -744,8 +753,29 @@ describe("ViewDashboard", () => {
   });
 
   describe("Navigation Functionality", () => {
-    it("sends a link without a folder to the default folder's dashboard list", async () => {
+    it("adds the dashboard's folder to a link without one and opens it", async () => {
       mockRouteFolder.value = undefined;
+      vi.mocked(findDashboardFolderId).mockResolvedValueOnce("default");
+      try {
+        wrapper = createWrapper();
+        await flushPromises();
+
+        expect(findDashboardFolderId).toHaveBeenCalledWith("test-org", "test-dashboard-1");
+        expect(global.mockRouterReplace).toHaveBeenCalledWith({
+          query: expect.objectContaining({ dashboard: "test-dashboard-1", folder: "default" }),
+        });
+        expect(getDashboard).toHaveBeenCalledWith(expect.anything(), "test-dashboard-1", "default");
+        expect(global.mockShowErrorNotification).not.toHaveBeenCalledWith(
+          "dashboard.viewDashboard.failedToLoadDashboard",
+        );
+      } finally {
+        mockRouteFolder.value = "default";
+      }
+    });
+
+    it("sends a link whose folder cannot be found to the list, as the last navigation", async () => {
+      mockRouteFolder.value = undefined;
+      vi.mocked(findDashboardFolderId).mockRejectedValueOnce(new Error("404"));
       try {
         wrapper = createWrapper();
         await flushPromises();
@@ -754,10 +784,70 @@ describe("ViewDashboard", () => {
         expect(global.mockShowErrorNotification).toHaveBeenCalledWith(
           "dashboard.viewDashboard.failedToLoadDashboard",
         );
-        expect(global.mockRouterReplace).toHaveBeenCalledWith({
+        expect(global.mockRouterReplace).toHaveBeenLastCalledWith({
           path: "/dashboards",
           query: { folder: "default", org_identifier: "test-org" },
         });
+      } finally {
+        mockRouteFolder.value = "default";
+      }
+    });
+
+    it("drops a folder lookup that resolves after the view moved to another dashboard", async () => {
+      mockRouteFolder.value = undefined;
+      vi.mocked(findDashboardFolderId).mockImplementationOnce(async () => {
+        mockMountedRoute.value!.query.dashboard = "drilled-dashboard";
+        return "f2";
+      });
+      try {
+        wrapper = createWrapper();
+        await flushPromises();
+
+        expect(findDashboardFolderId).toHaveBeenCalledWith("test-org", "test-dashboard-1");
+        expect(global.mockRouterReplace).not.toHaveBeenCalledWith({
+          query: expect.objectContaining({ folder: "f2" }),
+        });
+        expect(getDashboard).not.toHaveBeenCalled();
+      } finally {
+        mockRouteFolder.value = "default";
+      }
+    });
+
+    it("drops a folder lookup once a newer load already put a folder in the URL", async () => {
+      mockRouteFolder.value = undefined;
+      vi.mocked(findDashboardFolderId).mockImplementationOnce(async () => {
+        mockMountedRoute.value!.query.folder = "f9";
+        return "f2";
+      });
+      try {
+        wrapper = createWrapper();
+        await flushPromises();
+
+        expect(global.mockRouterReplace).not.toHaveBeenCalledWith({
+          query: expect.objectContaining({ folder: "f2" }),
+        });
+        expect(getDashboard).not.toHaveBeenCalledWith(expect.anything(), expect.anything(), "f2");
+      } finally {
+        mockRouteFolder.value = "default";
+      }
+    });
+
+    it("keeps a lookup that found no folder from redirecting a view that moved on", async () => {
+      mockRouteFolder.value = undefined;
+      vi.mocked(findDashboardFolderId).mockImplementationOnce(async () => {
+        mockMountedRoute.value!.query.dashboard = "drilled-dashboard";
+        return null;
+      });
+      try {
+        wrapper = createWrapper();
+        await flushPromises();
+
+        expect(global.mockRouterReplace).not.toHaveBeenCalledWith(
+          expect.objectContaining({ path: "/dashboards" }),
+        );
+        expect(global.mockShowErrorNotification).not.toHaveBeenCalledWith(
+          "dashboard.viewDashboard.failedToLoadDashboard",
+        );
       } finally {
         mockRouteFolder.value = "default";
       }

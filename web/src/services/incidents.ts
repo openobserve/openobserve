@@ -248,6 +248,10 @@ export interface RcaToolCall {
   input?: unknown;
   /** Present only with the org setting `ai_rca_thread_tool_output`. */
   output?: string | null;
+  /** AutoResolve runs: the guard held this change while planning, so it did not run. */
+  held?: boolean;
+  /** AutoResolve runs: the connection's name for a connection tool; null for any other tool. */
+  connection?: string | null;
 }
 
 /** One step the agent recorded with `record_step`. */

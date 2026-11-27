@@ -11,6 +11,8 @@ export interface AlertSourceIntegration {
    * incident. Empty means "use the org default" — see the review's
    * finding that incidents with no destination fire silently. */
   destinations: string[];
+  /** On-call team id this source's new incidents page ahead of routing; null means routing. */
+  oncall_team?: string | null;
   created_by: string;
   created_at: number;
   updated_at: number;
@@ -43,4 +45,5 @@ export interface CreateAlertSourcePayload {
   source_type?: string;
   config?: Record<string, any>;
   destinations?: string[];
+  oncall_team?: string;
 }

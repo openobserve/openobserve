@@ -9613,6 +9613,7 @@
       "promqlFiltersAndOnly": "PromQL-Filter unterstützen nur AND. Entfernen Sie OR und Gruppen oder wechseln Sie zu SQL.",
       "cappedHint": "Die ersten {count} Werte werden angezeigt",
       "cappedAllHint": "„Alle“ umfasst auch nicht aufgeführte Werte",
+      "metricsTruncatedHint": "Einige Metriken wurden nicht geprüft. Geben Sie eine Metrik an, um alle Werte anzuzeigen.",
       "metric": "Kennzahl",
       "label": "Bezeichnung",
       "metricSelectTooltip": "Wählen Sie eine Kennzahl aus oder verwenden Sie eine Variable wie $metricVariable, um sie anhand eines anderen Werts zu wählen.",
@@ -15419,7 +15420,9 @@
     "incidentDestination": "Ziel für Vorfälle",
     "incidentDestinationPlaceholder": "Org-Standard verwenden",
     "incidentDestinationHint": "Wohin Benachrichtigungen gehen, wenn Alarme dieser Quelle einen Vorfall erstellen oder sich ihm anschließen. Leer lassen, um den Org-Standard zu verwenden – ohne eine Einstellung werden passende Vorfälle still ausgelöst.",
+    "incidentDestinationHintOncall": "Wohin Benachrichtigungen zusätzlich zum On-Call-Paging gehen, wenn Alarme dieser Quelle einen Vorfall erstellen oder sich ihm anschließen. Leer lassen, um den Org-Standard zu verwenden.",
     "noDestinationSet": "Kein Ziel für Vorfälle festgelegt",
+    "oncallOnly": "Nur On-Call",
     "setupStep1Title": "1. Webhook erstellen",
     "setupStep1Body": "Erstellen Sie in Grafana, Alertmanager oder einem beliebigen Tool, das JSON POSTen kann, einen Webhook-Kontaktpunkt / Empfänger.",
     "setupRemainingStepsHint": "Speichern Sie diese Quelle, um ihre URL und ihr Token zu erhalten, und fügen Sie sie dann in die Webhook-Konfiguration ein.",
@@ -16502,6 +16505,13 @@
       "logoLightLabel": "Benutzerdefiniertes Logo (heller Modus)",
       "logoLightHelp": "Wird im hellen Modus angezeigt. PNG, JPG, GIF oder BMP, bis zu 150 × 30 px.",
       "logoDarkLabel": "Benutzerdefiniertes Logo (dunkler Modus)",
+      "logoTitle": "Eigenes Logo",
+      "logoHelp": "Wird in der Kopfzeile der App angezeigt. PNG, JPG, GIF, BMP, WEBP oder SVG, bis zu 150 × 30 px.",
+      "logoLightTitle": "Heller Modus",
+      "logoDarkTitle": "Dunkler Modus",
+      "logoSaved": "Gespeichert",
+      "logoNotSaved": "Nicht gespeichert",
+      "logoDimensions": "{width} × {height} px",
       "logoDarkHelp": "Wird im dunklen Modus angezeigt. PNG, JPG, GIF oder BMP, bis zu 150 × 30 px."
     },
     "modelPricingEditor": {
@@ -24262,8 +24272,19 @@
       "clear": "Löschen"
     },
     "file": {
-      "removeFile": "Datei entfernen",
-      "clearAll": "Alle löschen"
+      "removeNamed": "{name} entfernen",
+      "attachPrompt": "Datei zum Anhängen ablegen oder {browse}",
+      "attachPromptMultiple": "Dateien zum Anhängen ablegen oder {browse}",
+      "browseLink": "durchsuchen",
+      "supports": "Unterstützte Dateien {types}",
+      "dropFileToAttach": "Datei zum Anhängen ablegen",
+      "dropFilesToAttach": "Dateien zum Anhängen ablegen",
+      "typeRejected": "Nur {allowed}-Dateien werden akzeptiert",
+      "sizeRejected": "{size} überschreitet das Limit von {max}",
+      "countRejected": "Nur {count} Datei auf einmal | Nur {count} Dateien auf einmal",
+      "invalidJson": "Kein gültiges JSON: {detail}",
+      "invalidImage": "Keine gültige Bilddatei",
+      "unavailable": "Datei-Upload ist nicht verfügbar"
     },
     "date": {
       "openCalendar": "Kalender öffnen",
@@ -28089,8 +28110,8 @@
     "awayMark": "Als abwesend markieren",
     "awayClear": "Abwesenheit aufheben",
     "awayClearConfirm": "Aufheben",
-    "awayClearMessage": "Abwesenheit von {name} aufheben, {range}? Sie gilt in jedem Team.",
-    "awayConsequence": "Gilt in jedem Team, in dem {name} ist. Die Schichten gehen an die nächste Person der jeweiligen Rotation, sofern es eine gibt.",
+    "awayClearMessage": "Abwesenheit von {name} für {range} aufheben? Sie gilt für jedes Team in dieser Organisation.",
+    "awayConsequence": "Gilt für jedes Team, in dem {name} in dieser Organisation ist. Die Schichten gehen an die nächste Person in der jeweiligen Rotation, sofern es eine gibt.",
     "awayNextWeek": "Nächste Woche, Mo–So",
     "awayTitle": "Als abwesend markieren",
     "membersAddOpen": "Mitglieder hinzufügen",
@@ -28653,7 +28674,7 @@
     "mineJoinTeam": "Einem Team beitreten",
     "mineTestTeam": "Eine Testalarmierung an {team} senden",
     "mineCoverSaved": "Vertretung gespeichert",
-    "mineSlackLinkHow": "{command} link in Slack eingeben",
+    "mineSlackLinkHow": "Geben Sie in Slack {command} link ein",
     "mineSlackSetUpHint": "Öffnet Einstellungen › Slack",
     "myDeliveriesWhen": "Wann",
     "phoneAddHint": "Eine Nummer für SMS und Anrufe hinzufügen",
@@ -31006,7 +31027,7 @@
         "settings": "Einstellungen",
         "install": "Bei Installation",
         "destination": "Von einem Alarmziel",
-        "oncall": "Von {command} oncall hier"
+        "oncall": "Hier über {command} oncall"
       },
       "channel": "Kanal",
       "channelPlaceholder": "Kanäle durchsuchen",
@@ -34665,7 +34686,15 @@
     "offline": "Offline. Letzte Besuche bleiben verfügbar.",
     "sourceUnavailable": "Dieser Ressourcentyp ist nicht verfügbar",
     "emptyHelp": "Name oder ID zum Suchen eingeben",
-    "globalShortcut": "Globale Suche öffnen"
+    "globalShortcut": "Globale Suche öffnen",
+    "trigger": "Suchen oder zu … springen",
+    "allTypes": "Alle",
+    "capped": "Der erste Treffer wird angezeigt. | Die ersten {count} Treffer werden angezeigt.",
+    "hintNavigate": "Navigieren",
+    "hintOpen": "Öffnen",
+    "hintNewTab": "In neuem Tab öffnen",
+    "hintTypes": "Nach Typ filtern",
+    "hintClose": "Schließen"
   },
   "timeRangeInput": {
     "label": "Zeitbereich eingeben",

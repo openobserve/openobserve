@@ -34,6 +34,7 @@ function setup(selected: string[] = []) {
       resource("logs_insights"),
       resource("logs_unredacted"),
       resource("logs_cache"),
+      resource("ai_toolsets"),
       resource("prompt"),
       resource("stream"),
       resource("dfolder", [
@@ -166,19 +167,18 @@ describe("useRolePermissionRows - updateResourceEntities", () => {
     expect(row.permission.AllowGet.show).toBe(true);
   });
 
-  it("hides AllowGet and keeps AllowDelete on logs_cache rows", () => {
+  it.each([
+    ["logs_cache", ["AllowAll", "AllowDelete"]],
+    ["ai_toolsets", ["AllowAll", "AllowList", "AllowPut", "AllowDelete"]],
+  ])("%s rows show only %j", (name, shown) => {
     const { updateResourceEntities, permissionsState } = setup();
 
-    updateResourceEntities("logs_cache", ["name"], [{ name: "app" }]);
+    updateResourceEntities(name, ["name"], [{ name: "app" }]);
 
-    const row = entitiesOf(permissionsState, "logs_cache")[0];
-    expect(row.resourceName).toBe("logs_cache");
-    expect(row.permission.AllowGet.show).toBe(false);
-    expect(row.permission.AllowList.show).toBe(false);
-    expect(row.permission.AllowPost.show).toBe(false);
-    expect(row.permission.AllowPut.show).toBe(false);
-    expect(row.permission.AllowDelete.show).toBe(true);
-    expect(row.permission.AllowAll.show).toBe(true);
+    const row = entitiesOf(permissionsState, name)[0];
+    expect(row.resourceName).toBe(name);
+    const actions = ["AllowAll", "AllowList", "AllowGet", "AllowPost", "AllowPut", "AllowDelete"];
+    expect(actions.filter((a) => row.permission[a].show)).toEqual(shown);
   });
 });
 

@@ -41,9 +41,10 @@ use o2_enterprise::enterprise::{
     ai::{
         client::{DiscoverError, DiscoveredTool, McpEntry, get_agent_client},
         toolsets::{
-            McpAuth, McpData, ToolsetCreateRequest, ToolsetKind, ToolsetListResponse,
-            ToolsetResponse, ToolsetState, ToolsetStatus, ToolsetUpdateRequest, merge_update_data,
-            needs_credentials,
+            DestinationChanged, McpAuth, McpData, ToolsetCreateRequest, ToolsetKind,
+            ToolsetListResponse, ToolsetResponse, ToolsetState, ToolsetStatus,
+            ToolsetUpdateRequest, drop_write_header_names, keep_stored_write_headers,
+            merge_update_data, needs_credentials,
             oauth::{TokenError, tokens},
             push::{colliding_names, normalize_tool_name},
             validate_data, validate_name, validate_update, without_dropped_keys,
@@ -55,7 +56,10 @@ use o2_enterprise::enterprise::{
     },
 };
 use openobserve_api_common::extractors::Headers;
-use openobserve_core::auth::{UserEmail, check_permissions};
+use openobserve_core::{
+    auth::{UserEmail, check_permissions, is_ofga_object_visible},
+    autoresolve::approve::{APPROVE_OBJECT_TYPE, permitted_connections, rbac_on},
+};
 use serde::{Deserialize, Serialize};
 use svix_ksuid::{Ksuid, KsuidLike};
 use utoipa::ToSchema;
@@ -537,7 +541,7 @@ struct UpdatedData {
 pub async fn create(
     Path(org_id): Path<String>,
     Headers(user_email): Headers<UserEmail>,
-    Json(body): Json<ToolsetCreateRequest>,
+    Json(mut body): Json<ToolsetCreateRequest>,
 ) -> Response {
     let kind = match body.kind.parse::<ToolsetKind>() {
         Ok(kind) => kind,
@@ -560,6 +564,12 @@ pub async fn create(
     if let Err(refusal) = admit_url(kind, body.data.as_ref()).await {
         return refusal;
     }
+    if kind == ToolsetKind::Mcp
+        && let Some(data) = body.data.as_mut()
+    {
+        drop_write_header_names(data);
+    }
+
     let data_str = body
         .data
         .map(|data| without_dropped_keys(kind, data).to_string());
@@ -651,7 +661,9 @@ pub async fn get(
         Ok(Some(t)) => {
             let mut toolsets = [ToolsetResponse::from_toolset(t)];
             flag_renames(&org_id, &mut toolsets).await;
-            hide_mcp_urls(&org_id, &user_email.user_id, &mut toolsets).await;
+            let writer = toolsets[0].kind == ToolsetKind::Mcp
+                && may_update_every_toolset(&org_id, &user_email.user_id).await;
+            hide_mcp_urls(&org_id, &user_email.user_id, &mut toolsets, writer).await;
             let [toolset] = toolsets;
             Json(toolset).into_response()
         }
@@ -673,6 +685,8 @@ pub struct ListQuery {
     pub kind: Option<String>,
     /// Maximum number of results to return; a negative value is rejected with 400.
     pub limit: Option<u64>,
+    /// `list` (default) or `update`: list only the toolsets the caller holds that permission on.
+    pub permission: Option<String>,
 }
 
 #[utoipa::path(
@@ -682,18 +696,22 @@ pub struct ListQuery {
     tag = "AI",
     operation_id = "ListAiToolsets",
     summary = "List AI toolsets",
-    description = "Lists AI toolsets for the org with optional filtering. Only available in enterprise deployments.",
+    description = "Lists the org's AI toolsets the caller may list (or update), with optional filtering. \
+                   Org admins, and deployments without role-based access, get every toolset; a caller \
+                   with no grant gets an empty list. `can_create` says whether the caller may create \
+                   toolsets. Only available in enterprise deployments.",
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("name"   = Option<String>, Query, description = "Substring filter on name (case-insensitive)"),
         ("kind"   = Option<String>, Query, description = "Exact filter on kind: mcp | skill | generic"),
-        ("limit"  = Option<u64>,   Query, description = "Maximum number of results"),
+        ("limit"  = Option<u64>,   Query, description = "Maximum number of results, counted after the permission filter"),
+        ("permission" = Option<String>, Query, description = "list (default): toolsets the caller may list; update: toolsets the caller may update"),
     ),
     security(("Authorization" = [])),
     responses(
         (status = 200, description = "List of toolsets", content_type = "application/json", body = ToolsetListResponse),
-        (status = 400, description = "Invalid query parameters, such as a negative limit"),
-        (status = 403, description = "Feature not supported", content_type = "application/json"),
+        (status = 400, description = "Invalid query parameters, such as a negative limit or an unknown permission"),
+        (status = 403, description = "Feature not supported, or the permissions could not be read", content_type = "application/json"),
     ),
     extensions(("x-o2-ratelimit" = json!({"module": "AI", "operation": "list"})), ("x-o2-mcp" = json!({"enabled": false})))
 )]
@@ -702,20 +720,33 @@ pub async fn list(
     Query(params): Query<ListQuery>,
     Headers(user_email): Headers<UserEmail>,
 ) -> Response {
+    let permission = match params.permission.as_deref() {
+        None | Some("list") => "LIST",
+        Some("update") => "PUT",
+        Some(_) => return MetaHttpResponse::bad_request("permission must be list or update"),
+    };
+    let permitted = match permitted_connections(&org_id, &user_email.user_id, permission).await {
+        Ok(permitted) => permitted,
+        Err(e) => return MetaHttpResponse::forbidden(e),
+    };
+    let writer = may_update_every_toolset(&org_id, &user_email.user_id).await;
     let filter = infra::table::org_ai_toolsets::ListFilter {
         name: params.name,
         kind: params.kind,
     };
-    match infra::table::org_ai_toolsets::list(&org_id, filter, params.limit).await {
+    let db_limit = params.limit.filter(|_| permitted.is_none());
+    match infra::table::org_ai_toolsets::list(&org_id, filter, db_limit).await {
         Ok(toolsets) => {
+            let toolsets = permitted_page(&org_id, toolsets, permitted.as_deref(), params.limit);
             let mut res = ToolsetListResponse {
                 toolsets: toolsets
                     .into_iter()
                     .map(ToolsetResponse::from_toolset)
                     .collect(),
+                can_create: !rbac_on() || writer,
             };
             flag_renames(&org_id, &mut res.toolsets).await;
-            hide_mcp_urls(&org_id, &user_email.user_id, &mut res.toolsets).await;
+            hide_mcp_urls(&org_id, &user_email.user_id, &mut res.toolsets, writer).await;
             Json(res).into_response()
         }
         Err(e) => MetaHttpResponse::internal_error(e),
@@ -1105,6 +1136,14 @@ pub async fn delete(Path(path): Path<(String, String)>) -> Response {
         Err(e) => return MetaHttpResponse::internal_error(e),
     };
 
+    // A later toolset can never reuse the id, so a failed cleanup only leaves unreachable grants.
+    if o2_openfga::config::get_config().enabled {
+        use o2_openfga::authorizer::authz::{remove_object_grants, remove_ownership};
+        let object = openobserve_core::autoresolve::approve::connection_object(&id);
+        remove_object_grants(&org_id, &object).await;
+        remove_ownership(&org_id, &object, "", "").await;
+    }
+
     tokens().forget(&org_id, &id);
     let name = row.name.clone();
     if let Err(e) = db::ai_toolsets::published_delete(&row, now_micros()).await {
@@ -1151,29 +1190,6 @@ pub async fn resync(Path(org_id): Path<String>) -> Response {
     match db::ai_toolsets::resync(&org_id, now_micros()).await {
         Ok(published) => Json(ResyncResponse { published }).into_response(),
         Err(e) => MetaHttpResponse::internal_error(e),
-    }
-}
-
-/// An MCP URL can carry its key in the userinfo, path or query; only toolset writers see it whole.
-async fn hide_mcp_urls(org_id: &str, user_id: &str, toolsets: &mut [ToolsetResponse]) {
-    if !toolsets.iter().any(|t| t.kind == ToolsetKind::Mcp)
-        || check_permissions(
-            org_id,
-            org_id,
-            user_id,
-            "ai_toolsets",
-            "PUT",
-            None,
-            true,
-            false,
-            false,
-        )
-        .await
-    {
-        return;
-    }
-    for toolset in toolsets.iter_mut().filter(|t| t.kind == ToolsetKind::Mcp) {
-        hide_mcp_url(toolset);
     }
 }
 
@@ -1281,7 +1297,7 @@ fn updated_data(
     kind: &str,
     stored: Option<&str>,
     incoming: Option<serde_json::Value>,
-) -> Result<UpdatedData, String> {
+) -> Result<UpdatedData, UpdateRefusal> {
     let kind = kind.parse::<ToolsetKind>()?;
     let raw = stored;
     let stored = raw.and_then(|s| serde_json::from_str::<serde_json::Value>(s).ok());
@@ -1295,7 +1311,16 @@ fn updated_data(
             replaced: Vec::new(),
         });
     };
-    let merge = merge_update_data(kind, stored.as_ref(), incoming)?;
+    let sends_write_headers = incoming.get("write_headers").is_some();
+    let mut merge = merge_update_data(kind, stored.as_ref(), incoming)?;
+    if kind == ToolsetKind::Mcp {
+        // The merge copies stored keys the body left out; left-out write headers are judged below.
+        if !sends_write_headers && let Some(fields) = merge.data.as_object_mut() {
+            fields.remove("write_headers");
+        }
+        // Stored write headers stay for `***` or when left out, never for a changed destination.
+        keep_stored_write_headers(raw, &mut merge.data)?;
+    }
     let merged = Some(merge.data);
     validate_update(kind, stored.as_ref(), &merged)?;
     Ok(UpdatedData {
@@ -1305,19 +1330,47 @@ fn updated_data(
     })
 }
 
+/// Why a `PUT` stores nothing; `fields` names what changed under a kept secret, when that is why.
+#[derive(Debug)]
+struct UpdateRefusal {
+    message: String,
+    fields: Vec<&'static str>,
+}
+
+impl From<String> for UpdateRefusal {
+    fn from(message: String) -> Self {
+        let fields = if message.contains("gains or loses an entry") {
+            vec!["headers"]
+        } else if message.starts_with("re-enter secrets when the URL changes") {
+            vec!["url"]
+        } else {
+            Vec::new()
+        };
+        Self { message, fields }
+    }
+}
+
+impl From<DestinationChanged> for UpdateRefusal {
+    fn from(changed: DestinationChanged) -> Self {
+        Self {
+            message: changed.to_string(),
+            fields: changed.fields,
+        }
+    }
+}
+
 /// A refused merge; a kept secret that would follow a changed URL or header is the typed 400.
-fn update_refused(org_id: &str, id: &str, error: String) -> Response {
-    let field = if error.contains("gains or loses an entry") {
-        "headers"
-    } else if error.starts_with("re-enter secrets when the URL changes") {
-        "url"
-    } else {
-        return MetaHttpResponse::bad_request(error);
-    };
-    log::warn!("[org_id:{org_id}] toolset {id} update refused: secrets kept while {field} changed");
-    AiErrorEnvelope::new(AiErrorCode::InvalidRequest, error)
+fn update_refused(org_id: &str, id: &str, refusal: impl Into<UpdateRefusal>) -> Response {
+    let UpdateRefusal { message, fields } = refusal.into();
+    if fields.is_empty() {
+        return MetaHttpResponse::bad_request(message);
+    }
+    log::warn!(
+        "[org_id:{org_id}] toolset {id} update refused: secrets kept while {fields:?} changed"
+    );
+    AiErrorEnvelope::new(AiErrorCode::InvalidRequest, message)
         .legacy_code("destination_changed")
-        .with("fields", vec![field])
+        .with("fields", fields)
         .into_response()
 }
 
@@ -1676,6 +1729,74 @@ fn has_jsonrpc_result(body: &str) -> bool {
             .any(|data| has(data.trim()))
 }
 
+/// The first `limit` of `toolsets` that `permitted` lets the caller see; `None` permits every one.
+fn permitted_page(
+    org_id: &str,
+    toolsets: Vec<OrgToolset>,
+    permitted: Option<&[String]>,
+    limit: Option<u64>,
+) -> Vec<OrgToolset> {
+    let limit = limit.map_or(usize::MAX, |l| usize::try_from(l).unwrap_or(usize::MAX));
+    toolsets
+        .into_iter()
+        .filter(|t| is_ofga_object_visible(org_id, APPROVE_OBJECT_TYPE, &t.id, permitted))
+        .take(limit)
+        .collect()
+}
+
+/// Whether the caller holds Update on every toolset of the org, as creating one requires.
+async fn may_update_every_toolset(org_id: &str, user_id: &str) -> bool {
+    check_permissions(
+        org_id,
+        org_id,
+        user_id,
+        "ai_toolsets",
+        "PUT",
+        None,
+        true,
+        false,
+        false,
+    )
+    .await
+}
+
+/// An MCP URL can carry its key in the userinfo, path or query; only toolset writers see it whole.
+async fn hide_mcp_urls(
+    org_id: &str,
+    user_id: &str,
+    toolsets: &mut [ToolsetResponse],
+    updates_every_toolset: bool,
+) {
+    if updates_every_toolset || !toolsets.iter().any(|t| t.kind == ToolsetKind::Mcp) {
+        return;
+    }
+    let mcp: Vec<&mut ToolsetResponse> = toolsets
+        .iter_mut()
+        .filter(|t| t.kind == ToolsetKind::Mcp)
+        .collect();
+    // An Update grant on one toolset alone lets its holder edit it, and a save sends the URL.
+    let may_edit = futures::future::join_all(mcp.iter().map(|toolset| {
+        check_permissions(
+            &toolset.id,
+            org_id,
+            user_id,
+            "ai_toolsets",
+            "PUT",
+            None,
+            false,
+            false,
+            true,
+        )
+    }))
+    .await;
+    for (toolset, may_edit) in mcp.into_iter().zip(may_edit) {
+        if may_edit {
+            continue;
+        }
+        hide_mcp_url(toolset);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use serde_json::{Value, json};
@@ -1939,8 +2060,9 @@ mod tests {
         )
         .unwrap_err();
         assert!(
-            err.contains("re-enter secrets when the URL changes"),
-            "{err}"
+            err.message
+                .contains("re-enter secrets when the URL changes"),
+            "{err:?}"
         );
     }
 
@@ -1952,7 +2074,7 @@ mod tests {
             Some(json!({"schema": 2, "headers": {}})),
         )
         .unwrap_err();
-        assert!(err.contains("invalid mcp data"), "{err}");
+        assert!(err.message.contains("invalid mcp data"), "{err:?}");
     }
 
     #[tokio::test]
@@ -2549,7 +2671,10 @@ mod tests {
         emptied["auth"] = data["auth"].clone();
         emptied["auth"]["client_secret"] = json!("");
         let err = updated_data("mcp", Some(&data.to_string()), Some(emptied)).unwrap_err();
-        assert!(err.contains("client_secret` is required"), "{err}");
+        assert!(
+            err.message.contains("client_secret` is required"),
+            "{err:?}"
+        );
     }
 
     #[test]
@@ -2626,7 +2751,7 @@ mod tests {
     fn merge_secrets(
         stored: Option<&str>,
         incoming: serde_json::Value,
-    ) -> Result<serde_json::Value, String> {
+    ) -> Result<serde_json::Value, UpdateRefusal> {
         updated_data("mcp", stored, Some(incoming)).map(parsed)
     }
 
@@ -2911,5 +3036,48 @@ mod tests {
             usage.results(tail.as_bytes()),
             vec![("t1".to_string(), true)]
         );
+    }
+
+    #[test]
+    fn list_keeps_permitted_toolsets_then_applies_the_limit() {
+        let toolset = |id: &str| OrgToolset {
+            id: id.to_string(),
+            org: "acme".to_string(),
+            name: id.to_string(),
+            kind: "mcp".to_string(),
+            description: None,
+            data: None,
+            created_by: String::new(),
+            created_at: 0,
+            updated_at: 0,
+            enabled: true,
+            status_state: None,
+            status_since: None,
+            last_error: None,
+            last_used_at: None,
+            region_only: false,
+            origin_region: None,
+        };
+        let granted = |objects: &[&str]| objects.iter().map(|o| o.to_string()).collect::<Vec<_>>();
+        let one = granted(&["ai_toolsets:t2"]);
+        let two = granted(&["ai_toolsets:t3", "ai_toolsets:t2", "ai_toolsets:other"]);
+        let all = granted(&["ai_toolsets:_all_acme"]);
+        let other_org = granted(&["ai_toolsets:_all_beta"]);
+        type Case<'a> = (&'a str, Option<&'a [String]>, Option<u64>, &'a [&'a str]);
+        #[rustfmt::skip]
+        let cases: [Case; 6] = [
+            ("no filter", None, None, &["t1", "t2", "t3"]),
+            ("one toolset granted", Some(&one), None, &["t2"]),
+            ("limit counts after the filter", Some(&two), Some(1), &["t2"]),
+            ("every toolset of the org", Some(&all), Some(2), &["t1", "t2"]),
+            ("another org's grant", Some(&other_org), None, &[]),
+            ("no grant", Some(&[]), None, &[]),
+        ];
+        for (case, permitted, limit, want) in cases {
+            let toolsets = ["t1", "t2", "t3"].map(toolset).to_vec();
+            let got = permitted_page("acme", toolsets, permitted, limit);
+            let got: Vec<&str> = got.iter().map(|t| t.id.as_str()).collect();
+            assert_eq!(got, want, "{case}");
+        }
     }
 }

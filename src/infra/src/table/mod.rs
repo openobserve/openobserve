@@ -43,6 +43,13 @@ mod alert_slack_postgres_tests;
 pub mod alert_states;
 pub mod alerts;
 pub mod anomaly_detection;
+pub mod autoresolve;
+pub mod autoresolve_corrections;
+pub mod autoresolve_run_connections;
+pub mod autoresolve_runs;
+pub mod autoresolve_steps;
+#[cfg(test)]
+mod autoresolve_test_support;
 pub mod backfill_jobs;
 pub mod cipher;
 pub mod compactor_manual_jobs;

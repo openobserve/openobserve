@@ -9613,6 +9613,7 @@
       "promqlFiltersAndOnly": "PromQL-filters ondersteunen alleen AND. Verwijder OR en groepen, of schakel over naar SQL.",
       "cappedHint": "De eerste {count} waarden worden getoond",
       "cappedAllHint": "'Alles' omvat ook waarden die niet in de lijst staan",
+      "metricsTruncatedHint": "Sommige metrieken zijn niet aangevinkt. Geef een metriek op om alle waarden te zien.",
       "metric": "Metriek",
       "label": "Etiket",
       "metricSelectTooltip": "Selecteer een metriek of gebruik een variabele zoals $metricVariable om deze op basis van een andere waarde te kiezen.",
@@ -15419,7 +15420,9 @@
     "incidentDestination": "Incidentbestemming",
     "incidentDestinationPlaceholder": "Organisatiestandaard gebruiken",
     "incidentDestinationHint": "Waar meldingen naartoe gaan wanneer alarmen van deze bron een incident creëren of eraan deelnemen. Laat leeg om de organisatiestandaard te gebruiken — als geen van beide is ingesteld, worden overeenkomende incidenten stil geactiveerd.",
+    "incidentDestinationHintOncall": "Waar meldingen naartoe gaan, naast On-Call-paging, wanneer alarmen van deze bron een incident creëren of eraan deelnemen. Laat leeg om de organisatiestandaard te gebruiken.",
     "noDestinationSet": "Geen incidentbestemming ingesteld",
+    "oncallOnly": "Alleen On-Call",
     "setupStep1Title": "1. Maak een webhook",
     "setupStep1Body": "Maak in Grafana, Alertmanager of een tool die JSON kan POSTEN, een webhook-contactpunt / -receiver.",
     "setupRemainingStepsHint": "Sla deze bron op om de URL en token te krijgen en plak ze vervolgens in die webhook-configuratie.",
@@ -16502,6 +16505,13 @@
       "logoLightLabel": "Aangepast logo (lichte modus)",
       "logoLightHelp": "Getoond in de lichte modus. PNG, JPG, GIF of BMP, tot 150 × 30 px.",
       "logoDarkLabel": "Aangepast logo (donkere modus)",
+      "logoTitle": "Aangepast logo",
+      "logoHelp": "Wordt getoond in de app-header. PNG, JPG, GIF, BMP, WEBP of SVG, tot 150 × 30 px.",
+      "logoLightTitle": "Lichte modus",
+      "logoDarkTitle": "Donkere modus",
+      "logoSaved": "Opgeslagen",
+      "logoNotSaved": "Niet opgeslagen",
+      "logoDimensions": "{width} × {height} px",
       "logoDarkHelp": "Getoond in de donkere modus. PNG, JPG, GIF of BMP, tot 150 × 30 px."
     },
     "modelPricingEditor": {
@@ -24262,8 +24272,19 @@
       "clear": "Wissen"
     },
     "file": {
-      "removeFile": "Bestand verwijderen",
-      "clearAll": "Alles wissen"
+      "removeNamed": "{name} verwijderen",
+      "attachPrompt": "Sleep een bestand om toe te voegen, of {browse}",
+      "attachPromptMultiple": "Sleep bestanden om toe te voegen, of {browse}",
+      "browseLink": "blader",
+      "supports": "Ondersteunde bestanden {types}",
+      "dropFileToAttach": "Laat het bestand los om bij te voegen",
+      "dropFilesToAttach": "Laat de bestanden los om bij te voegen",
+      "typeRejected": "Alleen {allowed}-bestanden worden geaccepteerd",
+      "sizeRejected": "{size} overschrijdt de limiet van {max}",
+      "countRejected": "Slechts {count} bestand tegelijk | Slechts {count} bestanden tegelijk",
+      "invalidJson": "Geen geldige JSON: {detail}",
+      "invalidImage": "Geen geldig afbeeldingsbestand",
+      "unavailable": "Bestanden uploaden is niet beschikbaar"
     },
     "date": {
       "openCalendar": "Kalender openen",
@@ -28089,8 +28110,8 @@
     "awayMark": "Afwezig markeren",
     "awayClear": "Afwezigheid wissen",
     "awayClearConfirm": "Wissen",
-    "awayClearMessage": "Afwezigheid van {name} wissen, {range}? Dit geldt voor elk team.",
-    "awayConsequence": "Applies on every team {name} is on. Their shifts go to the next person on each rotation, if there is one.",
+    "awayClearMessage": "Afwezigheid van {name} wissen, {range}? Het geldt voor elk team in deze organisatie.",
+    "awayConsequence": "Geldt voor elk team waar {name} in deze organisatie deel van uitmaakt. Diens diensten gaan naar de volgende persoon in elke roostering, als die er is.",
     "awayNextWeek": "Volgende week, ma–zo",
     "awayTitle": "Afwezig markeren",
     "membersAddOpen": "Leden toevoegen",
@@ -34665,7 +34686,15 @@
     "offline": "Offline. Recente bezoeken blijven beschikbaar.",
     "sourceUnavailable": "Dit brontype is niet beschikbaar",
     "emptyHelp": "Voer een naam of ID in",
-    "globalShortcut": "Globaal zoeken openen"
+    "globalShortcut": "Globaal zoeken openen",
+    "trigger": "Zoeken of ga naar…",
+    "allTypes": "Alle",
+    "capped": "Toont de eerste match. | Toont de eerste {count} matches.",
+    "hintNavigate": "Navigeren",
+    "hintOpen": "Openen",
+    "hintNewTab": "Openen in nieuw tabblad",
+    "hintTypes": "Filteren op type",
+    "hintClose": "Sluiten"
   },
   "timeRangeInput": {
     "label": "Typ een tijdsbereik",

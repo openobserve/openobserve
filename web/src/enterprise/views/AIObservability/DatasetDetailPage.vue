@@ -303,14 +303,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OFile
           v-model="importFile"
           :label="t('aiObservability.datasets.detail.csvImport.fileLabel')"
-          :placeholder="t('aiObservability.datasets.detail.csvImport.placeholder')"
           :help-text="t('aiObservability.datasets.detail.csvImport.help')"
-          :max-file-size="DATASET_IMPORT_MAX_FILE_SIZE"
+          :max-size="DATASET_IMPORT_MAX_FILE_SIZE"
           accept=".csv,text/csv"
-          drop-zone
           required
           data-test="ai-dataset-detail-import-file"
-          @size-error="showCsvSizeError"
         />
       </div>
     </ODrawer>
@@ -647,14 +644,6 @@ function closeCsvImport() {
   if (isImporting.value) return;
   importOpen.value = false;
   importFile.value = null;
-}
-
-function showCsvSizeError() {
-  importFile.value = null;
-  toast({
-    variant: "error",
-    message: t("aiObservability.datasets.detail.csvImport.sizeError"),
-  });
 }
 
 async function importCsv() {

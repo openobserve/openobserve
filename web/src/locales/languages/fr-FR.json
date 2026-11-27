@@ -9613,6 +9613,7 @@
       "promqlFiltersAndOnly": "Les filtres PromQL ne prennent en charge que AND. Supprimez OR et les groupes, ou passez à SQL.",
       "cappedHint": "Affichage des {count} premières valeurs",
       "cappedAllHint": "« Tout » inclut aussi les valeurs non listées",
+      "metricsTruncatedHint": "Certaines métriques n'ont pas été vérifiées. Indiquez le nom d'une métrique pour afficher toutes les valeurs.",
       "metric": "Indicateur",
       "label": "Libellé",
       "metricSelectTooltip": "Sélectionnez un indicateur ou utilisez une variable comme $metricVariable pour le choisir à partir d'une autre valeur.",
@@ -15419,7 +15420,9 @@
     "incidentDestination": "Destination d'incident",
     "incidentDestinationPlaceholder": "Utiliser la valeur par défaut de l'organisation",
     "incidentDestinationHint": "Où vont les notifications lorsque les alertes de cette source créent ou rejoignent un incident. Laissez vide pour utiliser la valeur par défaut de l'organisation — sans aucune des deux définies, les incidents correspondants se déclenchent silencieusement.",
+    "incidentDestinationHintOncall": "Où vont les notifications, en plus de l'appel On-Call, lorsque les alertes de cette source créent ou rejoignent un incident. Laissez vide pour utiliser la valeur par défaut de l'organisation.",
     "noDestinationSet": "Aucune destination d'incident définie",
+    "oncallOnly": "On-Call uniquement",
     "setupStep1Title": "1. Créer un webhook",
     "setupStep1Body": "Dans Grafana, Alertmanager, ou tout outil pouvant envoyer du JSON via POST, créez un point de contact / récepteur webhook.",
     "setupRemainingStepsHint": "Enregistrez cette source pour obtenir son URL et son jeton, puis collez-les dans la configuration du webhook.",
@@ -16502,6 +16505,13 @@
       "logoLightLabel": "Logo personnalisé (mode clair)",
       "logoLightHelp": "Affiché en mode clair. PNG, JPG, GIF ou BMP, jusqu'à 150 × 30 px.",
       "logoDarkLabel": "Logo personnalisé (mode sombre)",
+      "logoTitle": "Logo personnalisé",
+      "logoHelp": "Affiché dans l'en-tête de l'application. PNG, JPG, GIF, BMP, WEBP ou SVG, jusqu'à 150 × 30 px.",
+      "logoLightTitle": "Mode clair",
+      "logoDarkTitle": "Mode sombre",
+      "logoSaved": "Enregistré",
+      "logoNotSaved": "Non enregistré",
+      "logoDimensions": "{width} × {height} px",
       "logoDarkHelp": "Affiché en mode sombre. PNG, JPG, GIF ou BMP, jusqu'à 150 × 30 px."
     },
     "modelPricingEditor": {
@@ -24262,8 +24272,19 @@
       "clear": "Effacer"
     },
     "file": {
-      "removeFile": "Supprimer le fichier",
-      "clearAll": "Tout effacer"
+      "removeNamed": "Supprimer {name}",
+      "attachPrompt": "Déposez un fichier pour le joindre, ou {browse}",
+      "attachPromptMultiple": "Déposez des fichiers pour les joindre, ou {browse}",
+      "browseLink": "parcourez",
+      "supports": "Fichiers acceptés {types}",
+      "dropFileToAttach": "Déposez le fichier à joindre",
+      "dropFilesToAttach": "Déposez les fichiers à joindre",
+      "typeRejected": "Seuls les fichiers {allowed} sont acceptés",
+      "sizeRejected": "{size} dépasse la limite de {max}",
+      "countRejected": "Seulement {count} fichier à la fois | Seulement {count} fichiers à la fois",
+      "invalidJson": "JSON non valide : {detail}",
+      "invalidImage": "Ce n'est pas un fichier image valide",
+      "unavailable": "Le téléversement de fichiers n'est pas disponible"
     },
     "date": {
       "openCalendar": "Ouvrir le calendrier",
@@ -28089,8 +28110,8 @@
     "awayMark": "Marquer comme absent",
     "awayClear": "Effacer l'absence",
     "awayClearConfirm": "Effacer",
-    "awayClearMessage": "Effacer l'absence de {name}, {range} ? Cela s'applique à toutes les équipes.",
-    "awayConsequence": "S'applique à toutes les équipes de {name}. Ses créneaux sont attribués à la personne suivante de chaque rotation, s'il y en a une.",
+    "awayClearMessage": "Effacer l'absence de {name}, {range} ? Cela s'applique à toutes les équipes de cette organisation.",
+    "awayConsequence": "S'applique à toutes les équipes dont {name} fait partie dans cette organisation. Ses gardes passent à la personne suivante de chaque rotation, s'il y en a une.",
     "awayNextWeek": "Semaine prochaine, lun.–dim.",
     "awayTitle": "Marquer comme absent",
     "membersAddOpen": "Ajouter des membres",
@@ -34665,7 +34686,15 @@
     "offline": "Hors ligne. Les visites récentes restent disponibles.",
     "sourceUnavailable": "Ce type de ressource est indisponible",
     "emptyHelp": "Saisissez un nom ou un ID",
-    "globalShortcut": "Ouvrir la recherche globale"
+    "globalShortcut": "Ouvrir la recherche globale",
+    "trigger": "Rechercher ou accéder à…",
+    "allTypes": "Tous",
+    "capped": "Affichage de la première correspondance. | Affichage des {count} premières correspondances.",
+    "hintNavigate": "Naviguer",
+    "hintOpen": "Ouvrir",
+    "hintNewTab": "Ouvrir dans un nouvel onglet",
+    "hintTypes": "Filtrer par type",
+    "hintClose": "Fermer"
   },
   "timeRangeInput": {
     "label": "Saisissez une plage temporelle",

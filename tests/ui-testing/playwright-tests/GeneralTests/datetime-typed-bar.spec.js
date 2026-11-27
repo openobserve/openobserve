@@ -65,7 +65,7 @@ test.describe("DateTime typed range bar testcases", () => {
     tag: ['@datetime-picker', '@all', '@P1']
   }, async ({ page }) => {
     await page.locator('body').click({ position: { x: 1, y: 1 } });
-    await page.keyboard.press('t');
+    await pm.dateTimePickerPage.pressPickerShortcut();
     await expect(pm.dateTimePickerPage.panel).toBeVisible();
     await expect(pm.dateTimePickerPage.rangeBarInput).toBeFocused();
     await expect(pm.dateTimePickerPage.rangeBarInput).toHaveValue('');

@@ -33,7 +33,7 @@ export type DraftFieldLabel =
 const URL_PATH = "/mcp/url";
 const TOKEN_URL_PATH = "/mcp/auth/token_url";
 const CLIENT_SECRET_PATH = "/mcp/auth/secret/value";
-const HEADER_PATH = /^\/mcp\/headers\/(\d+)\/value$/;
+const HEADER_PATH = /^\/mcp\/(headers|writeHeaders)\/(\d+)\/value$/;
 const SECRET_STATES = new Set<SecretRow["state"]>(["unchanged", "replacing", "new"]);
 
 export function toolsetDraftOf(values: ToolsetFormValues): ToolsetDraft {
@@ -41,7 +41,7 @@ export function toolsetDraftOf(values: ToolsetFormValues): ToolsetDraft {
   return JSON.parse(JSON.stringify({ ...values, mcp })) as ToolsetDraft;
 }
 
-/** Header values and the client secret are secrets and a URL can embed a token, so none is drafted. */
+/** Header values, write headers included, and the client secret are secrets and a URL can embed a token, so none is drafted. */
 export function redactToolsetDraft(draft: ToolsetDraft): { data: ToolsetDraft; paths: string[] } {
   const data = JSON.parse(JSON.stringify(draft)) as ToolsetDraft;
   const paths: string[] = [];
@@ -59,11 +59,13 @@ export function redactToolsetDraft(draft: ToolsetDraft): { data: ToolsetDraft; p
     mcp.auth.secret.value = "";
     paths.push(CLIENT_SECRET_PATH);
   }
-  (mcp.headers ?? []).forEach((row, index) => {
-    if (typeof row.value !== "string" || !row.value) return;
-    row.value = "";
-    paths.push(`/mcp/headers/${index}/value`);
-  });
+  for (const field of ["headers", "writeHeaders"] as const) {
+    (mcp[field] ?? []).forEach((row, index) => {
+      if (typeof row.value !== "string" || !row.value) return;
+      row.value = "";
+      paths.push(`/mcp/${field}/${index}/value`);
+    });
+  }
   return { data, paths };
 }
 
@@ -77,7 +79,9 @@ export function draftRedactedLabels(paths: string[], data: ToolsetDraft): DraftF
     else if (path === CLIENT_SECRET_PATH) label = { kind: "client_secret" };
     else {
       const match = HEADER_PATH.exec(path);
-      if (match) label = { kind: "header", name: data.mcp?.headers?.[Number(match[1])]?.key ?? "" };
+      const field = match?.[1] as "headers" | "writeHeaders" | undefined;
+      if (match && field)
+        label = { kind: "header", name: data.mcp?.[field]?.[Number(match[2])]?.key ?? "" };
     }
     const key = JSON.stringify(label);
     if (!label || seen.has(key)) return [];
@@ -92,7 +96,7 @@ export function draftFieldName(path: string): string | null {
   if (path === TOKEN_URL_PATH) return "mcp.auth.token_url";
   if (path === CLIENT_SECRET_PATH) return "mcp.auth.secret.value";
   const match = HEADER_PATH.exec(path);
-  return match ? `mcp.headers[${match[1]}].value` : null;
+  return match ? `mcp.${match[1]}[${match[2]}].value` : null;
 }
 
 const str = (value: unknown, fallback = ""): string =>
@@ -133,6 +137,9 @@ export function toolsetFormOfDraft(draft: unknown): ToolsetFormValues {
     url: str(mcp.url),
     timeout_seconds: Number.isFinite(timeout) && timeout > 0 ? timeout : 30,
     headers: (Array.isArray(mcp.headers) ? mcp.headers : []).map((row) => secretRowOf(row)),
+    writeHeaders: (Array.isArray(mcp.writeHeaders) ? mcp.writeHeaders : []).map((row) =>
+      secretRowOf(row),
+    ),
     auth: {
       ...emptyFormAuth(),
       token_url: str(auth.token_url),
