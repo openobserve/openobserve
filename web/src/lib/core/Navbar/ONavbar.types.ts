@@ -104,6 +104,8 @@ export interface SubnavChild {
   gate?: string;
   /** Shows the shared "Beta" tag (see BetaBadge.vue) next to this child's label. */
   beta?: boolean;
+  /** Shows the shared tag at its "Alpha" stage instead; wins over `beta`. */
+  alpha?: boolean;
   /** License feature key; `locked` keeps a lock badge on a link to the locked page, `hidden` drops the child. */
   feature?: string;
   /**
@@ -139,6 +141,8 @@ export interface NavGateContext {
   alertCalibrationEnabled: boolean;
   /** `/config` `fleet_enabled` (enterprise `O2_FLEET_ENABLED`). */
   fleetEnabled: boolean;
+  /** `/config` `autoresolve_enabled` (enterprise `O2_AUTORESOLVE_ENABLED` plus licence and keys). */
+  autoresolveEnabled: boolean;
   /** Raw `custom_hide_menus` entries (split on ",") — matches how pages test it. */
   hiddenMenus: Set<string>;
   /** `/config` `features` map (enabled / locked / hidden per license feature). */

@@ -331,18 +331,28 @@ const onPaginationChange = ({ page: next, size }: { page: number; size: number }
 const hasOwnGrant = (row: any) => ACTIONS.some((action) => props.isGranted(row, action));
 
 // Coverage is per resource type, not per row, so it is resolved once instead of 3505 times.
-const coveredResources = computed(() => {
-  const covered = new Set<string>();
+const coveredActions = computed(() => {
+  const covered = new Map<string, Set<string>>();
   props.scopes.forEach((wider) => {
-    if (ACTIONS.some((action) => props.isGranted(wider.node, action)))
-      wider.covers.forEach((resource) => covered.add(resource));
+    const held = props.isGranted(wider.node, ALLOW_ALL)
+      ? ACTIONS
+      : ACTIONS.filter((action) => props.isGranted(wider.node, action));
+    wider.covers.forEach((resource) => {
+      const actions = covered.get(resource) ?? new Set<string>();
+      held.forEach((action) => actions.add(action));
+      covered.set(resource, actions);
+    });
   });
   return covered;
 });
 
-// The Selected filter and the count follow the checkboxes: a row locked by a wider scope counts as selected.
+// The Selected filter and the count follow the checkboxes: only a box the row shows can be ticked by a wider scope.
 const hasEffectiveGrant = (row: any) =>
-  hasOwnGrant(row) || coveredResources.value.has(row.resourceName);
+  hasOwnGrant(row) ||
+  ACTIONS.some(
+    (action) =>
+      row.permission?.[action]?.show && coveredActions.value.get(row.resourceName)?.has(action),
+  );
 
 // Granted rows lead, but the order is fixed when a list opens: re-sorting on every tick would move the row under the cursor.
 const grantedAtOpen = ref(new Set<string>());

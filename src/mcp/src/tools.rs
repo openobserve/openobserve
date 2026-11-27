@@ -63,6 +63,9 @@ const TELEMETRY_SEGMENTS: [&str; 6] = [
 ];
 const TELEMETRY_PREFIXES: [&str; 4] = ["_search", "_around", "_values", "_correlate"];
 
+/// The one POST tool that only reads: SearchSQL runs on this streaming search route.
+const STREAM_SEARCH_PATH: &str = "/api/{org_id}/_search_stream";
+
 /// MCP extension configuration from x-o2-mcp OpenAPI extension
 ///
 /// Example usage in utoipa::path:
@@ -744,6 +747,12 @@ pub fn tool_class(name: &str) -> Option<ToolClass> {
 /// [`get_tool_metadata`] that answers `None` while MCP tools are not initialized.
 pub fn find_tool_metadata(name: &str) -> Option<rmcp_openapi::ToolMetadata> {
     TOOL_METADATA_CACHE.get()?.get(name).cloned()
+}
+
+/// A GET, or a search on its streaming route (SearchSQL runs there).
+pub fn is_read_only(metadata: &rmcp_openapi::ToolMetadata) -> bool {
+    let method = metadata.method.to_ascii_uppercase();
+    method == "GET" || (method == "POST" && metadata.path == STREAM_SEARCH_PATH)
 }
 
 /// Get the summary fields config for a tool (if configured via x-o2-mcp extension)

@@ -39,6 +39,8 @@ mod alert_group_reaper;
 mod alert_lease_sweep;
 #[cfg(feature = "enterprise")]
 mod alert_transitions_reaper;
+#[cfg(feature = "enterprise")]
+mod autoresolve_sweep;
 #[cfg(feature = "cloud")]
 mod cloud;
 mod compactor;
@@ -1632,6 +1634,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
     // RCA runs that stopped writing end as stale.
     #[cfg(feature = "enterprise")]
     rca_run_sweeper::run();
+    // Nothing else ends an AutoResolve run whose turn or step went silent.
+    #[cfg(feature = "enterprise")]
+    autoresolve_sweep::run();
     // Early Experiment deletion marks the head and leaves the removal to this
     // sweep, which retries until the Experiment's own storage is gone.
     #[cfg(feature = "enterprise")]

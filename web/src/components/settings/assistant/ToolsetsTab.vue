@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="refresh"
         />
         <OButton
-          v-if="canEdit"
+          v-if="canCreate"
           variant="primary"
           size="sm-action"
           class="max-md:min-h-11"
@@ -117,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :title="view.filterQuery ? undefined : t('assistant.toolsets.emptyTitle')"
           :description="view.filterQuery ? undefined : t('assistant.toolsets.empty')"
           :filtered="!!view.filterQuery"
-          :hide-action="!canEdit && !view.filterQuery"
+          :hide-action="!canCreate && !view.filterQuery"
           @action="(id) => (id === 'clear-filters' ? (view.filterQuery = '') : openForm('add'))"
         />
       </template>
@@ -329,19 +329,22 @@ const deleteMutation = useMutation(() => deleteToolsetMutation(page.org.value));
 
 const view = reactive(useListViewState("ai-toolsets", { filterQuery: "", pageSize: 20 }));
 const state = computed(() => readStateOf(list));
-const rows = computed(() => parseToolsetRows(list.data.value));
+const rows = computed(() => parseToolsetRows(list.data.value?.toolsets));
 const health = computed(() => hasToolsetHealth(rows.value));
 const clashes = computed(() => clashingNames(rows.value));
 // The server enforces the Toolsets permission; a refused write turns the page read-only.
 const writeForbidden = ref(false);
 const canEdit = computed(() => !writeForbidden.value && state.value !== "forbidden");
+// Creating needs Update on every toolset of the org; a grant on one toolset only edits that one.
+const canCreate = computed(() => canEdit.value && list.data.value?.canCreate !== false);
 const visibleRows = computed(() =>
   rows.value.filter((row) => matchesToolset(row, view.filterQuery, t(KIND_LABEL_KEYS[row.kind]))),
 );
 
 const formMode = computed(() => {
   const action = router.currentRoute.value.query.action;
-  return canEdit.value && (action === "add" || action === "edit") ? action : null;
+  if (action === "add") return canCreate.value ? action : null;
+  return canEdit.value && action === "edit" ? action : null;
 });
 const editId = computed(() => String(router.currentRoute.value.query.id ?? ""));
 
