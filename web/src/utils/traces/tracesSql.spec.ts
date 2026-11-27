@@ -613,9 +613,25 @@ describe("insertTraceIdColumn / canAddTraceId", () => {
 
 describe("resultShape / resultKeys", () => {
   it("detects span rows, trace rows and plain rows", () => {
-    expect(resultShape(["trace_id", "span_id", "x"])).toBe("spans");
-    expect(resultShape(["trace_id", "n"])).toBe("traces");
-    expect(resultShape(["service_name", "n"])).toBe("rows");
+    expect(resultShape(["trace_id", "span_id", "x"], true)).toBe("spans");
+    expect(resultShape(["trace_id", "n"], false)).toBe("traces");
+    expect(resultShape(["service_name", "n"], false)).toBe("rows");
+  });
+
+  it("keeps the span table for SELECT * only, so other columns are not hidden", () => {
+    expect(resultShape(["trace_id", "span_id", "n"], false)).toBe("traces");
+    expect(resultShape(["trace_id", "span_id", "http_route"], false)).toBe("traces");
+    const windowed = info(
+      `SELECT *, row_number() OVER (PARTITION BY trace_id ORDER BY duration DESC) AS rn FROM "t"`,
+    );
+    expect(resultShape(["trace_id", "span_id", "rn"], windowed.selectAll)).toBe("traces");
+    expect(resultShape(["trace_id", "span_id"], info(`SELECT * FROM "t"`).selectAll)).toBe("spans");
+  });
+
+  it("drops the shadow time keys the client and server add, unless selected", () => {
+    const hits = [{ trace_id: "t", rn: 1, _timestamp: 1, _start_time_ns: "1", _end_time_ns: "2" }];
+    expect(resultKeys(hits, ["*", "rn"])).toEqual(["rn", "trace_id"]);
+    expect(resultKeys(hits, ["_timestamp", "rn"])).toEqual(["_timestamp", "rn", "trace_id"]);
   });
 
   it("orders keys by the select list, then by first appearance", () => {
