@@ -88,6 +88,7 @@ import { useTheme } from "@/composables/useTheme";
 import { currentDevicePixelRatio, useChartPixelRatio } from "@/composables/useDevicePixelRatio";
 import { chartColor } from "@/utils/chartTheme";
 import * as echarts from "echarts/core";
+import type { ECElementEvent } from "echarts";
 import {
   BarChart,
   LineChart,
@@ -136,6 +137,7 @@ import {
   withRowWindow,
   type RowWindow,
 } from "@/utils/dashboard/convertStateTimelineData";
+import type { MovedNodes } from "@/utils/dashboard/convertNodeGraphData";
 import {
   indexesNearX,
   isLineStrokeEvent,
@@ -283,7 +285,9 @@ export default defineComponent({
       chart?.off("click");
       chart?.off("mouseover");
       chart?.off("contextmenu");
+      chart?.off("mousedown");
       chart?.getZr().off("mousemove", reportPointerTime);
+      chart?.getZr().off("mouseup", keepDroppedNode);
 
       //dispose
       if (chart) {
@@ -293,11 +297,25 @@ export default defineComponent({
       chart = null;
     };
 
+    // Editors fire window resizes on every change and a large node graph is slow to redraw.
+    const resizeToBox = () => {
+      const box = chartRef.value;
+      const graph = props.data?.extras?.nodeGraph;
+      if (
+        graph &&
+        box &&
+        chart?.getWidth?.() === box.clientWidth &&
+        chart?.getHeight?.() === box.clientHeight
+      )
+        return;
+      chart?.resize();
+    };
+
     const windowResizeEventCallback = async () => {
       try {
         await nextTick();
         await nextTick();
-        chart?.resize();
+        resizeToBox();
         applySvgPrintViewBox();
       } catch (e) {
         console.error("Error during resizing", e);
@@ -454,6 +472,47 @@ export default defineComponent({
       return kept;
     };
 
+    // Graph nodes the user dragged, kept across re-renders; only node graphs (extras.nodeGraph) set it.
+    const movedNodes: MovedNodes = new Map();
+    let movedNodesLayout: unknown;
+    let pressedNode: { seriesIndex: number; dataIndex: number; name: string; at: number[] } | null =
+      null;
+    const keepMovedNodes = (options: Record<string, unknown>) => {
+      const graph = props.data?.extras?.nodeGraph;
+      // Another chart type or layout places every node afresh.
+      if (graph?.layout !== movedNodesLayout) {
+        movedNodes.clear();
+        movedNodesLayout = graph?.layout;
+      }
+      return graph && movedNodes.size ? graph.placeNodes(options, movedNodes) : options;
+    };
+    const nodesOf = (seriesIndex: number) =>
+      chart?.getModel()?.getSeriesByIndex(seriesIndex)?.getData();
+    const pressNode = (params: ECElementEvent) => {
+      const { seriesIndex, dataIndex, name } = params;
+      const at: number[] | undefined =
+        props.data?.extras?.nodeGraph && params.dataType === "node" && seriesIndex !== undefined
+          ? nodesOf(seriesIndex)?.getItemLayout(dataIndex)
+          : undefined;
+      pressedNode =
+        at && seriesIndex !== undefined ? { seriesIndex, dataIndex, name, at: [...at] } : null;
+    };
+    // A restore or resize redraws from the options, so the drop must be written into them.
+    const keepDroppedNode = () => {
+      const pressed = pressedNode;
+      pressedNode = null;
+      const nodes = pressed && nodesOf(pressed.seriesIndex);
+      // A refresh during the drag redraws the nodes, so the index may now be another node's.
+      if (!pressed || nodes?.getName(pressed.dataIndex) !== pressed.name) return;
+      const at = nodes.getItemLayout(pressed.dataIndex);
+      if (!at || (at[0] === pressed.at[0] && at[1] === pressed.at[1])) return;
+      movedNodes.set(pressed.name, [at[0] / chart.getWidth(), at[1] / chart.getHeight()]);
+      chart?.setOption(chartOptions(props.data?.options || {}), {
+        notMerge: true,
+        lazyUpdate: true,
+      });
+    };
+
     const reportPointerTime = (event: { offsetX: number }) => {
       const report = props.data?.extras?.setPointerTime;
       if (!report || !chart) return;
@@ -469,7 +528,7 @@ export default defineComponent({
         withLineStrokeEvents(
           {
             aria: { enabled: !props.label },
-            ...withoutEntrance(keepRowWindow(options)),
+            ...withoutEntrance(keepRowWindow(keepMovedNodes(options))),
           },
           props.findLineOnContextMenu,
         ),
@@ -761,6 +820,8 @@ export default defineComponent({
 
     const chartInitialSetUp = () => {
       chart?.on("rendered", onRendered);
+      chart?.on("mousedown", pressNode);
+      chart?.getZr().on("mouseup", keepDroppedNode);
       chart?.on("mousemove", (params: any) => {
         if (isLineStrokeEvent(params)) return;
         emit("mousemove", params);
@@ -967,7 +1028,8 @@ export default defineComponent({
           // A restore would also reset the scrolled rows, so only the crosshair is cleared.
           if (props.data.extras?.crosshairSeriesIndex != null) {
             chart?.dispatchAction({ type: "updateAxisPointer", currTrigger: "leave" });
-          } else {
+          } else if (!pressedNode) {
+            // A node dragged past the panel's edge leaves the chart mid-drag; a restore would drop it back.
             restoreChart();
             if (props.data?.extras?.heatmapTimeAxis) {
               chart?.dispatchAction({ type: "updateAxisPointer", currTrigger: "leave" });
@@ -1155,6 +1217,7 @@ export default defineComponent({
 
       // Clean up chart instance
       chart?.getZr().off("mousemove", reportPointerTime);
+      chart?.getZr().off("mouseup", keepDroppedNode);
       chart?.dispose();
       chart = null;
 
@@ -1277,7 +1340,7 @@ export default defineComponent({
       async () => {
         try {
           await nextTick();
-          chart?.resize();
+          resizeToBox();
           try {
             chart?.setOption(chartOptions(props?.data?.options || {}), {
               lazyUpdate: true,

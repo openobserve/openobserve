@@ -9,6 +9,8 @@ src/assets/
 public/
 stats.html
 sbom.json
+# Byte copy of the o2-ai schema; a spec compares it with the o2-ai file.
+src/composables/assistant/findings.schema.json
 
 # Lockfiles & data
 package-lock.json

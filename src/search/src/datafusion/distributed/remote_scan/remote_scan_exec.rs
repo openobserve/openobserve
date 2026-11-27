@@ -23,7 +23,10 @@ use config::{
 use datafusion::{
     common::{DataFusionError, Result, tree_node::TreeNodeRecursion},
     execution::{SendableRecordBatchStream, TaskContext},
-    physical_expr::{AcrossPartitions, EquivalenceProperties, Partitioning, PhysicalExpr},
+    physical_expr::{
+        AcrossPartitions, EquivalenceProperties, Partitioning, PhysicalExpr,
+        equivalence::{EquivalenceClass, EquivalenceGroup},
+    },
     physical_plan::{
         DisplayAs, DisplayFormatType, ExecutionPlan, PlanProperties,
         execution_plan::{Boundedness, EmissionType},
@@ -129,6 +132,16 @@ impl RemoteScanExec {
         n_partitions: usize,
     ) -> Result<Arc<PlanProperties>> {
         let mut eq_properties = EquivalenceProperties::new(input.schema());
+        // Equalities hold row by row, so they survive merging the followers' rows; their
+        // constants may differ per follower and are filtered below.
+        eq_properties.add_equivalence_group(EquivalenceGroup::new(
+            input
+                .properties()
+                .eq_properties
+                .eq_group()
+                .iter()
+                .map(|class| EquivalenceClass::new(class.iter().cloned())),
+        ))?;
         // Followers each run their own copy of the input; only literal constants hold on all.
         eq_properties.add_constants(
             input

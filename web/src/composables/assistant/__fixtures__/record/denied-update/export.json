@@ -1,0 +1,61 @@
+[
+  {
+    "role": "user",
+    "content": "Raise the checkout threshold to 900 ms",
+    "sentAt": 1772417700000,
+    "turnId": "t-deny-1"
+  },
+  {
+    "role": "assistant",
+    "content": "Understood, I left the alert unchanged.",
+    "contentBlocks": [
+      {
+        "type": "approval",
+        "approval": {
+          "id": "apr_2",
+          "kind": "update",
+          "destructive": false,
+          "operation": "Update 1 alert",
+          "tool": "o2_update",
+          "targets": [
+            {
+              "type": "alert",
+              "name": "checkout-latency",
+              "id": "a_checkout"
+            }
+          ],
+          "before": {
+            "threshold": 500
+          },
+          "after": {
+            "threshold": 900
+          },
+          "grantable": false,
+          "editable": false,
+          "question": "Update the alert threshold?",
+          "args": {
+            "threshold": 900
+          },
+          "typed": true
+        }
+      },
+      {
+        "type": "approval_result",
+        "resolved": {
+          "id": "apr_2",
+          "approved": false,
+          "by": "you",
+          "at": 1772417760000
+        }
+      },
+      {
+        "type": "text",
+        "text": "Understood, I left the alert unchanged."
+      },
+      {
+        "type": "footer",
+        "footer": {}
+      }
+    ]
+  }
+]

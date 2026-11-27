@@ -16,6 +16,7 @@
 import { afterEach, describe, it, expect, vi, beforeEach } from "vitest";
 import { createMemoryHistory, createRouter, type RouteRecordRaw } from "vue-router";
 import useRoutes from "./router";
+import { threadHost } from "@/composables/assistant/fullThreadRoute";
 import Login from "@/views/Login.vue";
 import store from "@/stores";
 import { routeGuard } from "@/utils/zincutils";
@@ -25,7 +26,15 @@ import { PA_ROUTES } from "@/utils/rum/productAnalyticsRoutes";
 import config from "@/aws-exports";
 import enLocale from "@/locales/languages/en-US.json";
 import i18n from "@/locales";
+import { ref } from "vue";
 import { PUBLIC_LINKS_FOLDER_ID } from "@/utils/dashboard/pseudoFolders";
+
+const assistantGate = ref("available");
+
+vi.mock("@/composables/assistant", () => ({
+  useAssistantCapability: () => ({ gate: assistantGate }),
+}));
+vi.mock("@/views/AssistantView.vue", () => ({ default: { name: "AssistantView" } }));
 
 // Routes store an i18n KEY in `meta.titleKey` (src/router/index.ts translates it
 // per navigation), so assert the English copy the key still resolves to — a typo'd
@@ -60,6 +69,11 @@ vi.mock("@/utils/zincutils", () => ({
   useLocalTimezone: vi.fn(),
   invalidateLoginData: vi.fn(),
   getPath: vi.fn(() => "/"),
+}));
+
+vi.mock("@/lib/feedback/Toast/useToast", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/feedback/Toast/useToast")>()),
+  toast: vi.fn(),
 }));
 
 vi.mock("@/composables/security/useSecurityAccess", async (importOriginal) => ({
@@ -412,9 +426,7 @@ describe("useRoutes (router.ts)", () => {
       store.commit("setUserInfo", { email: "me@x.io" });
       writeEditorDraft(draftScope, { data: {} });
       const dispatch = vi.spyOn(store, "dispatch");
-      const aborted = vi.fn();
       const prompt = vi.fn();
-      window.addEventListener("o2:abort-ai-streams", aborted);
       window.addEventListener("beforeunload", prompt);
       const originalLocation = window.location;
       Object.defineProperty(window, "location", {
@@ -433,11 +445,9 @@ describe("useRoutes (router.ts)", () => {
       expect(dispatch).toHaveBeenCalledWith("logout");
       expect(dispatch).not.toHaveBeenCalledWith("logout", expect.anything());
       expect(readEditorDraft(draftScope)).not.toBeNull();
-      expect(aborted).toHaveBeenCalledTimes(1);
       expect(prompt).not.toHaveBeenCalled();
       expect(window.location.href).toBe("/login");
 
-      window.removeEventListener("o2:abort-ai-streams", aborted);
       window.removeEventListener("beforeunload", prompt);
       Object.defineProperty(window, "location", {
         configurable: true,
@@ -1969,6 +1979,113 @@ describe("useRoutes (router.ts)", () => {
     });
   });
 
+  describe("assistant full view route", () => {
+    const resolveIn = (homeChildRoutes: any[], path: string) => {
+      const catchAll = homeChildRoutes.find((r: any) => r.path === "/:catchAll(.*)*");
+      const router = createRouter({
+        history: createMemoryHistory(),
+        routes: [
+          {
+            path: "/",
+            component: { name: "Layout" },
+            children: homeChildRoutes.filter((r: any) => r !== catchAll),
+          },
+          catchAll,
+        ],
+      });
+      return router.resolve(path);
+    };
+
+    afterEach(() => {
+      assistantGate.value = "available";
+    });
+
+    it("redirects /assistant/:chatId? to the thread in Home's AI tab, keeping the query", () => {
+      const { homeChildRoutes } = useRoutes();
+      const route = findRoute(homeChildRoutes, "assistant");
+      expect(route.path).toBe("assistant/:chatId?");
+      expect(route.component).toBeUndefined();
+      expect(
+        route.redirect({
+          params: { chatId: "0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b" },
+          query: { org_identifier: "acme" },
+        }),
+      ).toEqual({
+        name: "home",
+        params: {},
+        query: {
+          org_identifier: "acme",
+          tab: "ai",
+          thread: "0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b",
+        },
+      });
+      expect(route.redirect({ params: {}, query: {} })).toEqual({
+        name: "home",
+        params: {},
+        query: { tab: "ai", thread: "" },
+      });
+    });
+
+    it("lands a pushed /assistant/:id on Home with ?tab=ai&thread=", async () => {
+      const { homeChildRoutes } = useRoutes();
+      const catchAll = homeChildRoutes.find((r: any) => r.path === "/:catchAll(.*)*");
+      const router = createRouter({
+        history: createMemoryHistory(),
+        routes: [
+          {
+            path: "/",
+            component: { name: "Layout", render: () => null },
+            children: homeChildRoutes
+              .filter((r: any) => r !== catchAll)
+              .map((r: any) => ({ ...r, beforeEnter: undefined })),
+          },
+        ],
+      });
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+      await router.push({ name: "assistant", params: { chatId: "abc" }, query: { a: "1" } });
+      expect(warn).not.toHaveBeenCalledWith(expect.stringContaining("Discarded invalid param"));
+      warn.mockRestore();
+      expect(router.currentRoute.value.name).toBe("home");
+      expect(router.currentRoute.value.query).toEqual({ a: "1", tab: "ai", thread: "abc" });
+    });
+
+    it("leaves the /ai namespace and the share routes untouched", () => {
+      const { homeChildRoutes } = useRoutes();
+      expect(resolveIn(homeChildRoutes, "/ai/shared/t1").name).toBe("sharedChat");
+      const others = homeChildRoutes.filter(
+        (r: any) => r.name !== "assistant" && /^\/?assistant/.test(r.path ?? ""),
+      );
+      expect(others).toEqual([]);
+    });
+
+    it("opens an /assistant chat on the page that hosts its own thread, else on Home", () => {
+      const route: any = useRoutes().homeChildRoutes.find((r: any) => r.name === "assistant");
+      const to = { params: { chatId: "s1" }, query: { org_identifier: "default" } };
+      expect(route.redirect(to)).toEqual({
+        name: "home",
+        params: {},
+        query: { org_identifier: "default", tab: "ai", thread: "s1" },
+      });
+      threadHost.value = "autobotInvestigate";
+      try {
+        expect(route.redirect(to)).toEqual({
+          name: "autobotInvestigate",
+          params: {},
+          query: { org_identifier: "default", thread: "s1" },
+        });
+      } finally {
+        threadHost.value = "home";
+      }
+    });
+
+    it("registers /close-tab outside the layout, authenticated", () => {
+      const route = useRoutes().parentRoutes.find((r: any) => r.name === "closeTab");
+      expect(route.path).toBe("/close-tab");
+      expect(route.meta.public).toBeUndefined();
+      expect(enTitle(route.meta.titleKey)).toBe("You're signed in");
+    });
+  });
+
   // =========================================================================
   // 16. homeChildRoutes — shortUrl route
   // =========================================================================
@@ -2377,11 +2494,38 @@ describe("useRoutes (router.ts)", () => {
       const { homeChildRoutes } = useRoutes();
       const route = findRoute(homeChildRoutes, "viewDashboard");
 
-      const mockTo = {};
+      const mockTo = { query: { dashboard: "d1", folder: "default" } };
       const mockFrom = {};
       const mockNext = vi.fn();
       route.beforeEnter(mockTo, mockFrom, mockNext);
-      expect(routeGuard).toHaveBeenCalledWith(mockTo, mockFrom, mockNext);
+      expect(routeGuard).toHaveBeenCalledWith(mockTo, mockFrom, expect.any(Function));
+      expect(mockNext).toHaveBeenCalledWith(undefined);
+    });
+
+    it("sends a dashboard link without a folder to the dashboard list, with an error", async () => {
+      const { routeGuard } = await import("@/utils/zincutils");
+      const { toast } = await import("@/lib/feedback/Toast/useToast");
+      vi.mocked(routeGuard).mockClear();
+      const { homeChildRoutes } = useRoutes();
+      const route = findRoute(homeChildRoutes, "viewDashboard");
+      const next = vi.fn();
+
+      route.beforeEnter(
+        { query: { org_identifier: "acme", dashboard: "d1", tab: "default" } },
+        {},
+        next,
+      );
+
+      expect(next).toHaveBeenCalledWith({
+        path: "/dashboards",
+        query: { org_identifier: "acme", folder: "default" },
+        replace: true,
+      });
+      expect(routeGuard).toHaveBeenCalledTimes(1);
+      expect(toast).toHaveBeenCalledWith({
+        variant: "error",
+        message: "Failed to load dashboard. Redirecting to dashboard list.",
+      });
     });
 
     it("sends a playlist link on the dashboard view to the TV player", async () => {
@@ -2412,7 +2556,18 @@ describe("useRoutes (router.ts)", () => {
       const to = { query: { dashboard: "d1", playlist: "d1,d2", tvpage: "1", kiosk: "true" } };
       const next = vi.fn();
       route.beforeEnter(to, {}, next);
-      expect(routeGuard).toHaveBeenCalledWith(to, {}, next);
+      expect(routeGuard).toHaveBeenCalledWith(to, {}, expect.any(Function));
+      expect(next).toHaveBeenCalledWith(undefined);
+    });
+
+    it("leaves a paywall or other route-guard redirect of a folderless link as it is", async () => {
+      const { routeGuard } = await import("@/utils/zincutils");
+      vi.mocked(routeGuard).mockImplementationOnce((_to, _from, next) => next({ name: "plans" }));
+      const { homeChildRoutes } = useRoutes();
+      const route = findRoute(homeChildRoutes, "viewDashboard");
+      const next = vi.fn();
+      route.beforeEnter({ query: { dashboard: "d1" } }, {}, next);
+      expect(next).toHaveBeenCalledExactlyOnceWith({ name: "plans" });
     });
 
     it("registers the TV playlist route behind the route guard", async () => {
@@ -2541,7 +2696,7 @@ describe("useRoutes (router.ts)", () => {
   // 23. Edge cases
   // =========================================================================
   describe("Edge Cases", () => {
-    it("should have exactly these 10 parentRoutes, the anonymous public pages included", () => {
+    it("should have exactly these 11 parentRoutes, the anonymous public pages included", () => {
       const { parentRoutes } = useRoutes();
       expect(parentRoutes.map((r: any) => r.path)).toEqual([
         "/login",
@@ -2549,6 +2704,7 @@ describe("useRoutes (router.ts)", () => {
         "/logout",
         "/cb",
         "/ai/public/:token",
+        "/close-tab",
         "/slack/oauth/callback",
         "/slack/link",
         "/slack/link/callback",

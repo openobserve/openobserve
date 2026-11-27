@@ -58,8 +58,6 @@ const props = defineProps<{
   endTime: number;
 }>();
 
-const emit = defineEmits<{ (e: "sendToAiChat", value: unknown, append?: boolean): void }>();
-
 const { t } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
@@ -416,7 +414,6 @@ const fmtTs = (ts: unknown): string => explorerTime(ts, store.state.timezone);
         @load-correlation="openCorrelation"
         @showPrevDetail="stepSample(-1)"
         @showNextDetail="stepSample(1)"
-        @sendToAiChat="(v: unknown, a?: boolean) => emit('sendToAiChat', v, a)"
       />
     </div>
   </div>

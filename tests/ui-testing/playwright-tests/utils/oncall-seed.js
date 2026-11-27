@@ -479,7 +479,7 @@ function rungEscalatingToTeam(priority, rotationId, { channels = ['email'] } = {
  *
  * `l0` is deliberately omitted unless a caller passes it: absent means
  * unchanged, and sending it on an ordinary rung edit would silently
- * un-configure the AI-SRE gate.
+ * un-configure the investigation gate.
  */
 async function setTeamPolicy(page, teamId, {
   rungs,
@@ -1026,6 +1026,15 @@ async function deleteOnCallFixturesByPrefix(page, prefix) {
   } catch { /* best effort */ }
 
   for (const teamId of doomedTeamIds) {
+    // A team still holding an open page refuses the delete, so close its pages first.
+    try {
+      for (const record of await listResponses(page, { teamId })) {
+        await page.request.post(
+          `${base}/api/${org}/oncall/responses/${encodeURIComponent(record.id)}/resolve`,
+          { headers, data: {} },
+        );
+      }
+    } catch { /* best effort */ }
     await tryDelete(`${base}/api/${org}/oncall/teams/${encodeURIComponent(teamId)}`);
   }
 

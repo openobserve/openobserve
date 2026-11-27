@@ -37,6 +37,20 @@ const { mockQCopyToClipboard, cellActionsColumnRef } = vi.hoisted(() => ({
     meta: { disableCellAction: false },
   },
 }));
+vi.mock("@/components/ai-assistant/entry/AiEntryButton.vue", async () => {
+  const { defineComponent, h } = await import("vue");
+  return {
+    __esModule: true,
+    default: defineComponent({
+      inheritAttrs: false,
+      setup:
+        (_, { attrs }) =>
+        () =>
+          h("i", { "data-test": attrs.dataTest }),
+    }),
+  };
+});
+
 vi.mock("@/utils/clipboard", () => ({
   copyToClipboard: mockQCopyToClipboard,
 }));
@@ -468,6 +482,16 @@ describe("TracesSearchResultList", () => {
         item()!.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
         await flushPromises();
         expect(wrapper.emitted("open-in-new-tab")![0]).toEqual([hit]);
+      });
+
+      it("has no AI items, as on main", async () => {
+        await openMenu({});
+        expect(
+          wrapper.element.querySelector('[data-test="trace-context-menu-field"]'),
+        ).not.toBeNull();
+        await vi.dynamicImportSettled();
+        await flushPromises();
+        expect(document.querySelector('[data-test^="ai-entry-trace-"]')).toBeNull();
       });
 
       it("omits open in new tab when the parent gives no href", async () => {

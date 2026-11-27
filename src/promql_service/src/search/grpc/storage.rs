@@ -27,7 +27,10 @@ use config::{
     },
     metrics::{self, QUERY_PARQUET_CACHE_RATIO_NODE},
 };
-use datafusion::error::{DataFusionError, Result};
+use datafusion::{
+    arrow::datatypes::Metadata,
+    error::{DataFusionError, Result},
+};
 use hashbrown::{HashMap, HashSet};
 use infra::{
     cache::file_data,
@@ -320,7 +323,7 @@ pub(crate) async fn create_context(
         trace_id,
         org_id,
         stream_name,
-        schema: Arc::new(schema.with_metadata(Default::default())),
+        schema: Arc::new(schema.with_metadata(Metadata::default())),
         files,
         scan_stats,
         sort_order,

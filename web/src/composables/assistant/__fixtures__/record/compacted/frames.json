@@ -1,0 +1,54 @@
+{
+  "schema": "o2-assistant-record-case/1",
+  "timezone": "UTC",
+  "turns": [
+    {
+      "turn_id": "t-cmp-1",
+      "created": 1772418300000000,
+      "user": {
+        "text": "Summarise the incident"
+      },
+      "frames": [
+        {
+          "type": "status"
+        },
+        {
+          "type": "message_delta",
+          "content": "Payments reset connections at 02:00."
+        },
+        {
+          "type": "complete"
+        }
+      ],
+      "status": "completed",
+      "first_seq": 1,
+      "last_seq": 4
+    },
+    {
+      "turn_id": "t-cmp-2",
+      "created": 1772418600000000,
+      "user": {
+        "text": "And the root cause?"
+      },
+      "frames": [
+        {
+          "type": "status"
+        },
+        {
+          "type": "compacting"
+        },
+        {
+          "type": "message_delta",
+          "content": "A config push lowered the pool size."
+        },
+        {
+          "type": "complete",
+          "compacted": true
+        }
+      ],
+      "status": "completed",
+      "first_seq": 5,
+      "last_seq": 9
+    }
+  ]
+}

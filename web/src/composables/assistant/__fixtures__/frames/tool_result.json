@@ -1,0 +1,29 @@
+{
+  "_source": "o2-ai src/server/tool_formatting.py tool_result frame",
+  "_item": "today",
+  "frame": {
+    "type": "tool_result",
+    "tool": "SearchSQL",
+    "success": true,
+    "message": "SearchSQL completed successfully",
+    "call_id": "call_3",
+    "summary": "4 rows",
+    "call_args": {
+      "stream_name": "default",
+      "stream_type": "logs",
+      "sql": "SELECT service_name, http_status, count(*) AS errors FROM \"default\" WHERE level = 'error' GROUP BY service_name, http_status ORDER BY errors DESC",
+      "start_time": 1760000000000000,
+      "end_time": 1760000900000000
+    },
+    "response": {
+      "hits": [
+        {
+          "service_name": "checkout",
+          "http_status": 502,
+          "errors": 121
+        }
+      ],
+      "total": 4
+    }
+  }
+}

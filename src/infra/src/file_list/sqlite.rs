@@ -2336,7 +2336,6 @@ mod tests {
             deleted,
             id: 0,
             selection: None,
-            row_group_size: None,
         }
     }
 

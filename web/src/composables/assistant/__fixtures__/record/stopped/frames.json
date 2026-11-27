@@ -1,0 +1,48 @@
+{
+  "schema": "o2-assistant-record-case/1",
+  "timezone": "UTC",
+  "turns": [
+    {
+      "turn_id": "t-stop-1",
+      "created": 1772417940000000,
+      "user": {
+        "text": "Find slow checkout traces"
+      },
+      "frames": [
+        {
+          "type": "status"
+        },
+        {
+          "type": "tool_call",
+          "tool": "SearchSQL",
+          "message": "Querying traces",
+          "context": {
+            "sql": "SELECT * FROM traces WHERE duration > 900"
+          },
+          "call_id": "call_s1"
+        },
+        {
+          "type": "tool_result",
+          "tool": "SearchSQL",
+          "success": true,
+          "call_id": "call_s1",
+          "summary": {
+            "count": 42,
+            "took": 12
+          }
+        },
+        {
+          "type": "message_delta",
+          "content": "42 traces are slower than 900 ms; the slowest"
+        },
+        {
+          "type": "cancelled",
+          "turn_id": "t-stop-1"
+        }
+      ],
+      "status": "cancelled",
+      "first_seq": 1,
+      "last_seq": 6
+    }
+  ]
+}

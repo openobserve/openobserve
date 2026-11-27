@@ -1254,19 +1254,21 @@ async fn values_inner(
                 .unwrap_or(0.0)
                 .max(ret.peak_memory_usage.unwrap_or(0.0)),
         );
+        // fields run one after another, so their took details add up
+        resp.took_detail.add(&ret.took_detail);
         work_group_set.push(ret.work_group);
     }
     resp.total = fields.len();
     resp.hits = hit_values;
     resp.size = size;
-    resp.took = start.elapsed().as_millis() as usize;
+    resp.set_took(start.elapsed().as_millis() as usize);
 
     let time = start.elapsed().as_secs_f64();
     http_report_metrics(start, org_id, stream_type, "200", "_values/v1", "", "");
 
     let req_stats = RequestStats {
         records: resp.hits.len() as i64,
-        response_time: time,
+        response_time: time * 1000.0,
         size: resp.scan_size as f64,
         scan_files: if resp.scan_files > 0 {
             Some(resp.scan_files as i64)
@@ -1865,7 +1867,7 @@ pub async fn search_history(
     let took_wait_in_queue = Some(search_res.took_detail.wait_in_queue);
     let req_stats = RequestStats {
         records: search_res.hits.len() as i64,
-        response_time: time_taken,
+        response_time: time_taken * 1000.0,
         size: search_res.scan_size as f64,
         request_body: Some(search_query_req.query.sql),
         user_email: user_id,
