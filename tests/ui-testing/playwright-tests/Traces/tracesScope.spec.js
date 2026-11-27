@@ -4,27 +4,17 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
-const { ingestTraces } = require('../utils/trace-ingestion.js');
+const { seedSearchableTraces } = require('../utils/trace-ingestion.js');
 
 const ROOT = "(reference_parent_span_id IS NULL OR reference_parent_span_id = '')";
 
 test.describe("Traces scope select testcases", () => {
-  test.describe.configure({ mode: 'serial' });
+  test.describe.configure({ mode: 'parallel' });
   let pm;
 
   test.beforeAll(async ({ browser }) => {
     test.setTimeout(120000);
-    const context = await browser.newContext({
-      storageState: 'playwright-tests/utils/auth/user.json',
-    });
-    const page = await context.newPage();
-    try {
-      await ingestTraces(page, 6, { forceScenario: 'success' });
-    } catch (e) {
-      testLogger.warn('Scope trace seeding failed (continuing)', { error: e.message });
-    } finally {
-      await context.close();
-    }
+    await seedSearchableTraces(browser, 6, { forceScenario: 'success' });
   });
 
   test.beforeEach(async ({ page }, testInfo) => {
@@ -45,6 +35,7 @@ test.describe("Traces scope select testcases", () => {
   test("P1: Root spans narrows the list request, and the link restores the select", {
     tag: ['@tracesScope', '@traces', '@query', '@P1', '@all']
   }, async ({ page }) => {
+    await pm.tracesPage.setQueryEditorValue('');
     await expect(pm.tracesPage.getScopeValue()).toHaveAttribute('aria-label', 'All spans');
     const capture = pm.tracesPage.captureSearchRequests();
 
@@ -54,7 +45,7 @@ test.describe("Traces scope select testcases", () => {
       .poll(() => capture.requests.filter((r) => r.panel === 'results').map((r) => r.sql), {
         timeout: 20000,
       })
-      .toContainEqual(expect.stringContaining(ROOT));
+      .toContainEqual(expect.stringContaining(`WHERE ${ROOT} ORDER BY`));
     capture.stop();
     await expect(page).toHaveURL(/[?&]scope=root(&|$)/, { timeout: 10000 });
 

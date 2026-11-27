@@ -118,6 +118,7 @@ async fn delete(msg: Message) -> Result<()> {
         log::error!("[SUPER_CLUSTER:sync] Failed to delete user: {email}, error: {e}");
         return Err(e);
     }
+    crate::org_user::forget_grants(None, email).await;
     if let Err(e) = users::remove(email).await {
         log::error!("[SUPER_CLUSTER:sync] Failed to delete user: {email}, error: {e}");
         return Err(e);

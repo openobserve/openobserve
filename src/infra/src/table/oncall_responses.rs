@@ -1912,7 +1912,28 @@ async fn delivery_health_in<C: ConnectionTrait>(
     Ok(out)
 }
 
+/// Pages each person was sent in `[from, to)`, and how many at night; pages, not messages.
 pub async fn deliveries_by_person(
+    org_id: &str,
+    team_id: &str,
+    from: i64,
+    to: i64,
+    night_windows: &[(i64, i64)],
+) -> Result<Vec<(String, i64, i64)>, errors::Error> {
+    deliveries_by_person_in(
+        get_orm_client_rw().await,
+        org_id,
+        team_id,
+        from,
+        to,
+        night_windows,
+    )
+    .await
+}
+
+/// [`deliveries_by_person`] against a caller-supplied connection.
+async fn deliveries_by_person_in<C: ConnectionTrait>(
+    client: &C,
     org_id: &str,
     team_id: &str,
     from: i64,
@@ -1922,8 +1943,6 @@ pub async fn deliveries_by_person(
     use std::collections::HashMap;
 
     use sea_orm::sea_query::Query;
-
-    let client = get_orm_client_rw().await;
 
     let base = || {
         oncall_response_events::Entity::find()
@@ -1944,10 +1963,14 @@ pub async fn deliveries_by_person(
             )
     };
 
+    // Distinct records: every rung and every channel writes its own delivery row for one page.
     let totals: Vec<PersonTally> = base()
         .select_only()
         .column_as(oncall_response_events::Column::Recipient, "who")
-        .column_as(oncall_response_events::Column::Id.count(), "count")
+        .column_as(
+            Expr::col(oncall_response_events::Column::ResponseId).count_distinct(),
+            "count",
+        )
         .group_by(oncall_response_events::Column::Recipient)
         .into_model()
         .all(client)
@@ -1967,7 +1990,10 @@ pub async fn deliveries_by_person(
             .filter(nights)
             .select_only()
             .column_as(oncall_response_events::Column::Recipient, "who")
-            .column_as(oncall_response_events::Column::Id.count(), "count")
+            .column_as(
+                Expr::col(oncall_response_events::Column::ResponseId).count_distinct(),
+                "count",
+            )
             .group_by(oncall_response_events::Column::Recipient)
             .into_model()
             .all(client)
@@ -2503,6 +2529,64 @@ mod tests {
         .into_iter()
         .collect();
         assert_eq!(health, expected);
+    }
+
+    /// A page sent on two channels, or repeated up the ladder, is still one page carried.
+    #[tokio::test]
+    async fn test_pages_carried_counts_pages_not_messages() {
+        use sea_orm::{Database, Schema};
+
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        let backend = db.get_database_backend();
+        let schema = Schema::new(backend);
+        for stmt in [
+            schema.create_table_from_entity(oncall_responses::Entity),
+            schema.create_table_from_entity(oncall_response_events::Entity),
+        ] {
+            db.execute(backend.build(&stmt)).await.unwrap();
+        }
+        for id in ["resp_1", "resp_2"] {
+            let mut row = model();
+            row.id = id.into();
+            oncall_responses::ActiveModel::from(row)
+                .insert(&db)
+                .await
+                .unwrap();
+        }
+
+        let rows = [
+            ("resp_1", "ana@o2.ai", Channel::Email, 1_500),
+            ("resp_1", "ana@o2.ai", Channel::Sms, 1_500),
+            ("resp_1", "ana@o2.ai", Channel::Email, 1_600),
+            ("resp_2", "ana@o2.ai", Channel::Email, 5_000),
+            ("resp_1", "bo@o2.ai", Channel::Email, 1_500),
+        ];
+        for (i, (response, who, channel, at)) in rows.into_iter().enumerate() {
+            let mut m = event_model(ResponseEventKind::Delivery);
+            m.id = format!("ev_{i}");
+            m.response_id = response.into();
+            m.recipient = Some(who.into());
+            m.channel = Some(channel.to_i32());
+            m.delivered = Some(true);
+            m.at = at;
+            oncall_response_events::ActiveModel::from(m)
+                .insert(&db)
+                .await
+                .unwrap();
+        }
+
+        let mut carried =
+            deliveries_by_person_in(&db, "default", "team_1", 0, 10_000, &[(0, 2_000)])
+                .await
+                .unwrap();
+        carried.sort();
+        assert_eq!(
+            carried,
+            vec![
+                ("ana@o2.ai".to_string(), 2, 1),
+                ("bo@o2.ai".to_string(), 1, 1),
+            ]
+        );
     }
 
     /// One in-memory table holding `row`, for the compare-and-swap tests.

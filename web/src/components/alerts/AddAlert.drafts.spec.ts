@@ -32,6 +32,11 @@ import { alertDraftBase } from "@/utils/alerts/alertEditorDraft";
 import { fillField } from "@/test/unit/helpers/fillField";
 import { PANEL_DRAFT_AUTOSAVE_MS } from "@/composables/dashboard/usePanelDraft";
 import { byTest, click, clickLeave, clickRestore, pressEscape } from "@/test/unit/helpers/draftDom";
+import {
+  registerLifecycleDialogs,
+  resetLifecycleForTests,
+  useLifecycleQuestion,
+} from "@/composables/assistant/lifecycleQuestions";
 import AddAlert from "./AddAlert.vue";
 
 vi.mock("@/composables/useStreams", () => ({
@@ -771,5 +776,51 @@ describe("AddAlert drafts", () => {
       expect(readEditorDraft(anomalyScope)).not.toBeNull();
       expect(byTest("editor-draft-restore-dialog")).toBeNull();
     });
+  });
+});
+
+describe("AddAlert assistant leave guard", () => {
+  let unregister: () => void;
+  const asked = useLifecycleQuestion();
+
+  beforeEach(() => {
+    localStorage.clear();
+    resetLifecycleForTests();
+    unregister = registerLifecycleDialogs();
+  });
+
+  afterEach(() => {
+    asked.value?.answer("discard");
+    unregister();
+    wrapper?.unmount();
+    wrapper = null;
+  });
+
+  it("lets a new alert nobody edited leave without asking", async () => {
+    await mountEditor();
+    // A step filling its default on mount sets the form's isDirty, with no user input.
+    vm().form.setFieldValue("description", "a step's default");
+    await flushPromises();
+
+    await router.push("/logs");
+    await flushPromises();
+
+    expect(asked.value).toBeNull();
+    expect(router.currentRoute.value.path).toBe("/logs");
+  });
+
+  it("asks once about an edit: the draft's dialog decides, and the assistant does not ask again", async () => {
+    await mountEditor();
+    await edit("trigger_condition.threshold", 7);
+
+    const navigation = router.push("/logs");
+    await flushPromises();
+    expect(byTest("editor-draft-leave-dialog")).not.toBeNull();
+    clickLeave("o-dialog-neutral-btn");
+    await navigation;
+    await flushPromises();
+
+    expect(asked.value).toBeNull();
+    expect(router.currentRoute.value.path).toBe("/logs");
   });
 });

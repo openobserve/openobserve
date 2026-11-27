@@ -46,6 +46,7 @@ pub(crate) struct MonitorStream {
     root_cache_buf: Arc<Mutex<CacheBuf>>,
     done: bool,
     overwrite_cache: bool,
+    remote_partial_errs: Vec<Arc<Mutex<String>>>,
 }
 
 impl MonitorStream {
@@ -53,20 +54,21 @@ impl MonitorStream {
         id: String,
         start_time: i64,
         end_time: i64,
-        schema: SchemaRef,
         root_cache_buf: Arc<Mutex<CacheBuf>>,
         stream: SendableRecordBatchStream,
         overwrite_cache: bool,
+        remote_partial_errs: Vec<Arc<Mutex<String>>>,
     ) -> Self {
         Self {
             id,
             start_time,
             end_time,
-            schema,
+            schema: stream.schema(),
             stream,
             root_cache_buf,
             done: false,
             overwrite_cache,
+            remote_partial_errs,
         }
     }
 
@@ -82,6 +84,12 @@ impl MonitorStream {
 
     pub fn check_and_add_partition(&mut self) -> bool {
         self.root_cache_buf.lock().check_and_add_partition()
+    }
+
+    fn has_remote_partial_err(&self) -> bool {
+        self.remote_partial_errs
+            .iter()
+            .any(|err| !err.lock().is_empty())
     }
 }
 
@@ -104,6 +112,15 @@ impl Stream for MonitorStream {
                 self.done = true;
 
                 let partition_done = self.check_and_add_partition();
+                // A failed remote node ends its stream cleanly; keep its window query-local (_tmp)
+                // so later windows of this query still add it, but no other query reuses it.
+                let missing_remote_data = partition_done && self.has_remote_partial_err();
+                if missing_remote_data {
+                    log::warn!(
+                        "[streaming_id: {}] a remote node returned a partial error, caching the window as a temporary file",
+                        self.id
+                    );
+                }
                 let streaming_done = partition_done
                     && GLOBAL_CACHE
                         .id_cache
@@ -114,7 +131,7 @@ impl Stream for MonitorStream {
                     &self.id,
                     self.start_time,
                     self.end_time,
-                    self.is_complete_partition_window(),
+                    self.is_complete_partition_window() && !missing_remote_data,
                 );
 
                 // Start - Cache record batches to disk
@@ -182,6 +199,7 @@ mod tests {
     use datafusion::{
         error::DataFusionError,
         execution::SendableRecordBatchStream,
+        physical_expr::expressions::col,
         physical_plan::{
             aggregates::{AggregateExec, AggregateMode, PhysicalGroupBy},
             empty::EmptyExec,
@@ -192,7 +210,15 @@ mod tests {
     use tokio::sync::mpsc;
 
     use super::*;
-    use crate::datafusion::physical_plan::streaming_aggs_exec::merge::cache_buf::CacheStream;
+    use crate::datafusion::physical_plan::streaming_aggs_exec::{
+        merge::cache_buf::CacheStream, registry::init_cache,
+    };
+
+    // DataFusion rejects an AggregateExec with neither grouping nor aggregates.
+    fn group_by_col1(schema: &Schema) -> PhysicalGroupBy {
+        let col1 = col("col1", schema).unwrap();
+        PhysicalGroupBy::new_single(vec![(col1, "col1".to_string())])
+    }
 
     #[test]
     fn test_monitor_stream_new() {
@@ -222,7 +248,7 @@ mod tests {
                 Arc::new(
                     AggregateExec::try_new(
                         AggregateMode::Partial,
-                        PhysicalGroupBy::new_single(vec![]),
+                        group_by_col1(&schema),
                         vec![],
                         vec![],
                         Arc::new(EmptyExec::new(schema.clone())),
@@ -238,10 +264,10 @@ mod tests {
             "test_monitor".to_string(),
             1000,
             2000,
-            schema.clone(),
             cache_buf,
             input_stream,
             false,
+            vec![],
         );
 
         // Verify initial state
@@ -253,14 +279,19 @@ mod tests {
     #[tokio::test]
     async fn test_failed_partition_does_not_complete_cache() {
         let schema = Arc::new(Schema::empty());
+        let agg_schema = Arc::new(Schema::new(vec![Field::new(
+            "col1",
+            DataType::Int64,
+            false,
+        )]));
         let aggregate = Arc::new(
             AggregateExec::try_new(
                 AggregateMode::Partial,
-                PhysicalGroupBy::new_single(vec![]),
+                group_by_col1(&agg_schema),
                 vec![],
                 vec![],
-                Arc::new(EmptyExec::new(schema.clone())),
-                schema.clone(),
+                Arc::new(EmptyExec::new(agg_schema.clone())),
+                agg_schema.clone(),
             )
             .unwrap(),
         );
@@ -279,13 +310,68 @@ mod tests {
             "failed-partition".to_string(),
             0,
             1,
-            schema,
             cache.clone(),
             input,
             false,
+            vec![],
         );
         assert!(stream.next().await.unwrap().is_err());
         assert!(stream.next().await.is_none());
         assert_eq!(cache.lock().cached_partition_num, 0);
+    }
+
+    #[tokio::test]
+    async fn test_remote_partial_err_keeps_window_query_local() {
+        async fn run(label: &str, partial_err: &str) -> (String, String, String) {
+            let schema = Arc::new(Schema::empty());
+            let agg_schema = Arc::new(Schema::new(vec![Field::new(
+                "col1",
+                DataType::Int64,
+                false,
+            )]));
+            let aggregate = Arc::new(
+                AggregateExec::try_new(
+                    AggregateMode::Partial,
+                    group_by_col1(&agg_schema),
+                    vec![],
+                    vec![],
+                    Arc::new(EmptyExec::new(agg_schema.clone())),
+                    agg_schema.clone(),
+                )
+                .unwrap(),
+            );
+            let cache = Arc::new(Mutex::new(CacheBuf {
+                total_partition_num: 1,
+                cached_partition_num: 0,
+                cached_buf: CacheStream::new(false, 1, aggregate),
+            }));
+            let id = format!("monitor_{label}_{}", config::ider::generate());
+            let (start, end) = (0, 60_000_000);
+            let dir = format!("org_t/logs/{id}/1");
+            init_cache(&id, start, end, &dir, 1);
+            let path = |complete| {
+                let name = generate_aggregation_cache_file_name(&id, start, end, complete);
+                infra::cache::file_data::disk::get_file_path(&get_cache_file_path(&dir, &name))
+                    .unwrap()
+            };
+            let (complete, tmp) = (path(true), path(false));
+            let input = Box::pin(MemoryStream::try_new(vec![], schema, None).unwrap());
+            let errs = vec![Arc::new(Mutex::new(partial_err.to_string()))];
+            let mut stream = MonitorStream::new(id.clone(), start, end, cache, input, false, errs);
+            assert!(stream.next().await.is_none());
+            (id, complete, tmp)
+        }
+        let exists = |p: &str| std::path::Path::new(p).exists();
+
+        let (id, complete, tmp) = run("remote_ok", "").await;
+        assert!(exists(&complete) && !exists(&tmp));
+        GLOBAL_CACHE.remove(&id);
+        let _ = std::fs::remove_file(&complete);
+
+        let (id, complete, tmp) = run("remote_err", "node down").await;
+        assert!(!exists(&complete) && exists(&tmp));
+        assert_eq!(GLOBAL_CACHE.get(&id).unwrap().len(), 1);
+        GLOBAL_CACHE.remove(&id);
+        assert!(!exists(&tmp));
     }
 }

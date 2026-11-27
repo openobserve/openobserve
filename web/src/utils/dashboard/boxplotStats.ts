@@ -33,3 +33,25 @@ export const boxplotStatAlias = (alias: string, column: string) => `${alias}_${c
 
 export const boxplotStatAliases = (alias: string) =>
   BOXPLOT_STATS.map((stat) => boxplotStatAlias(alias, stat.column));
+
+/** Column names with each complete summary set (`<alias>_min` … `<alias>_count`) replaced by its base alias, in place of its first column. */
+export const collapseBoxplotSummaryColumns = (names: string[]): string[] => {
+  const present = new Set(names);
+  const summaryOf = new Map<string, string>();
+  const suffix = `_${BOXPLOT_STATS[0].column}`;
+  for (const name of names) {
+    if (!name?.endsWith(suffix)) continue;
+    const base = name.slice(0, -suffix.length);
+    const aliases = boxplotStatAliases(base);
+    if (aliases.every((alias) => present.has(alias))) {
+      for (const alias of aliases) summaryOf.set(alias, base);
+    }
+  }
+  const collapsed: string[] = [];
+  for (const name of names) {
+    const base = summaryOf.get(name);
+    if (base === undefined) collapsed.push(name);
+    else if (!collapsed.includes(base)) collapsed.push(base);
+  }
+  return collapsed;
+};

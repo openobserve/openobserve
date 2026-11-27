@@ -158,8 +158,18 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 156: add alert_incidents.last_detection_at, when a new detection joined a worked case.
 // 157: add alert_incident_alerts.labels and severity, create alert_pair_verdicts, and delete
 //      service_streams rows named by the metric-name label that list no trace stream.
+// 158: create alert_leases.
 // 159: delete org_ai_toolsets rows of the removed cli kind.
-pub const DB_SCHEMA_VERSION: u64 = 159;
+// 160: add first_event_at to ai_chat_turns.
+// 161: org_ai_toolsets health; create ai_grants, ai_actions, ai_access_requests, ai_turn_marks.
+// 162: chat pins, seeds, turn versions, decisions, hide_attachments, ai_chat_feedback/imports.
+// 163: create paid_overage_attribution.
+// 164: create ai_approvals.
+// 165: add agent to ai_chat_turns.
+// 166: add branched_from to ai_chat_sessions.
+// 167: add approval_scope to ai_actions.
+// 168: add oncall_policies.saved_by_person, set once a person saves the ladder.
+pub const DB_SCHEMA_VERSION: u64 = 168;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -186,9 +196,6 @@ const MAX_FILE_SIZE_DEFAULT_FLOOR: usize = 32 * 1024 * 1024;
 const JOB_RUNTIME_BLOCKING_PER_CPU: usize = 8;
 const JOB_RUNTIME_BLOCKING_FLOOR: usize = 32;
 const JOB_RUNTIME_BLOCKING_CAP: usize = 256;
-// The current value is recorded in each tantivy index file (puffin `row_group_size`
-// property) so it can be changed safely without breaking row_id → row_group mapping
-// for older files.
 pub const PARQUET_MAX_ROW_GROUP_SIZE: usize = 128 * 1024;
 pub const PARQUET_FILE_CHUNK_SIZE: usize = 100 * 1024; // 100k, num_rows
 pub const DEFAULT_BLOOM_FILTER_FPP: f64 = 0.01;
@@ -3071,6 +3078,12 @@ pub struct Limit {
         help = "How long unstarred query history entries are kept, in days. Starred entries are kept until deleted. 0 or less removes the age limit; each user still keeps at most 500 unstarred entries per source (logs, traces, metrics, dbm, profiles), the oldest of that source pruned first. It does not stop collection, ZO_QUERY_HISTORY_ENABLED=false does."
     )]
     pub query_history_retention_days: i64,
+    #[env_config(
+        name = "ZO_AI_ACTIONS_RETENTION_DAYS",
+        default = 90,
+        help = "How long rows of the assistant's action ledger (Activity) are kept, in days. Their before/after snapshots are always cleared once the 24 h undo window passes. 0 or less keeps every row."
+    )]
+    pub ai_actions_retention_days: i64,
     #[env_config(name = "ZO_ALERT_SCHEDULE_TIMEOUT", default = 90)] // seconds
     pub alert_schedule_timeout: i64,
     #[env_config(

@@ -1,0 +1,10 @@
+{
+  "_source": "openobserve src/api/management/src/request/ai/chats.rs:1087-1101 error_frame + failed_turn_message",
+  "shape": "I2",
+  "body": {
+    "type": "error",
+    "error": "The response failed (agent_unreachable). Please try again.",
+    "error_code": "agent_unreachable",
+    "recoverable": false
+  }
+}

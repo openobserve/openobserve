@@ -39,15 +39,9 @@ use crate::index::IndexCondition;
 #[derive(Debug, Clone)]
 pub enum TantivyResult {
     RowIds(Vec<u32>),
-    RowIdsSelection {
-        row_ids: Arc<BooleanBuffer>, // per-row match bitmap, length num_rows
-        row_group_size: Option<u32>,
-    },
-    SelectCandidates {
-        candidates: Arc<Vec<(i64, u32)>>, //(_timestamp, doc_id) pairs
-        row_group_size: Option<u32>,
-    },
-    NoMatch, // the file should be excluded without building a bitmap
+    RowIdsSelection(Arc<BooleanBuffer>), // per-row match bitmap, length num_rows
+    SelectCandidates(Arc<Vec<(i64, u32)>>), //(_timestamp, doc_id) pairs
+    NoMatch,                             // the file should be excluded without building a bitmap
     Skipped {
         percent: usize, // skipped tantivy search, with the percentage
     },
@@ -72,10 +66,10 @@ impl TantivyResult {
             Self::RowIds(row_ids) => {
                 row_ids.capacity() * std::mem::size_of::<u32>() + std::mem::size_of::<Vec<u32>>()
             }
-            Self::RowIdsSelection { row_ids, .. } => {
+            Self::RowIdsSelection(row_ids) => {
                 row_ids.inner().len() + std::mem::size_of::<BooleanBuffer>()
             }
-            Self::SelectCandidates { candidates, .. } => {
+            Self::SelectCandidates(candidates) => {
                 candidates.capacity() * std::mem::size_of::<(i64, u32)>()
                     + std::mem::size_of::<Vec<(i64, u32)>>()
             }
@@ -141,10 +135,7 @@ impl TantivyResult {
         )?;
 
         if res.is_empty() {
-            return Ok(Self::SelectCandidates {
-                candidates: Arc::new(Vec::new()),
-                row_group_size: None,
-            });
+            return Ok(Self::SelectCandidates(Arc::new(Vec::new())));
         }
 
         // every index file stores _timestamp as a single-valued fast field,
@@ -164,10 +155,7 @@ impl TantivyResult {
                 Ok((ts, doc.doc_id))
             })
             .collect::<anyhow::Result<Vec<_>>>()?;
-        Ok(Self::SelectCandidates {
-            candidates: Arc::new(candidates),
-            row_group_size: None,
-        })
+        Ok(Self::SelectCandidates(Arc::new(candidates)))
     }
 
     pub fn handle_simple_count(searcher: &Searcher, query: Box<dyn Query>) -> anyhow::Result<Self> {
@@ -373,14 +361,10 @@ mod tests {
         )
         .unwrap();
         match result {
-            TantivyResult::SelectCandidates {
-                candidates,
-                row_group_size,
-            } => {
+            TantivyResult::SelectCandidates(candidates) => {
                 let mut candidates = (*candidates).clone();
                 candidates.sort_unstable();
                 assert_eq!(candidates, vec![(90, 1), (100, 0)]);
-                assert_eq!(row_group_size, None);
             }
             other => panic!("expected SelectCandidates, got {other:?}"),
         }
@@ -394,7 +378,7 @@ mod tests {
         )
         .unwrap();
         match result {
-            TantivyResult::SelectCandidates { candidates, .. } => {
+            TantivyResult::SelectCandidates(candidates) => {
                 let mut candidates = (*candidates).clone();
                 candidates.sort_unstable();
                 assert_eq!(candidates, vec![(70, 3), (80, 2)]);
@@ -461,10 +445,7 @@ mod tests {
 
     #[test]
     fn test_select_candidates_memory_size() {
-        let result = TantivyResult::SelectCandidates {
-            candidates: Arc::new(vec![(100i64, 1u32), (99, 2)]),
-            row_group_size: None,
-        };
+        let result = TantivyResult::SelectCandidates(Arc::new(vec![(100i64, 1u32), (99, 2)]));
         assert!(result.get_memory_size() >= 2 * std::mem::size_of::<(i64, u32)>());
     }
 
@@ -532,10 +513,7 @@ mod tests {
     #[test]
     fn test_memory_size_edge_cases() {
         // Test with empty collections
-        let result = TantivyResult::RowIdsSelection {
-            row_ids: Arc::new(BooleanBuffer::new_unset(0)),
-            row_group_size: None,
-        };
+        let result = TantivyResult::RowIdsSelection(Arc::new(BooleanBuffer::new_unset(0)));
         let memory_size = result.get_memory_size();
         assert_eq!(memory_size, std::mem::size_of::<BooleanBuffer>());
 

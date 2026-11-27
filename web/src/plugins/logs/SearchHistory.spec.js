@@ -72,7 +72,7 @@ vi.mock("vue-i18n", async (importOriginal) => {
   return {
     ...actual,
     // Delegate to the real message catalogue instead of echoing the key, so
-    // assertions on rendered copy (e.g. formatTime -> "1500.00 sec") stay real.
+    // assertions on rendered copy (e.g. formatTime -> "1.50 sec") stay real.
     useI18n: () => ({
       t: (...args) => i18n.global.t(...args),
     }),
@@ -246,10 +246,10 @@ describe("SearchHistory Component", () => {
       expect(mockWriteText).toHaveBeenCalledWith(testSQL);
     });
 
-    it("formats time duration correctly", () => {
-      expect(wrapper.vm.formatTime(1500)).toBe("1500.00 sec");
-      expect(wrapper.vm.formatTime(60000)).toBe("60000.00 sec");
-      expect(wrapper.vm.formatTime(3600000)).toBe("3600000.00 sec");
+    it("formats a took in milliseconds as seconds", () => {
+      expect(wrapper.vm.formatTime(1500)).toBe("1.50 sec");
+      expect(wrapper.vm.formatTime(60000)).toBe("60.00 sec");
+      expect(wrapper.vm.formatTime(3600000)).toBe("3600.00 sec");
     });
   });
 

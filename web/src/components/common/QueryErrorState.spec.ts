@@ -34,6 +34,25 @@ function mountState(props: Record<string, unknown>) {
   });
 }
 
+describe("QueryErrorState ai-door slot", () => {
+  it("renders the host's door in both layouts and nothing without one", () => {
+    const door = { "ai-door": '<span data-test="the-door" />' };
+    for (const size of ["hero", "block"]) {
+      const withDoor = mount(QueryErrorState, {
+        props: {
+          errorMsg: "Unknown field 'timeout'",
+          errorDetail: "detail",
+          size: size as "hero" | "block",
+        },
+        slots: door,
+        global: { plugins: [store] },
+      });
+      expect(withDoor.find('[data-test="the-door"]').exists()).toBe(true);
+      expect(mountState({ size }).find('[data-test="the-door"]').exists()).toBe(false);
+    }
+  });
+});
+
 describe("QueryErrorState free-text cards", () => {
   beforeAll(() => {
     const global = i18n.global as unknown as {
@@ -173,33 +192,28 @@ describe("QueryErrorState free-text cards", () => {
     expect(wrapper.find(RUN_CARD).exists()).toBe(false);
   });
 
-  it("keeps copy, Ask AI and detail toggling working alongside the new cards (L-28)", async () => {
+  it("keeps copy and detail toggling working alongside the new cards (L-28)", async () => {
     vi.useFakeTimers();
     const writeText = vi.fn();
     Object.assign(navigator, { clipboard: { writeText } });
     try {
-      const hero = mountState({ errorCode: 20001, aiEnabled: true, freeTextCandidate: "status =" });
+      const hero = mountState({ errorCode: 20001, freeTextCandidate: "status =" });
       await hero.find('[data-test="query-error-copy-btn"]').trigger("click");
       expect(writeText).toHaveBeenCalled();
       expect(hero.find('[data-test="query-error-copy-btn"]').text()).toContain("Copied!");
       vi.advanceTimersByTime(2000);
       await hero.vm.$nextTick();
       expect(hero.find('[data-test="query-error-copy-btn"]').text()).not.toContain("Copied!");
-      await hero.find('[data-test="query-error-ask-ai-btn"]').trigger("click");
-      expect(hero.emitted("ask-ai")).toHaveLength(1);
 
       const detail = "line one\n".repeat(30);
       const block = mountState({
         errorCode: 20001,
         size: "block",
-        aiEnabled: true,
         errorDetail: detail,
       });
       await block.find('[data-test="query-error-copy-btn"]').trigger("click");
       expect(block.find('[data-test="query-error-copy-btn"]').text()).toContain("Copied!");
       await block.find('[data-test="query-error-copy-btn"]').trigger("click");
-      await block.find('[data-test="query-error-ask-ai-btn"]').trigger("click");
-      expect(block.emitted("ask-ai")).toHaveLength(1);
       await block.find('[data-test="query-error-fix-query-btn"]').trigger("click");
       expect(block.emitted("fix-query")).toHaveLength(1);
     } finally {
@@ -328,7 +342,6 @@ describe("QueryErrorState protected-stream refusal", () => {
         errorCode: 20014,
         errorMsg:
           "Stream _o2_alert_calibration_digests holds internal records and cannot be searched",
-        aiEnabled: true,
       },
       global: { plugins: [store, router] },
     });
@@ -340,7 +353,6 @@ describe("QueryErrorState protected-stream refusal", () => {
     );
     expect(wrapper.findComponent(OEmptyState).props("illustration")).toBe("lock");
     expect(wrapper.find(FIX_CARD).exists()).toBe(false);
-    expect(wrapper.find('[data-test="query-error-ask-ai-btn"]').exists()).toBe(false);
 
     const card = wrapper.get('[data-test="query-error-open-calibration-card"]');
     expect(card.text()).toContain("Open Alert calibration");
@@ -367,7 +379,7 @@ describe("QueryErrorState protected-stream refusal without Alert Calibration (OS
   withCalibration(false);
 
   it("shows a neutral red refusal with no card to a page the build lacks", () => {
-    const wrapper = mountState({ errorCode: 20014, errorMsg: PROTECTED_MSG, aiEnabled: true });
+    const wrapper = mountState({ errorCode: 20014, errorMsg: PROTECTED_MSG });
     const title = wrapper.get('[data-test="query-error-title"]');
     expect(title.text()).toBe("Internal records can't be searched here");
     expect(title.classes()).toContain("text-status-error-text");

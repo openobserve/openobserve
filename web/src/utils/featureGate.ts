@@ -28,7 +28,7 @@ export const FREE_LIMIT_GB = 50;
 
 // Icon mirrors each feature's own nav entry.
 export const LOCKED_FEATURES: Partial<Record<string, { icon: IconName }>> = {
-  ai_assistant: { icon: "auto-awesome" },
+  ai_assistant: { icon: "assistant-spark" },
 };
 
 interface RejectedResponse {
@@ -59,6 +59,17 @@ const SIGNAL_FEATURES: Partial<Record<string, string>> = {
 /** License key of a stream type; the backend reads a missing type as logs, other types have no key. */
 export const streamTypeFeature = (streamType?: string | null): string | null =>
   SIGNAL_FEATURES[streamType || "logs"] ?? null;
+
+/** License key of a resolved route's page: its `licenseFeature`, or its stream type's on an explorer. */
+export const routeLicenseFeature = (route: {
+  meta?: Record<string | number | symbol, unknown>;
+  query?: Record<string, unknown>;
+}): string | null => {
+  const key = route.meta?.licenseFeatureFromStreamType
+    ? streamTypeFeature(route.query?.stream_type as string | undefined)
+    : route.meta?.licenseFeature;
+  return typeof key === "string" ? key : null;
+};
 
 /** Path of the shared upsell page, for a locked feature that has no page of its own. */
 export const featureLockedPath = (key: string): string => `/feature-locked/${key}`;

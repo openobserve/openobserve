@@ -313,6 +313,22 @@ describe("MetricsVisualize", () => {
       wrapper.unmount();
     });
 
+    it("holds a held seed: the query and window apply, nothing runs", async () => {
+      const wrapper = mountVisualize({
+        seed: SEED,
+        holdSeed: true,
+        selectedDateTime: { startTime: 1000, endTime: 2000 },
+      });
+      await flushPromises();
+      await flushPromises();
+      await wrapper.setProps({ selectedDateTime: { startTime: 3000, endTime: 4000 } });
+      await flushPromises();
+
+      expect(editorRunQuery).not.toHaveBeenCalled();
+      expect(panelData.current.meta.dateTime.start_time).toEqual(new Date(3000));
+      wrapper.unmount();
+    });
+
     it("still fires when the parent nulls the seed on `seed-consumed` (as it really does)", async () => {
       // The REAL parent binds `@seed-consumed="visualizeSeed = null"`, and the
       // emit happens in the child's `onBeforeMount` — so the prop is already

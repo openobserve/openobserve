@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { foldTurns, mergeIncremental, type StoredTurn } from "@/components/O2AIChat.history";
+import { foldTurns, mergeIncremental, type StoredTurn } from "@/composables/assistant/pure";
 import type { ChatMessage, ChatHistoryEntry, TurnSpan } from "@/ts/interfaces/chat";
 import { raw, type TranslateFn } from "@/types/i18n";
 import { notifyChatListChanged } from "@/utils/chatListRevision";
@@ -126,7 +126,7 @@ export interface ChatHistoryServer {
   removeAll: (orgId: string) => Promise<unknown>;
 }
 
-// Module scope: the list (HomeChatHistory) and the chat that opens an entry (O2AIChat) share only the numeric id.
+// Module scope: the list and the chat that opens an entry share only the numeric id.
 const listedSessions = new Map<number, string>();
 const listedTitles = new Map<number, string>();
 
