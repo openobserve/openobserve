@@ -9608,6 +9608,7 @@
       "promqlFiltersAndOnly": "PromQL 篩選條件僅支援 AND。請移除 OR 與群組，或切換至 SQL。",
       "cappedHint": "顯示前 {count} 個值",
       "cappedAllHint": "「全部」也會比對未列出的值",
+      "metricsTruncatedHint": "部分指標未勾選。請輸入指標名稱以查看所有值。",
       "metric": "指標",
       "label": "標籤",
       "metricSelectTooltip": "選擇一個指標，或使用如 $metricVariable 的變數，以根據另一個值選擇。",
@@ -16499,6 +16500,13 @@
       "logoLightLabel": "自訂標誌（淺色模式）",
       "logoLightHelp": "於淺色模式顯示。支援 PNG、JPG、GIF 或 BMP，最大 150 × 30 px。",
       "logoDarkLabel": "自訂標誌（深色模式）",
+      "logoTitle": "自訂標誌",
+      "logoHelp": "顯示於應用程式標頭。支援 PNG、JPG、GIF、BMP、WEBP 或 SVG，最大 150 × 30 px。",
+      "logoLightTitle": "淺色模式",
+      "logoDarkTitle": "深色模式",
+      "logoSaved": "已儲存",
+      "logoNotSaved": "未儲存",
+      "logoDimensions": "{width} × {height} 像素",
       "logoDarkHelp": "於深色模式顯示。支援 PNG、JPG、GIF 或 BMP，最大 150 × 30 px。"
     },
     "modelPricingEditor": {
@@ -24184,8 +24192,19 @@
       "clear": "清除"
     },
     "file": {
-      "removeFile": "移除檔案",
-      "clearAll": "全部清除"
+      "removeNamed": "移除 {name}",
+      "attachPrompt": "拖放檔案以附加，或 {browse}",
+      "attachPromptMultiple": "拖放檔案以附加，或 {browse}",
+      "browseLink": "瀏覽",
+      "supports": "支援的檔案 {types}",
+      "dropFileToAttach": "放開以附加檔案",
+      "dropFilesToAttach": "放開以附加檔案",
+      "typeRejected": "僅接受 {allowed} 檔案",
+      "sizeRejected": "{size} 超過 {max} 的限制",
+      "countRejected": "一次只能 {count} 個檔案 | 一次只能 {count} 個檔案",
+      "invalidJson": "不是有效的 JSON:{detail}",
+      "invalidImage": "不是有效的圖片檔案",
+      "unavailable": "無法使用檔案上傳"
     },
     "date": {
       "openCalendar": "開啟行事曆",

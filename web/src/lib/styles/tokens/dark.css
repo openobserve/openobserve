@@ -493,6 +493,7 @@
   --color-file-chip-text: var(--color-primary-200);
   --color-file-chip-remove: var(--color-primary-200);
   --color-file-drag-bg: var(--color-primary-950);
+  --color-file-zone-drag-bg: var(--color-primary-900);
   --color-file-drag-border: var(--color-primary-400);
 
   /* Date / Time / Color (ODate, OTime, OColor) */

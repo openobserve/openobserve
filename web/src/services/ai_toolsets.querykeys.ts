@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { orgKey } from "@/composables/query/keys";
+import type { ToolsetPermission } from "./ai_toolsets";
 
 /**
  * Keys only, dependency-free apart from `orgKey`, so a write in another domain
@@ -25,4 +26,6 @@ import { orgKey } from "@/composables/query/keys";
 export const aiToolsetKeys = {
   all: (org: string) => orgKey(org, "settings", "aiToolsets"),
   list: (org: string) => orgKey(org, "settings", "aiToolsets"),
+  mcps: (org: string, permission: ToolsetPermission) =>
+    orgKey(org, "settings", "aiToolsets", "mcps", permission),
 };

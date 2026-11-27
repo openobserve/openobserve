@@ -25,50 +25,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @cancel="goToList(initialFolder)"
     @import="importJson"
   >
-    <template #url-input-section="{ url, updateUrl }">
-      <div class="my-[0.725rem] flex items-end gap-2 max-md:flex-wrap">
-        <div class="w-[69%] max-md:w-full">
-          <OInput
-            data-test="slo-import-url-input"
-            :model-value="url"
-            size="md"
-            :label="t('dashboard.addURL')"
-            @update:model-value="updateUrl"
-          />
-        </div>
-        <div class="w-[30%] max-md:w-full" data-test="slo-import-folder-dropdown">
-          <!-- SLOs live in alert folders; there is no SLO folder type. -->
-          <SelectFolderDropDown
-            type="alerts"
-            :active-folder-id="selectedFolder"
-            @folder-selected="onFolderSelected"
-          />
-        </div>
+    <!-- The destination folder applies to both tabs, so it sits above the file and URL inputs -->
+    <template #above-input>
+      <div class="w-full max-w-sm" data-test="slo-import-folder-dropdown">
+        <!-- SLOs live in alert folders; there is no SLO folder type. -->
+        <SelectFolderDropDown
+          type="alerts"
+          :active-folder-id="selectedFolder"
+          @folder-selected="onFolderSelected"
+        />
       </div>
     </template>
 
-    <template #file-input-section="{ jsonFiles, updateFiles }">
-      <div class="mb-1 flex w-[calc(100%-0.625rem)] items-start gap-2 max-md:flex-wrap">
-        <div class="w-[69%] max-md:w-full">
-          <OFile
-            data-test="slo-import-json-file-input"
-            :model-value="jsonFiles"
-            :label="t('dashboard.dropFileMsg')"
-            accept=".json"
-            multiple
-            drop-zone
-            :help-text="t('common.jsonFilesOnlyHint')"
-            size="md"
-            @update:model-value="updateFiles"
-          />
-        </div>
-        <div class="w-[30%] max-md:w-full">
-          <SelectFolderDropDown
-            type="alerts"
-            :active-folder-id="selectedFolder"
-            @folder-selected="onFolderSelected"
-          />
-        </div>
+    <template #url-input-section="{ url, updateUrl }">
+      <div class="my-[0.725rem]">
+        <OInput
+          data-test="slo-import-url-input"
+          :model-value="url"
+          size="md"
+          :label="t('dashboard.addURL')"
+          @update:model-value="updateUrl"
+        />
+      </div>
+    </template>
+
+    <template #file-input-section="{ jsonFiles, updateFiles, clearRejectedJson }">
+      <div class="mb-1">
+        <OFile
+          data-test="slo-import-json-file-input"
+          :label="t('dashboard.selectFile')"
+          :model-value="jsonFiles"
+          accept=".json"
+          multiple
+          :validate="validateJsonFile"
+          @update:model-value="updateFiles"
+          @rejected="clearRejectedJson"
+        />
       </div>
     </template>
 
@@ -117,6 +109,7 @@ import BaseImport from "@/components/common/BaseImport.vue";
 import SelectFolderDropDown from "@/components/common/sidebar/SelectFolderDropDown.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OFile from "@/lib/forms/File/OFile.vue";
+import { createJsonFileValidator } from "@/lib/forms/File/validateJsonFile";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 
 type ImportResult = { success: boolean; message: I18nText };
@@ -133,6 +126,7 @@ const STRIPPED_FIELDS = [
 ];
 
 const { t } = useI18nTyped();
+const validateJsonFile = createJsonFileValidator(t);
 const route = useRoute();
 const router = useRouter();
 const store = useStore();

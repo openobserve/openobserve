@@ -9613,6 +9613,7 @@
       "promqlFiltersAndOnly": "I filtri PromQL supportano solo AND. Rimuovi OR e i gruppi, oppure passa a SQL.",
       "cappedHint": "Vengono mostrati i primi {count} valori",
       "cappedAllHint": "«Tutto» include anche i valori non elencati",
+      "metricsTruncatedHint": "Alcune metriche non sono state controllate. Indica il nome di una metrica per vedere tutti i valori.",
       "metric": "Metrica",
       "label": "Etichetta",
       "metricSelectTooltip": "Seleziona una metrica o usa una variabile come $metricVariable per sceglierla in base a un altro valore.",
@@ -16504,6 +16505,13 @@
       "logoLightLabel": "Logo personalizzato (modalità chiara)",
       "logoLightHelp": "Mostrato in modalità chiara. PNG, JPG, GIF o BMP, fino a 150 × 30 px.",
       "logoDarkLabel": "Logo personalizzato (modalità scura)",
+      "logoTitle": "Logo personalizzato",
+      "logoHelp": "Visualizzato nell'intestazione dell'app. PNG, JPG, GIF, BMP, WEBP o SVG, fino a 150 × 30 px.",
+      "logoLightTitle": "Modalità chiara",
+      "logoDarkTitle": "Modalità scura",
+      "logoSaved": "Salvato",
+      "logoNotSaved": "Non salvato",
+      "logoDimensions": "{width} × {height} px",
       "logoDarkHelp": "Mostrato in modalità scura. PNG, JPG, GIF o BMP, fino a 150 × 30 px."
     },
     "modelPricingEditor": {
@@ -24189,8 +24197,19 @@
       "clear": "Cancella"
     },
     "file": {
-      "removeFile": "Rimuovi file",
-      "clearAll": "Cancella tutto"
+      "removeNamed": "Rimuovi {name}",
+      "attachPrompt": "Trascina un file per allegarlo, oppure {browse}",
+      "attachPromptMultiple": "Trascina i file per allegarli, oppure {browse}",
+      "browseLink": "sfoglia",
+      "supports": "File supportati {types}",
+      "dropFileToAttach": "Rilascia il file da allegare",
+      "dropFilesToAttach": "Rilascia i file da allegare",
+      "typeRejected": "Sono accettati solo file {allowed}",
+      "sizeRejected": "{size} supera il limite di {max}",
+      "countRejected": "Solo {count} file alla volta | Solo {count} file alla volta",
+      "invalidJson": "JSON non valido: {detail}",
+      "invalidImage": "Non è un file immagine valido",
+      "unavailable": "Il caricamento dei file non è disponibile"
     },
     "date": {
       "openCalendar": "Apri calendario",

@@ -23,6 +23,7 @@ import {
 } from "./iam.queries";
 import { iamKeys } from "./iam.querykeys";
 import { userKeys } from "./users.querykeys";
+import { aiToolsetKeys } from "./ai_toolsets.querykeys";
 
 vi.mock("./iam", () => ({
   getGroups: vi.fn(),
@@ -55,6 +56,7 @@ describe("role mutations", () => {
     queryClient.setQueryData(iamKeys.roles(ORG), ["nmcdev"]);
     queryClient.setQueryData(userKeys.allUserRoles(ORG), { "alice@example.com": ["nmcdev"] });
     queryClient.setQueryData(userKeys.assignableRoles(ORG), [{ label: "Admin", value: "admin" }]);
+    queryClient.setQueryData(aiToolsetKeys.mcps(ORG, "update"), { mcps: [], canCreate: false });
   });
 
   it.each([
@@ -66,6 +68,8 @@ describe("role mutations", () => {
 
     expect(isInvalidated(iamKeys.roles(ORG))).toBe(true);
     expect(isInvalidated(userKeys.allUserRoles(ORG))).toBe(true);
+    // A role grant also decides which MCPs a person may use.
+    expect(isInvalidated(aiToolsetKeys.mcps(ORG, "update"))).toBe(true);
     // The assignable list is the fixed built-in role set — no role write changes it.
     expect(isInvalidated(userKeys.assignableRoles(ORG))).toBe(false);
   });

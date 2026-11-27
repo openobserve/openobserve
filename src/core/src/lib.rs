@@ -28,6 +28,8 @@ pub mod auth;
 pub mod authz;
 #[cfg(feature = "enterprise")]
 pub mod autoobserve;
+#[cfg(feature = "enterprise")]
+pub mod autoresolve;
 #[cfg(any(feature = "enterprise", test))]
 pub mod background_access;
 pub mod bootstrap;

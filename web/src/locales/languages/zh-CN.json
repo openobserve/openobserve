@@ -9613,6 +9613,7 @@
       "promqlFiltersAndOnly": "PromQL 筛选条件仅支持 AND。请删除 OR 和分组，或切换到 SQL。",
       "cappedHint": "显示前 {count} 个值",
       "cappedAllHint": "“全部”也会匹配未列出的值",
+      "metricsTruncatedHint": "部分指标未勾选。输入指标名称可查看所有值。",
       "metric": "指标",
       "label": "标签",
       "metricSelectTooltip": "选择一个指标，或使用 $metricVariable 之类的变量根据其他值进行选择。",
@@ -16504,6 +16505,13 @@
       "logoLightLabel": "自定义徽标（浅色模式）",
       "logoLightHelp": "在浅色模式下显示。支持 PNG、JPG、GIF 或 BMP，最大 150 × 30 px。",
       "logoDarkLabel": "自定义徽标（深色模式）",
+      "logoTitle": "自定义徽标",
+      "logoHelp": "显示在应用页眉中。支持 PNG、JPG、GIF、BMP、WEBP 或 SVG，最大 150 × 30 像素。",
+      "logoLightTitle": "浅色模式",
+      "logoDarkTitle": "深色模式",
+      "logoSaved": "已保存",
+      "logoNotSaved": "未保存",
+      "logoDimensions": "{width} × {height} 像素",
       "logoDarkHelp": "在深色模式下显示。支持 PNG、JPG、GIF 或 BMP，最大 150 × 30 px。"
     },
     "modelPricingEditor": {
@@ -24189,8 +24197,19 @@
       "clear": "清除"
     },
     "file": {
-      "removeFile": "移除文件",
-      "clearAll": "全部清除"
+      "removeNamed": "移除 {name}",
+      "attachPrompt": "拖放文件以附加，或 {browse}",
+      "attachPromptMultiple": "拖放多个文件以附加，或 {browse}",
+      "browseLink": "浏览",
+      "supports": "支持的文件 {types}",
+      "dropFileToAttach": "松开以附加文件",
+      "dropFilesToAttach": "松开以附加文件",
+      "typeRejected": "仅接受 {allowed} 文件",
+      "sizeRejected": "{size} 超过 {max} 的限制",
+      "countRejected": "一次只能 {count} 个文件 | 一次只能 {count} 个文件",
+      "invalidJson": "不是有效的 JSON:{detail}",
+      "invalidImage": "不是有效的图片文件",
+      "unavailable": "文件上传不可用"
     },
     "date": {
       "openCalendar": "打开日历",

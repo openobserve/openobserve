@@ -15,26 +15,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <fieldset class="flex flex-col gap-2" data-test="ai-toolset-header-rows">
-    <legend class="text-text-heading mb-1 text-sm font-medium">{{ t("aiToolset.headers") }}</legend>
+  <fieldset class="flex flex-col gap-2" :data-test="`${testId}-rows`">
+    <legend class="text-text-heading mb-1 text-sm font-medium">
+      {{ legend ?? t("aiToolset.headers") }}
+    </legend>
     <div
       v-for="(row, i) in rows"
       :key="i"
       class="flex items-start gap-2 max-md:flex-wrap"
-      :data-test="`ai-toolset-header-${i}-row`"
+      :data-test="`${testId}-${i}-row`"
     >
       <div class="w-48 shrink-0 max-md:w-full">
         <OFormInput
-          :name="`mcp.headers[${i}].key`"
+          :name="`mcp.${field}[${i}].key`"
           :label="t('aiToolset.headerKey')"
           :readonly="isLocked(row)"
           :help-text="isLocked(row) ? t('assistant.toolsets.secret.keyLocked') : undefined"
-          :data-test="`ai-toolset-header-${i}-key`"
+          :data-test="`${testId}-${i}-key`"
         />
       </div>
       <div class="min-w-0 flex-1 max-md:w-full">
         <OFormSecretInput
-          :name="`mcp.headers[${i}].value`"
+          :name="`mcp.${field}[${i}].value`"
           :state="row.state"
           :label="t('aiToolset.headerValue')"
           :unchanged-label="t('assistant.toolsets.secret.unchanged')"
@@ -44,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :show-label="t('assistant.toolsets.secret.show')"
           :hide-label="t('assistant.toolsets.secret.hide')"
           :required="row.state !== 'unchanged' && !!row.key"
-          :data-test="`ai-toolset-header-${i}`"
+          :data-test="`${testId}-${i}`"
           @update:state="(state) => setState(i, state)"
         />
       </div>
@@ -53,8 +55,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="sm"
         class="mt-5 max-md:mt-0 max-md:min-h-11"
         :aria-label="t('assistant.toolsets.secret.removeHeader', { key: row.key || String(i + 1) })"
-        :data-test="`ai-toolset-header-${i}-remove`"
-        @click="form.removeFieldValue('mcp.headers', i)"
+        :data-test="`${testId}-${i}-remove`"
+        @click="form.removeFieldValue(`mcp.${field}`, i)"
         >{{ t("assistant.toolsets.secret.remove") }}</OButton
       >
     </div>
@@ -62,9 +64,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       variant="outline"
       size="sm"
       class="self-start max-md:min-h-11"
-      data-test="ai-toolset-header-add"
-      @click="form.pushFieldValue('mcp.headers', { key: '', value: '', state: 'new' })"
-      >{{ t("aiToolset.addHeader") }}</OButton
+      :data-test="`${testId}-add`"
+      @click="form.pushFieldValue(`mcp.${field}`, { key: '', value: '', state: 'new' })"
+      >{{ addLabel ?? t("aiToolset.addHeader") }}</OButton
     >
   </fieldset>
 </template>
@@ -75,14 +77,22 @@ import type { FormContextValue } from "@/lib/forms/Form/OForm.types";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSecretInput from "@/lib/forms/SecretInput/OFormSecretInput.vue";
 import type { SecretInputState } from "@/lib/forms/SecretInput/OSecretInput.types";
-import { useI18nTyped } from "@/types/i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 
 import type { SecretRow } from "./AssistantToolsetForm.schema";
 
-const props = defineProps<{
-  form: FormContextValue;
-  rows: SecretRow[];
-}>();
+const props = withDefaults(
+  defineProps<{
+    form: FormContextValue;
+    rows: SecretRow[];
+    /** Which secret list of `mcp` the rows edit: the headers, or AutoResolve's write headers. */
+    field?: "headers" | "writeHeaders";
+    legend?: I18nText;
+    addLabel?: I18nText;
+    testId?: string;
+  }>(),
+  { field: "headers", legend: undefined, addLabel: undefined, testId: "ai-toolset-header" },
+);
 
 const { t } = useI18nTyped();
 
@@ -92,8 +102,9 @@ function isLocked(row: SecretRow): boolean {
 }
 
 function setState(i: number, state: SecretInputState) {
-  props.form.setFieldValue(`mcp.headers[${i}].state`, state);
+  props.form.setFieldValue(`mcp.${props.field}[${i}].state`, state);
   const stored = props.rows[i]?.stored;
-  if (state === "unchanged" && stored) props.form.setFieldValue(`mcp.headers[${i}].key`, stored);
+  if (state === "unchanged" && stored)
+    props.form.setFieldValue(`mcp.${props.field}[${i}].key`, stored);
 }
 </script>

@@ -540,6 +540,24 @@ export const emptyStatePresets = {
       },
     ],
   },
+  "no-autoresolve-runs": {
+    illustration: "history",
+    variant: "neutral",
+    titleKey: "emptyState.noAutoResolveRuns.title",
+    descriptionKey: "emptyState.noAutoResolveRuns.description",
+  },
+  "no-saved-autoresolve": {
+    illustration: "box",
+    variant: "neutral",
+    titleKey: "emptyState.noSavedAutoResolve.title",
+    descriptionKey: "emptyState.noSavedAutoResolve.description",
+  },
+  "no-autoresolve-connections": {
+    illustration: "connect",
+    variant: "create",
+    titleKey: "emptyState.noAutoResolveConnections.title",
+    descriptionKey: "emptyState.noAutoResolveConnections.description",
+  },
   // Nothing open is the GOOD state here, so this is neutral rather than a
   // create prompt - a responder should not be nudged to make a page exist.
   "no-oncall-responses": {
@@ -1161,6 +1179,8 @@ export const presetNouns: Partial<Record<EmptyStatePresetName, string>> = {
   "no-streams": "emptyState.nouns.streams",
   "no-alerts": "emptyState.nouns.alerts",
   "no-incidents": "emptyState.nouns.incidents",
+  "no-autoresolve-runs": "emptyState.nouns.autoresolveRuns",
+  "no-saved-autoresolve": "emptyState.nouns.savedAutoResolve",
   "no-traces": "emptyState.nouns.traces",
   "no-profiles": "emptyState.nouns.profiles",
   "no-discovery-items": "emptyState.nouns.discoveryItems",

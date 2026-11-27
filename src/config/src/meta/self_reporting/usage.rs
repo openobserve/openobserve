@@ -87,6 +87,7 @@ pub fn is_internal_stream(stream_name: &str) -> bool {
 /// Streams only a feature writer fills, so no ingestion credential may write them over OTLP.
 pub fn is_feature_writer_stream(stream_name: &str) -> bool {
     stream_name == crate::meta::alerts::alert_calibration::DIGEST_STREAM
+        || stream_name == crate::meta::autoresolve::AUTORESOLVE_RUNS_STREAM
         || stream_name.starts_with(crate::meta::autoobserve::AUTOOBSERVE_STREAM_PREFIX)
         || stream_name.starts_with(crate::meta::service_identity::SERVICE_SIGNALS_STREAM_PREFIX)
         || stream_name == SESSION_REPLAY_RESOURCES_STREAM

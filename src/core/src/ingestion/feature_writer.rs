@@ -22,6 +22,7 @@ use config::{
     meta::{
         alerts::alert_calibration::DIGEST_STREAM,
         autoobserve::AUTOOBSERVE_STREAM_PREFIX,
+        autoresolve::AUTORESOLVE_RUNS_STREAM,
         service_identity::SERVICE_SIGNALS_STREAM_PREFIX,
         stream::{SESSION_REPLAY_RESOURCES_STREAM, StreamType},
     },
@@ -64,14 +65,16 @@ const ROTATION_FAILED: &str = "The ingestion token was not rotated because the {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum FeatureWriter {
     AlertCalibration,
+    AutoResolve,
     AutoObserve,
     ServiceSignals,
     SessionReplay,
 }
 
 impl FeatureWriter {
-    pub const ALL: [Self; 4] = [
+    pub const ALL: [Self; 5] = [
         Self::AlertCalibration,
+        Self::AutoResolve,
         Self::AutoObserve,
         Self::ServiceSignals,
         Self::SessionReplay,
@@ -84,6 +87,7 @@ impl FeatureWriter {
     pub fn token_name(self) -> &'static str {
         match self {
             Self::AlertCalibration => "_o2_alert_calibration",
+            Self::AutoResolve => "_o2_autoresolve",
             Self::AutoObserve => "_o2_autoobserve",
             Self::ServiceSignals => "_o2_service_signals",
             Self::SessionReplay => "_o2_sessionreplay_resources",
@@ -93,7 +97,10 @@ impl FeatureWriter {
     /// AutoObserve rows land in `_meta` whatever org they describe, so its token lives there.
     pub fn token_org(self, org: &str) -> &str {
         match self {
-            Self::AlertCalibration | Self::ServiceSignals | Self::SessionReplay => org,
+            Self::AlertCalibration
+            | Self::AutoResolve
+            | Self::ServiceSignals
+            | Self::SessionReplay => org,
             Self::AutoObserve => META_ORG_ID,
         }
     }
@@ -101,6 +108,7 @@ impl FeatureWriter {
     pub fn allows(self, stream: &str) -> bool {
         match self {
             Self::AlertCalibration => stream == DIGEST_STREAM,
+            Self::AutoResolve => stream == AUTORESOLVE_RUNS_STREAM,
             Self::AutoObserve => stream.starts_with(AUTOOBSERVE_STREAM_PREFIX),
             Self::ServiceSignals => stream.starts_with(SERVICE_SIGNALS_STREAM_PREFIX),
             Self::SessionReplay => stream == SESSION_REPLAY_RESOURCES_STREAM,
@@ -110,7 +118,10 @@ impl FeatureWriter {
     /// Service signals write verdict events as logs and their rollups as metrics.
     pub fn stream_types(self) -> &'static [StreamType] {
         match self {
-            Self::AlertCalibration | Self::AutoObserve | Self::SessionReplay => &[StreamType::Logs],
+            Self::AlertCalibration
+            | Self::AutoResolve
+            | Self::AutoObserve
+            | Self::SessionReplay => &[StreamType::Logs],
             Self::ServiceSignals => &[StreamType::Logs, StreamType::Metrics],
         }
     }
@@ -120,13 +131,16 @@ impl FeatureWriter {
     pub fn ingestion_type(self) -> cluster_rpc::IngestionType {
         match self {
             Self::AlertCalibration | Self::ServiceSignals => cluster_rpc::IngestionType::Json,
-            Self::AutoObserve | Self::SessionReplay => cluster_rpc::IngestionType::Usage,
+            Self::AutoResolve | Self::AutoObserve | Self::SessionReplay => {
+                cluster_rpc::IngestionType::Usage
+            }
         }
     }
 
     pub fn job(self) -> SystemJobType {
         match self {
             Self::AlertCalibration => SystemJobType::AlertCalibration,
+            Self::AutoResolve => SystemJobType::AutoResolve,
             Self::AutoObserve => SystemJobType::AutoObserve,
             Self::ServiceSignals => SystemJobType::ServiceSignals,
             Self::SessionReplay => SystemJobType::SessionReplay,
@@ -154,6 +168,7 @@ impl FeatureWriter {
     fn feature(self) -> &'static str {
         match self {
             Self::AlertCalibration => "Alert Calibration",
+            Self::AutoResolve => "AutoResolve",
             Self::AutoObserve => "AutoObserve",
             Self::ServiceSignals => "Service Versions",
             Self::SessionReplay => "Session Replay",
@@ -511,6 +526,9 @@ pub(crate) mod tests {
         assert!(!SessionReplay.allows("_rumdata"));
         assert!(!SessionReplay.allows("_o2_sessionreplay_resources_x"));
         assert!(!SessionReplay.allows(DIGEST_STREAM));
+        assert!(AutoResolve.allows(AUTORESOLVE_RUNS_STREAM));
+        assert!(!AutoResolve.allows("_o2_ai_chat_events"));
+        assert_eq!(AutoResolve.stream_types(), &[StreamType::Logs]);
         assert_eq!(SessionReplay.token_org("demo-org"), "demo-org");
         assert_eq!(SessionReplay.stream_types(), &[StreamType::Logs]);
         assert_eq!(

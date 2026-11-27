@@ -9613,6 +9613,7 @@
       "promqlFiltersAndOnly": "PromQL のフィルターは AND のみサポートしています。OR とグループを削除するか、SQL に切り替えてください。",
       "cappedHint": "最初の {count} 件の値を表示しています",
       "cappedAllHint": "「すべて」には一覧にない値も含まれます",
+      "metricsTruncatedHint": "一部のメトリクスは確認されていません。すべての値を表示するには、メトリクス名を指定してください。",
       "metric": "メトリクス",
       "label": "ラベル",
       "metricSelectTooltip": "メトリクスを選択するか、$metricVariable のような変数を使用して別の値から選択します。",
@@ -16504,6 +16505,13 @@
       "logoLightLabel": "カスタムロゴ（ライトモード）",
       "logoLightHelp": "ライトモードで表示されます。PNG、JPG、GIF、BMP、最大 150 × 30 px。",
       "logoDarkLabel": "カスタムロゴ（ダークモード）",
+      "logoTitle": "カスタムロゴ",
+      "logoHelp": "アプリのヘッダーに表示されます。PNG、JPG、GIF、BMP、WEBP または SVG、最大 150 × 30 px。",
+      "logoLightTitle": "ライトモード",
+      "logoDarkTitle": "ダークモード",
+      "logoSaved": "保存済み",
+      "logoNotSaved": "未保存",
+      "logoDimensions": "{width} × {height} px",
       "logoDarkHelp": "ダークモードで表示されます。PNG、JPG、GIF、BMP、最大 150 × 30 px。"
     },
     "modelPricingEditor": {
@@ -24189,8 +24197,19 @@
       "clear": "クリア"
     },
     "file": {
-      "removeFile": "ファイルを削除",
-      "clearAll": "すべてクリア"
+      "removeNamed": "{name} を削除",
+      "attachPrompt": "ファイルをドロップして添付、または{browse}",
+      "attachPromptMultiple": "ファイルをドロップして添付、または{browse}",
+      "browseLink": "参照",
+      "supports": "対応ファイル {types}",
+      "dropFileToAttach": "ドロップしてファイルを添付",
+      "dropFilesToAttach": "ドロップしてファイルを添付",
+      "typeRejected": "{allowed} ファイルのみ受け付けます",
+      "sizeRejected": "{size} は上限 {max} を超えています",
+      "countRejected": "一度に {count} ファイルのみ | 一度に {count} ファイルのみ",
+      "invalidJson": "無効な JSON: {detail}",
+      "invalidImage": "有効な画像ファイルではありません",
+      "unavailable": "ファイルのアップロードは利用できません"
     },
     "date": {
       "openCalendar": "カレンダーを開く",
