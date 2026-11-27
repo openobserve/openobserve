@@ -197,6 +197,8 @@ struct Caller {
     is_memory_admin: bool,
     /// May read the text, as the scope's GET route requires; a conflict shows it only then.
     can_read: bool,
+    /// May save the text, as the scope's PUT route requires; a revert needs it too.
+    can_save: bool,
 }
 
 #[derive(Clone, Copy)]
@@ -789,6 +791,7 @@ pub async fn update_my_memory(
                 author: Author::User(key.scope_key.clone()),
                 is_memory_admin: false,
                 can_read: true,
+                can_save: true,
             };
             write_memory(&key, None, body, caller).await
         }
@@ -905,6 +908,7 @@ pub async fn revert_my_memory(
                 author: Author::User(key.scope_key.clone()),
                 is_memory_admin: false,
                 can_read: true,
+                can_save: true,
             };
             revert(&key, None, body.rev, caller).await
         }
@@ -965,10 +969,16 @@ async fn caller(org_id: &str, user_email: &str, read_resource: &str) -> Result<C
         false,
     )
     .await;
+    // Shared memory's PUT routes check `ai` PUT; revert is routed on `ai_memory` PUT alone.
+    let can_save = check_permissions(
+        org_id, org_id, user_email, "ai", "PUT", None, true, false, false,
+    )
+    .await;
     Ok(Caller {
         author: Author::User(user_id),
         is_memory_admin: is_memory_admin(org_id, user_email).await,
         can_read,
+        can_save,
     })
 }
 
@@ -1131,7 +1141,7 @@ fn check_write(
 }
 
 async fn revert(key: &MemoryKey, toolset_id: Option<&str>, rev: i64, caller: Caller) -> Response {
-    if key.scope != MemoryScope::User && !caller.is_memory_admin {
+    if key.scope != MemoryScope::User && !(caller.is_memory_admin && caller.can_save) {
         return MetaHttpResponse::forbidden("only a memory admin can revert this memory");
     }
     match memory_db::revert(key, toolset_id, rev, caller.author).await {
@@ -1599,6 +1609,7 @@ pub(crate) mod tests {
             author: Author::User("u1".to_string()),
             is_memory_admin,
             can_read: true,
+            can_save: true,
         }
     }
 
@@ -1875,6 +1886,7 @@ pub(crate) mod tests {
             author: Author::User(id.to_string()),
             is_memory_admin: false,
             can_read: true,
+            can_save: true,
         };
         let resp = write_memory(&theirs, None, text("theirs", 0), caller(&them)).await;
         assert_eq!(resp.status(), StatusCode::OK);
@@ -1967,6 +1979,28 @@ pub(crate) mod tests {
         let resp = super::super::toolsets::delete(Path((org.clone(), dashed))).await;
         assert_eq!(resp.status(), StatusCode::OK);
         assert!(memory_db::get(&key).await.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn a_revert_needs_the_right_to_save_that_memory() {
+        if !meta_store().await {
+            return;
+        }
+        let key = MemoryKey::org(&unique_org("memory_revert_save"));
+        for (content, rev) in [("one\n", 0), ("two\n", 1)] {
+            let resp = write_memory(&key, None, text(content, rev), person(true)).await;
+            assert_eq!(resp.status(), StatusCode::OK);
+        }
+        let memory_only = Caller {
+            can_save: false,
+            ..person(true)
+        };
+        let resp = revert(&key, None, 1, memory_only).await;
+        assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+        assert_eq!(memory_body(&key, true).await.unwrap().rev, 2);
+        let resp = revert(&key, None, 1, person(true)).await;
+        assert_eq!(resp.status(), StatusCode::OK);
+        assert_eq!(memory_body(&key, true).await.unwrap().content, "one\n");
     }
 
     #[tokio::test]
@@ -2485,6 +2519,7 @@ pub(crate) mod tests {
             author: Author::User(user_id.clone()),
             is_memory_admin: false,
             can_read: true,
+            can_save: true,
         };
         write_memory(&MemoryKey::user(&org, &user_id), None, text("p99", 0), mine).await;
         let mcps = || {
