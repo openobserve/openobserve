@@ -291,21 +291,12 @@ const emit = defineEmits<{
 const store = useStore();
 const { t } = useI18nTyped();
 
-// Severity chips scale the sample's share up to the window's real total, which
-// SearchResult owns — one count query feeds both that chip row and its
-// "N events" chip, so the two can never disagree.
-//
-// Deliberately not the sum of per-pattern volumes: those come from match_all()
-// on a template's constant text, which matches a superset of that pattern's own
-// logs and can be identical for two different templates, so summing them
-// double-counts. Shares stay on the sample, which IS a clean partition.
-
-/** Scale a sample-derived share to the whole window when the total is known. */
-const scaleToWindow = (sampleCount: number): number | null => {
-  const analyzed = props.totalLogsAnalyzed ?? 0;
+// Not per-pattern volumes: their match_all() supersets overlap, so summing them double-counts.
+/** Scale a share of the window (percent) to a count when the total is known. */
+const scaleToWindow = (percentage: number): number | null => {
   const total = props.windowTotal ?? null;
-  if (!total || analyzed <= 0) return null;
-  return Math.round((sampleCount / analyzed) * total);
+  if (!total) return null;
+  return Math.round((percentage / 100) * total);
 };
 
 const openDetails = (pattern: any, index: number) => {
@@ -337,32 +328,32 @@ const onSeverityFilterChange = (value: unknown) => {
   analytics.track("log_patterns_severity_filtered", { count: next.length });
 };
 
-// Chip counts come from the extraction sample, which is a clean partition
-// (every analyzed log belongs to exactly one pattern). They're then scaled to
-// the window's true total so the chips read in real magnitudes.
-const severityCounts = computed<Record<PatternSeverityKey, number>>(() => {
-  const counts: Record<PatternSeverityKey, number> = {
-    error: 0,
-    warning: 0,
-    info: 0,
-    debug: 0,
-    uncategorized: 0,
-  };
+const emptySeverityTotals = (): Record<PatternSeverityKey, number> => ({
+  error: 0,
+  warning: 0,
+  info: 0,
+  debug: 0,
+  uncategorized: 0,
+});
+const severityTotals = computed(() => {
+  const shares = emptySeverityTotals();
+  const estimates = emptySeverityTotals();
   for (const p of props.patterns ?? []) {
-    counts[patternSeverityKeyForPattern(p)] += p?.frequency ?? 0;
+    const key = patternSeverityKeyForPattern(p);
+    shares[key] += p?.percentage ?? 0;
+    estimates[key] += p?.estimated_count ?? 0;
   }
-  return counts;
+  return { shares, estimates };
 });
 
 // Only surface chips for severities actually present, in fixed severity order.
 const severityChips = computed(() =>
-  SEVERITY_ORDER.filter((key) => severityCounts.value[key] > 0).map((key) => {
-    const scaled = scaleToWindow(severityCounts.value[key]);
+  SEVERITY_ORDER.filter((key) => severityTotals.value.estimates[key] > 0).map((key) => {
+    const scaled = scaleToWindow(severityTotals.value.shares[key]);
     return {
       key,
       label: t(SEVERITY_LABEL_KEY[key]),
-      countLabel:
-        scaled !== null ? `~${compactCount(scaled)}` : severityCounts.value[key].toLocaleString(),
+      countLabel: `~${compactCount(scaled ?? severityTotals.value.estimates[key])}`,
       colorClass: severityTextClass(key),
     };
   }),
@@ -388,10 +379,9 @@ const filteredPatterns = computed(() => {
   return all.filter((p) => active.has(patternSeverityKeyForPattern(p)));
 });
 
-// Share bars scale against sample frequencies — the same clean partition the
-// percentages use, so bars and percentages stay consistent with each other.
+// Share bars scale against the weighted estimates the percentages come from.
 const maxFrequency = computed(() =>
-  filteredPatterns.value.reduce((max, p) => Math.max(max, p?.frequency ?? 0), 0),
+  filteredPatterns.value.reduce((max, p) => Math.max(max, p?.estimated_count ?? 0), 0),
 );
 
 // --- "jump to latest data" (parity with the logs search empty state) --------
