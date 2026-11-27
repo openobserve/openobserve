@@ -28,9 +28,8 @@ use hashbrown::HashMap;
 
 use super::selection_from_row_ids;
 
-/// A file's top-`limit` candidates as `(_timestamp, doc_id)` plus the row
-/// group size of its index file.
-type FileCandidates = (Arc<Vec<(i64, u32)>>, Option<u32>);
+/// A file's top-`limit` candidates as `(_timestamp, doc_id)`.
+type FileCandidates = Arc<Vec<(i64, u32)>>;
 
 /// Prunes the file list of a SimpleSelect query using the per-file
 /// candidates collected from the tantivy index, each carrying the exact
@@ -64,18 +63,12 @@ impl SimpleSelectPruner {
 
     /// Record a file's exact candidates; its selection is deferred until the
     /// global top-N merge in [`Self::finalize`].
-    pub fn record_candidates(
-        &mut self,
-        file_name: String,
-        candidates: Arc<Vec<(i64, u32)>>,
-        row_group_size: Option<u32>,
-    ) {
+    pub fn record_candidates(&mut self, file_name: String, candidates: Arc<Vec<(i64, u32)>>) {
         debug_assert!(
             candidates.is_sorted_by(|a, b| if self.ascend { a.0 <= b.0 } else { a.0 >= b.0 }),
             "candidates must be timestamp-ordered best-first"
         );
-        self.candidates
-            .insert(file_name, (candidates, row_group_size));
+        self.candidates.insert(file_name, candidates);
     }
 
     /// Whether the groups after `group_id` can be dropped: at least `limit`
@@ -93,7 +86,7 @@ impl SimpleSelectPruner {
         let guaranteed: usize = self
             .candidates
             .values()
-            .map(|(candidates, _)| candidates.partition_point(beyond_bound))
+            .map(|candidates| candidates.partition_point(beyond_bound))
             .sum();
         if guaranteed < self.limit {
             return false;
@@ -124,7 +117,7 @@ impl SimpleSelectPruner {
         // the winners only need to be selected, never sorted
         let mut merged: Vec<(i64, &String, u32)> = candidates
             .iter()
-            .flat_map(|(key, (candidates, _))| {
+            .flat_map(|(key, candidates)| {
                 candidates
                     .iter()
                     .map(move |&(ts, doc_id)| (ts, key, doc_id))
@@ -146,7 +139,7 @@ impl SimpleSelectPruner {
         for &(_, key, doc_id) in &merged {
             winners.entry(key).or_default().push(doc_id);
         }
-        for (key, (_, row_group_size)) in &candidates {
+        for key in candidates.keys() {
             let Some(doc_ids) = winners.get(key) else {
                 // exact candidates but no winning row: the file cannot
                 // contribute to the top-N
@@ -158,7 +151,7 @@ impl SimpleSelectPruner {
                 .expect("candidate files were retained above");
             let row_ids =
                 selection_from_row_ids(file.meta.records as usize, doc_ids.iter().copied());
-            file.with_selection(FileSelection::Rows(Arc::new(row_ids)), *row_group_size);
+            file.with_selection(FileSelection::Rows(Arc::new(row_ids)));
         }
 
         // with a full winner set, drop the files without candidates that
@@ -276,7 +269,7 @@ mod tests {
             candidates: HashMap::new(),
         };
         for (key, rows) in candidates {
-            pruner.record_candidates(key.to_string(), Arc::new(rows.to_vec()), Some(1024));
+            pruner.record_candidates(key.to_string(), Arc::new(rows.to_vec()));
         }
         pruner
     }
@@ -321,7 +314,6 @@ mod tests {
         // the selections shrink to the winning rows only
         assert_eq!(selected_rows(&files["file_91_100"]), vec![10, 11]);
         assert_eq!(selected_rows(&files["file_81_90"]), vec![20]);
-        assert_eq!(files["file_91_100"].row_group_size, Some(1024));
     }
 
     #[test]
@@ -442,7 +434,7 @@ mod tests {
     fn test_record_candidates_defers_selection() {
         let files = build_file_map(vec![create_file_key(1, 10)]);
         let mut pruner = make_pruner(5, false, &[]);
-        pruner.record_candidates("file_1_10".to_string(), Arc::new(vec![(9, 3)]), Some(1024));
+        pruner.record_candidates("file_1_10".to_string(), Arc::new(vec![(9, 3)]));
         // deferred: recorded on the pruner, no selection built yet
         assert!(files["file_1_10"].selection.is_none());
         assert!(pruner.candidates.contains_key("file_1_10"));
