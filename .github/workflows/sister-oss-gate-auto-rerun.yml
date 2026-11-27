@@ -2,7 +2,8 @@ name: Sister OSS Gate Auto Re-run
 
 # When a required check or a review lands on an openobserve PR, re-run the failed `Sister OSS PR` gate
 # on its same-named o2-enterprise PR, so a "Merge when ready" enterprise PR proceeds unattended.
-# When the openobserve PR opens, re-run a passed gate so the enterprise PR is blocked again.
+# When the openobserve PR opens or gets a new push, re-run a passed gate so the enterprise PR is
+# blocked again; o2-enterprise has no merge queue to re-check it at merge time.
 # The gate re-reads the PR, so a re-run that finds it still unready just fails again.
 #
 # REQUIRED — secrets.ORG_ADMIN_TOKEN: o2-enterprise Actions: write, Pull requests: read.
@@ -22,7 +23,7 @@ on:
   status:
   # pull_request_target: the base copy of this file runs, so a PR cannot edit it to reach the token.
   pull_request_target:
-    types: [opened, reopened]
+    types: [opened, reopened, synchronize]
   pull_request_review:
     types: [submitted, dismissed]
 
@@ -77,7 +78,7 @@ jobs:
             --jq '[.workflow_runs[] | select(.conclusion != "skipped")] | sort_by(.created_at) | last
                   | if . == null then "- -" else "\(.id) \(.conclusion // .status)" end')
           # A passed run must re-run whole: --failed has no failed jobs to pick up.
-          if [ "$ACTION" = "pull_request_target/opened" ] || [ "$ACTION" = "pull_request_target/reopened" ]; then
+          if [[ "$ACTION" == pull_request_target/* ]]; then
             WANT=success FLAG=""
           else
             WANT=failure FLAG="--failed"
