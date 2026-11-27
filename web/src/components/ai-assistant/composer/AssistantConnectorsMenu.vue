@@ -132,7 +132,7 @@ const open = ref(false);
 
 const org = computed<string>(() => vuex.state.selectedOrganization?.identifier ?? "");
 const list = useQuery(computed(() => ({ ...aiToolsetsQuery(org.value), enabled: !!org.value })));
-const rows = computed<ToolsetRow[]>(() => parseToolsetRows(list.data.value));
+const rows = computed<ToolsetRow[]>(() => parseToolsetRows(list.data.value?.toolsets));
 const enableMutation = useMutation(() => setToolsetEnabledMutation(org.value));
 
 // Switches are org-wide (D4'); a flip shows at once and the server's answer settles it.

@@ -342,18 +342,31 @@ describe("ModulePane - own grant under a wider scope", () => {
 
 describe("ModulePane - effective grants", () => {
   // The count and the Granted filter must agree with the ticked boxes, including inherited ones.
-  it("counts and keeps rows granted only by a wider scope", async () => {
+  it.each([
+    { name: "a wider All covers every row", wider: ["AllowAll"], hidden: [], kept: ["cpu", "mem"] },
+    {
+      name: "a wider action the rows do not show covers none of them",
+      wider: ["AllowList"],
+      hidden: ["AllowList"],
+      kept: ["mem"],
+    },
+  ])("counts and keeps rows granted by a wider scope: $name", async ({ wider, hidden, kept }) => {
+    const withHidden = (node: any) => {
+      hidden.forEach((action) => (node.permission[action].show = false));
+      return node;
+    };
     const wrapper = await mountPane(
-      [makeScope("metrics", ["AllowAll"])],
-      [makeNode("cpu"), makeNode("mem")],
+      [makeScope("metrics", wider)],
+      [withHidden(makeNode("cpu")), withHidden(makeNode("mem", ["AllowPut"]))],
     );
 
     expect(wrapper.text()).toContain(
-      String(i18n.global.t("iam.editRole.moduleGrantedCount", { count: 2 })),
+      String(i18n.global.t("iam.editRole.moduleGrantedCount", { count: kept.length })),
     );
     await wrapper.find('[data-test="edit-role-module-pane-filter-granted"]').trigger("click");
-    expect(entityBox(wrapper, "cpu", "AllowGet").exists()).toBe(true);
-    expect(entityBox(wrapper, "mem", "AllowGet").exists()).toBe(true);
+    ["cpu", "mem"].forEach((row) =>
+      expect(entityBox(wrapper, row, "AllowPut").exists()).toBe(kept.includes(row)),
+    );
   });
 });
 

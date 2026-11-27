@@ -78,11 +78,27 @@ describe("UploadSourceMaps", () => {
       type: "application/zip",
     });
 
-  it("renders the page with the dropzone + native file input", async () => {
+  it("renders the page with the drop zone + native file input", async () => {
     const wrapper = await mountPage();
     expect(wrapper.findComponent({ name: "OForm" }).exists()).toBe(true);
-    expect(wrapper.find('[data-test="rum-upload-source-maps-file-dropzone"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="rum-upload-source-maps-file-input"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="rum-upload-source-maps-file-zone"]').exists()).toBe(true);
+    const input = wrapper.find('[data-test="rum-upload-source-maps-file-field"]');
+    expect(input.exists()).toBe(true);
+    expect(input.attributes("accept")).toBe(".zip");
+  });
+
+  it("refuses a non-.zip file on its row and leaves the form value empty", async () => {
+    const wrapper = await mountPage();
+    const input = wrapper.find('[data-test="rum-upload-source-maps-file-field"]');
+    const file = new File(["x"], "map.txt", { type: "text/plain" });
+    Object.defineProperty(input.element, "files", { value: [file], configurable: true });
+    await input.trigger("change");
+    await flushPromises();
+
+    const row = wrapper.find('[data-test="o-file-chip-0"]');
+    expect(row.attributes("data-state")).toBe("error");
+    expect(row.text()).toContain("map.txt");
+    expect(getForm(wrapper).state.values.file).toBeNull();
   });
 
   it("prefills service/version/environment from the route query", async () => {

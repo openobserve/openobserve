@@ -33,75 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }}<OTooltip :content="t('alerts.incidents.rcaLight.openFindingsHint')"
       /></OButton>
 
-      <span class="text-text-heading inline-flex items-center gap-1.5 text-sm font-semibold">
-        <span class="inline-flex h-3 items-end gap-0.5" aria-hidden="true">
-          <span
-            v-for="bar in 3"
-            :key="bar"
-            class="w-1 rounded-xs"
-            :class="[
-              BAR_HEIGHT[bar - 1],
-              bar <= rcaBandLevel(card.band) ? 'bg-accent' : 'bg-border-default',
-            ]"
-          />
-        </span>
-        <span data-test="rca-verdict-band" :data-band="card.band ?? 'none'">{{ bandText }}</span>
-        <OPopover
-          v-if="breakdown"
-          side="bottom"
-          align="start"
-          :aria-label="t('alerts.incidents.rcaLight.whyConfidence')"
-        >
-          <template #trigger>
-            <OButton
-              variant="ghost"
-              size="icon-xs"
-              icon-left="info-outline"
-              data-test="rca-verdict-band-info"
-              :aria-label="t('alerts.incidents.rcaLight.whyConfidence')"
-            />
-          </template>
-          <div
-            data-test="rca-verdict-confidence-why"
-            class="flex w-96 max-w-[calc(100vw-1.5rem)] flex-col gap-2 p-3"
-          >
-            <span class="text-text-heading text-sm font-semibold">
-              {{ t("alerts.incidents.rcaLight.whyBand", { band: bandWord(card.band) }) }}
-            </span>
-            <dl class="text-compact m-0 grid grid-cols-[max-content_minmax(0,1fr)] gap-x-4 gap-y-1">
-              <dt class="text-text-secondary">
-                {{ t("alerts.incidents.rcaSummary.confidenceClaimed") }}
-              </dt>
-              <dd data-test="rca-confidence-claimed" class="text-text-heading m-0 font-semibold">
-                {{ bandWord(breakdown.claimed) }}
-              </dd>
-              <dt class="text-text-secondary">
-                {{ t("alerts.incidents.rcaSummary.confidenceEvidence") }}
-              </dt>
-              <dd data-test="rca-confidence-evidence" class="text-text-body m-0">
-                <span class="text-text-heading font-semibold">{{
-                  bandWord(breakdown.evidence)
-                }}</span>
-                · {{ breakdown.evidence_reason }}
-              </dd>
-              <template v-if="breakdown.next_level">
-                <dt class="text-text-secondary">{{ t("alerts.incidents.rcaLight.nextLevel") }}</dt>
-                <dd class="text-text-body m-0">{{ breakdown.next_level }}</dd>
-              </template>
-              <template v-if="breakdown.caps.length > 0">
-                <dt class="text-text-secondary">
-                  {{
-                    t("alerts.incidents.rcaSummary.confidenceCapped", { band: bandWord("medium") })
-                  }}
-                </dt>
-                <dd data-test="rca-confidence-caps" class="text-text-body m-0">
-                  {{ listOf(breakdown.caps) }}
-                </dd>
-              </template>
-            </dl>
-          </div>
-        </OPopover>
-      </span>
+      <RcaConfidenceBand :band="card.band" :breakdown="breakdown" />
 
       <OButton
         v-if="unverifiedCount > 0"
@@ -348,10 +280,9 @@ import OText from "@/lib/core/Typography/OText.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import type { RcaBand, RcaRunSummary } from "@/services/incidents";
+import type { RcaRunSummary } from "@/services/incidents";
 import {
   RCA_OUTCOME_PILL,
-  rcaBandLevel,
   rcaHypothesisStatusLabel,
   type RcaVerdictView,
 } from "@/utils/incidents/rcaSummary";
@@ -361,6 +292,7 @@ import { incidentLiveWords, unfoldDuration } from "@/utils/incidents/incidentUnf
 import { useNowMicros } from "@/composables/downtimes/useNowMicros";
 import { getIntlLocale } from "@/locales";
 import { rcaImpactFact, rcaOpenFindings, type RcaAlertsNow, type RcaFiringScope } from "./rcaLight";
+import RcaConfidenceBand from "./RcaConfidenceBand.vue";
 import RcaInlineText from "./RcaInlineText.vue";
 import RcaPill from "./RcaPill.vue";
 
@@ -397,23 +329,11 @@ defineEmits<{
 
 const { t } = useI18nTyped();
 
-/** Heights of the three band bars. */
-const BAR_HEIGHT = ["h-1.5", "h-2.25", "h-3"] as const;
 const DASH = raw("—");
 
 const card = computed(() => props.summary.card);
 const outcomePill = computed(() => RCA_OUTCOME_PILL[card.value.outcome ?? "inconclusive"]);
 const breakdown = computed(() => card.value.confidence ?? null);
-
-const BAND_WORD: Record<RcaBand, I18nText> = {
-  high: t("alerts.incidents.aiAnalysis.band.high"),
-  medium: t("alerts.incidents.aiAnalysis.band.medium"),
-  low: t("alerts.incidents.aiAnalysis.band.low"),
-};
-const bandWord = (band: RcaBand | undefined) => (band ? BAND_WORD[band] : DASH);
-const bandText = computed(() =>
-  t("alerts.incidents.rcaLight.bandConfidence", { band: bandWord(card.value.band) }),
-);
 
 const openFindings = computed(() => rcaOpenFindings(props.summary.hypotheses));
 const openFindingsLabel = computed(() => {

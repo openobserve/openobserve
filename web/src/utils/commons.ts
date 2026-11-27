@@ -15,7 +15,11 @@
 
 //Dashboard Manipulation Functions
 
-import { dashboardsByFolderQuery } from "@/services/dashboards.queries";
+import {
+  dashboardsByFolderQuery,
+  toSearchHit,
+  type DashboardSearchHit,
+} from "@/services/dashboards.queries";
 import { foldersQuery } from "@/services/common.queries";
 import { dashboardKeys } from "@/services/dashboards.querykeys";
 import { folderKeys } from "@/services/common.querykeys";
@@ -31,7 +35,7 @@ import {
 } from "./dashboard/convertDashboardSchemaVersion";
 import { same } from "./dashboard/saveConflict";
 import { normalizeReservedTimestampAlias } from "./dashboard/timestampAliasRewrite";
-import commonService from "../services/common";
+import commonService, { type Folder } from "../services/common";
 import { gt, type TranslateFn } from "@/types/i18n";
 import { findPanelById } from "./dashboard/findPanel";
 import { deletePanelDraftsFor } from "@/composables/dashboard/usePanelDraft";
@@ -850,6 +854,51 @@ const ensureVariablesStructure = (dashboard: any): void => {
       dashboard.variables.list = [];
     }
   }
+};
+
+// Bounds the parallel folder listings while the lookup can still stop at the first match.
+const FOLDER_LOOKUP_BATCH = 6;
+
+/** The folder a dashboard lives in, for links that name only the dashboard; null when it cannot be found. */
+export const findDashboardFolderId = async (
+  org: string,
+  dashboardId: string,
+): Promise<string | null> => {
+  // A folder the user cannot list is skipped here, not reported as an access refusal.
+  const quiet = { silentForbidden: true };
+  // Two small requests find most dashboards, so the folder-by-folder scan is only the fallback.
+  const byTitle = async (): Promise<string | null> => {
+    const response = await dashboardService.get_Dashboard(org, dashboardId, undefined, quiet);
+    const body = response?.data?.[`v${response?.data?.version}`];
+    const title = typeof body?.title === "string" ? body.title : "";
+    if (!title) return null;
+    const res = await dashboardService.list(0, 1000, "name", false, "", org, "", title, quiet);
+    const hit = (res?.data?.dashboards ?? [])
+      .map(toSearchHit)
+      .find((row: DashboardSearchHit) => row.dashboardId === dashboardId);
+    return hit?.folderId ?? null;
+  };
+  const quick = await byTitle().catch(() => null);
+  if (quick) return quick;
+  // Uncached, so a moved dashboard is not sent to the folder it left.
+  const folders: Folder[] =
+    (await commonService.list_Folders(org, "dashboards", quiet)).data?.list ?? [];
+  // Each folder is listed under its own permission, so a user barred from "default" still finds it.
+  const holds = async (folderId: string): Promise<boolean> => {
+    const res = await dashboardService
+      .list(0, 1000, "name", false, "", org, folderId, "", quiet)
+      .catch(() => null);
+    return (res?.data?.dashboards ?? []).some(
+      (row: unknown) => toSearchHit(row).dashboardId === dashboardId,
+    );
+  };
+  for (let i = 0; i < folders.length; i += FOLDER_LOOKUP_BATCH) {
+    const batch = folders.slice(i, i + FOLDER_LOOKUP_BATCH);
+    const found = await Promise.all(batch.map((folder) => holds(folder.folderId)));
+    const index = found.indexOf(true);
+    if (index !== -1) return batch[index].folderId;
+  }
+  return null;
 };
 
 export const getDashboard = async (store: any, dashboardId: any, folderId: any) => {

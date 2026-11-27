@@ -170,7 +170,12 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 167: add approval_scope to ai_actions.
 // 168: add oncall_policies.saved_by_person, set once a person saves the ladder.
 // 169: add incident_integrations.oncall_team, the team an external alert source pages.
-pub const DB_SCHEMA_VERSION: u64 = 169;
+// 170: create autoresolve, autoresolve_runs and autoresolve_steps.
+// 171: create autoresolve_corrections, and add plan_corrections, person_verdict and
+//      added_connections to autoresolve_runs.
+// 172: add autoresolve_runs.plan_history.
+// 173: add incident_id to autoresolve_runs, with one live run per incident.
+pub const DB_SCHEMA_VERSION: u64 = 173;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables

@@ -9613,6 +9613,7 @@
       "promqlFiltersAndOnly": "Filtry PromQL obsługują tylko AND. Usuń OR i grupy albo przełącz na SQL.",
       "cappedHint": "Wyświetlono pierwsze {count} wartości",
       "cappedAllHint": "„Wszystkie” obejmuje też wartości spoza listy",
+      "metricsTruncatedHint": "Niektóre metryki nie zostały zaznaczone. Wpisz nazwę metryki, aby zobaczyć wszystkie wartości.",
       "metric": "Metryka",
       "label": "Etykieta",
       "metricSelectTooltip": "Wybierz metrykę lub użyj zmiennej, np. $metricVariable, aby wybrać ją na podstawie innej wartości.",
@@ -16504,6 +16505,13 @@
       "logoLightLabel": "Niestandardowe logo (tryb jasny)",
       "logoLightHelp": "Wyświetlane w trybie jasnym. PNG, JPG, GIF lub BMP, do 150 × 30 px.",
       "logoDarkLabel": "Niestandardowe logo (tryb ciemny)",
+      "logoTitle": "Własne logo",
+      "logoHelp": "Wyświetlane w nagłówku aplikacji. PNG, JPG, GIF, BMP, WEBP lub SVG, do 150 × 30 px.",
+      "logoLightTitle": "Tryb jasny",
+      "logoDarkTitle": "Tryb ciemny",
+      "logoSaved": "Zapisano",
+      "logoNotSaved": "Niezapisane",
+      "logoDimensions": "{width} × {height} px",
       "logoDarkHelp": "Wyświetlane w trybie ciemnym. PNG, JPG, GIF lub BMP, do 150 × 30 px."
     },
     "modelPricingEditor": {
@@ -24186,8 +24194,19 @@
       "clear": "Wyczyść"
     },
     "file": {
-      "removeFile": "Usuń plik",
-      "clearAll": "Wyczyść wszystko"
+      "removeNamed": "Usuń {name}",
+      "attachPrompt": "Przeciągnij plik, aby załączyć, lub {browse}",
+      "attachPromptMultiple": "Przeciągnij pliki, aby załączyć, lub {browse}",
+      "browseLink": "przeglądaj",
+      "supports": "Obsługiwane pliki {types}",
+      "dropFileToAttach": "Upuść plik, aby go dołączyć",
+      "dropFilesToAttach": "Upuść pliki, aby je dołączyć",
+      "typeRejected": "Akceptowane są tylko pliki: {allowed}",
+      "sizeRejected": "{size} przekracza limit {max}",
+      "countRejected": "Tylko {count} plik naraz | Tylko {count} pliki naraz",
+      "invalidJson": "Nieprawidłowy JSON: {detail}",
+      "invalidImage": "To nie jest prawidłowy plik obrazu",
+      "unavailable": "Przesyłanie plików jest niedostępne"
     },
     "date": {
       "openCalendar": "Otwórz kalendarz",

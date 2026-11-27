@@ -9613,6 +9613,7 @@
       "promqlFiltersAndOnly": "PromQL filtreleri yalnızca AND destekler. OR ve grupları kaldırın ya da SQL'e geçin.",
       "cappedHint": "İlk {count} değer gösteriliyor",
       "cappedAllHint": "“Tümü”, listelenmeyen değerleri de kapsar",
+      "metricsTruncatedHint": "Bazı metrikler kontrol edilmedi. Tüm değerleri görmek için bir metrik adı belirtin.",
       "metric": "Metrik",
       "label": "Etiket",
       "metricSelectTooltip": "Bir metrik seçin veya başka bir değere göre seçmek için $metricVariable gibi bir değişken kullanın.",
@@ -16504,6 +16505,13 @@
       "logoLightLabel": "Özel logo (açık mod)",
       "logoLightHelp": "Açık modda gösterilir. PNG, JPG, GIF veya BMP, en fazla 150 × 30 px.",
       "logoDarkLabel": "Özel logo (koyu mod)",
+      "logoTitle": "Özel logo",
+      "logoHelp": "Uygulama başlığında gösterilir. PNG, JPG, GIF, BMP, WEBP veya SVG, en fazla 150 × 30 px.",
+      "logoLightTitle": "Açık mod",
+      "logoDarkTitle": "Koyu mod",
+      "logoSaved": "Kaydedildi",
+      "logoNotSaved": "Kaydedilmedi",
+      "logoDimensions": "{width} × {height} piksel",
       "logoDarkHelp": "Koyu modda gösterilir. PNG, JPG, GIF veya BMP, en fazla 150 × 30 px."
     },
     "modelPricingEditor": {
@@ -24186,8 +24194,19 @@
       "clear": "Temizle"
     },
     "file": {
-      "removeFile": "Dosyayı kaldır",
-      "clearAll": "Tümünü temizle"
+      "removeNamed": "{name} öğesini kaldır",
+      "attachPrompt": "Eklemek için bir dosya bırakın veya {browse}",
+      "attachPromptMultiple": "Eklemek için dosyaları bırakın veya {browse}",
+      "browseLink": "göz atın",
+      "supports": "Desteklenen dosyalar {types}",
+      "dropFileToAttach": "Eklemek için dosyayı bırakın",
+      "dropFilesToAttach": "Eklemek için dosyaları bırakın",
+      "typeRejected": "Yalnızca {allowed} dosyaları kabul edilir",
+      "sizeRejected": "{size}, {max} sınırını aşıyor",
+      "countRejected": "Bir seferde yalnızca {count} dosya | Bir seferde yalnızca {count} dosya",
+      "invalidJson": "Geçerli JSON değil: {detail}",
+      "invalidImage": "Geçerli bir görüntü dosyası değil",
+      "unavailable": "Dosya yükleme kullanılamıyor"
     },
     "date": {
       "openCalendar": "Takvimi aç",
