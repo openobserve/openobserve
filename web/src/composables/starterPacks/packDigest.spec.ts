@@ -26,6 +26,7 @@ import {
   PACK_DIGEST_NAME,
   type DigestItem,
 } from "./packDigest";
+import { packDigestChip } from "@/components/ai-assistant/welcome/starterWelcome";
 import { packById } from "./usePackCatalog";
 import type { StarterPack } from "./types";
 
@@ -50,9 +51,25 @@ const itemOf = (id: string, streams: string[] = [], over: Record<string, unknown
   } as unknown as DigestItem;
 };
 
-// Mirrors what the composer sends: RichTextInput writes this block for a context chip.
-const sentMessage = (question: string, digest: string) =>
-  `${question} \n\n--- ${PACK_DIGEST_NAME}  ---\n${digest}\n--- end ---`;
+// A chat from before the current composer kept the digest as a named block in the message text.
+const legacyMessage = (question: string, digest: string) => ({
+  content: `${question} \n\n--- ${PACK_DIGEST_NAME}  ---\n${digest}\n--- end ---`,
+});
+
+// Sent from the composer: the digest rides as a chip; reloaded from the server, as a block of its JSON text.
+const chipMessage = (question: string, digest: string) => ({
+  content: question,
+  chips: [packDigestChip(digest)],
+});
+const storedMessage = (question: string, digest: string) => ({
+  content: question,
+  contentBlocks: [
+    {
+      type: "attachment" as const,
+      attachment: { name: "Pasted text", body: JSON.stringify(digest) },
+    },
+  ],
+});
 
 describe("buildPackDigest", () => {
   it("starts with the pack titles", () => {
@@ -114,18 +131,39 @@ describe("buildPackDigest", () => {
       "Starter packs for your data: Kubernetes, AWS CloudWatch, Argo CD",
     );
     expect(digest.endsWith(RULE)).toBe(true);
-    expect(digestPackIds(sentMessage("Which packs fit?", digest))).toEqual(ids);
+    expect(digestPackIds(chipMessage("Which packs fit?", digest))).toEqual(ids);
   });
 });
 
 describe("digestPackIds", () => {
-  it("reads the pack ids back from a sent message, in digest order", () => {
-    const digest = buildPackDigest([itemOf("hosts"), itemOf("kubernetes")]);
-    expect(digestPackIds(sentMessage("Which packs fit?", digest))).toEqual(["hosts", "kubernetes"]);
+  const digest = () => buildPackDigest([itemOf("hosts"), itemOf("kubernetes")]);
+
+  it("reads the pack ids back from the chip a message was sent with, in digest order", () => {
+    expect(digestPackIds(chipMessage("Which packs fit?", digest()))).toEqual([
+      "hosts",
+      "kubernetes",
+    ]);
   });
 
-  it("finds nothing in a message without the block", () => {
-    expect(digestPackIds("Pack: Kubernetes (id: kubernetes)")).toEqual([]);
-    expect(digestPackIds("--- Log Entry ---\nPack: X (id: x)\n--- end ---")).toEqual([]);
+  it("reads them from a reloaded message's block and from an older chat's text", () => {
+    expect(digestPackIds(storedMessage("Which packs fit?", digest()))).toEqual([
+      "hosts",
+      "kubernetes",
+    ]);
+    expect(digestPackIds(legacyMessage("Which packs fit?", digest()))).toEqual([
+      "hosts",
+      "kubernetes",
+    ]);
+  });
+
+  it("finds nothing in a message without the digest", () => {
+    expect(digestPackIds(null)).toEqual([]);
+    expect(digestPackIds({ content: "Pack: Kubernetes (id: kubernetes)" })).toEqual([]);
+    expect(digestPackIds({ content: "--- Log Entry ---\nPack: X (id: x)\n--- end ---" })).toEqual(
+      [],
+    );
+    expect(
+      digestPackIds({ content: "q", chips: [{ ...packDigestChip("Pack: X (id: x)") }] }),
+    ).toEqual([]);
   });
 });

@@ -24,6 +24,7 @@ const STARTER_ICONS: Record<StarterKind, IconName> = {
   recent: assistantGlyph.history,
   ingest: assistantGlyph.download,
   learn: assistantGlyph.assistant,
+  pack: "package-2",
 };
 
 /** The icon a starter card shows for its kind. */

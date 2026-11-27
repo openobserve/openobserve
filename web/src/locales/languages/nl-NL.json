@@ -10943,11 +10943,6 @@
       "tryOneOfThese": "Of probeer een van deze"
     },
     "capabilities": {
-      "starter": {
-        "title": "Starterpakketten instellen",
-        "description": "Dashboards, alarms en opgeslagen weergaven, gebouwd voor je gegevens uit {packs}.",
-        "prompt": "Welke starterpakketten passen bij mijn gegevens, en wat maakt elk ervan aan?"
-      },
       "query": {
         "title": "Schrijf een query",
         "description": "SQL voor logs, traces, RUM, of PromQL voor metrieken.",
@@ -10975,16 +10970,6 @@
       "mapStreamSchema": "Breng het schema van mijn stream \"default\" in kaart",
       "promqlCpu": "Schrijf PromQL voor pods met een CPU van > 80%",
       "lastAlertFired": "Waarom is mijn laatste alarm afgegaan?"
-    },
-    "starterSuggestions": {
-      "whichPacks": "Welke starterpakketten passen bij mijn gegevens?",
-      "setUpPack": "Het {pack}-pakket instellen",
-      "whatInPack": "Wat zit er in het {pack}-pakket?",
-      "errorsLastHour": "Toon me fouten van het afgelopen uur"
-    },
-    "starter": {
-      "checking": "Je gegevens controleren op starterpakketten…",
-      "readyWhenYouAre": "Klaar wanneer jij dat bent:"
     },
     "placeholderRotation": {
       "one": "Laat me fouten zien van het afgelopen uur...",

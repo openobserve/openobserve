@@ -110,6 +110,7 @@ export type { ProjectRecordOptions, RecordAudience, StoredTurn } from "./record"
 export {
   MAIN_MIN_REM,
   MAX_IMAGES,
+  MAX_CHIP_BYTES,
   NAV_RAIL_REM,
   SIDEBAR_MIN_REM,
   UNDO_WINDOW_MS,

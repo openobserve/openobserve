@@ -10938,11 +10938,6 @@
       "tryOneOfThese": "或試試以下其中一項"
     },
     "capabilities": {
-      "starter": {
-        "title": "設定入門套件",
-        "description": "專為您的 {packs} 資料打造的儀表板、警示與已儲存檢視。",
-        "prompt": "哪些入門套件適合我的資料，而每個套件又會建立哪些內容？"
-      },
       "query": {
         "title": "撰寫查詢",
         "description": "用於日誌、追蹤、RUM 的 SQL，或用於指標的 PromQL。",
@@ -10970,16 +10965,6 @@
       "mapStreamSchema": "對應我的「default」串流結構描述",
       "promqlCpu": "為 CPU 使用率 > 80% 的 Pod 撰寫 PromQL",
       "lastAlertFired": "為什麼我的上一個警示會觸發？"
-    },
-    "starterSuggestions": {
-      "whichPacks": "哪些入門套件適合我的資料？",
-      "setUpPack": "設定 {pack} 套件",
-      "whatInPack": "{pack} 套件裡有什麼？",
-      "errorsLastHour": "顯示過去一小時的錯誤"
-    },
-    "starter": {
-      "checking": "正在檢查您的資料以尋找入門套件…",
-      "readyWhenYouAre": "準備好時即可開始："
     },
     "placeholderRotation": {
       "one": "顯示過去一小時的錯誤…",

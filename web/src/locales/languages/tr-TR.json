@@ -10943,11 +10943,6 @@
       "tryOneOfThese": "Veya bunlardan birini deneyin"
     },
     "capabilities": {
-      "starter": {
-        "title": "Başlangıç Paketlerini kur",
-        "description": "Gösterge panoları, uyarılar ve kaydedilmiş görünümler {packs} verileriniz için oluşturuldu.",
-        "prompt": "Hangi başlangıç paketleri verilerime uygun ve her biri ne oluşturacak?"
-      },
       "query": {
         "title": "Sorgu yaz",
         "description": "Günlükler, izler, RUM için SQL veya metrikler için PromQL.",
@@ -10975,16 +10970,6 @@
       "mapStreamSchema": "\"default\" akış şemamı eşle",
       "promqlCpu": "> %80 CPU kullanan bölmeler için PromQL yazın",
       "lastAlertFired": "Son uyarım neden tetiklendi?"
-    },
-    "starterSuggestions": {
-      "whichPacks": "Hangi başlangıç paketleri verilerime uygun?",
-      "setUpPack": "{pack} paketini kur",
-      "whatInPack": "{pack} paketinde neler var?",
-      "errorsLastHour": "Son bir saatteki hataları göster"
-    },
-    "starter": {
-      "checking": "Başlangıç paketleri için verileriniz kontrol ediliyor…",
-      "readyWhenYouAre": "Siz hazır olduğunuzda:"
     },
     "placeholderRotation": {
       "one": "Bana son saatteki hataları göster...",

@@ -10941,11 +10941,6 @@
       "tryOneOfThese": "Or try one of these"
     },
     "capabilities": {
-      "starter": {
-        "title": "ตั้งค่าแพ็กเริ่มต้น",
-        "description": "แดชบอร์ด การแจ้งเตือน และมุมมองที่บันทึกไว้ซึ่งสร้างขึ้นสำหรับข้อมูล {packs} ของคุณ",
-        "prompt": "แพ็กเริ่มต้นใดเหมาะกับข้อมูลของฉัน และแต่ละแพ็กจะสร้างอะไรบ้าง"
-      },
       "query": {
         "title": "เขียนคิวรี",
         "description": "SQL for logs, traces, RUM, or PromQL for metrics.",
@@ -10973,16 +10968,6 @@
       "mapStreamSchema": "Map my \"default\" stream schema",
       "promqlCpu": "Write PromQL for pods using > 80% CPU",
       "lastAlertFired": "Why was my last alert fired?"
-    },
-    "starterSuggestions": {
-      "whichPacks": "แพ็กเริ่มต้นใดเหมาะกับข้อมูลของฉัน",
-      "setUpPack": "ตั้งค่าแพ็ก {pack}",
-      "whatInPack": "แพ็ก {pack} มีอะไรบ้าง",
-      "errorsLastHour": "แสดงข้อผิดพลาดจากชั่วโมงที่ผ่านมา"
-    },
-    "starter": {
-      "checking": "กำลังตรวจสอบข้อมูลของคุณเพื่อค้นหาแพ็กเริ่มต้น…",
-      "readyWhenYouAre": "พร้อมเมื่อคุณพร้อม:"
     },
     "placeholderRotation": {
       "one": "Show me errors from the last hour…",

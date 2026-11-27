@@ -10943,11 +10943,6 @@
       "tryOneOfThese": "Oppure prova uno di questi"
     },
     "capabilities": {
-      "starter": {
-        "title": "Configura i pacchetti starter",
-        "description": "Dashboard, avvisi e viste salvate realizzati per i tuoi dati {packs}.",
-        "prompt": "Quali pacchetti starter sono adatti ai miei dati e cosa creerà ciascuno?"
-      },
       "query": {
         "title": "Scrivi una query",
         "description": "SQL per log, tracce, RUM, o PromQL per le metriche.",
@@ -10975,16 +10970,6 @@
       "mapStreamSchema": "Mappa lo schema del mio stream \"default\"",
       "promqlCpu": "Scrivi PromQL per pod utilizzando una CPU > 80%",
       "lastAlertFired": "Perché è stato attivato il mio ultimo avviso?"
-    },
-    "starterSuggestions": {
-      "whichPacks": "Quali pacchetti starter sono adatti ai miei dati?",
-      "setUpPack": "Configura il pacchetto {pack}",
-      "whatInPack": "Cosa contiene il pacchetto {pack}?",
-      "errorsLastHour": "Mostrami gli errori dell'ultima ora"
-    },
-    "starter": {
-      "checking": "Verifica dei tuoi dati per i pacchetti starter…",
-      "readyWhenYouAre": "Pronti quando vuoi:"
     },
     "placeholderRotation": {
       "one": "Mostrami gli errori dell'ultima ora...",

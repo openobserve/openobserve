@@ -76,6 +76,13 @@ export const packRowInput = (item: HomePackRowItem, askAdmin: boolean): PackRowI
   };
 };
 
+/** The preview's counts once it loads, else the catalog's, so a row never reads empty meanwhile. */
+export const packItemCounts = ({ pack, flow }: Pick<HomePackRowItem, "pack" | "flow">) => ({
+  dashboards: flow.dashboardCount.value ?? pack.dashboards.length,
+  alerts: flow.alertCount.value ?? pack.alerts.length,
+  views: flow.viewCount.value ?? pack.savedViews.length,
+});
+
 /** Null until the preview has counted, so a button never shows a count it has not made. */
 export const packSetUpCount = (flow: StarterPackFlow): number | null => {
   const counts = [flow.dashboardCount.value, flow.alertCount.value, flow.viewCount.value];

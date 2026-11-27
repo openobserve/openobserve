@@ -766,6 +766,58 @@ describe("keys (`40` §1.4, CT-09)", () => {
     expect(send).toHaveBeenCalledWith(sid);
   });
 
+  it("shows the host's send chips in full and adds them to the message only when it is sent", async () => {
+    const chip = {
+      id: "starter-pack-digest",
+      kind: "pasted_text" as const,
+      label: raw("Starter packs for your data"),
+      data: "Starter packs for your data: Kubernetes",
+      sizeBytes: 40,
+      provenance: "attach" as const,
+      sent: "serialized" as const,
+    };
+    const { wrapper, store, send, textarea, sid } = setup({ sendChips: [chip] });
+    await flushPromises();
+    const shown = wrapper.get('[data-test="assistant-composer-send-chip"]');
+    expect(shown.text()).toBe("Starter packs for your data");
+    expect(store.state.sessions[sid].composer.chips).toEqual([]);
+    await shown.get('[data-test="assistant-context-chip-remove"]').trigger("click");
+    expect(wrapper.emitted("remove-send-chip")).toEqual([["starter-pack-digest"]]);
+    // An accepted send becomes a message; the sent draft is what the engine reads.
+    let sentChips: string[] = [];
+    send.mockImplementation(async (id: string) => {
+      sentChips = store.state.sessions[id].composer.chips.map((held) => held.id);
+      store.state.sessions[id].messages.push({ role: "user", content: raw("which packs?") });
+      return { state: "done", saved: "server" } as never;
+    });
+    await type(textarea(), "which packs?");
+    await textarea().trigger("keydown", { key: "Enter" });
+    await flushPromises();
+    expect(send).toHaveBeenCalledWith(sid);
+    expect(sentChips).toEqual(["starter-pack-digest"]);
+    expect(wrapper.emitted("send-chips-withdrawn")).toBeUndefined();
+  });
+
+  it("takes the send chips back out of the draft when the send is refused", async () => {
+    const chip = {
+      id: "starter-pack-digest",
+      kind: "pasted_text" as const,
+      label: raw("Starter packs for your data"),
+      data: "Starter packs for your data: Kubernetes",
+      sizeBytes: 40,
+      provenance: "attach" as const,
+      sent: "serialized" as const,
+    };
+    const { wrapper, store, send, textarea, sid } = setup({ sendChips: [chip] });
+    send.mockResolvedValue({ state: "refused" } as never);
+    await type(textarea(), "which packs?");
+    await textarea().trigger("keydown", { key: "Enter" });
+    await flushPromises();
+    expect(store.state.sessions[sid].composer.chips).toEqual([]);
+    expect(store.state.sessions[sid].composer.text).toBe("which packs?");
+    expect(wrapper.emitted("send-chips-withdrawn")).toEqual([[sid]]);
+  });
+
   it("ignores Enter while an IME composes, and Shift+Enter is a newline (CT-09 AC 1, 3)", async () => {
     const { send, textarea } = setup();
     await type(textarea(), "にほん");

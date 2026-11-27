@@ -10943,11 +10943,6 @@
       "tryOneOfThese": "または、次のいずれかを試してください"
     },
     "capabilities": {
-      "starter": {
-        "title": "スターターパックをセットアップ",
-        "description": "{packs} データに合わせて作成されたダッシュボード、アラート、保存済みビュー。",
-        "prompt": "どのスターターパックが自分のデータに合いますか？それぞれ何が作成されますか？"
-      },
       "query": {
         "title": "クエリを作成",
         "description": "ログ、トレース、RUM向けのSQL、またはメトリクス向けのPromQL。",
@@ -10975,16 +10970,6 @@
       "mapStreamSchema": "「default」ストリームのスキーマをマップする",
       "promqlCpu": "80% 以上の CPU を使用するポッド用の PromQL を記述する",
       "lastAlertFired": "前回のアラートはなぜ起動されたのですか？"
-    },
-    "starterSuggestions": {
-      "whichPacks": "どのスターターパックが自分のデータに合いますか？",
-      "setUpPack": "{pack} パックをセットアップ",
-      "whatInPack": "{pack} パックには何が含まれますか？",
-      "errorsLastHour": "過去1時間のエラーを表示"
-    },
-    "starter": {
-      "checking": "スターターパックのためにデータを確認しています…",
-      "readyWhenYouAre": "準備ができたら始めましょう:"
     },
     "placeholderRotation": {
       "one": "過去 1 時間のエラーを表示...",

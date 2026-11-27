@@ -10943,11 +10943,6 @@
       "tryOneOfThese": "또는 다음 중 하나를 시도해 보십시오."
     },
     "capabilities": {
-      "starter": {
-        "title": "스타터 팩 설정하기",
-        "description": "{packs} 데이터에 맞춰 구축된 대시보드, 알림 및 저장된 뷰.",
-        "prompt": "내 데이터에 맞는 스타터 팩은 무엇이며, 각 팩은 무엇을 생성하나요?"
-      },
       "query": {
         "title": "쿼리 작성하기",
         "description": "로그, 트레이스, RUM용 SQL 또는 메트릭용 PromQL.",
@@ -10975,16 +10970,6 @@
       "mapStreamSchema": "내 \"default\" 스트림 스키마 매핑",
       "promqlCpu": "80% 이상의 CPU를 사용하는 파드용 PromQL을 작성하십시오.",
       "lastAlertFired": "내 마지막 알림은 왜 발생했나요?"
-    },
-    "starterSuggestions": {
-      "whichPacks": "내 데이터에 맞는 스타터 팩은 무엇인가요?",
-      "setUpPack": "{pack} 팩 설정하기",
-      "whatInPack": "{pack} 팩에는 무엇이 들어 있나요?",
-      "errorsLastHour": "지난 1시간 동안의 오류를 보여 주세요"
-    },
-    "starter": {
-      "checking": "스타터 팩에 맞는 데이터인지 확인하는 중…",
-      "readyWhenYouAre": "준비되면 시작하세요:"
     },
     "placeholderRotation": {
       "one": "지난 한 시간 동안 발생한 오류를 보여주세요...",

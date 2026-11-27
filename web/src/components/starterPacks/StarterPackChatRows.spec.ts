@@ -15,7 +15,7 @@
 
 import { flushPromises, mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { nextTick, ref } from "vue";
+import { defineComponent, h, nextTick, ref } from "vue";
 
 import i18n from "@/locales";
 import { packById } from "@/composables/starterPacks/usePackCatalog";
@@ -72,10 +72,19 @@ const matcherDouble = (state = "matched") => {
 
 const IDS = ["kubernetes", "hosts", "docker"];
 
+// The real popover reads the org's members; the stub keeps the kind it was opened for.
+const AskAdminStub = defineComponent({
+  name: "AssistantAskAdminPopover",
+  props: { kind: String, org: String },
+  setup(props, { slots }) {
+    return () => h("span", { "data-kind": props.kind }, slots.trigger?.());
+  },
+});
+
 const render = async (packIds = ["kubernetes", "hosts"]) => {
   const wrapper = mount(StarterPackChatRows, {
     props: { org: "org", packIds },
-    global: { plugins: [i18n], stubs: { OIcon: true } },
+    global: { plugins: [i18n], stubs: { OIcon: true, AssistantAskAdminPopover: AskAdminStub } },
   });
   await flushPromises();
   return wrapper;
@@ -100,18 +109,28 @@ describe("StarterPackChatRows", () => {
     expect(fake.browser.saveBuiltIn).not.toHaveBeenCalled();
   });
 
-  it("draws a row per pack on offer, with the badge on the first one", async () => {
+  it("draws a row per pack on offer, with no badge", async () => {
     fake.matchers.docker.state.value = "none";
     const wrapper = await render(IDS);
-    expect(wrapper.text()).toContain("Ready when you are:");
+    expect(wrapper.text()).toContain("Ready when you are");
     expect(has(wrapper, "starter-pack-chat-row-kubernetes")).toBe(true);
     expect(has(wrapper, "starter-pack-chat-row-hosts")).toBe(true);
     expect(has(wrapper, "starter-pack-chat-row-docker")).toBe(false);
-    expect(has(wrapper, "starter-pack-chat-best-kubernetes")).toBe(true);
-    expect(has(wrapper, "starter-pack-chat-best-hosts")).toBe(false);
+    expect(wrapper.find('[data-test^="starter-pack-chat-best-"]').exists()).toBe(false);
+    // The title column keeps a floor, so the buttons wrap below it rather than squeeze it away.
+    const title = wrapper.get('[data-test="starter-pack-chat-note-kubernetes"]').element
+      .parentElement!;
+    expect(title.classList).toContain("min-w-32");
+    expect(title.parentElement!.classList).toContain("flex-wrap");
     expect(wrapper.get('[data-test="starter-pack-chat-set-up-kubernetes"]').text()).toBe(
       "Set up 4 items",
     );
+    expect(wrapper.get('[data-test="starter-pack-chat-note-kubernetes"]').text()).toBe(
+      "1 dashboard · 2 alerts · 1 saved view",
+    );
+    expect(
+      wrapper.get('[data-test="starter-pack-chat-row-kubernetes"]').attributes("data-state"),
+    ).toBe("idle");
   });
 
   it("sets up through the flow with alerts off and opens the review from the link", async () => {
@@ -178,7 +197,7 @@ describe("StarterPackChatRows", () => {
     expect(fake.browser.markInstalled).not.toHaveBeenCalled();
   });
 
-  it("keeps the set up pack ready, drops the other offers and the badge once the offer ends", async () => {
+  it("keeps the set up pack ready and drops the other offers once the offer ends", async () => {
     const wrapper = await render();
     fake.flows.kubernetes.record.value = { status: "complete", items: [] };
     fake.flows.kubernetes.installed.value = true;
@@ -194,15 +213,10 @@ describe("StarterPackChatRows", () => {
       "Open dashboard",
     );
     expect(has(wrapper, "starter-pack-chat-row-hosts")).toBe(false);
-    expect(has(wrapper, "starter-pack-chat-best-kubernetes")).toBe(false);
-  });
-
-  it("drops the badge from the other offers while one pack is being set up", async () => {
-    const wrapper = await render();
-    fake.flows.kubernetes.running.value = true;
-    await nextTick();
-    expect(has(wrapper, "starter-pack-chat-row-hosts")).toBe(true);
-    expect(has(wrapper, "starter-pack-chat-best-hosts")).toBe(false);
+    expect(
+      wrapper.get('[data-test="starter-pack-chat-row-kubernetes"]').attributes("data-state"),
+    ).toBe("ready");
+    expect(wrapper.text()).not.toContain("Ready when you are");
   });
 
   it("offers Retry on a partial set up", async () => {
@@ -227,6 +241,19 @@ describe("StarterPackChatRows", () => {
     expect(note()).toBe("Someone else started setting up this pack.");
   });
 
+  it("lets anyone who may set up finish a stopped setup someone else started", async () => {
+    fake.flows.hosts.record.value = { status: "installing", items: [] };
+    fake.flows.hosts.interrupted.value = true;
+    fake.flows.hosts.interruptedBy = ref("other@example.com");
+    const wrapper = await render(["hosts"]);
+    expect(wrapper.get('[data-test="starter-pack-chat-row-hosts"]').attributes("data-state")).toBe(
+      "failed",
+    );
+    expect(wrapper.get('[data-test="starter-pack-chat-retry-hosts"]').text()).toBe("Finish");
+    await wrapper.get('[data-test="starter-pack-chat-retry-hosts"]').trigger("click");
+    expect(fake.flows.hosts.retry).toHaveBeenCalled();
+  });
+
   it("says who is running a setup elsewhere, with no Set up or Finish", async () => {
     fake.flows.hosts.record.value = { status: "installing", items: [] };
     fake.flows.hosts.runningBy.value = "other@example.com";
@@ -238,13 +265,31 @@ describe("StarterPackChatRows", () => {
     );
   });
 
-  it("asks for an admin instead of offering the button", async () => {
+  it("asks an admin through the access request instead of offering the button", async () => {
     fake.flows.kubernetes.forbidden.value = true;
     const wrapper = await render(["kubernetes"]);
+    expect(
+      wrapper.get('[data-test="starter-pack-chat-row-kubernetes"]').attributes("data-state"),
+    ).toBe("forbidden");
     expect(wrapper.get('[data-test="starter-pack-chat-note-kubernetes"]').text()).toBe(
-      "Ask an admin to set this up",
+      "1 dashboard · 2 alerts · 1 saved view",
     );
     expect(has(wrapper, "starter-pack-chat-set-up-kubernetes")).toBe(false);
+    const ask = wrapper.get('[data-test="starter-pack-chat-ask-admin-kubernetes"]');
+    expect(ask.text()).toBe("Ask an admin");
+    expect(ask.element.closest("[data-kind]")!.getAttribute("data-kind")).toBe("access");
+    expect(wrapper.text()).not.toContain("Ready when you are");
+  });
+
+  it("shows the setup in this tab with no buttons", async () => {
+    fake.flows.kubernetes.running.value = true;
+    const wrapper = await render(["kubernetes"]);
+    expect(
+      wrapper.get('[data-test="starter-pack-chat-row-kubernetes"]').attributes("data-state"),
+    ).toBe("settingUp");
+    expect(wrapper.find('[data-test="starter-pack-chat-row-kubernetes"] button').exists()).toBe(
+      false,
+    );
   });
 
   it("draws nothing on a reloaded chat once the org is past the offer", async () => {

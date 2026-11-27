@@ -65,6 +65,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               }}</span>
               <OTooltip :content="t('assistant.client.storageBlocked')" />
             </span>
+            <template v-if="!replying">
+              <span
+                v-for="chip in sendChips"
+                :key="chip.id"
+                class="inline-flex shrink-0"
+                data-test="assistant-composer-send-chip"
+              >
+                <AssistantContextChip
+                  :chip="chip"
+                  :popup="false"
+                  @remove="emit('remove-send-chip', chip.id)"
+                />
+              </span>
+            </template>
             <slot v-if="!replying" name="chips" />
             <template #link-askAdmin>
               <AssistantAskAdminPopover kind="access" :org="org">
@@ -188,6 +202,8 @@ export interface AssistantComposerProps {
   opening?: boolean;
   /** The 70 % / 90 % included-credit notice; the shell decides when it shows. */
   lowCredits?: { threshold: CreditThreshold; usage: AssistantUsage } | null;
+  /** Chips the host adds to the next message only when it is sent; shown in the strip and removable. */
+  sendChips?: ContextChip[];
 }
 
 export interface AssistantComposerEmits {
@@ -195,6 +211,10 @@ export interface AssistantComposerEmits {
   (e: "show-running"): void;
   /** The low-credit notice's Plans or Dismiss link. */
   (e: "low-credits", action: "manage" | "dismiss"): void;
+  /** The user removed one of `sendChips`. */
+  (e: "remove-send-chip", id: string): void;
+  /** A refused send took its `sendChips` back out of the draft. */
+  (e: "send-chips-withdrawn", sid: Sid): void;
 }
 
 /** A starter prompt over a draft this long asks Replace · Append · Cancel (IW-06 AC 5). */
@@ -227,6 +247,7 @@ import AssistantMentionMenu, {
   type MentionOption,
 } from "@/components/ai-assistant/context/AssistantMentionMenu.vue";
 import AssistantAskAdminPopover from "@/components/ai-assistant/gate/AssistantAskAdminPopover.vue";
+import AssistantContextChip from "@/components/ai-assistant/context/AssistantContextChip.vue";
 import { isCreditsRefusal } from "@/components/ai-assistant/turn/creditsRefusal";
 import {
   MAX_IMAGES,
@@ -314,6 +335,7 @@ const props = withDefaults(defineProps<AssistantComposerProps>(), {
   accessLost: false,
   opening: false,
   lowCredits: null,
+  sendChips: () => [],
 });
 
 const emit = defineEmits<AssistantComposerEmits>();
@@ -380,7 +402,9 @@ const chipsShown = computed(
   () => images.value.length > 0 || stagedChips.value.some((chip) => chip.kind !== "time"),
 );
 // An empty box draws no strip: it holds only a notice, or the chips the user added.
-const stripShown = computed(() => !!notice.value || (!replying.value && chipsShown.value));
+const stripShown = computed(
+  () => !!notice.value || (!replying.value && (chipsShown.value || props.sendChips.length > 0)),
+);
 // A bare `@` is an unfinished mention, not a question (CT-05).
 const hasContent = computed(() => /[^@\s]/.test(text.value) || attached.value);
 const storageBlocked = computed(() => store.drafts.storageBlocked.value);
@@ -1159,7 +1183,12 @@ function trySend(): void {
   usedSendIds.add(sendId);
   blockedLine.value = null;
   pasteOffer.value = null;
-  void store.send(id).then((result) => onRefused(id, sendId, result));
+  const added = props.sendChips.filter((chip) => store.addChip(id, chip).ok);
+  const sentBefore = store.state.sessions[id]?.messages.length ?? 0;
+  void store.send(id).then((result) => {
+    withdrawSendChips(id, added, sentBefore);
+    onRefused(id, sendId, result);
+  });
 }
 
 // Enter while this tab's answer streams queues one message; a second one is refused with both texts kept as they are.
@@ -1180,6 +1209,16 @@ function queueOrHold(): void {
 }
 
 // A cross-tab lock that landed between render and click refuses the send; the draft stays and the same click works once it lifts.
+// A send that never became a message takes its host chips back, so the saved draft never keeps them.
+function withdrawSendChips(id: Sid, added: ContextChip[], sentBefore: number): void {
+  const session = store.state.sessions[id];
+  if (!added.length || !session || session.messages.length > sentBefore) return;
+  const held = added.filter((chip) => session.composer.chips.some((c) => c.id === chip.id));
+  if (!held.length) return;
+  for (const chip of held) store.removeChip(id, chip.id);
+  emit("send-chips-withdrawn", id);
+}
+
 function onRefused(id: Sid, sendId: string, result: TurnTerminal): void {
   const lock = result.state === "refused" ? store.turnLockOf(id) : null;
   if (!lock) return;

@@ -765,11 +765,6 @@
         "description": "5733f91136e6e006",
         "prompt": "8328bbd65dcc42ee",
         "title": "419133b48084fd07"
-      },
-      "starter": {
-        "description": "3ac369ff39ba1d32",
-        "prompt": "a0bb25df88ec8906",
-        "title": "817f8dd82d9eb12e"
       }
     },
     "creditsExhausted": "684d0fd783d37f61",
@@ -795,16 +790,6 @@
       "two": "4af48998e3fce54d"
     },
     "responseStoppedByUser": "c71360c983ede9fe",
-    "starter": {
-      "checking": "506368550830538d",
-      "readyWhenYouAre": "6892db91e23a2305"
-    },
-    "starterSuggestions": {
-      "errorsLastHour": "3cc3a0c4b4f4cb8f",
-      "setUpPack": "dd4d6cfc867f7c19",
-      "whatInPack": "f99a3a63c7220783",
-      "whichPacks": "8dab99d00dc3c374"
-    },
     "suggestions": {
       "lastAlertFired": "2cf05400e4ffb439",
       "mapStreamSchema": "4c384a8b344a7d5c",

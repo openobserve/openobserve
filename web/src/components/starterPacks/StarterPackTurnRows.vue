@@ -16,17 +16,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useStore } from "vuex";
 import { STARTER_PACKS_ENABLED } from "@/constants/starterPacks";
 import { digestPackIds } from "@/composables/starterPacks/packDigest";
+import type { ChatMessage } from "@/ts/interfaces/chat";
 import StarterPackCatalogGate from "./StarterPackCatalogGate.vue";
 import StarterPackChatRows from "./StarterPackChatRows.vue";
 
-// The user message the reply answers; only a pack digest block in it brings the rows.
-const props = defineProps<{ request: string }>();
+// The user message the answer replies to; only a pack digest sent with it brings the rows.
+const props = defineProps<{ request: ChatMessage | null; org: string }>();
 
-const store = useStore();
-const org = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
 const packIds = computed(() => (STARTER_PACKS_ENABLED ? digestPackIds(props.request) : []));
 </script>
 

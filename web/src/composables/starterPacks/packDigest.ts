@@ -13,7 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { parseAttachmentBlocks } from "@/composables/assistant/record";
+import { parseAttachmentBlocks } from "@/composables/assistant/pure";
+import type { ChatMessage } from "@/ts/interfaces/chat";
 
 import { PACK_DIGEST_NAME } from "./packDigestName";
 import type { HomePackRowItem } from "./useHomePacks";
@@ -115,12 +116,39 @@ export function buildPackDigest(items: DigestItem[]): string {
   return [head, ...body, "", RULE].join("\n");
 }
 
-/** Pack ids of a digest block in a sent message, in digest order; empty when it has none. */
-export function digestPackIds(content: string): string[] {
-  if (!content || !content.includes(PACK_DIGEST_NAME)) return [];
-  const block = parseAttachmentBlocks(content).blocks.find(
-    (entry) => entry.name.trim() === PACK_DIGEST_NAME,
-  );
-  if (!block) return [];
-  return [...block.body.matchAll(PACK_LINE)].map((match) => match[1]);
+export type DigestSource = Pick<ChatMessage, "content" | "chips" | "contentBlocks">;
+
+const packIdsIn = (text: string): string[] =>
+  text.startsWith(`${PACK_DIGEST_NAME}:`)
+    ? [...text.matchAll(PACK_LINE)].map((match) => match[1])
+    : [];
+
+// A sent chip's block body is the JSON string of its text; a legacy block holds the text itself.
+const blockText = (body: string): string => {
+  try {
+    const value: unknown = JSON.parse(body);
+    return typeof value === "string" ? value : body;
+  } catch {
+    return body;
+  }
+};
+
+/** Pack ids of the digest a sent user message carried, in digest order; empty when it has none. */
+export function digestPackIds(message: DigestSource | null | undefined): string[] {
+  if (!message) return [];
+  const content = String(message.content ?? "");
+  const texts = [
+    ...(message.chips ?? []).map(({ data }) => (typeof data === "string" ? data : "")),
+    ...(message.contentBlocks ?? []).map((block) =>
+      block.type === "attachment" ? blockText(block.attachment?.body ?? "") : "",
+    ),
+    ...(content.includes(PACK_DIGEST_NAME)
+      ? parseAttachmentBlocks(content).blocks.map(({ body }) => blockText(body))
+      : []),
+  ];
+  for (const text of texts) {
+    const ids = packIdsIn(text);
+    if (ids.length) return ids;
+  }
+  return [];
 }

@@ -159,6 +159,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @action="(action) => onOutcome(action, outcome.record)"
                 @manual="(query: QueryRef) => onManualRoute(query, turn.turnId)"
               />
+              <StarterPackTurnRows
+                v-if="packRowsShown(turn)"
+                :request="turn.user"
+                :org="session?.org ?? ''"
+              />
             </template>
             <template v-if="turn.answer && answerActionsFor(turn)" #actions>
               <AssistantMessageActions
@@ -402,6 +407,8 @@ import OText from "@/lib/core/Typography/OText.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { trackAssistant } from "@/services/assistantAnalytics";
 import { useI18nTyped } from "@/types/i18n";
+import { STARTER_PACKS_ENABLED } from "@/constants/starterPacks";
+import { digestPackIds } from "@/composables/starterPacks/packDigest";
 
 import AssistantHandoffMarker from "./AssistantHandoffMarker.vue";
 import AssistantHandoffSuggestion from "./AssistantHandoffSuggestion.vue";
@@ -415,6 +422,25 @@ import { useTranscriptScroll } from "./useTranscriptScroll";
 const AssistantMessageActions = defineAsyncComponent(() => import("./AssistantMessageActions.vue"));
 
 const AssistantFollowUps = defineAsyncComponent(() => import("./AssistantFollowUps.vue"));
+
+// Pack rows act in the org, so they load only under an answer to a message that sent a pack digest.
+const StarterPackTurnRows = defineAsyncComponent(
+  () => import("@/components/starterPacks/StarterPackTurnRows.vue"),
+);
+const UNFINISHED: ReadonlySet<string> = new Set([
+  "failed",
+  "stopped",
+  "expired",
+  "cancelledElsewhere",
+]);
+const ENDED_BADLY: ReadonlySet<string> = new Set(["failed", "stopped", "refused"]);
+// Only a finished answer offers packs; a failed, stopped or refused turn says nothing about them.
+const packRowsShown = (turn: TranscriptTurn): boolean => {
+  if (!STARTER_PACKS_ENABLED || props.readonly || turn.live || !turn.answer) return false;
+  if (turn.outcomes.some(({ record }) => UNFINISHED.has(record.kind))) return false;
+  if (turn.isLast && ENDED_BADLY.has(session.value?.turn.state ?? "")) return false;
+  return digestPackIds(turn.user).length > 0;
+};
 
 const props = withDefaults(defineProps<AssistantTranscriptProps>(), {
   sid: undefined,

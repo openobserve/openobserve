@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { mount } from "@vue/test-utils";
+import { flushPromises, mount } from "@vue/test-utils";
 import { describe, expect, it, vi } from "vitest";
 import { computed } from "vue";
 
@@ -22,12 +22,34 @@ import i18n from "@/locales";
 import { fakeRouter, fakeVuex } from "../../components/ai-assistant/__tests__/fakeAssistant";
 
 const homeState = vi.hoisted(() => ({ value: "ai" as string }));
+const fill = vi.hoisted(() => vi.fn());
 
 vi.mock("./useAgentHomeState", () => ({
   useAgentHomeState: () => ({
     state: computed(() => homeState.value),
     offReason: computed(() => null),
   }),
+}));
+// Packs stay off unless a spec turns them on; the offer is a double whose button asks with a chip.
+const packs = vi.hoisted(() => ({ enabled: false }));
+vi.mock("@/constants/starterPacks", () => ({
+  get STARTER_PACKS_ENABLED() {
+    return packs.enabled;
+  },
+}));
+vi.mock("@/components/starterPacks/StarterPackCatalogGate.vue", () => ({
+  __esModule: true,
+  default: { name: "StarterPackCatalogGate", props: ["org"], template: "<div><slot /></div>" },
+}));
+vi.mock("@/components/starterPacks/StarterPackOffer.vue", () => ({
+  __esModule: true,
+  default: {
+    name: "StarterPackOffer",
+    props: ["org", "variant"],
+    emits: ["ask"],
+    template:
+      "<button data-test=\"pack-offer-stub\" :data-variant=\"variant\" @click=\"$emit('ask', 'Which packs?', { id: 'starter-pack-digest' })\" />",
+  },
 }));
 vi.mock("./AgentHomeGreeting.vue", () => ({
   default: { name: "AgentHomeGreeting", template: '<div data-test="greeting-stub" />' },
@@ -41,6 +63,7 @@ vi.mock("@/components/ai-assistant/history/AssistantChatSearch.vue", () => ({
 vi.mock("@/components/ai-assistant/welcome/AssistantLauncher.vue", () => ({
   default: {
     name: "AssistantLauncher",
+    methods: { fill: (...args: unknown[]) => fill(...args) },
     template: '<div data-test="launcher-stub" />',
   },
 }));
@@ -77,6 +100,20 @@ describe("AgentHomeFirstRun (HomeFirstRun board, B-shell-5)", () => {
       "agent-home-brief-me",
     ]) {
       expect(wrapper.find(`[data-test="${gone}"]`).exists()).toBe(false);
+    }
+  });
+
+  it("hands the pack question and its digest chip to the Ask box", async () => {
+    packs.enabled = true;
+    try {
+      const wrapper = mountFirstRun();
+      await flushPromises();
+      const offer = wrapper.get('[data-test="pack-offer-stub"]');
+      expect(offer.attributes("data-variant")).toBe("roomy");
+      await offer.trigger("click");
+      expect(fill).toHaveBeenCalledWith("Which packs?", undefined, [{ id: "starter-pack-digest" }]);
+    } finally {
+      packs.enabled = false;
     }
   });
 });

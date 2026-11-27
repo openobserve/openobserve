@@ -49,6 +49,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ greeting }}
       </h2>
     </div>
+    <div
+      v-if="$slots['before-starters']"
+      :class="['flex min-w-0 flex-col empty:hidden', opening ? fadeUpClasses(1) : '']"
+      data-test="assistant-welcome-before-starters"
+    >
+      <slot name="before-starters" />
+    </div>
     <!-- The full page lists recent chats under its composer instead, so only a panel offers starters -->
     <template v-if="variant === 'compact'">
       <div v-if="loading" class="flex flex-col gap-2" data-test="assistant-welcome-loading">
@@ -58,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <li
           v-for="(starter, index) in shownStarters"
           :key="starter.id"
-          :class="['flex min-w-0', opening ? fadeUpClasses(index + 1) : '']"
+          :class="['flex min-w-0', opening ? fadeUpClasses(index + startersFrom) : '']"
         >
           <AssistantStarterRow
             :label="starter.label"
@@ -126,7 +133,7 @@ const props = withDefaults(defineProps<AssistantWelcomeProps>(), {
 
 const emit = defineEmits<AssistantWelcomeEmits>();
 
-defineSlots<{ default?: () => unknown }>();
+const slots = defineSlots<{ default?: () => unknown; "before-starters"?: () => unknown }>();
 
 const vuex = useStore();
 const { greeting } = useGreeting(() => vuex?.state.userInfo?.email);
@@ -134,6 +141,8 @@ const headingId = `assistant-welcome-${useId()}`;
 
 const fresh = computed(() => props.scope.streamCount === 0);
 const shownStarters = computed(() => props.starters.slice(0, WELCOME_STARTERS));
+// The offer rises right after the greeting, so the starters follow it.
+const startersFrom = computed(() => (slots["before-starters"] ? 2 : 1));
 
 function select(starter: Starter, index: number): void {
   trackAssistant("ai_welcome_starter", { starter_kind: starter.kind, index, via: "click" });

@@ -101,3 +101,16 @@ export const packBusyText = (
   if (!who) return t("starterPacks.busySomeone");
   return mine ? t("starterPacks.busyYou") : t("starterPacks.busyBy", { who: raw(who) });
 };
+
+/** A pack's item counts in one sentence-case line, "6 dashboards · 4 alerts"; zero counts are left out. */
+export const packCountsLine = (
+  t: Translate,
+  counts: { dashboards: number; alerts: number; views: number },
+): I18nText => {
+  const { dashboards, alerts, views } = counts;
+  const parts: I18nText[] = [];
+  if (dashboards) parts.push(t("starterPacks.card.dashboards", { count: dashboards }, dashboards));
+  if (alerts) parts.push(t("starterPacks.countAlerts", { count: alerts }, alerts));
+  if (views) parts.push(t("starterPacks.guide.rowSavedViews", { count: views }, views));
+  return raw(parts.join(" · "));
+};

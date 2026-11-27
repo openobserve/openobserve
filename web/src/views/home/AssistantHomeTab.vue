@@ -41,6 +41,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :class="HOME_COLUMN_CLASS"
         />
         <AssistantLauncher v-else ref="launcher" :class="HOME_COLUMN_CLASS" />
+        <StarterPackCatalogGate v-if="packsShown" :org="org">
+          <StarterPackOffer
+            :key="org"
+            :org="org"
+            variant="roomy"
+            :class="HOME_COLUMN_CLASS"
+            @ask="(prompt, chip) => launcher?.fill(prompt, undefined, [chip])"
+          />
+        </StarterPackCatalogGate>
         <AssistantNewChatBelow
           v-if="state === 'ai'"
           :class="[HOME_COLUMN_CLASS, 'pt-2']"
@@ -70,6 +79,7 @@ import { useStore } from "vuex";
 import AssistantChatSearch from "@/components/ai-assistant/history/AssistantChatSearch.vue";
 import AssistantLauncher from "@/components/ai-assistant/welcome/AssistantLauncher.vue";
 import AssistantNewChatBelow from "@/components/ai-assistant/welcome/AssistantNewChatBelow.vue";
+import { STARTER_PACKS_ENABLED } from "@/constants/starterPacks";
 import type { Sid } from "@/composables/assistant";
 import { homeQueryFrom } from "@/composables/assistant/pure";
 import useBreakpoint from "@/composables/useBreakpoint";
@@ -96,6 +106,15 @@ const { lgUp } = useBreakpoint();
 const { state, offReason } = useAgentHomeState();
 
 const org = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
+
+// Pack code loads only for an org that can be offered packs, next to a box that can take the question.
+const StarterPackCatalogGate = defineAsyncComponent(
+  () => import("@/components/starterPacks/StarterPackCatalogGate.vue"),
+);
+const StarterPackOffer = defineAsyncComponent(
+  () => import("@/components/starterPacks/StarterPackOffer.vue"),
+);
+const packsShown = computed(() => STARTER_PACKS_ENABLED && !!org.value && !offReason.value);
 
 // Past chats stay readable with the credits used up; no agent, Open Source or a loading gate draws no rail.
 const railShown = computed(() => lgUp.value && (state.value === "ai" || state.value === "budget"));

@@ -10943,11 +10943,6 @@
       "tryOneOfThese": "Lub wypróbuj jedną z tych opcji"
     },
     "capabilities": {
-      "starter": {
-        "title": "Skonfiguruj pakiety startowe",
-        "description": "Pulpity, alerty i zapisane widoki utworzone dla danych {packs}.",
-        "prompt": "Które pakiety startowe pasują do moich danych i co utworzy każdy z nich?"
-      },
       "query": {
         "title": "Napisz zapytanie",
         "description": "SQL dla logów, trace, RUM lub PromQL dla metryk.",
@@ -10975,16 +10970,6 @@
       "mapStreamSchema": "Zmapuj mój schemat strumienia \"default\"",
       "promqlCpu": "Napisz PromQL dla podów używających > 80% CPU",
       "lastAlertFired": "Dlaczego mój ostatni alert został wywołany?"
-    },
-    "starterSuggestions": {
-      "whichPacks": "Które pakiety startowe pasują do moich danych?",
-      "setUpPack": "Skonfiguruj pakiet {pack}",
-      "whatInPack": "Co zawiera pakiet {pack}?",
-      "errorsLastHour": "Pokaż błędy z ostatniej godziny"
-    },
-    "starter": {
-      "checking": "Sprawdzanie danych pod kątem pakietów startowych…",
-      "readyWhenYouAre": "Gotowe, gdy tylko chcesz:"
     },
     "placeholderRotation": {
       "one": "Pokaż mi błędy z ostatniej godziny…",

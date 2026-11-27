@@ -10943,11 +10943,6 @@
       "tryOneOfThese": "Hoặc thử một trong những"
     },
     "capabilities": {
-      "starter": {
-        "title": "Thiết lập Gói khởi đầu",
-        "description": "Bảng điều khiển, cảnh báo và chế độ xem đã lưu được tạo cho dữ liệu {packs} của bạn.",
-        "prompt": "Gói khởi đầu nào phù hợp với dữ liệu của tôi, và mỗi gói sẽ tạo ra những gì?"
-      },
       "query": {
         "title": "Viết truy vấn",
         "description": "SQL cho nhật ký, trace, RUM, hoặc PromQL cho chỉ số.",
@@ -10975,16 +10970,6 @@
       "mapStreamSchema": "Ánh xạ lược đồ stream \"default\" của tôi",
       "promqlCpu": "Viết PromQL cho các pods sử dụng > 80% CPU",
       "lastAlertFired": "Tại sao cảnh báo cuối cùng của tôi lại kích hoạt?"
-    },
-    "starterSuggestions": {
-      "whichPacks": "Gói khởi đầu nào phù hợp với dữ liệu của tôi?",
-      "setUpPack": "Thiết lập gói {pack}",
-      "whatInPack": "Gói {pack} gồm có những gì?",
-      "errorsLastHour": "Cho tôi xem lỗi trong một giờ qua"
-    },
-    "starter": {
-      "checking": "Đang kiểm tra dữ liệu của bạn cho các gói khởi đầu…",
-      "readyWhenYouAre": "Sẵn sàng khi bạn muốn:"
     },
     "placeholderRotation": {
       "one": "Hiển thị lỗi từ giờ qua…",

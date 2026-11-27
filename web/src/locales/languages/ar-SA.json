@@ -10943,11 +10943,6 @@
       "tryOneOfThese": "أو جرب واحدة من هذه"
     },
     "capabilities": {
-      "starter": {
-        "title": "إعداد حزم البدء",
-        "description": "لوحات معلومات وتنبيهات وعروض محفوظة مصممة لبيانات {packs} الخاصة بك.",
-        "prompt": "ما حزم البدء التي تناسب بياناتي، وماذا ستنشئ كل واحدة منها؟"
-      },
       "query": {
         "title": "كتابة استعلام",
         "description": "SQL للسجلات أو التتبع أو RUM أو PromQL للمقاييس.",
@@ -10975,16 +10970,6 @@
       "mapStreamSchema": "ارسم مخطط التدفق \"default\" الخاص بي",
       "promqlCpu": "كتابة PromQL للكبسولات باستخدام معالج > 80٪",
       "lastAlertFired": "لماذا تم إطلاق آخر تنبيه لي؟"
-    },
-    "starterSuggestions": {
-      "whichPacks": "أي حزم البدء تناسب بياناتي؟",
-      "setUpPack": "أعدّ حزمة {pack}",
-      "whatInPack": "ما الذي تتضمنه حزمة {pack}؟",
-      "errorsLastHour": "اعرض أخطاء الساعة الأخيرة"
-    },
-    "starter": {
-      "checking": "جارٍ فحص بياناتك بحثًا عن حزم البدء…",
-      "readyWhenYouAre": "جاهز عندما تكون مستعدًا:"
     },
     "placeholderRotation": {
       "one": "أرني أخطاء من الساعة الماضية...",

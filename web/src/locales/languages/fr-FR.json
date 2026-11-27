@@ -10943,11 +10943,6 @@
       "tryOneOfThese": "Ou essayez l'un d'entre eux"
     },
     "capabilities": {
-      "starter": {
-        "title": "Configurer les packs de démarrage",
-        "description": "Tableaux de bord, alertes et vues enregistrées conçus pour vos données {packs}.",
-        "prompt": "Quels packs de démarrage correspondent à mes données, et que créera chacun d'eux ?"
-      },
       "query": {
         "title": "Écrire une requête",
         "description": "SQL pour les logs, les traces, le RUM, ou PromQL pour les métriques.",
@@ -10975,16 +10970,6 @@
       "mapStreamSchema": "Mapper mon schéma de flux « par défaut »",
       "promqlCpu": "Écrivez PromQL pour les pods utilisant > 80 % du processeur",
       "lastAlertFired": "Pourquoi ma dernière alerte a-t-elle été déclenchée ?"
-    },
-    "starterSuggestions": {
-      "whichPacks": "Quels packs de démarrage correspondent à mes données ?",
-      "setUpPack": "Configurer le pack {pack}",
-      "whatInPack": "Que contient le pack {pack} ?",
-      "errorsLastHour": "Affichez-moi les erreurs de la dernière heure"
-    },
-    "starter": {
-      "checking": "Vérification de vos données pour les packs de démarrage…",
-      "readyWhenYouAre": "Prêt quand vous l'êtes :"
     },
     "placeholderRotation": {
       "one": "Montrez-moi les erreurs de la dernière heure...",

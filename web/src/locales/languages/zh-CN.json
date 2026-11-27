@@ -10943,11 +10943,6 @@
       "tryOneOfThese": "或者试试其中一个"
     },
     "capabilities": {
-      "starter": {
-        "title": "设置入门包",
-        "description": "为您的 {packs} 数据构建的仪表盘、告警和已保存视图。",
-        "prompt": "哪些入门包适合我的数据？每个入门包会创建什么？"
-      },
       "query": {
         "title": "编写查询",
         "description": "用于日志、追踪和 RUM 的 SQL，或用于指标的 PromQL。",
@@ -10975,16 +10970,6 @@
       "mapStreamSchema": "映射我的 “默认” 数据流架构",
       "promqlCpu": "使用 > 80% 的 CPU 为 pod 编写 PromQL",
       "lastAlertFired": "为什么我上一个告警会触发？"
-    },
-    "starterSuggestions": {
-      "whichPacks": "哪些入门包适合我的数据？",
-      "setUpPack": "设置 {pack} 包",
-      "whatInPack": "{pack} 包里有什么？",
-      "errorsLastHour": "显示过去一小时的错误"
-    },
-    "starter": {
-      "checking": "正在检查您的数据以匹配入门包…",
-      "readyWhenYouAre": "准备就绪，随时开始："
     },
     "placeholderRotation": {
       "one": "让我看看过去一小时的错误...",

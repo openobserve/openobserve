@@ -13,68 +13,93 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
+import { reactive } from "vue";
 
-export type StarterWelcomeMode = "none" | "loading" | "starter";
+import { byteSize, type ContextChip, type Sid, type Starter } from "@/composables/assistant";
+import i18n from "@/locales";
+import { gt, raw, type I18nText, type TranslateFn } from "@/types/i18n";
+import { uiIntlLocale } from "@/utils/formatters";
 
-/** A chip the welcome puts in the composer. */
-export interface WelcomeContext {
-  name: string;
-  text: string;
-}
-
-export interface WelcomeSuggestion {
-  id: string;
-  icon: string;
-  text: I18nText;
-}
+export type StarterWelcomeMode = "none" | "loading" | "starter" | "askAdmin";
 
 /** Packs show only for an onboarding org with a match; anything unanswered keeps today's welcome. */
 export const starterWelcomeMode = (state: {
   visible: boolean;
   showSection: boolean;
   loading: boolean;
+  /** Packs fit the data, but this user may not set them up. */
+  askAdmin?: boolean;
 }): StarterWelcomeMode => {
   if (!state.visible) return "none";
   if (state.showSection) return "starter";
+  if (state.askAdmin) return "askAdmin";
   return state.loading ? "loading" : "none";
 };
 
-export const joinTitles = (t: TranslateFn, titles: string[]): I18nText => {
-  if (titles.length < 2) return raw(titles[0] ?? "");
-  return raw(`${titles.slice(0, -1).join(", ")} ${t("common.and")} ${titles[titles.length - 1]}`);
-};
+/** Pack titles as one list in the UI locale: "Kubernetes, NGINX and PostgreSQL". */
+export const joinTitles = (titles: string[]): I18nText =>
+  raw(new Intl.ListFormat(uiIntlLocale(), { type: "conjunction" }).format(titles));
 
-/** With one pack, both pack chips name it, so no chip ever reads a missing name. */
-export const starterSuggestions = (t: TranslateFn, titles: string[]): WelcomeSuggestion[] => {
-  const top = raw(titles[0] ?? "");
-  const second = raw(titles[1] ?? titles[0] ?? "");
-  return [
-    { id: "whichPacks", icon: "package-2", text: t("aiAssistant.starterSuggestions.whichPacks") },
-    {
-      id: "setUpPack",
-      icon: "rocket-launch",
-      text: t("aiAssistant.starterSuggestions.setUpPack", { pack: top }),
-    },
-    {
-      id: "whatInPack",
-      icon: "inventory-2",
-      text: t("aiAssistant.starterSuggestions.whatInPack", { pack: second }),
-    },
-    {
-      id: "mapStreamSchema",
-      icon: "data-object",
-      text: t("aiAssistant.suggestions.mapStreamSchema"),
-    },
-    {
-      id: "errorsLastHour",
-      icon: "error-outline",
-      text: t("aiAssistant.starterSuggestions.errorsLastHour"),
-    },
-    {
-      id: "otherToolToO2",
-      icon: "swap-horiz",
-      text: t("assistant.welcome.starter.otherToolToO2"),
-    },
-  ];
-};
+/** One id, so the welcome finds its own digest chip in the composer and the store never holds two. */
+export const PACK_DIGEST_CHIP_ID = "starter-pack-digest";
+
+/** The matched packs as a composer chip; it is sent as a text block the assistant reads. */
+export const packDigestChip = (text: string, t: TranslateFn = gt): ContextChip => ({
+  id: PACK_DIGEST_CHIP_ID,
+  kind: "pasted_text",
+  label: t("starterPacks.offer.title"),
+  // Narrow chip rows show this; it still names the chip in full.
+  short: t("starterPacks.offer.chipShort"),
+  data: text,
+  sizeBytes: byteSize(text),
+  provenance: "attach",
+  sent: "serialized",
+});
+
+const PACK_PROMPT = "starterPacks.offer.question";
+
+/** The pack question as the model reads it: English whatever the UI locale, like every welcome starter. */
+export const packQuestion = (): string =>
+  (i18n.global as unknown as { t(key: string, named: object, opts: object): string }).t(
+    PACK_PROMPT,
+    {},
+    { locale: "en-us" },
+  );
+
+/** The welcome's first starter while packs are offered: the question, with the digest chip staged beside it. */
+export const packStarter = (digest: string, t: TranslateFn = gt): Starter => ({
+  id: "pack",
+  kind: "pack",
+  label: t(PACK_PROMPT),
+  prompt: packQuestion(),
+  chips: [packDigestChip(digest, t)],
+  dataTest: "assistant-starter-0",
+});
+
+/** The key a removal is kept under while the panel's empty chat has no session yet. */
+export const PENDING_DIGEST = "pending";
+
+// Chats whose user removed the digest; in memory only, so a reload offers it again.
+const dismissed = reactive(new Set<string>());
+
+export const digestDismissed = (key: string): boolean => dismissed.has(key);
+
+export function dismissDigest(key: string): void {
+  dismissed.add(key);
+}
+
+/** The first keystroke starts a session; a removal made before it moves to that chat. */
+export function adoptPendingDismissal(sid: Sid): void {
+  if (!dismissed.delete(PENDING_DIGEST)) return;
+  dismissed.add(sid);
+}
+
+/** A removal that never got a chat is dropped, so the next empty chat offers the digest again. */
+export function clearPendingDismissal(): void {
+  dismissed.delete(PENDING_DIGEST);
+}
+
+/** Lets a spec start from a fresh page session; never called by app code. */
+export function resetDigestDismissalsForTests(): void {
+  dismissed.clear();
+}
