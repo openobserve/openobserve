@@ -104,6 +104,13 @@ impl FromStr for MCPMethod {
     }
 }
 
+/// Which tools a caller may run; an AutoResolve run's token may only read.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ToolAccess {
+    Any,
+    ReadOnly,
+}
+
 // MCP Error Codes with discriminant values
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[repr(i32)]

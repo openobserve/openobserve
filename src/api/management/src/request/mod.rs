@@ -30,6 +30,8 @@ pub mod anomaly_detection;
 pub mod authz;
 #[cfg(feature = "enterprise")]
 pub mod autoobserve;
+#[cfg(feature = "enterprise")]
+pub mod autoresolve;
 #[cfg(feature = "cloud")]
 pub mod cloud;
 pub mod dashboards;

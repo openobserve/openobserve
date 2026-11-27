@@ -28,6 +28,7 @@ import {
   formatNumericValue,
   resolveIsNumber,
   resolveMetricValueStyle,
+  tableMissingCellText,
 } from "./tableConfigUtils";
 
 describe("tableConfigUtils", () => {
@@ -426,6 +427,21 @@ describe("tableConfigUtils", () => {
       const out = formatNumericValue(5, null, "", "", 2);
       expect(typeof out).toBe("string");
       expect(out).toContain("5");
+    });
+  });
+
+  describe("tableMissingCellText", () => {
+    it("labels NULL and empty string differently by default", () => {
+      expect(tableMissingCellText(null, null, "")).toBe("(null)");
+      expect(tableMissingCellText(undefined, null, "")).toBe("(null)");
+      expect(tableMissingCellText("", null, "")).toBe("(empty)");
+    });
+
+    it("prefers a special mapping, then the no-value replacement", () => {
+      const cache = buildValueMappingCache([{ type: "special", match: "empty", text: "blank" }]);
+      expect(tableMissingCellText("", cache, "N/A")).toBe("blank");
+      expect(tableMissingCellText(null, cache, "N/A")).toBe("N/A");
+      expect(tableMissingCellText(null, cache, "")).toBe("(null)");
     });
   });
 

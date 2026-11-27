@@ -610,12 +610,31 @@ import {
 import QueryVariableEditor from "./QueryVariableEditor.vue";
 import FilterBuilder from "@/components/filterBar/FilterBuilder.vue";
 import type { FilterBuilderExpose } from "@/components/filterBar/FilterBuilder.types";
-import type { VariableFilterValue } from "@/components/filterBar/codecs";
+import {
+  dashboardVariableFilterCodec,
+  makeGroup,
+  type DashboardFilterGroup,
+  type VariableFilter,
+  type VariableFilterValue,
+} from "@/components/filterBar/codecs";
 import { requestFieldValues } from "@/composables/fieldValueStore";
 import { toFilterFieldType, type FilterField } from "@/utils/query/filterBar";
 import useNotifications from "@/composables/useNotifications";
 import { useDashboardSaveConflict } from "@/composables/dashboard/useDashboardSaveConflict";
 import analytics from "@/services/product_analytics";
+
+// Rows every OR branch needs, so a reader that only knows `filter` gets a superset, never a narrower list.
+const andOnlyFilterRows = (group: DashboardFilterGroup): VariableFilter[] => {
+  const codec = dashboardVariableFilterCodec();
+  const context = { fields: [] };
+  const tree = codec.parse({ filter_group: group }, context);
+  const hasTopLevelOr = tree.items.some((item, index) => index > 0 && item.connector === "OR");
+  if (tree.negate || hasTopLevelOr) return [];
+  const rows = tree.items.flatMap((item) =>
+    item.kind === "condition" ? [{ ...item, connector: "AND" as const, meta: undefined }] : [],
+  );
+  return codec.serialize(makeGroup(rows), context).filter ?? [];
+};
 
 export default defineComponent({
   name: "AddSettingVariable",
@@ -1354,8 +1373,13 @@ export default defineComponent({
         ...base
       } = queryData;
       const language = query_type === "promql" && base.stream_type === "metrics" ? "promql" : "sql";
-      // The builder writes filter_group only for OR or nesting, so the two never both apply.
-      const rest = { ...base, ...(filter_group ? { filter_group } : { filter: filter ?? [] }) };
+      // Readers that know filter_group ignore filter; older ones fall back to its AND-only rows.
+      const rest = {
+        ...base,
+        ...(filter_group
+          ? { filter_group, filter: andOnlyFilterRows(filter_group as DashboardFilterGroup) }
+          : { filter: filter ?? [] }),
+      };
       const typed = language === "promql" ? { ...rest, query_type: language } : rest;
       if (!custom_query) return typed;
       const payload: typeof typed & { query: string; value_field?: string; label_field?: string } =

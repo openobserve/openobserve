@@ -18,6 +18,7 @@
 use super::ai_chat::AI_CHAT_EVENTS_STREAM;
 use crate::meta::{
     alerts::alert_calibration::DIGEST_STREAM,
+    autoresolve::AUTORESOLVE_RUNS_STREAM,
     sql::{TableReferenceExt, resolve_stream_names_with_type},
 };
 
@@ -32,6 +33,8 @@ pub enum ProtectedReader {
     ChatHistory,
     /// The alert calibration API, which filters records by alert visibility (D:L263).
     AlertCalibration,
+    /// AutoResolve run records; no reader exists yet, so every search is refused.
+    AutoResolve,
 }
 
 impl ProtectedReader {
@@ -40,6 +43,7 @@ impl ProtectedReader {
         match stream_name {
             AI_CHAT_EVENTS_STREAM => Some(Self::ChatHistory),
             DIGEST_STREAM => Some(Self::AlertCalibration),
+            AUTORESOLVE_RUNS_STREAM => Some(Self::AutoResolve),
             _ => None,
         }
     }
@@ -94,6 +98,10 @@ mod tests {
         assert_eq!(
             ProtectedReader::of("_o2_alert_calibration_digests"),
             Some(ProtectedReader::AlertCalibration)
+        );
+        assert_eq!(
+            ProtectedReader::of("_o2_autoresolve_runs"),
+            Some(ProtectedReader::AutoResolve)
         );
         for name in [
             "_o2_service_graph",

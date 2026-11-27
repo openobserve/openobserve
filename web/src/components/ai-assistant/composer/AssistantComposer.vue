@@ -154,13 +154,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       ref="file"
       class="hidden"
       accept="image/png,image/jpeg"
-      :type-error-toast="false"
       multiple
       :model-value="null"
-      :max-file-size="MAX_IMAGE_SIZE_BYTES"
+      :max-size="MAX_IMAGE_SIZE_BYTES"
       @change="onPicked"
-      @size-error="(files) => files.forEach(refuseSize)"
-      @type-error="() => refuse('type', t('assistant.context.imageType'))"
+      @rejected="onRejected"
     />
   </div>
 </template>
@@ -261,7 +259,7 @@ import useBreakpoint from "@/composables/useBreakpoint";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OFile from "@/lib/forms/File/OFile.vue";
-import type { FileValue } from "@/lib/forms/File/OFile.types";
+import type { FileRejection, FileValue } from "@/lib/forms/File/OFile.types";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { trackAssistant } from "@/services/assistantAnalytics";
 import { MAX_IMAGE_SIZE_BYTES } from "@/ts/interfaces/chat";
@@ -1325,6 +1323,13 @@ function refuse(cap: ImageCap, line: I18nText): void {
 
 function refuseSize(picked: File): void {
   refuse("size", imageTooBigLine(t, picked));
+}
+
+// The hidden field refuses by type or size before onPicked runs; say why with the composer's own lines.
+function onRejected(rejections: FileRejection[]): void {
+  const tooBig = rejections.filter(({ file }) => file.size > MAX_IMAGE_SIZE_BYTES);
+  tooBig.forEach(({ file }) => refuseSize(file));
+  if (tooBig.length < rejections.length) refuse("type", t("assistant.context.imageType"));
 }
 
 function openPicker(): void {

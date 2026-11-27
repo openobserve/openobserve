@@ -305,6 +305,16 @@ describe("BaseImport.vue", () => {
       (wrapper.vm as any).updateFiles(fakeFiles);
       expect((wrapper.vm as any).jsonFiles).toEqual(fakeFiles);
     });
+
+    it("clears the editor once every file is removed, so nothing stale gets imported", async () => {
+      wrapper = createWrapper();
+      const vm = wrapper.vm as any;
+      vm.updateFiles([new File(['[{"name":"from_a"}]'], "a.json", { type: "application/json" })]);
+      await vi.waitFor(() => expect(vm.jsonStr).toContain("from_a"));
+      vm.updateFiles([]);
+      await vi.waitFor(() => expect(vm.jsonStr).toBe(""));
+      expect(vm.jsonArrayOfObj).toEqual([]);
+    });
   });
 
   describe("URL import fetch", () => {

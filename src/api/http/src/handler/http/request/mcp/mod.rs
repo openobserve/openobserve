@@ -14,15 +14,16 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use axum::{
-    Json,
+    Extension, Json,
     body::{Body, Bytes},
     extract::Path,
     http::{HeaderMap, StatusCode, header},
     response::Response,
 };
 use futures_util::StreamExt;
+use openobserve_api_common::auth::delegation::DelegatedCaller;
 use openobserve_mcp::{
-    MCP_PROTOCOL_VERSION_MODERN, MCP_SUPPORTED_PROTOCOL_VERSIONS, MCPRequest,
+    MCP_PROTOCOL_VERSION_MODERN, MCP_SUPPORTED_PROTOCOL_VERSIONS, MCPRequest, ToolAccess,
     decode_mcp_header_value, handle_mcp_request, handle_mcp_request_stream,
     is_supported_protocol_version, ledger::Origin,
 };
@@ -43,6 +44,14 @@ const JSONRPC_HEADER_MISMATCH: i32 = -32020;
 const JSONRPC_UNSUPPORTED_PROTOCOL_VERSION: i32 = -32022;
 const JSONRPC_METHOD_NOT_FOUND: i32 = -32601;
 const JSONRPC_INVALID_REQUEST: i32 = -32600;
+
+/// A run token reads only, whatever the agent in front of the server lets through.
+fn tool_access(caller: Option<&Extension<DelegatedCaller>>) -> ToolAccess {
+    match caller {
+        Some(Extension(caller)) if caller.is_autoresolve_run() => ToolAccess::ReadOnly,
+        _ => ToolAccess::Any,
+    }
+}
 
 /// Build an HTTP response carrying a JSON-RPC error body.
 fn jsonrpc_error_response(
@@ -228,8 +237,10 @@ fn validate_mcp_headers(headers: &HeaderMap, request: &MCPRequest) -> Option<Res
 pub async fn handle_mcp_post(
     Path(org_id): Path<String>,
     headers: HeaderMap,
+    caller: Option<Extension<DelegatedCaller>>,
     Json(mcp_request): Json<MCPRequest>,
 ) -> Response {
+    let access = tool_access(caller.as_ref());
     // Extract auth token from Authorization header
     let auth_token = headers
         .get(header::AUTHORIZATION)
@@ -252,7 +263,7 @@ pub async fn handle_mcp_post(
     // Process the notification but return 202.
     if mcp_request.id.is_none() && mcp_request.method != "initialize" {
         // Fire-and-forget: process notification asynchronously, don't wait
-        let _ = handle_mcp_request(&org_id, mcp_request, auth_token, origin.as_ref()).await;
+        let _ = handle_mcp_request(&org_id, mcp_request, auth_token, origin.as_ref(), access).await;
         return Response::builder()
             .status(StatusCode::ACCEPTED)
             .body(Body::empty())
@@ -268,18 +279,18 @@ pub async fn handle_mcp_post(
     // Determine if client wants SSE streaming
     let wants_sse = accept_header.contains("text/event-stream");
 
-    let response = match handle_mcp_request(&org_id, mcp_request, auth_token, origin.as_ref()).await
-    {
-        Ok(r) => r,
-        Err(e) => {
-            log::error!("MCP handle_mcp_request error: {e}");
-            return Response::builder()
-                .status(StatusCode::INTERNAL_SERVER_ERROR)
-                .header(header::CONTENT_TYPE, "application/json")
-                .body(Body::from(format!("{{\"error\": \"MCP error: {}\"}}", e)))
-                .unwrap();
-        }
-    };
+    let response =
+        match handle_mcp_request(&org_id, mcp_request, auth_token, origin.as_ref(), access).await {
+            Ok(r) => r,
+            Err(e) => {
+                log::error!("MCP handle_mcp_request error: {e}");
+                return Response::builder()
+                    .status(StatusCode::INTERNAL_SERVER_ERROR)
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Body::from(format!("{{\"error\": \"MCP error: {}\"}}", e)))
+                    .unwrap();
+            }
+        };
 
     // Per 2026-07-28, some JSON-RPC errors carry a non-200 HTTP status so
     // dual-era clients can distinguish a modern server from a legacy one.
@@ -369,6 +380,7 @@ pub async fn handle_mcp_delete(Path(_org_id): Path<String>) -> Response {
 pub async fn handle_mcp_get(
     Path(org_id): Path<String>,
     headers: HeaderMap,
+    caller: Option<Extension<DelegatedCaller>>,
     body: Bytes,
 ) -> Response {
     // Extract auth token from Authorization header
@@ -425,8 +437,11 @@ pub async fn handle_mcp_get(
         Ok(origin) => origin,
         Err(problem) => return refused_origin(mcp_request.id.as_ref(), problem),
     };
+    let access = tool_access(caller.as_ref());
     let stream =
-        match handle_mcp_request_stream(&org_id, mcp_request, auth_token, origin.as_ref()).await {
+        match handle_mcp_request_stream(&org_id, mcp_request, auth_token, origin.as_ref(), access)
+            .await
+        {
             Ok(s) => s,
             Err(e) => {
                 return Response::builder()
@@ -701,6 +716,7 @@ mod tests {
         let response = handle_mcp_post(
             Path("default".to_string()),
             HeaderMap::new(),
+            None,
             Json(ping_request()),
         )
         .await;
@@ -713,8 +729,13 @@ mod tests {
         let mut headers = HeaderMap::new();
         headers.insert(MCP_PROTOCOL_VERSION_HEADER, "unsupported".parse().unwrap());
 
-        let response =
-            handle_mcp_post(Path("default".to_string()), headers, Json(ping_request())).await;
+        let response = handle_mcp_post(
+            Path("default".to_string()),
+            headers,
+            None,
+            Json(ping_request()),
+        )
+        .await;
 
         assert_eq!(response.status(), StatusCode::BAD_REQUEST);
     }
@@ -724,8 +745,13 @@ mod tests {
         let mut headers = HeaderMap::new();
         headers.insert(MCP_PROTOCOL_VERSION_HEADER, "2025-11-25".parse().unwrap());
 
-        let response =
-            handle_mcp_post(Path("default".to_string()), headers, Json(ping_request())).await;
+        let response = handle_mcp_post(
+            Path("default".to_string()),
+            headers,
+            None,
+            Json(ping_request()),
+        )
+        .await;
 
         assert_eq!(response.status(), StatusCode::OK);
     }
@@ -735,6 +761,7 @@ mod tests {
         let response = handle_mcp_post(
             Path("default".to_string()),
             modern_headers("server/discover", None),
+            None,
             Json(modern_request("server/discover", None)),
         )
         .await;
@@ -747,6 +774,7 @@ mod tests {
         let response = handle_mcp_post(
             Path("default".to_string()),
             HeaderMap::new(),
+            None,
             Json(modern_request("server/discover", None)),
         )
         .await;
@@ -762,6 +790,7 @@ mod tests {
         let response = handle_mcp_post(
             Path("default".to_string()),
             headers,
+            None,
             Json(modern_request("server/discover", None)),
         )
         .await;
@@ -774,6 +803,7 @@ mod tests {
         let response = handle_mcp_post(
             Path("default".to_string()),
             modern_headers("tools/call", Some("other_tool")),
+            None,
             Json(modern_request("tools/call", Some("tool_search"))),
         )
         .await;
@@ -789,6 +819,7 @@ mod tests {
         let response = handle_mcp_post(
             Path("default".to_string()),
             headers,
+            None,
             Json(modern_request("server/discover", None)),
         )
         .await;
@@ -801,6 +832,7 @@ mod tests {
         let response = handle_mcp_post(
             Path("default".to_string()),
             modern_headers("bogus/method", None),
+            None,
             Json(modern_request("bogus/method", None)),
         )
         .await;
@@ -911,6 +943,43 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[tokio::test]
+    async fn a_run_token_cannot_call_a_change_tool() {
+        use openobserve_mcp::tools::{get_tool_metadata, init_mcp_tools, is_read_only};
+
+        init_mcp_tools(&crate::handler::http::router::openapi::ApiDoc::openapi()).unwrap();
+        let read = |name: &str| is_read_only(&get_tool_metadata(name).unwrap());
+        let reads = ["SearchSQL", "StreamList", "CreateDashboard"];
+        assert_eq!(reads.map(read), [true, true, false]);
+
+        let run = DelegatedCaller {
+            link_id: "r1".to_string(),
+            installation_id: String::new(),
+            org: "default".to_string(),
+            jti: "j1".to_string(),
+            scope: config::utils::delegation::SCOPE_AUTORESOLVE.to_string(),
+        };
+        let mut request = ping_request();
+        request.method = "tools/call".to_string();
+        request.params =
+            json!({"name": "tools_call", "arguments": {"tool": "CreateDashboard", "args": {}}});
+        let response = handle_mcp_post(
+            Path("default".to_string()),
+            HeaderMap::new(),
+            Some(Extension(run)),
+            Json(request),
+        )
+        .await;
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let body: Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(
+            body["error"]["message"],
+            "OpenObserve changes are not available to AutoResolve."
+        );
     }
 
     #[test]

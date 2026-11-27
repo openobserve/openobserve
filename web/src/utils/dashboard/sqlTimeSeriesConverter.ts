@@ -23,6 +23,30 @@ import { createSeriesOverrideLookup } from "./seriesOverrides";
 import { sortTooltipParams } from "./tooltipSort";
 import { stackTotalRows } from "./stackTotals";
 
+type TimeAxisValue = Date | number;
+
+// A histogram bucket is keyed at the rounded-down start, so it can sit before the query start.
+const earlierAxisBound = (
+  queryStart: TimeAxisValue,
+  series: { data?: unknown[] }[] | undefined,
+): TimeAxisValue => {
+  let earliest = queryStart;
+  let earliestMs = new Date(queryStart).getTime();
+  series?.forEach((seriesObj) => {
+    seriesObj?.data?.forEach((point) => {
+      if (!Array.isArray(point) || point[1] === null || point[1] === undefined) return;
+      const x: unknown = point[0];
+      if (!(x instanceof Date) && typeof x !== "number") return;
+      const xMs = new Date(x).getTime();
+      if (Number.isFinite(xMs) && xMs < earliestMs) {
+        earliest = x;
+        earliestMs = xMs;
+      }
+    });
+  });
+  return earliest;
+};
+
 /**
  * Handles auto SQL time series conversion.
  * Detects histogram / timestamp x-axis fields and converts series data and
@@ -158,7 +182,10 @@ export const applyAutoSQLTimeSeries = (
       const queryEndMs = parseInt(metadata?.queries[0]?.endTime?.toString() ?? "0") / 1000;
       const timeGap = metadata?.queries[0]?.timeRangeGap?.seconds ?? 0;
       if (queryStartMs > 0 && queryEndMs > 0) {
-        options.xAxis[0].min = toZonedTime(queryStartMs + timeGap, store.state.timezone);
+        options.xAxis[0].min = earlierAxisBound(
+          toZonedTime(queryStartMs + timeGap, store.state.timezone),
+          options.series,
+        );
         options.xAxis[0].max = toZonedTime(queryEndMs + timeGap, store.state.timezone);
       }
 
@@ -388,7 +415,10 @@ export const applyCustomSQLTimeSeries = (
       const queryEndMs = parseInt(metadata?.queries[0]?.endTime?.toString() ?? "0") / 1000;
       const timeGap = metadata?.queries[0]?.timeRangeGap?.seconds ?? 0;
       if (queryStartMs > 0 && queryEndMs > 0) {
-        options.xAxis[0].min = toZonedTime(queryStartMs + timeGap, store.state.timezone);
+        options.xAxis[0].min = earlierAxisBound(
+          toZonedTime(queryStartMs + timeGap, store.state.timezone),
+          options.series,
+        );
         options.xAxis[0].max = toZonedTime(queryEndMs + timeGap, store.state.timezone);
       }
 
