@@ -152,7 +152,8 @@
   --d-zebra: #1b1b1e;
   --d-hover: #2f2f34;
 
-  --color-surface-shell: var(--d-chrome);
+  /* A slate night shell: neutral enough that the accent never tints the dark frame purple. */
+  --color-surface-shell: #0d1016;
   --color-surface-card: var(--d-base);
   --color-surface-panel: var(--d-panel);
   --color-surface-band: var(--d-well);
@@ -203,8 +204,9 @@
   /* eslint-disable-next-line local/no-hardcoded-px -- optical shadow geometry, not layout */
   --shadow-overlay: 0 8px 24px rgb(0 0 0 / 0.45);
 
-  --color-card-edge: rgb(255 255 255 / 0.06);
-  --shadow-card: none;
+  --color-card-edge: #222731;
+  /* eslint-disable-next-line local/no-hardcoded-px -- optical shadow geometry, not layout */
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.45), 0 6px 16px -8px rgb(0 0 0 / 0.6);
 
   /* grey-900 on error-400 is 6.40:1. */
   --color-cancel-query-bg: var(--color-error-400);
@@ -438,15 +440,19 @@
   /* Every row carries its level as a strip (info and debug too), so the table shows the data's colour. */
   --color-log-strip-info: #5b8ff0;
   --color-log-strip-debug: #5eb5c4;
-  /* Quiet surfaces: a faint cool page behind white panels, one light hairline everywhere, no card lift. */
-  --color-surface-shell: #fafafd;
+  /* The shell is a wash of the theme accent so the frame reads as branded, not disabled grey. */
+  --color-surface-shell: color-mix(in srgb, var(--color-accent) 9%, #ffffff);
   --color-surface-band: #f3f3f6;
   --color-surface-hover: #ececf0;
   --color-surface-subtle-hover: #f6f6f9;
   --color-border-subtle: #ebebee;
   --color-border-button: #e6e6e7;
-  --color-card-edge: #ebebee;
-  --shadow-card: none;
+  --color-card-edge: color-mix(in srgb, var(--color-accent) 12%, #e0e4eb);
+  /* eslint-disable local/no-hardcoded-px -- optical shadow geometry, not layout */
+  --shadow-card:
+    0 1px 2px rgb(15 23 42 / 0.06),
+    0 6px 16px -8px color-mix(in srgb, var(--color-accent) 25%, transparent);
+  /* eslint-enable local/no-hardcoded-px */
   --color-table-header-bg: #fafafd;
   --color-table-header-border: #ebebee;
   --color-table-row-divider: #ebebee;
@@ -762,9 +768,11 @@
   span.inline-flex.shrink-0.align-middle:not([data-destructive-icon]) {
   color: var(--toolbar-btn-rest-fg);
 }
-/* Light toolbar buttons are a borderless fill a step lighter than the band, so a dense row reads as one quiet set. */
+/* Light toolbar buttons are a light borderless fill with a soft drop, so they read as buttons without turning grey. */
 :root:not(.dark) {
-  --toolbar-btn-rest-bg: #eeeef2;
+  --toolbar-btn-rest-bg: #f3f4f7;
+  /* eslint-disable-next-line local/no-hardcoded-px -- optical shadow geometry, not layout */
+  --toolbar-btn-rest-shadow: 0 1px 1px rgb(16 24 40 / 0.05);
   /* On white, near-black glyphs feel heavy; mid grey still reads as enabled. */
   --toolbar-btn-rest-fg: var(--color-text-body);
 }
