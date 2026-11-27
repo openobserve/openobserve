@@ -151,6 +151,7 @@ pub(crate) fn apply_custom_template_plain(
             ctx.kind.event_label(ctx.event),
         )
         .replace("{status_dot}", super::resolve::status_dot(ctx))
+        .replace("{status_color}", super::resolve::status_color(ctx))
         .replace(
             "{alert_level_label}",
             &super::resolve::level_label(&ctx.alert_level),

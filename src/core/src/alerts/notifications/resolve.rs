@@ -621,6 +621,7 @@ pub(crate) fn extra_scalar_vars(ctx: &NotificationContext) -> Vec<(&'static str,
             ctx.kind.event_label(ctx.event).to_string(),
         ),
         ("status_dot", status_dot(ctx).to_string()),
+        ("status_color", status_color(ctx).to_string()),
         ("alert_level_label", level_label(&ctx.alert_level)),
         ("alert_trigger_time_utc", utc_stamp(ctx.alert_trigger_time)),
         ("cluster_name", ctx.cluster_name.clone()),
@@ -698,12 +699,13 @@ pub(crate) fn utc_stamp(micros: i64) -> String {
         .unwrap_or_default()
 }
 
-pub(crate) const EXTRA_SCALAR_NAMES: [&str; 15] = [
+pub(crate) const EXTRA_SCALAR_NAMES: [&str; 16] = [
     "notification_kind",
     "notification_event",
     "notification_kind_label",
     "notification_event_label",
     "status_dot",
+    "status_color",
     "alert_level_label",
     "alert_trigger_time_utc",
     "cluster_name",

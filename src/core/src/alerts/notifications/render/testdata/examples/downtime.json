@@ -183,6 +183,7 @@
       "notification_kind_label": "Downtime",
       "notification_event_label": "Started",
       "status_dot": "🔵",
+      "status_color": "#4A90D9",
       "alert_level_label": null,
       "alert_trigger_time_utc": "2026-11-02 22:00:00 UTC",
       "cluster_name": "o2-acme",

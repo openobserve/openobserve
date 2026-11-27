@@ -192,6 +192,7 @@
       "notification_kind_label": "On-call",
       "notification_event_label": "Paged",
       "status_dot": "🟠",
+      "status_color": "#F2952F",
       "alert_level_label": "P2",
       "alert_trigger_time_utc": "2026-11-02 10:05:00 UTC",
       "cluster_name": "o2-acme",

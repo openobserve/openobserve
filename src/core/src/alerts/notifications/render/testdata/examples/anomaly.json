@@ -219,6 +219,7 @@
       "notification_kind_label": "Anomaly",
       "notification_event_label": "Firing",
       "status_dot": "🔴",
+      "status_color": "#E01E5A",
       "alert_level_label": "Critical",
       "alert_trigger_time_utc": "2026-11-02 10:05:00 UTC",
       "cluster_name": "o2-acme",

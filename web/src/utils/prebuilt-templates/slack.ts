@@ -48,38 +48,43 @@ export const isValidSlackWebhookUrl = (url: string): boolean => {
  */
 const slackTemplateBody = JSON.stringify(
   {
-    text: "[{alert_status}] *{alert_name}*",
+    text: "[{alert_status}] {alert_name}",
+    // The title sits above the bar; the attachment draws the bar in the status color.
     blocks: [
       {
-        type: "header",
-        text: {
-          type: "plain_text",
-          text: "[{alert_status}] {alert_name}",
-        },
-      },
-      {
         type: "section",
-        fields: [
-          { type: "mrkdwn", text: "*Stream:*\n{stream_name}" },
-          { type: "mrkdwn", text: "*Type:*\n{stream_type}" },
-          { type: "mrkdwn", text: "*Status:*\n{alert_status}" },
-          { type: "mrkdwn", text: "*Count:*\n{alert_count}" },
-        ],
+        text: { type: "mrkdwn", text: "*[{alert_status}] {alert_name}*" },
       },
+    ],
+    attachments: [
       {
-        type: "section",
-        text: {
-          type: "mrkdwn",
-          text: "*Threshold Exceeded:* {alert_operator} {alert_threshold}",
-        },
-      },
-      {
-        type: "actions",
-        elements: [
+        color: "{status_color}",
+        blocks: [
           {
-            type: "button",
-            text: { type: "plain_text", text: "View in OpenObserve" },
-            url: "{alert_url}",
+            type: "section",
+            fields: [
+              { type: "mrkdwn", text: "*Stream:*\n{stream_name}" },
+              { type: "mrkdwn", text: "*Type:*\n{stream_type}" },
+              { type: "mrkdwn", text: "*Count:*\n{alert_count}" },
+              { type: "mrkdwn", text: "*Threshold:*\n{alert_operator} {alert_threshold}" },
+            ],
+          },
+          {
+            type: "section",
+            text: {
+              type: "mrkdwn",
+              text: "*Status:* {alert_status}\n*Time:* {alert_trigger_time_str}",
+            },
+          },
+          {
+            type: "actions",
+            elements: [
+              {
+                type: "button",
+                text: { type: "plain_text", text: "View in OpenObserve" },
+                url: "{alert_url}",
+              },
+            ],
           },
         ],
       },
