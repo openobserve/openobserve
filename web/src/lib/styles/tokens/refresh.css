@@ -163,9 +163,9 @@
   --color-surface-selected-neutral: #36363c;
 
   /* Not pure white: near-white text halates on dark surfaces. */
-  --color-text-heading: #e6e7ec;
-  --color-text-body: #c4c6cf;
-  --color-text-secondary: #9a9dab;
+  --color-text-heading: #d6d7dc;
+  --color-text-body: #babcc3;
+  --color-text-secondary: #92949d;
   --color-text-disabled: #5c5f6b;
 
   --color-border-subtle: var(--d-divider);
