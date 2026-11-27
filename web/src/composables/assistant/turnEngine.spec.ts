@@ -1669,6 +1669,17 @@ describe("turnEngine: outcomes", () => {
     expect(tracked("ai_turn_ended")).toHaveLength(1);
   });
 
+  it("shows a live toolset call as toolset · tool from the org's toolsets", async () => {
+    const h = setup();
+    Object.assign(h.capability, { toolsets: () => ["datadog"] });
+    await start(h);
+    h.feed({ type: "tool_call", tool: "datadog_search_logs", call_id: "c1" });
+    expect(h.session().messages[1].contentBlocks?.[0]).toMatchObject({
+      call_id: "c1",
+      tool: "datadog · search_logs",
+    });
+  });
+
   it("emits the stall event after 30 s without a frame (HT-01 AC 3)", async () => {
     const h = setup();
     await start(h);

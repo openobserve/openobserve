@@ -28,7 +28,10 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use bytes::Bytes;
-use config::utils::hash::{Sum64, fnv};
+use config::{
+    meta::oncall::confidence::ToolsetNames,
+    utils::hash::{Sum64, fnv},
+};
 use infra::table::{
     ai_approvals, ai_chat_feedback, ai_chat_imports,
     ai_chat_sessions::{self, ListCursor, ListFilter, Model, NO_SEQ, NewImport, STATUS_ACTIVE},
@@ -410,6 +413,8 @@ struct TurnTail {
     decisions: Vec<Value>,
     /// The decisions already sent, each once, as their JSON text.
     answered: HashSet<String>,
+    /// The org's toolsets, so a toolset call shows as it does in the stored chat.
+    toolsets: ToolsetNames,
 }
 
 impl TurnTail {
@@ -426,11 +431,12 @@ impl TurnTail {
             sent: from_seq.max(start_seq - 1),
             decisions: ai_chat_turns::decisions_of(record),
             answered: HashSet::new(),
+            toolsets: ToolsetNames::default(),
         }
     }
 
     fn runs_of(&self, events: &[DurableEvent]) -> Vec<FrameRun> {
-        frame_runs(turn_frames(events, &self.session_id))
+        frame_runs(turn_frames(events, &self.session_id, &self.toolsets))
     }
 
     /// The decisions of `frame`, when it is a card, that were not sent yet.
@@ -864,7 +870,13 @@ pub(super) async fn load_turns(
     row: &Model,
     _auth: Option<&str>,
 ) -> Result<Vec<serde_json::Value>, Response> {
-    Ok(project_turns(&load_events(row).await?, &row.session_id))
+    // A stored chat doesn't record its toolsets; a deleted one's calls keep their raw name.
+    let toolsets = org_toolset_names(&row.org_id).await;
+    Ok(project_turns(
+        &load_events(row).await?,
+        &row.session_id,
+        &toolsets,
+    ))
 }
 
 /// Projected `turns` with their turn records; turns admitted after `admitted_by` are left out.
@@ -1244,7 +1256,8 @@ pub async fn get(
                 .remove(&row.session_id)
         });
     version.pending = pending.is_some();
-    let turns = project_turns(&events, &row.session_id);
+    let toolsets = org_toolset_names(&row.org_id).await;
+    let turns = project_turns(&events, &row.session_id, &toolsets);
     // Incremental only from a copy older than the watermark whose version we can read.
     let known_seq = params
         .known_seq
@@ -1654,6 +1667,7 @@ pub async fn stream_turn(
     // Subscribed before storage is read, so no commit falls between the two.
     let feed = registry::subscribe(&org_id, &row.session_id, &turn_id);
     let mut tail = TurnTail::new(&record, from_seq);
+    tail.toolsets = org_toolset_names(&org_id).await;
     tail.end_seq = turn_end_seq(&record).await;
     if let Err(resp) = catch_up(&mut tail, &mut record).await {
         return resp;
@@ -2117,8 +2131,17 @@ fn login_mac(login: &str, session_id: &str, refresh_token: &str) -> String {
     registry::login_binding_mac(&format!("ai-login\n{login}\n{session_id}\n{refresh_token}"))
 }
 
-fn project_turns(events: &[DurableEvent], session_id: &str) -> Vec<Value> {
-    let mut projected = openobserve_core::ai_chat::projection::project(events, session_id);
+/// The org's toolset names now, which a stored call shows as `toolset · tool`.
+async fn org_toolset_names(org_id: &str) -> ToolsetNames {
+    openobserve_core::ai_chat::rca_ledger::org_tool_classes(org_id)
+        .await
+        .names()
+        .clone()
+}
+
+fn project_turns(events: &[DurableEvent], session_id: &str, toolsets: &ToolsetNames) -> Vec<Value> {
+    let mut projected =
+        openobserve_core::ai_chat::projection::project(events, session_id, toolsets);
     match projected.get_mut("turns").map(Value::take) {
         Some(Value::Array(turns)) => turns,
         _ => Vec::new(),
@@ -2822,8 +2845,8 @@ fn stream_dropped(turn_id: &str) -> Bytes {
 }
 
 /// The frames of the turn these events are; the record's typed terminal is its only end or error.
-fn turn_frames(events: &[DurableEvent], session_id: &str) -> Vec<Value> {
-    project_turns(events, session_id)
+fn turn_frames(events: &[DurableEvent], session_id: &str, toolsets: &ToolsetNames) -> Vec<Value> {
+    project_turns(events, session_id, toolsets)
         .into_iter()
         .filter_map(|turn| match turn {
             Value::Object(mut turn) => turn.remove("frames"),
@@ -4556,7 +4579,7 @@ mod tests {
             serde_json::json!({"info": {"id": "msg_a", "role": "assistant", "parentID": "msg_u",
                 "error": {"name": "APIError", "data": {"message": "provider down"}}}}),
         ));
-        let projected = project_turns(&events, "sid");
+        let projected = project_turns(&events, "sid", &ToolsetNames::default());
         assert!(
             projected[0]["frames"]
                 .as_array()

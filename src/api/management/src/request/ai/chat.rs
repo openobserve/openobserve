@@ -48,6 +48,9 @@ use {
                 TurnPolicy, get_agent_client, is_agent_unreachable, is_session_owner_unavailable,
                 upstream_error_code, upstream_error_status, upstream_retry_after,
             },
+            toolsets::push::{
+                load_agent_tools, load_turn_memory, report_unavailable, unregistered,
+            },
         },
         common::{
             auditor::{AuditMessage, DelegatedAudit, Protocol, ResponseMeta},
@@ -650,6 +653,17 @@ impl TurnAudit {
             audit::audit(self.message(status, error_message)).await;
         }
     }
+}
+
+/// Whose personal memory goes with the turn: a registered user's, never an RCA turn's.
+#[cfg(feature = "enterprise")]
+async fn memory_owner(user_email: &str, agent_type: &str) -> Option<String> {
+    if agent_type == RCA_AGENT_TYPE {
+        return None;
+    }
+    openobserve_core::ai_chat::admission::resolve_owner(user_email)
+        .await
+        .ok()
 }
 
 /// One `chat_stream` turn, ready to go to o2-ai with or without persistence.
@@ -3301,9 +3315,20 @@ async fn chat_turn(
                 .collect()
         });
 
-        let (tool_mcps, tool_skills) =
-            o2_enterprise::enterprise::ai::toolsets::push::load_agent_tools(org_id_str).await;
-        let tool_mcps = turn_tools(prompt_body.mode, tool_mcps);
+        let mut tools = load_agent_tools(org_id_str).await;
+        tools.mcps = turn_tools(prompt_body.mode, tools.mcps);
+        tools.unavailable = turn_tools(prompt_body.mode, tools.unavailable);
+        let given_toolsets = tools.mcps.iter().map(|m| m.name.clone()).collect();
+        // This endpoint never persists a turn, so its memory is read-only.
+        let owner = memory_owner(user_id, agent_type).await;
+        let memory = load_turn_memory(
+            org_id_str,
+            owner.as_deref(),
+            delegated,
+            false,
+            &mut tools.mcps,
+        )
+        .await;
         let session = parts
             .headers
             .get(X_O2_ASSISTANT_SESSION_ID.as_str())
@@ -3320,16 +3345,9 @@ async fn chat_turn(
                     Some(history)
                 },
                 images,
-                mcps: if tool_mcps.is_empty() {
-                    None
-                } else {
-                    Some(tool_mcps)
-                },
-                skills: if tool_skills.is_empty() {
-                    None
-                } else {
-                    Some(tool_skills)
-                },
+                mcps: (!tools.mcps.is_empty()).then_some(tools.mcps),
+                unavailable_toolsets: (!tools.unavailable.is_empty()).then_some(tools.unavailable),
+                skills: (!tools.skills.is_empty()).then_some(tools.skills),
                 // Set by persistence admission below; absent, o2-ai streams as before.
                 turn_id: None,
                 known_seq: None,
@@ -3339,6 +3357,8 @@ async fn chat_turn(
                 ephemeral: prompt_body.ephemeral,
                 attachments: forwarded_attachments(prompt_body.attachments),
                 confirm_timeout_secs: confirm_timeout(prompt_body.confirm_timeout_secs),
+                org_memory: memory.org,
+                user_memory: memory.user,
                 ..QueryRequest::new(last_user_message, context)
             },
             &policy,
@@ -3395,6 +3415,9 @@ async fn chat_turn(
             .await
         {
             Ok(response) => {
+                let unavailable =
+                    unregistered(response.toolsets_unavailable.as_ref(), &given_toolsets);
+                report_unavailable(org_id_str, unavailable);
                 #[cfg(feature = "cloud")]
                 if let Err(error) = openobserve_core::trial_quota::authorize_ai_usage(
                     org_id_str,
@@ -3708,9 +3731,20 @@ async fn stream_turn(
                 .collect()
         });
 
-        let (tool_mcps, tool_skills) =
-            o2_enterprise::enterprise::ai::toolsets::push::load_agent_tools(&org_id_str).await;
-        let tool_mcps = turn_tools(prompt_body.mode, tool_mcps);
+        let mut tools = load_agent_tools(&org_id_str).await;
+        tools.mcps = turn_tools(prompt_body.mode, tools.mcps);
+        tools.unavailable = turn_tools(prompt_body.mode, tools.unavailable);
+        // Memory is writable only on a turn that is stored, as `persists_turn` decides below.
+        let persisted = o2_enterprise::enterprise::ai::chat::is_enabled() && !prompt_body.ephemeral;
+        let owner = memory_owner(&user_id, agent_type).await;
+        let memory = load_turn_memory(
+            &org_id_str,
+            owner.as_deref(),
+            delegated,
+            persisted,
+            &mut tools.mcps,
+        )
+        .await;
         let session = forward_headers
             .get(X_O2_ASSISTANT_SESSION_ID.as_str())
             .map(String::as_str);
@@ -3724,16 +3758,9 @@ async fn stream_turn(
                     Some(history)
                 },
                 images,
-                mcps: if tool_mcps.is_empty() {
-                    None
-                } else {
-                    Some(tool_mcps)
-                },
-                skills: if tool_skills.is_empty() {
-                    None
-                } else {
-                    Some(tool_skills)
-                },
+                mcps: (!tools.mcps.is_empty()).then_some(tools.mcps),
+                unavailable_toolsets: (!tools.unavailable.is_empty()).then_some(tools.unavailable),
+                skills: (!tools.skills.is_empty()).then_some(tools.skills),
                 // Set by persistence admission below; absent, o2-ai streams as before.
                 turn_id: None,
                 known_seq: None,
@@ -3743,6 +3770,8 @@ async fn stream_turn(
                 ephemeral: prompt_body.ephemeral,
                 attachments: forwarded_attachments(prompt_body.attachments),
                 confirm_timeout_secs: confirm_timeout(prompt_body.confirm_timeout_secs),
+                org_memory: memory.org,
+                user_memory: memory.user,
                 ..QueryRequest::new(last_user_message, context)
             },
             &policy,
@@ -3937,19 +3966,26 @@ async fn persisted_turn(turn: StreamTurn) -> Response {
     let store = std::sync::Arc::new(openobserve_core::ai_chat::StreamChatStore::new(
         settings.retention_days,
     ));
+    let identity = TurnIdentity {
+        org_id,
+        session_id,
+        user_id: owner,
+        agent_type,
+        turn_id,
+        trace_id,
+        epoch: row.session_epoch,
+        last_committed_seq: row.last_committed_seq,
+        opencode_session_id: row.opencode_session_id,
+    };
+    let toolsets = query_req.mcps.iter().flatten().map(|m| m.name.clone());
+    let on_commit = openobserve_core::ai_chat::toolset_calls::with_toolset_calls(
+        &identity,
+        toolsets.collect(),
+        None,
+    );
     let rx = spawn_turn(
         TurnSpec {
-            identity: TurnIdentity {
-                org_id,
-                session_id,
-                user_id: owner,
-                agent_type,
-                turn_id,
-                trace_id,
-                epoch: row.session_epoch,
-                last_committed_seq: row.last_committed_seq,
-                opencode_session_id: row.opencode_session_id,
-            },
+            identity,
             request: query_req,
             auth_header: auth,
             forward_headers,
@@ -3959,7 +3995,7 @@ async fn persisted_turn(turn: StreamTurn) -> Response {
             registration,
             // The span outlives this response, so the task ends it.
             on_end: Some(turn_end(span, turn_mark)),
-            on_commit: None,
+            on_commit: Some(on_commit),
         },
         settings,
     );
@@ -4447,6 +4483,12 @@ fn data_frame(line: &[u8]) -> Option<serde_json::Map<String, Value>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn an_rca_turn_carries_no_personal_memory() {
+        assert_eq!(memory_owner("u@example.com", RCA_AGENT_TYPE).await, None);
+    }
 
     #[cfg(feature = "cloud")]
     #[tokio::test]

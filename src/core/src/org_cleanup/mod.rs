@@ -1321,7 +1321,7 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     #[cfg(feature = "cloud")]
     use infra::table::trial_quota_usage;
     use infra::table::{
-        alert_acks, alert_calibration, alert_incidents, alert_leases, anomaly_detection,
+        ai_memory, alert_acks, alert_calibration, alert_incidents, alert_leases, anomaly_detection,
         autoresolve, autoresolve_corrections, autoresolve_run_connections, autoresolve_runs,
         autoresolve_steps, compactor_manual_jobs, distinct_values, external_alerts, gen_ai_agents,
         incident_events, incident_integrations, llm_eval, llm_prompts, llm_secrets, oncall_teams,
@@ -1460,9 +1460,15 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     llm_secrets::delete_by_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/llm_secrets: {e}"))?;
+    ai_memory::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/ai_memory: {e}"))?;
     org_ai_toolsets::delete_by_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/org_ai_toolsets: {e}"))?;
+    org_ai_toolsets::delete_tombstones_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/ai_toolset_tombstones: {e}"))?;
     delete_org_ai_assistant_resources(org_id).await?;
     // A queued write would re-insert the rows; other nodes' flushes refuse an inactive org.
     #[cfg(feature = "enterprise")]
@@ -2499,7 +2505,7 @@ mod tests {
     ];
 
     /// Every infra and db-layer source the org-deletion program touches, by path under `src/`.
-    const TEARDOWN_SOURCES: [(&str, &str); 92] = [
+    const TEARDOWN_SOURCES: [(&str, &str); 93] = [
         (
             "db/src/alerts/alert.rs",
             include_str!("../../../db/src/alerts/alert.rs"),
@@ -2659,6 +2665,10 @@ mod tests {
         (
             "infra/src/table/ai_chat_turns.rs",
             include_str!("../../../infra/src/table/ai_chat_turns.rs"),
+        ),
+        (
+            "infra/src/table/ai_memory.rs",
+            include_str!("../../../infra/src/table/ai_memory.rs"),
         ),
         (
             "infra/src/table/alerts/mod.rs",
@@ -5416,6 +5426,7 @@ mod tests {
     #[test]
     fn test_the_dek_outlives_every_row_encrypted_under_it() {
         for call in [
+            "ai_memory::delete_by_org(org_id)",
             "llm_secrets::delete_by_org(org_id)",
             "org_ai_toolsets::delete_by_org(org_id)",
             "providers::delete_all_by_org(org_id)",
@@ -5626,6 +5637,21 @@ mod tests {
                 "{child} must run before {parent}"
             );
         }
+    }
+
+    #[test]
+    fn test_ai_memory_revisions_go_before_their_memory() {
+        let (_, source) = TEARDOWN_SOURCES
+            .iter()
+            .find(|(path, _)| *path == "infra/src/table/ai_memory.rs")
+            .unwrap();
+        let body = fn_body(source, "delete_by_org");
+        let at = |table: &str| {
+            body.find(&format!("{table}::Entity::delete_many()"))
+                .unwrap_or_else(|| panic!("ai_memory::delete_by_org never deletes {table}"))
+        };
+        assert!(at("ai_memory_revisions") < at("ai_memory"));
+        position_of("ai_memory::delete_by_org(org_id)");
     }
 
     #[test]

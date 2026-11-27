@@ -5,7 +5,7 @@
 //         CrossLinkDialog (name required, URL required, invalid URL, happy path)
 //
 // Cleanup notes:
-//   - AI Toolsets created in the happy-path test use the prefix ai_toolset_fv_001.
+//   - AI Toolsets created in the happy-path test use the prefix ai-toolset-fv-.
 //     Delete manually via Management > AI Toolsets if cleanup.spec.js does not yet
 //     support AI Toolset deletion via API.
 //   - Cross-link items created in the happy-path test are deleted within the test.
@@ -62,7 +62,7 @@ test.describe('AI Toolsets form validation', { tag: '@enterprise' }, () => {
         testLogger.info('Testing MCP URL required validation on empty submit');
 
         // Fill a valid name but leave MCP URL empty (default kind is MCP)
-        await pm.aiToolsetsFormValidation.fillName('ai_toolset_fv_url_test');
+        await pm.aiToolsetsFormValidation.fillName('ai-toolset-fv-url-test');
         await pm.aiToolsetsFormValidation.clickSave();
 
         await expect(pm.aiToolsetsFormValidation.getMcpUrlErrorLocator()).toBeVisible();
@@ -95,7 +95,7 @@ test.describe('AI Toolsets form validation', { tag: '@enterprise' }, () => {
         await expect(pm.aiToolsetsFormValidation.getNameErrorLocator()).toBeVisible();
         await expect(pm.aiToolsetsFormValidation.getNameErrorLocator()).toContainText('Name is required');
 
-        await pm.aiToolsetsFormValidation.fillName('ai_toolset_fv_fix');
+        await pm.aiToolsetsFormValidation.fillName('ai-toolset-fv-fix');
         await expect(pm.aiToolsetsFormValidation.getNameErrorLocator()).not.toBeVisible();
 
         testLogger.info('Name error correctly cleared after input');
@@ -106,10 +106,8 @@ test.describe('AI Toolsets form validation', { tag: '@enterprise' }, () => {
     }, async ({ page }) => {
         testLogger.info('Testing successful AI Toolset creation');
 
-        // Unique name per run — the suite has no automated cleanup, so a fixed
-        // name collides with a previously-created toolset and the save silently
-        // fails (duplicate), leaving the form open.
-        const toolsetName = `ai_toolset_fv_${Date.now()}`;
+        // Unique per run: nothing deletes it, and a duplicate name keeps the form open.
+        const toolsetName = `ai-toolset-fv-${Date.now()}`;
         await pm.aiToolsetsFormValidation.fillName(toolsetName);
         await pm.aiToolsetsFormValidation.fillMcpUrl('https://api.example.com/mcp/');
         await pm.aiToolsetsFormValidation.clickSave();

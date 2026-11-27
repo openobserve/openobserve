@@ -21,6 +21,7 @@ pub mod chat;
 pub mod chats;
 pub mod error;
 pub mod grants;
+pub mod memory;
 pub mod seeded;
 pub mod settings;
 pub mod shares;

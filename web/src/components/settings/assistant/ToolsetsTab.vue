@@ -89,14 +89,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="refresh"
         />
         <OButton
+          v-if="canEdit && superCluster"
+          variant="outline"
+          size="sm-action"
+          class="max-md:min-h-11"
+          data-test="ai-toolsets-resync-btn"
+          @click="resync"
+          >{{ t("aiToolset.resync") }}</OButton
+        >
+        <OButton
           v-if="canCreate"
           variant="primary"
           size="sm-action"
           class="max-md:min-h-11"
           data-test="ai-toolsets-add-btn"
+          :aria-label="
+            toolsetDrafts.hasNew
+              ? t('common.editorDraft.newDot', { label: t('assistant.toolsets.add') })
+              : undefined
+          "
           @click="openForm('add')"
-          >{{ t("assistant.toolsets.add") }}</OButton
-        >
+          >{{ t("assistant.toolsets.add") }}
+          <EditorDraftDot
+            v-if="toolsetDrafts.hasNew"
+            :saved-at="toolsetDrafts.savedAt(null)"
+            corner
+            data-test="ai-toolsets-add-draft-dot"
+        /></OButton>
       </template>
       <template #error>
         <div class="flex flex-col items-center gap-3 p-6" data-test="ai-toolsets-load-error">
@@ -122,7 +141,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </template>
       <template #cell-name="{ row }">
-        <OTruncatedText class="block">{{ raw(row.name) }}</OTruncatedText>
+        <span class="flex min-w-0 items-center gap-1">
+          <OTruncatedText class="block">{{ raw(row.name) }}</OTruncatedText>
+          <EditorDraftDot
+            v-if="toolsetDrafts.ids.has(row.id)"
+            :saved-at="toolsetDrafts.savedAt(row.id)"
+            :data-test="`ai-toolsets-${row.name}-draft-dot`"
+          />
+          <template v-for="note in notesOf(row)" :key="note.kind">
+            <span
+              class="inline-flex shrink-0"
+              role="img"
+              :aria-label="note.lines.join(' ')"
+              :data-test="`ai-toolsets-${row.name}-${note.kind}-icon`"
+            >
+              <OIcon :name="note.icon" size="sm" :class="note.tone" />
+              <OTooltip max-width="25rem">
+                <template #content>
+                  <div v-for="line in note.lines" :key="line">{{ line }}</div>
+                </template>
+              </OTooltip>
+            </span>
+          </template>
+        </span>
       </template>
       <template #cell-kind="{ row }">
         <OTag
@@ -166,6 +207,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <AssistantToolsetStatus :row="row" :clash="clashes.has(row.agentName)" tags-only />
           </template>
           <template v-if="canEdit">
+            <OButton
+              v-if="presetUpdated(row)"
+              variant="ghost"
+              size="sm"
+              class="max-md:hidden"
+              :data-test="`ai-toolset-${row.name}-review-preset`"
+              @click="openReview(row)"
+              >{{ t("aiToolset.reviewPresetUpdate") }}</OButton
+            >
+            <OButton
+              v-if="row.badges?.includes('allTools')"
+              variant="ghost"
+              size="sm"
+              class="max-md:hidden"
+              :data-test="`ai-toolset-${row.name}-choose-tools`"
+              @click="chooseTools(row)"
+              >{{ t("aiToolset.chooseTools") }}</OButton
+            >
             <OButton
               v-if="health"
               variant="ghost"
@@ -214,6 +273,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >{{ t("assistant.toolsets.test") }}</ODropdownItem
               >
               <ODropdownItem
+                v-if="presetUpdated(row)"
+                :data-test="`ai-toolset-${row.name}-review-preset-menu`"
+                @select="openReview(row)"
+                >{{ t("aiToolset.reviewPresetUpdate") }}</ODropdownItem
+              >
+              <ODropdownItem
+                v-if="row.badges?.includes('allTools')"
+                :data-test="`ai-toolset-${row.name}-choose-tools-menu`"
+                @select="chooseTools(row)"
+                >{{ t("aiToolset.chooseTools") }}</ODropdownItem
+              >
+              <ODropdownItem
                 :data-test="`ai-toolset-${row.name}-edit-menu`"
                 @select="openForm('edit', row.id)"
                 >{{ t("common.edit") }}</ODropdownItem
@@ -248,6 +319,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
     </OTable>
     <p role="status" class="sr-only" data-test="ai-toolsets-announce">{{ announcement }}</p>
+    <AiToolsetPresetReview
+      v-model:open="review.open"
+      :row="review.row"
+      :preset="review.preset"
+      @saved="refresh"
+    />
   </section>
 </template>
 
@@ -255,11 +332,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { useMutation, useQuery } from "@tanstack/vue-query";
 import { computed, reactive, ref, watch } from "vue";
 import { useRouter } from "vue-router";
+import { useStore } from "vuex";
+
+import AiToolsetPresetReview from "@/components/ai_toolsets/AiToolsetPresetReview.vue";
+import { presetBadge, type Preset } from "@/components/ai_toolsets/presets";
 
 import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
+import EditorDraftDot from "@/components/common/drafts/EditorDraftDot.vue";
 import { useAssistantName } from "@/composables/assistant";
 import useBreakpoint from "@/composables/useBreakpoint";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
+import { useEditorDraftIds } from "@/composables/useEditorDraft";
 import { useLicenseLock } from "@/composables/useFeatureLock";
 import { useListViewState } from "@/composables/useListViewState";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -276,8 +359,11 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import aiToolsetsService from "@/services/ai_toolsets";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
-import { aiToolsetsQuery } from "@/services/ai_toolsets.queries";
+import { aiToolsetPresetsQuery, aiToolsetsQuery } from "@/services/ai_toolsets.queries";
 import { capabilitiesQuery } from "@/services/assistant.queries";
 import {
   setToolsetEnabledMutation,
@@ -285,6 +371,7 @@ import {
 } from "@/services/assistant_settings.queries";
 import { deleteToolsetMutation } from "@/services/assistant_settings.queries";
 import { raw, useI18nTyped } from "@/types/i18n";
+import { deleteEditorDraftsFor } from "@/utils/drafts/editorDraftStore";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 import AssistantToolsetForm from "./AssistantToolsetForm.vue";
@@ -305,6 +392,7 @@ const name = useAssistantName();
 const router = useRouter();
 const page = useAssistantSettingsPage();
 const { confirm } = useConfirmDialog();
+const toolsetDrafts = useEditorDraftIds("ai_toolset");
 // Below md the button shows only its icon; above it the visible age is its name, so a label there would contradict it.
 const { mdUp } = useBreakpoint();
 
@@ -326,6 +414,28 @@ const capabilities = useQuery(
 const enableMutation = useMutation(() => setToolsetEnabledMutation(page.org.value));
 const testMutation = useMutation(() => testToolsetMutation(page.org.value));
 const deleteMutation = useMutation(() => deleteToolsetMutation(page.org.value));
+// Replication exists only on a super cluster, so Resync means nothing elsewhere.
+const superCluster = !!useStore()?.state?.zoConfig?.super_cluster_enabled;
+const presetList = useQuery(
+  computed(() => ({
+    ...aiToolsetPresetsQuery(page.org.value),
+    enabled: !!page.org.value && !toolsetsLocked.value,
+  })),
+);
+const presets = computed<Preset[] | undefined>(() => presetList.data.value);
+const review = ref<{ open: boolean; row: ReviewRow | null; preset: Preset | null }>({
+  open: false,
+  row: null,
+  preset: null,
+});
+
+type ReviewRow = { id: string; name: string; description?: string; data: Record<string, any> };
+type Note = {
+  kind: string;
+  icon: "error-outline" | "info-outline" | "link-off";
+  tone: string;
+  lines: string[];
+};
 
 const view = reactive(useListViewState("ai-toolsets", { filterQuery: "", pageSize: 20 }));
 const state = computed(() => readStateOf(list));
@@ -437,8 +547,94 @@ function openForm(action: "add" | "edit", id?: string) {
   });
 }
 
+function presetUpdated(row: ToolsetRow): boolean {
+  return presetBadge(row.data, presets.value) === "updated";
+}
+
+/** Warnings need an admin's action, information does not; a toolset never listed is not connected. */
+function notesOf(row: ToolsetRow): Note[] {
+  const warn: string[] = [];
+  const info: string[] = [];
+  const badge = presetBadge(row.data, presets.value);
+  if (row.needsCredentials) warn.push(t("aiToolset.noteNeedsCredentials"));
+  if (badge === "retired") warn.push(t("aiToolset.notePresetRetired"));
+  if (row.badges?.includes("noTools")) warn.push(t("aiToolset.noteNoTools"));
+  if (badge === "updated") {
+    const id = (row.data?.preset as { id?: string } | undefined)?.id;
+    const label = presets.value?.find((p) => p.id === id)?.label ?? row.name;
+    info.push(t("aiToolset.notePresetUpdated", { preset: label }));
+  }
+  if (row.badges?.includes("allTools")) info.push(t("aiToolset.noteAllTools"));
+  if (row.regionOnly) info.push(t("aiToolset.regionOnly"));
+  const notes: Note[] = [];
+  if (warn.length)
+    notes.push({
+      kind: "warning",
+      icon: "error-outline",
+      tone: "text-status-warning-text",
+      lines: warn,
+    });
+  if (info.length)
+    notes.push({ kind: "info", icon: "info-outline", tone: "text-text-secondary", lines: info });
+  if (row.badges?.includes("notVerified"))
+    notes.push({
+      kind: "not-connected",
+      icon: "link-off",
+      tone: "text-text-secondary",
+      lines: [t("aiToolset.noteNotConnected")],
+    });
+  return notes;
+}
+
+function openReview(row: ToolsetRow) {
+  const id = (row.data?.preset as { id?: string } | undefined)?.id;
+  const preset = presets.value?.find((p) => p.id === id) ?? null;
+  const reviewRow = {
+    id: row.id,
+    name: row.name,
+    description: row.description,
+    data: row.data ?? {},
+  };
+  review.value = { open: true, row: reviewRow, preset };
+}
+
+/** Opens the edit form on its tool picker. */
+function chooseTools(row: ToolsetRow) {
+  void router.push({
+    query: { ...router.currentRoute.value.query, action: "edit", id: row.id, section: "tools" },
+  });
+}
+
+async function resync() {
+  const ok = await confirm({
+    title: t("aiToolset.resync"),
+    message: t("aiToolset.resyncMessage"),
+    confirmLabel: t("aiToolset.resync"),
+  });
+  if (!ok) return;
+  try {
+    const res = await aiToolsetsService.resync(page.org.value);
+    toast({ variant: "success", message: t("aiToolset.resynced", { count: res.data.published }) });
+  } catch (err) {
+    const message = (err as { response?: { data?: { message?: unknown } } })?.response?.data
+      ?.message;
+    toast({
+      variant: "error",
+      message:
+        typeof message === "string" ? raw(message.slice(0, 500)) : t("aiToolset.resyncFailed"),
+    });
+  }
+}
+
 function closeForm() {
-  const { action: _action, id: _id, ...query } = router.currentRoute.value.query;
+  const {
+    action: _action,
+    id: _id,
+    section: _section,
+    preset: _preset,
+    kind: _kind,
+    ...query
+  } = router.currentRoute.value.query;
   void router.push({ query });
 }
 
@@ -499,6 +695,7 @@ async function remove(row: ToolsetRow) {
   if (!ok) return;
   try {
     await deleteMutation.mutateAsync(row.id);
+    deleteEditorDraftsFor({ kind: "ai_toolset", org: page.org.value, entityId: row.id });
     toast({ variant: "success", message: t("assistant.toolsets.deleted", { name: row.name }) });
   } catch (err) {
     if (statusOf(err) === 403) {

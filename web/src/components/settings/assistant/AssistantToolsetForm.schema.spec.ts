@@ -101,17 +101,16 @@ describe("toolset form schema and payload", () => {
   });
 
   it("rejects a name another toolset already reaches the agent under", () => {
-    const values = {
-      ...toolsetFormDefaults(),
-      name: "My_Tool",
-      mcp: { url: "u", timeout_seconds: 30, headers: [] },
-    };
+    const defaults = toolsetFormDefaults();
+    const values = { ...defaults, name: "my-tool", mcp: { ...defaults.mcp, url: "u" } };
     expect(issuesOf(values, { ...NONE, isTaken: (agent) => agent === "my-tool" })).toEqual([
       'name=assistant.toolsets.form.nameClash:{"agent":"my-tool"}',
     ]);
     expect(
       issuesOf(values, { ...NONE, editing: true, isTaken: (agent) => agent === "my-tool" }),
     ).toEqual([]);
+    // A new name must already be the one the agent sees, as the server requires.
+    expect(issuesOf({ ...values, name: "My_Tool" })).toEqual(["name=aiToolset.nameInvalid"]);
   });
 
   it("rejects *** typed as a secret value", () => {
@@ -143,6 +142,95 @@ describe("toolset form schema and payload", () => {
     const removed = structuredClone(loaded);
     removed.mcp.headers.pop();
     expect(reenterReason(removed, loaded, true)).toBeNull();
+  });
+
+  describe("OAuth, presets and tool lists", () => {
+    const OAUTH = {
+      ...STORED,
+      region_only: true,
+      data: {
+        url: "https://dt.example/mcp",
+        timeout_seconds: 30,
+        headers: { "X-Tenant": "***" },
+        auth: {
+          type: "oauth_client_credentials",
+          token_url: "https://sso.example/token",
+          client_id: "id-1",
+          client_secret: "***",
+          scope: "a b",
+          extra_params: { resource: "***" },
+        },
+        allowed_tools: ["search_*"],
+        write_tools: [],
+        tool_classes: [{ tool: "search_logs", class: "logs" }],
+        preset: { id: "dynatrace", revision: 2, params: { env: "https://dt.example" } },
+        tools_verified_at: 5,
+      },
+    };
+
+    it("keeps the stored client secret, lists and keys it doesn't edit, without URL copies", () => {
+      const values = toolsetFormOf(OAUTH, true);
+      expect(values.region_only).toBe(true);
+      expect(values.mcp.auth.secret).toEqual({
+        key: "client_secret",
+        value: null,
+        state: "unchanged",
+        stored: "client_secret",
+      });
+      expect(toolsetDataOf(values, true)).toEqual({
+        schema: 2,
+        url: "https://dt.example/mcp",
+        headers: { "X-Tenant": SECRET_MASK },
+        timeout_seconds: 30,
+        auth: {
+          type: "oauth_client_credentials",
+          token_url: "https://sso.example/token",
+          client_id: "id-1",
+          client_secret: SECRET_MASK,
+          scope: "a b",
+          extra_params: { resource: "***" },
+        },
+        allowed_tools: ["search_*"],
+        write_tools: [],
+        tool_classes: [{ tool: "search_logs", class: "logs" }],
+        preset: { id: "dynatrace", revision: 2 },
+      });
+    });
+
+    it("asks for the client secret again when the token URL moves", () => {
+      const loaded = toolsetFormOf(OAUTH, true);
+      const values = structuredClone(loaded);
+      values.mcp.auth.token_url = "https://other.example/token";
+      expect(reenterReason(values, loaded, true)).toBe("destination");
+      expect(keptSecretPaths(values)).toEqual(["mcp.headers[0]", "mcp.auth.secret"]);
+    });
+
+    it("needs a client secret and an https token URL, and no typed Authorization header", () => {
+      const values = toolsetFormDefaults();
+      values.name = "dt";
+      values.mcp.url = "https://dt.example/mcp";
+      values.mcp.auth.client_id = "id-1";
+      values.mcp.auth.token_url = "http://sso.example/token";
+      values.mcp.headers = [{ key: "Authorization", value: "Bearer x", state: "new" }];
+      expect(issuesOf(values)).toEqual([
+        "mcp.auth.token_url=aiToolset.tokenUrlHttps",
+        "mcp.auth.secret.value=aiToolset.clientSecretRequired",
+        "mcp.headers.0.key=aiToolset.authorizationWithOauth",
+      ]);
+      const replicated = { ...NONE, missingSecretOk: () => true };
+      values.mcp.auth.token_url = "https://sso.example/token";
+      values.mcp.headers = [];
+      expect(issuesOf(values, replicated)).toEqual([]);
+    });
+
+    it("starts a new MCP with every tool off and refuses an empty preset field", () => {
+      const values = toolsetFormDefaults();
+      values.name = "dd";
+      values.mcp.url = "https://dd.example/mcp";
+      expect(toolsetDataOf(values, true).allowed_tools).toEqual([]);
+      values.mcp.preset_params = { site: " " };
+      expect(issuesOf(values)).toEqual(["mcp.preset_params.site=aiToolset.presetParamRequired"]);
+    });
   });
 
   it("loads AutoResolve's write headers by name only and keeps each unless it is replaced", () => {

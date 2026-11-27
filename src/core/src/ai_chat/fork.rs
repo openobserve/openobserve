@@ -944,6 +944,29 @@ pub(crate) mod tests {
         assert_eq!(plan_resume(&events), Err(ResumeRefusal::ReportSubmitted));
     }
 
+    #[test]
+    fn a_toolset_call_does_not_refuse_the_resume() {
+        let mut s = Session {
+            events: three_steps(),
+        };
+        for (i, tool) in ["submit_search", "vendor_submit_report"]
+            .into_iter()
+            .enumerate()
+        {
+            s.tool(
+                "msg_a3",
+                &format!("prt_p{i}"),
+                tool,
+                "completed",
+                json!({"markdown": "## Root cause"}),
+                json!({}),
+                5_000,
+                5_001,
+            );
+        }
+        assert_eq!(plan_resume(&s.events).unwrap().cut_seq, THREE_STEPS_CUT);
+    }
+
     /// Nothing to resume when no step would be left before the cut.
     #[test]
     fn no_step_before_the_cut_is_nothing_to_resume() {
@@ -1559,8 +1582,8 @@ pub(crate) mod tests {
         let events = crate::ai_chat::record_v2::tests::golden_events("v2_readtool.json");
         let fork = rewrite_ids(events.clone(), "fork-a");
         let (source, copy) = (
-            crate::ai_chat::projection::project(&events, ""),
-            crate::ai_chat::projection::project(&fork, ""),
+            crate::ai_chat::projection::project(&events, "", &Default::default()),
+            crate::ai_chat::projection::project(&fork, "", &Default::default()),
         );
         let id = |turns: &Value| {
             turns["turns"][0]["user_message_id"]

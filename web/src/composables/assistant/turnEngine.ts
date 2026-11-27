@@ -153,6 +153,8 @@ export interface EngineCapability {
   dataLevel?(): DataLevel | undefined;
   /** `capability.agents`; a spec's fake without it has no roster. */
   agents?(): CapabilityAgent[] | undefined;
+  /** The org's enabled toolsets by the name the agent calls them. */
+  toolsets?(): readonly string[] | undefined;
 }
 
 export interface TurnEngineDeps {
@@ -377,7 +379,10 @@ export function createTurnEngine(deps: TurnEngineDeps): TurnEngine {
       let answered = false;
       if (acceptsFrames(session.turn) || lateCard || catchUp) {
         rec.stream.messages = session.messages;
-        const live = { ...liveCtx(t), pendingApprovalId: session.pendingApproval?.id ?? null };
+        const live = {
+          ...liveCtx(t, deps),
+          pendingApprovalId: session.pendingApproval?.id ?? null,
+        };
         for (const effect of reduce(rec.stream, frame, live)) {
           if (effect.kind === "approval") {
             // A stopped turn asks nothing more; a card replayed by the catch-up would wait on a dead turn.
@@ -540,7 +545,7 @@ export function createTurnEngine(deps: TurnEngineDeps): TurnEngine {
       truncateAnswer(session, rec);
       for (const block of kept) appendToAnswer(session, rec, block);
       rec.stream = freshStream(session.messages);
-      for (const frame of rec.throughSeq) reduce(rec.stream, frame, liveCtx(t));
+      for (const frame of rec.throughSeq) reduce(rec.stream, frame, liveCtx(t, deps));
       mirrorExtras(session.turnMeta, rec.stream);
       return { stream: [], turn: [] };
     });
@@ -562,7 +567,7 @@ export function createTurnEngine(deps: TurnEngineDeps): TurnEngine {
               rec.stream.messages = session.messages;
               // The held card's id lets the reducer drop a second copy of an id-less card.
               const effects = reduce(rec.stream, frame, {
-                ...liveCtx(t),
+                ...liveCtx(t, deps),
                 pendingApprovalId: held ?? null,
               });
               mirrorExtras(session.turnMeta, rec.stream);
@@ -1500,12 +1505,14 @@ function liveOnlyFrames(frames: AssistantFrame[]): AssistantFrame[] {
   });
 }
 
-function liveCtx(t: TranslateFn): ReducerCtx {
+function liveCtx(t: TranslateFn, deps: Pick<TurnEngineDeps, "capability">): ReducerCtx {
+  const toolsets = deps.capability().toolsets?.();
   return {
     isActive: true,
     phase: "live",
     t,
     generateNavigation: (tool, args, body) => generateNavigationFromToolResult(tool, args, body, t),
+    ...(toolsets?.length && { toolsets: new Set(toolsets) }),
   };
 }
 

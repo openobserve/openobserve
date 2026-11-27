@@ -753,6 +753,12 @@ fn fleet_mutation(method: &Method, path: &str) -> bool {
     module == Some("fleet") || (segments.get(org_at) == Some(&"v2") && module == Some("fleets"))
 }
 
+/// Routes whose handler writes its own audit entry, so their bodies never reach the generic one.
+#[cfg(feature = "enterprise")]
+fn audits_itself(path: &str) -> bool {
+    path.ends_with("ai/chat_stream") || path.ends_with("ai/toolsets/_discover")
+}
+
 #[cfg(feature = "enterprise")]
 pub async fn audit_middleware(request: Request, next: Next) -> Response {
     let http_method = request.method().clone();
@@ -764,7 +770,9 @@ pub async fn audit_middleware(request: Request, next: Next) -> Response {
 
     if get_o2_config().common.audit_enabled
         && !(after_org.ends_with("_stream")
-            || path.ends_with("ai/chat_stream")
+            || audits_itself(&path)
+            || (http_method == Method::PUT
+                && openobserve_api_management::request::ai::memory::audits_own_put(&path))
             // The handler writes its own record: the body is the prompt, its images and context.
             || path.ends_with("ai/chat")
             || common::meta::ingestion_routes::is_ingestion_write(
@@ -1282,6 +1290,19 @@ pub fn basic_routes() -> Router {
                 require_features(&[Feature::Dashboards], req, next)
             }));
         router = router.merge(public);
+    }
+
+    // o2-ai's agent memory writes: the internal secret and the running turn are checked inside.
+    #[cfg(feature = "enterprise")]
+    {
+        router = router.route(
+            "/internal/ai/memory",
+            post(openobserve_api_management::request::ai::memory::internal_write).route_layer(
+                middleware::from_fn(|req, next| {
+                    require_features(&[Feature::AiAssistant], req, next)
+                }),
+            ),
+        );
     }
 
     // Unauthenticated like status pages: the share token is checked in the handler.
@@ -2202,8 +2223,32 @@ fn service_route_table() -> Router {
 
             // AI
             .route("/{org_id}/ai/toolsets", get(ai::toolsets::list).post(ai::toolsets::create))
+            .route("/{org_id}/ai/toolsets/_discover", post(ai::toolsets::discover))
+            .route("/{org_id}/ai/toolsets/_resync", post(ai::toolsets::resync))
+            .route("/{org_id}/ai/toolsets/prebuilt", get(ai::toolsets::prebuilt))
+            .route("/{org_id}/ai/toolsets/_list", get(ai::toolsets::list_for_agent))
             .route("/{org_id}/ai/toolsets/{id}", get(ai::toolsets::get).put(ai::toolsets::update).patch(ai::toolsets::patch).delete(ai::toolsets::delete))
             .route("/{org_id}/ai/toolsets/{id}/test", post(ai::toolsets::test))
+            .route("/{org_id}/ai/toolsets/{id}/memory", get(ai::memory::get_toolset_memory).put(ai::memory::update_toolset_memory))
+            .route("/{org_id}/ai/toolsets/{id}/memory/revisions", get(ai::memory::list_toolset_memory_revisions))
+            .route("/{org_id}/ai/toolsets/{id}/memory/revisions/{rev_id}", get(ai::memory::get_toolset_memory_revision))
+            .route("/{org_id}/ai/toolsets/{id}/memory/revisions/{rev_id}/accept", post(ai::memory::accept_toolset_memory_revision))
+            .route("/{org_id}/ai/toolsets/{id}/memory/revisions/{rev_id}/discard", post(ai::memory::discard_toolset_memory_revision))
+            .route("/{org_id}/ai/toolsets/{id}/memory/revert", post(ai::memory::revert_toolset_memory))
+            .route("/{org_id}/ai/memory/org", get(ai::memory::get_org_memory).put(ai::memory::update_org_memory))
+            .route("/{org_id}/ai/memory/org/revisions", get(ai::memory::list_org_memory_revisions))
+            .route("/{org_id}/ai/memory/org/revisions/{id}", get(ai::memory::get_org_memory_revision))
+            .route("/{org_id}/ai/memory/org/revisions/{id}/accept", post(ai::memory::accept_org_memory_revision))
+            .route("/{org_id}/ai/memory/org/revisions/{id}/discard", post(ai::memory::discard_org_memory_revision))
+            .route("/{org_id}/ai/memory/org/revert", post(ai::memory::revert_org_memory))
+            .route("/{org_id}/ai/memory/_resync", post(ai::memory::resync_memory))
+            .route("/{org_id}/ai/memory/pending", get(ai::memory::list_pending_memory_edits))
+            .route("/{org_id}/ai/memory/pending/accept", post(ai::memory::accept_pending_memory_edits))
+            .route("/{org_id}/ai/memory/pending/discard", post(ai::memory::discard_pending_memory_edits))
+            .route("/{org_id}/ai/memory/me", get(ai::memory::get_my_memory).put(ai::memory::update_my_memory).delete(ai::memory::delete_my_memory))
+            .route("/{org_id}/ai/memory/me/revisions", get(ai::memory::list_my_memory_revisions))
+            .route("/{org_id}/ai/memory/me/revisions/{id}", get(ai::memory::get_my_memory_revision))
+            .route("/{org_id}/ai/memory/me/revert", post(ai::memory::revert_my_memory))
 
             // RE patterns
             .route("/{org_id}/re_patterns", get(re_pattern::list).post(re_pattern::save))
@@ -4077,6 +4122,15 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn toolset_discovery_bodies_never_reach_the_generic_audit() {
+        assert!(audits_itself("api/acme/ai/toolsets/_discover"));
+        assert!(audits_itself("api/acme/ai/chat_stream"));
+        assert!(!audits_itself("api/acme/ai/toolsets"));
+        assert!(!audits_itself("api/acme/ai/toolsets/t1"));
+    }
+
     fn audited(method: Method, path: &str, body: &str) -> String {
         audit_body(&method, path, None, body.as_bytes().to_vec())
     }
@@ -4209,6 +4263,26 @@ mod tests {
         }
         assert!(
             body.contains(r#""max_tokens":5"#) && body.contains("kept"),
+            "{body}"
+        );
+    }
+
+    #[test]
+    fn a_toolset_write_s_credentials_never_reach_the_audit() {
+        let body = audited(
+            Method::PUT,
+            "api/acme/ai/toolsets/t1",
+            r#"{"description":"kept","data":{"url":"https://m.example/mcp?k=u-1",
+                "headers":{"DD-API-KEY":"h-1","X-Tenant":"h-2"},
+                "auth":{"type":"oauth_client_credentials","token_url":"https://s.example/t?k=t-1",
+                    "client_id":"c-1","client_secret":"s-1","extra_params":{"assertion":"e-1"}},
+                "allowed_tools":["search_logs"]}}"#,
+        );
+        for secret in ["u-1", "h-1", "h-2", "t-1", "c-1", "s-1", "e-1"] {
+            assert!(!body.contains(secret), "{secret} leaked: {body}");
+        }
+        assert!(
+            body.contains("kept") && body.contains("search_logs"),
             "{body}"
         );
     }

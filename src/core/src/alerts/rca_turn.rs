@@ -68,7 +68,10 @@ use o2_enterprise::enterprise::{
             HealthResponse, POLICY_CONTEXT_KEY, QueryRequest, RCA_AGENT_TYPE, SESSION_ID_HEADER,
             get_agent_client,
         },
-        toolsets::{McpEntry, SkillEntry, push::load_agent_tools},
+        toolsets::{
+            McpEntry, SkillEntry,
+            push::{AgentTools, TurnMemory, load_agent_tools, load_turn_memory},
+        },
     },
     alerts::rca_service,
     common::config::get_config as get_o2_config,
@@ -93,7 +96,7 @@ use crate::ai_chat::{
     cancel::cancel_chat_turn,
     fork,
     projection::Folded,
-    rca_ledger::{RunTranscript, TranscriptQuestion, decode_run},
+    rca_ledger::{RunTranscript, TranscriptQuestion, decode_run_with, run_tool_classes},
     rca_thread::{SUBMIT_REPORT, ThreadPart, ThreadStats, ToolPart, project_rca_thread},
     read_committed_events,
     record_v2::{event_parts, record_message},
@@ -373,9 +376,12 @@ async fn start_turn(
     fork: Option<ForkedSession>,
 ) -> Result<TurnStarted, RcaTurnError> {
     // A cancel may have ended the run since the decision to continue it.
+    let mut recorded_context = None;
     if run.session_id.is_some() {
         match runs_table::get_rw(&run.org_id, &run.run_id).await {
-            Ok(Some(row)) if runs_table::to_item(&row).state == RunState::Running => {}
+            Ok(Some(row)) if runs_table::to_item(&row).state == RunState::Running => {
+                recorded_context = runs_table::decode(row.context_used.as_deref());
+            }
             Ok(_) => {
                 return Err(RcaTurnError::Other(format!(
                     "run {} is no longer running",
@@ -386,13 +392,23 @@ async fn start_turn(
         }
     }
     let prompt = prompt.render();
-    let (mcps, skills) = load_agent_tools(&run.org_id).await;
+    let AgentTools {
+        mut mcps,
+        skills,
+        unavailable,
+    } = load_agent_tools(&run.org_id).await;
+    let toolsets = mcps.iter().map(|m| m.name.clone()).collect();
+    // No person is behind an RCA turn, so it gets no user memory.
+    let memory = load_turn_memory(&run.org_id, None, false, true, &mut mcps).await;
 
     let session_id = match run.session_id.clone() {
-        Some(session_id) => session_id,
+        Some(session_id) => {
+            record_continuation_memory(&run, recorded_context, &memory, &mcps).await;
+            session_id
+        }
         None => {
             let mut patch = RunUpdate {
-                context_used: Some(context_used(&run.context, &mcps, &skills)),
+                context_used: Some(context_used(&run.context, &mcps, &skills, &memory)),
                 ..Default::default()
             };
             let session_id = match fork {
@@ -475,7 +491,9 @@ async fn start_turn(
         })
         .ok();
     let mut request = rca_request(prompt, &run.context, settings.as_ref());
+    request.org_memory = memory.org;
     request.mcps = (!mcps.is_empty()).then_some(mcps);
+    request.unavailable_toolsets = (!unavailable.is_empty()).then_some(unavailable);
     request.skills = (!skills.is_empty()).then_some(skills);
     admission::apply_admission(&mut request, &admitted);
     let AdmittedTurn {
@@ -530,6 +548,14 @@ async fn start_turn(
         })),
         on_commit: Some(on_commit),
     };
+    let spec = TurnSpec {
+        on_commit: Some(crate::ai_chat::toolset_calls::with_toolset_calls(
+            &spec.identity,
+            toolsets,
+            spec.on_commit,
+        )),
+        ..spec
+    };
     // No reader; the turn forwards no frames and goes on to its end.
     spawn_headless_turn(spec, settings);
     Ok(started)
@@ -574,7 +600,12 @@ fn rca_policy(settings: Option<&OrgAiSettings>) -> Value {
 }
 
 /// Expose only the context actually provided to this run.
-fn context_used(context: &Value, mcps: &[McpEntry], skills: &[SkillEntry]) -> Value {
+fn context_used(
+    context: &Value,
+    mcps: &[McpEntry],
+    skills: &[SkillEntry],
+    memory: &TurnMemory,
+) -> Value {
     let past_causes: Vec<Value> = context
         .get("past_causes")
         .and_then(Value::as_array)
@@ -585,7 +616,71 @@ fn context_used(context: &Value, mcps: &[McpEntry], skills: &[SkillEntry]) -> Va
         .collect();
     let skills: Vec<&str> = skills.iter().map(|s| s.name.as_str()).collect();
     let toolsets: Vec<&str> = mcps.iter().map(|m| m.name.as_str()).collect();
-    json!({ "past_causes": past_causes, "skills": skills, "toolsets": toolsets })
+    json!({
+        "past_causes": past_causes,
+        "skills": skills,
+        "toolsets": toolsets,
+        "memory": memory_used(memory, mcps),
+    })
+}
+
+/// A continuation adds the revisions it delivers to the run's record; a failure only logs.
+async fn record_continuation_memory(
+    run: &RcaTurnRun,
+    recorded: Option<Value>,
+    memory: &TurnMemory,
+    mcps: &[McpEntry],
+) {
+    let Some(context_used) = with_memory_used(recorded, memory_used(memory, mcps)) else {
+        return;
+    };
+    let patch = RunUpdate {
+        context_used: Some(context_used),
+        ..Default::default()
+    };
+    if let Err(e) = rca_runs::update_run(&run.org_id, &run.run_id, patch).await {
+        log::warn!(
+            "[RCA_TURN] cannot record the memory run {} read: {e:#}",
+            run.run_id
+        );
+    }
+}
+
+/// `recorded` with the delivered entries it lacks appended; `None` when there is nothing new.
+fn with_memory_used(recorded: Option<Value>, delivered: Vec<Value>) -> Option<Value> {
+    let mut context = recorded.unwrap_or_else(|| json!({}));
+    let fields = context.as_object_mut()?;
+    let used = fields
+        .entry("memory")
+        .or_insert_with(|| json!([]))
+        .as_array_mut()?;
+    let before = used.len();
+    for entry in delivered {
+        if !used.contains(&entry) {
+            used.push(entry);
+        }
+    }
+    (used.len() > before).then_some(context)
+}
+
+/// Loaded memory blocks by op id, since two regions can reach the same rev with different text.
+fn memory_used(memory: &TurnMemory, mcps: &[McpEntry]) -> Vec<Value> {
+    let mut blocks = vec![];
+    if let Some(org) = &memory.org {
+        blocks.push(("org", "", org));
+    }
+    for mcp in mcps {
+        if let Some(block) = &mcp.memory {
+            blocks.push(("toolset", mcp.name.as_str(), block));
+        }
+    }
+    let mut used = vec![];
+    for (scope, scope_key, block) in blocks {
+        if let (false, Some(op_id)) = (block.not_loaded, &block.op_id) {
+            used.push(json!({ "scope": scope, "scope_key": scope_key, "op_id": op_id }));
+        }
+    }
+    used
 }
 
 /// One `[past:<cause>] <summary>` context line as `{id: "past:<cause>", summary}`.
@@ -662,12 +757,15 @@ async fn finalize(
         return false;
     }
 
+    let classes = run_tool_classes(&run).await;
     let ending = RunEnd {
         thread: events
             .as_deref()
             .map(|events| project_rca_thread(events, &turns, false, false).stats),
         reusable_steps: events.as_deref().and_then(fork::reusable_steps),
-        transcript: events.as_deref().map(decode_run),
+        transcript: events
+            .as_deref()
+            .map(|events| decode_run_with(events, &classes)),
         turn_error: turns
             .iter()
             .rev()
@@ -1957,7 +2055,7 @@ where
     }
     // What the transcript shows read stays read; every other row is not read.
     let transcript = match read_session(org_id, run.session_id.as_deref()).await {
-        Ok((events, _)) => Some(decode_run(&events)),
+        Ok((events, _)) => Some(decode_run_with(&events, &run_tool_classes(&run).await)),
         Err(e) => {
             log::warn!("[RCA_TURN] cannot read the transcript of cancelled run {run_id}: {e:#}");
             None
@@ -2155,7 +2253,7 @@ async fn end_at_deadline(org_id: &str, run_id: &str) -> bool {
     let ending = RunEnd {
         org_id: org_id.to_string(),
         thread: Some(project_rca_thread(&events, &turns, false, false).stats),
-        transcript: Some(decode_run(&events)),
+        transcript: Some(decode_run_with(&events, &run_tool_classes(&run).await)),
         reusable_steps: fork::reusable_steps(&events),
         turn_error: None,
         turn_message: None,
@@ -2374,9 +2472,66 @@ mod tests {
     use sea_orm::{ActiveModelTrait, EntityTrait};
 
     use super::*;
+
+    #[test]
+    fn a_continuation_appends_newly_delivered_revisions_and_keeps_the_rest() {
+        let org = |op: &str| json!({"scope": "org", "scope_key": "", "op_id": op});
+        let recorded =
+            json!({"toolsets": ["datadog"], "resumed_from": "s0", "memory": [org("op1")]});
+        let merged =
+            with_memory_used(Some(recorded.clone()), vec![org("op1"), org("op2")]).unwrap();
+        assert_eq!(merged["memory"], json!([org("op1"), org("op2")]));
+        assert_eq!(merged["toolsets"], recorded["toolsets"]);
+        assert_eq!(merged["resumed_from"], "s0");
+        assert!(with_memory_used(Some(recorded), vec![org("op1")]).is_none());
+        let fresh = with_memory_used(None, vec![org("op3")]).unwrap();
+        assert_eq!(fresh, json!({"memory": [org("op3")]}));
+    }
+
+    #[test]
+    fn context_used_lists_the_op_ids_of_loaded_memory_only() {
+        use config::meta::ai::memory::MemoryBlock;
+        let block = |op_id: Option<&str>, not_loaded: bool| MemoryBlock {
+            rev: 1,
+            op_id: op_id.map(str::to_string),
+            not_loaded,
+            ..Default::default()
+        };
+        let mcp = |name: &str, memory: MemoryBlock| McpEntry {
+            name: name.to_string(),
+            memory: Some(memory),
+            ..Default::default()
+        };
+        let mcps = [
+            mcp("loaded", block(Some("op-t1"), false)),
+            mcp("skipped", block(Some("op-s1"), true)),
+            mcp("never-written", block(None, false)),
+        ];
+        let memory = TurnMemory {
+            org: Some(block(Some("op-o1"), false)),
+            user: None,
+        };
+        let used = context_used(&json!({}), &mcps, &[], &memory);
+        assert_eq!(
+            used["memory"],
+            json!([
+                {"scope": "org", "scope_key": "", "op_id": "op-o1"},
+                {"scope": "toolset", "scope_key": "loaded", "op_id": "op-t1"},
+            ])
+        );
+        assert_eq!(
+            used["toolsets"],
+            json!(["loaded", "skipped", "never-written"])
+        );
+        let none = context_used(&json!({}), &[], &[], &TurnMemory::default());
+        assert_eq!(none["memory"], json!([]));
+    }
     use crate::{
         ai_chat::{
-            rca_ledger::tests::{H1, H2, hypothesis, ledger_session, submit, verdict},
+            rca_ledger::{
+                decode_run,
+                tests::{H1, H2, hypothesis, ledger_session, submit, verdict},
+            },
             rca_thread::tests::{
                 SECOND_REPORT, Session, T, VISIBLE_TOOL_CALLS, hits, rca_session, search_sql,
                 without_report,

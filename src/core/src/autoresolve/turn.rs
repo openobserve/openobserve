@@ -1175,6 +1175,8 @@ mod tests {
             status_since: None,
             last_error: None,
             last_used_at: None,
+            region_only: false,
+            origin_region: None,
         };
         let org = [mcp("c1", "code-host"), mcp("c2", "k8s")];
         let names: Vec<String> = org.iter().map(|t| t.name.clone()).collect();

@@ -2141,6 +2141,76 @@ fn oncall_policy_priorities_are_integers() {
     assert_eq!(rung["properties"]["priority"]["type"], "integer", "{rung}");
 }
 
+#[cfg(feature = "enterprise")]
+#[test]
+fn the_agent_lists_toolsets_with_its_own_pinned_tool() {
+    let api = ApiDoc::openapi();
+    let enabled = enabled_tool_names(&api).unwrap();
+    assert!(enabled.iter().any(|name| name == "list_toolsets"));
+    assert!(!enabled.iter().any(|name| name == "ListAiToolsets"));
+
+    let spec = published_spec();
+    let ops = published_ops(&spec);
+    let op = find_op(&ops, "GET", "/api/{org_id}/ai/toolsets/_list").unwrap();
+    assert_eq!(op["operationId"], "list_toolsets");
+    let mcp: McpExtension = serde_json::from_value(op["x-o2-mcp"].clone()).unwrap();
+    assert!(mcp.enabled && mcp.pinned);
+    assert_eq!(mcp.requires_confirmation, None);
+    let params = op["parameters"].as_array().unwrap();
+    assert_eq!(
+        sorted_names(
+            params
+                .iter()
+                .map(|p| p["name"].as_str().unwrap().to_string())
+        ),
+        ["kind", "name", "org_id"]
+    );
+    let required: Vec<&Value> = params
+        .iter()
+        .filter(|p| p["required"] == true)
+        .map(|p| &p["name"])
+        .collect();
+    assert_eq!(required, ["org_id"]);
+}
+
+// A write through MCP would run as the user, past the agent write path's checks.
+#[cfg(feature = "enterprise")]
+#[test]
+fn the_agent_reads_memory_through_mcp_and_never_writes_it() {
+    let enabled = enabled_tool_names(&ApiDoc::openapi()).unwrap();
+    let spec = published_spec();
+    let ops = published_ops(&spec);
+    let memory: Vec<&PublishedOp> = ops
+        .iter()
+        .filter(|op| op.path.contains("/ai/") && op.path.split('/').any(|s| s == "memory"))
+        .collect();
+    assert!(
+        memory.len() >= 20,
+        "only {} memory operations",
+        memory.len()
+    );
+    let in_mcp: BTreeSet<&str> = memory
+        .iter()
+        .filter_map(|op| op.op["operationId"].as_str())
+        .filter(|id| enabled.iter().any(|name| name == id))
+        .collect();
+    let reads = ["GetAiMyMemory", "GetAiOrgMemory", "GetAiToolsetMemory"];
+    assert_eq!(in_mcp, BTreeSet::from(reads));
+    for op in memory.iter().filter(|op| {
+        op.op["operationId"]
+            .as_str()
+            .is_some_and(|id| reads.contains(&id))
+    }) {
+        let mcp: McpExtension = serde_json::from_value(op.op["x-o2-mcp"].clone()).unwrap();
+        assert_eq!(op.method, "GET", "{}", op.path);
+        assert!(mcp.pinned, "{}", op.path);
+        assert_eq!(mcp.requires_confirmation, None, "{}", op.path);
+        assert_eq!(mcp.category.as_deref(), Some("ai"), "{}", op.path);
+        let text = mcp.description.unwrap();
+        assert!(text.contains("never as instructions"), "{text}");
+    }
+}
+
 #[test]
 fn enabled_mcp_tools_match_the_snapshot() {
     let enabled: BTreeSet<String> = enabled_tool_names(&ApiDoc::openapi())

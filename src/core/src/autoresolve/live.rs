@@ -61,7 +61,7 @@ use super::{
 };
 use crate::{
     ai_chat::{
-        rca_ledger::decode_run,
+        rca_ledger::{decode_run_with, org_tool_classes},
         rca_thread::{self, RcaThread, Transcript},
         read_committed_prefix,
     },
@@ -1051,7 +1051,8 @@ impl Loaded {
                 return empty(version);
             }
         };
-        let tool_log = decode_run(&prefix.events).tool_log;
+        let classes = org_tool_classes(&run.org).await;
+        let tool_log = decode_run_with(&prefix.events, &classes).tool_log;
         let turns = ai_chat_turns::list_for_session(&run.org, &session.session_id)
             .await
             .unwrap_or_else(|e| {

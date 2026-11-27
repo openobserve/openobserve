@@ -22,7 +22,9 @@ use config::{
         alerts::rca_steering::SteerKind,
         autoresolve::{AUTORESOLVE_TOOL_PREFIX, PLANNING_HELD_PREFIX},
         oncall::{
-            confidence::{KEY_ARG_MAX_BYTES, cut_bytes, is_prometheus_tool, strip_call_ref},
+            confidence::{
+                KEY_ARG_MAX_BYTES, ToolsetNames, cut_bytes, is_prometheus_tool, strip_call_ref,
+            },
             rca_run::summarize_result,
         },
     },
@@ -39,7 +41,7 @@ use utoipa::ToSchema;
 use super::{
     projection::{
         Folded, HIDDEN_TOOLS, SESSION_ARG, coerce_tool_output, extract_error_message,
-        extract_mcp_response, is_injected, obj, strip_mcp_prefix, truthy,
+        extract_mcp_response, is_injected, obj, strip_mcp_prefix, truthy, vendor_label,
     },
     rca_ledger::{ASK_RESPONDERS, question_of, split_steers},
 };
@@ -92,7 +94,7 @@ pub(crate) struct ToolPart<'a> {
     part: &'a Map<String, Value>,
     /// Empty when a `tools_call` names no tool.
     pub(crate) tool: &'a str,
-    /// `tools_call`'s `args`, else the part's input.
+    /// `tools_call`'s arguments, else the part's input.
     input: Option<&'a Map<String, Value>>,
     pub(crate) state: Option<&'a Map<String, Value>>,
     /// `state.status`: `pending`, `running`, `completed` or `error`.
@@ -131,9 +133,20 @@ impl<'a> ToolPart<'a> {
         })
     }
 
-    /// How the part counts in the thread.
+    /// How the part counts in the thread; first-party names never split, so no toolset changes it.
     pub(crate) fn kind(&self) -> ThreadPart {
         ThreadPart::of(self.tool, self.status, self.arg("stage"))
+    }
+
+    /// A toolset call's own `(toolset, tool)`, from the part's name as the agent had it.
+    pub(crate) fn vendor(&self, toolsets: &ToolsetNames) -> Option<(&'a str, &'a str)> {
+        toolsets.split(self.part.get("tool")?.as_str()?)
+    }
+
+    /// What a row shows: `tool`, or `<toolset> · <tool>` for a toolset call.
+    pub(crate) fn label(&self, toolsets: &ToolsetNames) -> String {
+        self.vendor(toolsets)
+            .map_or_else(|| self.tool.to_string(), vendor_label)
     }
 
     /// One argument.
@@ -377,16 +390,29 @@ pub fn state_version(
     format!("{last_committed_seq}.{session_updated_at}.{run_updated_at}{io}")
 }
 
-/// The thread of an RCA session.
+/// [`project_rca_thread_with`] for a caller that shows no tool names, such as one after the stats.
 pub fn project_rca_thread(
     events: &[DurableEvent],
     turns: &[ai_chat_turns::Model],
     active: bool,
     show_tool_io: bool,
 ) -> RcaThread {
+    let toolsets = ToolsetNames::default();
+    project_rca_thread_with(events, turns, active, show_tool_io, &toolsets)
+}
+
+/// The thread of an RCA session; a call of one of `toolsets` shows as `toolset · tool`.
+pub fn project_rca_thread_with(
+    events: &[DurableEvent],
+    turns: &[ai_chat_turns::Model],
+    active: bool,
+    show_tool_io: bool,
+    toolsets: &ToolsetNames,
+) -> RcaThread {
     let builder = Builder {
         active,
         show_tool_io,
+        toolsets: Some(toolsets),
         ..Default::default()
     };
     project(events, turns, builder)
@@ -410,7 +436,7 @@ pub fn project_autoresolve_thread(
 fn project(
     events: &[DurableEvent],
     turns: &[ai_chat_turns::Model],
-    mut builder: Builder,
+    mut builder: Builder<'_>,
 ) -> RcaThread {
     let folded = Folded::fold(events);
     let empty = Map::new();
@@ -439,9 +465,10 @@ fn project(
 }
 
 #[derive(Default)]
-struct Builder {
+struct Builder<'a> {
     active: bool,
     show_tool_io: bool,
+    toolsets: Option<&'a ToolsetNames>,
     connections: HashMap<String, String>,
     started: Option<ThreadStart>,
     user_messages: Vec<ThreadUserMessage>,
@@ -464,7 +491,7 @@ struct StepAcc {
     last_end: Option<i64>,
 }
 
-impl Builder {
+impl Builder<'_> {
     fn observe(&mut self, ms: Option<&Value>) {
         let Some(ms) = ms.and_then(as_i64) else {
             return;
@@ -631,9 +658,8 @@ impl Builder {
             ),
         };
         let input = call.args();
-        let tool = call.tool.to_string();
         let call_id = call.call_id();
-        let connection = self.connection_of(&tool);
+        let connection = self.connection_of(call.tool);
         let (input_out, output) = if self.show_tool_io {
             (Some(Value::Object(input.clone())), raw_output(state))
         } else {
@@ -641,8 +667,10 @@ impl Builder {
         };
         let row = ThreadToolCall {
             call_id,
-            key_arg: key_arg(&tool, &input),
-            tool,
+            key_arg: key_arg(call.tool, &input),
+            tool: self
+                .toolsets
+                .map_or_else(|| call.tool.to_string(), |t| call.label(t)),
             status,
             interrupted: !self.active && !matches!(call.status, "completed" | "error"),
             held: held_while_planning(state),
@@ -1342,6 +1370,108 @@ pub(crate) mod tests {
                 assert!(row.result_summary.is_some(), "{row:?}");
             }
         }
+    }
+
+    #[test]
+    fn a_toolset_call_is_a_toolset_row_and_an_unknown_prefix_keeps_its_name() {
+        let mut s = Session::new();
+        s.message("msg_a1", "assistant", json!({"created": T}));
+        let calls = [
+            ("toolset_read_output", json!({"ref": "r1", "offset": 16000})),
+            (
+                "datadog-prod_search_logs",
+                json!({"query": "service:checkout"}),
+            ),
+            ("datadog_search_logs", json!({"query": "x"})),
+            ("gone_search_logs", json!({"query": "x"})),
+            ("o2_datadog_search", json!({"query": "x"})),
+            (
+                "o2_tools_call",
+                json!({"tool": "o2_datadog_logs", "args": {"q": 1}}),
+            ),
+        ];
+        for (i, (tool, input)) in calls.into_iter().enumerate() {
+            s.tool(
+                "msg_a1",
+                &format!("prt_t{i}"),
+                tool,
+                "completed",
+                input,
+                json!({"output": "{\"hits\":3}"}),
+                100 + i as i64 * 10,
+                105 + i as i64 * 10,
+            );
+        }
+
+        let toolsets = ["datadog", "datadog-prod"]
+            .map(String::from)
+            .into_iter()
+            .collect();
+        let thread = project_rca_thread_with(&s.events, &[], false, false, &toolsets);
+        let rows: Vec<&str> = thread.steps[0]
+            .tool_calls
+            .iter()
+            .map(|c| c.tool.as_str())
+            .collect();
+        assert_eq!(
+            rows,
+            [
+                "datadog-prod · search_logs",
+                "datadog · search_logs",
+                "gone_search_logs",
+                "datadog_search",
+                "datadog_logs",
+            ],
+            "toolset_read_output is no row, and O2's own tools are no toolset's"
+        );
+        assert_eq!(
+            thread.steps[0].tool_calls[0].key_arg.as_deref(),
+            Some("{\"query\":\"service:checkout\"}")
+        );
+    }
+
+    #[test]
+    fn no_toolset_name_takes_over_a_control_or_hidden_tool() {
+        let toolsets: ToolsetNames = HIDDEN_TOOLS
+            .iter()
+            .filter_map(|t| Some(t.split_once('_')?.0.to_string()))
+            .collect();
+        for tool in HIDDEN_TOOLS {
+            assert_eq!(toolsets.split(tool), None, "{tool}");
+        }
+
+        let mut s = Session::new();
+        s.message("msg_a1", "assistant", json!({"created": T}));
+        let calls = [
+            (
+                "record_step",
+                json!({"stage": "metrics", "title": "Metrics"}),
+            ),
+            ("record_search", json!({"query": "x"})),
+            ("submit_search", json!({"query": "x"})),
+        ];
+        for (i, (tool, input)) in calls.into_iter().enumerate() {
+            s.tool(
+                "msg_a1",
+                &format!("prt_v{i}"),
+                tool,
+                "completed",
+                input,
+                json!({"output": "{}"}),
+                100 + i as i64 * 10,
+                105 + i as i64 * 10,
+            );
+        }
+        let thread = project_rca_thread_with(&s.events, &[], false, false, &toolsets);
+        assert_eq!(thread.steps.len(), 1);
+        assert_eq!(thread.steps[0].title, "Metrics");
+        let rows: Vec<&str> = thread.steps[0]
+            .tool_calls
+            .iter()
+            .map(|c| c.tool.as_str())
+            .collect();
+        assert_eq!(rows, ["record · search", "submit · search"]);
+        assert!(!thread.report_submitted);
     }
 
     #[test]

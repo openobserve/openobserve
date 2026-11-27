@@ -12,9 +12,19 @@
 // this file only describes what is valid.
 
 import { z } from "zod";
+import {
+  emptyAuth,
+  isAuthorizationHeader,
+  isHttpsUrl,
+  REDACTED,
+  sameUrl,
+  usesClientCredentials,
+  type ToolsetAuth,
+} from "./toolsetAuth";
 
-// Name char rule: letters, digits, hyphen, underscore.
-export const aiToolsetNameRegex = /^[a-zA-Z0-9_-]+$/;
+// The server's create rule: the name the agent sees, so normalization never changes it.
+export const aiToolsetNameRegex = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+export const AI_TOOLSET_NAME_MAX = 64;
 
 // One row of a key/value secret list (mcp headers). All fields are
 // free-form and optional (a blank starter row is valid — only non-empty rows are
@@ -26,25 +36,46 @@ export const secretRowSchema = z.object({
   visible: z.boolean().optional(),
 });
 
-export const makeAddAiToolsetSchema = (t: (_key: string) => string) =>
+// Saved toolsets keep legacy names (names are immutable), so the name rule only gates a create.
+export const makeAddAiToolsetSchema = (
+  t: (_key: string) => string,
+  isEditing: () => boolean = () => false,
+  // A row replicated without this region's secret takes edits that leave its credentials alone.
+  missingSecretOk: (_mcp: { url?: string; auth: ToolsetAuth }) => boolean = () => false,
+  // What an edit started from; a stored secret is kept only for the URLs it was entered for.
+  loaded: () => { url?: string; auth: ToolsetAuth } | null = () => null,
+) =>
   z
     .object({
       // ── Always validated ────────────────────────────────────────────────
-      name: z
-        .string()
-        .min(1, t("aiToolset.nameRequired"))
-        .regex(aiToolsetNameRegex, t("aiToolset.nameInvalid"))
-        .max(256, t("aiToolset.nameTooLong")),
+      name: z.string().min(1, t("aiToolset.nameRequired")),
       kind: z.string().min(1, t("aiToolset.kindRequired")),
       description: z.string().optional(),
+      region_only: z.boolean().optional(),
 
-      // ── MCP fields (validated only when kind === "mcp" — see superRefine) ─
-      // Number inputs emit strings → z.coerce.number(); consumers coerce at use.
-      // `headers` is a form-owned dynamic array-field (no validation rule).
+      // Validated only when kind === "mcp" (see superRefine); number inputs emit strings.
       mcp: z.object({
         url: z.string().optional(),
+        // A preset's URL-template fields; the URL is rebuilt from them, so none is saved or drafted.
+        preset_params: z.record(z.string(), z.string()).optional().default({}),
         timeout_seconds: z.coerce.number().optional(),
         headers: z.array(secretRowSchema).optional().default([]),
+        auth: z
+          .object({
+            token_url: z.string().optional(),
+            client_id: z.string().optional(),
+            client_secret: z.string().optional(),
+            scope: z.string().optional(),
+            extra: z.record(z.string(), z.any()).optional().default({}),
+          })
+          .optional()
+          .default(emptyAuth()),
+        // `null` is an absent key, so the agent's default for that list applies.
+        allowed_tools: z.array(z.string()).nullable().default(null),
+        blocked_tools: z.array(z.string()).nullable().default(null),
+        write_tools: z.array(z.string()).nullable().default(null),
+        // Stored keys this form doesn't edit (e.g. `tool_classes`), sent back as they are.
+        extra: z.record(z.string(), z.any()).optional().default({}),
       }),
 
       // ── Skill fields (content validated only when kind === "skill") ───────
@@ -56,6 +87,22 @@ export const makeAddAiToolsetSchema = (t: (_key: string) => string) =>
       }),
     })
     .superRefine((val, ctx) => {
+      if (!isEditing() && val.name) {
+        if (!aiToolsetNameRegex.test(val.name)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["name"],
+            message: t("aiToolset.nameInvalid"),
+          });
+        }
+        if (val.name.length > AI_TOOLSET_NAME_MAX) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["name"],
+            message: t("aiToolset.nameTooLong"),
+          });
+        }
+      }
       // mcp.url required when kind === "mcp". Bare empty check (NO trim): a
       // whitespace-only url is accepted. (Note the asymmetry: skill.content below
       // DOES trim; url does not.)
@@ -65,6 +112,49 @@ export const makeAddAiToolsetSchema = (t: (_key: string) => string) =>
           path: ["mcp", "url"],
           message: t("aiToolset.mcpUrlRequired"),
         });
+      }
+      if (val.kind === "mcp") {
+        const auth = val.mcp.auth;
+        const refuse = (path: (string | number)[], message: string) =>
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["mcp", ...path],
+            message: t(message),
+          });
+        const stored = loaded();
+        const urlChanged = !!stored && !sameUrl(val.mcp.url, stored.url);
+        val.mcp.headers.forEach((row, index) => {
+          if (urlChanged && row.value === REDACTED) {
+            refuse(["headers", index, "value"], "aiToolset.reenterSecretForUrl");
+          }
+        });
+        for (const [param, value] of Object.entries(val.mcp.preset_params)) {
+          if (!value.trim()) refuse(["preset_params", param], "aiToolset.presetParamRequired");
+        }
+        if (usesClientCredentials(auth)) {
+          if (!auth.token_url?.trim()) {
+            refuse(["auth", "token_url"], "aiToolset.tokenUrlRequired");
+          } else if (!isHttpsUrl(auth.token_url)) {
+            refuse(["auth", "token_url"], "aiToolset.tokenUrlHttps");
+          }
+          if (!auth.client_secret?.trim() && !missingSecretOk(val.mcp)) {
+            refuse(["auth", "client_secret"], "aiToolset.clientSecretRequired");
+          } else if (
+            auth.client_secret === REDACTED &&
+            stored &&
+            (urlChanged || !sameUrl(auth.token_url, stored.auth.token_url))
+          ) {
+            refuse(["auth", "client_secret"], "aiToolset.reenterSecretForUrl");
+          }
+          val.mcp.headers.forEach((row, index) => {
+            if (isAuthorizationHeader(row) && row.value) {
+              refuse(["headers", index, "key"], "aiToolset.authorizationWithOauth");
+            }
+          });
+        } else if (auth.client_secret?.trim()) {
+          // Without a client id the secret would be dropped without a word.
+          refuse(["auth", "client_id"], "aiToolset.clientIdRequired");
+        }
       }
       // skill.content required when kind === "skill". Trim IS applied here —
       // unlike url above.
@@ -86,6 +176,18 @@ export const addAiToolsetDefaults = (): AddAiToolsetForm => ({
   name: "",
   kind: "mcp",
   description: "",
-  mcp: { url: "", timeout_seconds: 30, headers: [] },
+  region_only: false,
+  // A new custom MCP starts with every tool off; the picker turns tools on.
+  mcp: {
+    url: "",
+    preset_params: {},
+    timeout_seconds: 30,
+    headers: [],
+    auth: emptyAuth(),
+    allowed_tools: [],
+    blocked_tools: null,
+    write_tools: null,
+    extra: {},
+  },
   skill: { content: "" },
 });

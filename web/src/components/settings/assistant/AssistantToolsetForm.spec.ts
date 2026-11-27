@@ -38,9 +38,25 @@ vi.mock("@/composables/assistant", async (importOriginal) => ({
   useAssistantCapability: () => fake.current!.handle,
 }));
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast }));
-vi.mock("@/components/CodeQueryEditor.vue", () => ({ default: { render: () => null } }));
+vi.mock("@/components/CodeQueryEditor.vue", () => ({
+  __esModule: true,
+  default: {
+    name: "QueryEditorStub",
+    props: ["query"],
+    emits: ["update:query"],
+    render: () => null,
+  },
+}));
 vi.mock("@/services/ai_toolsets", () => ({
-  default: { list: vi.fn(), get: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn() },
+  default: {
+    list: vi.fn(),
+    get: vi.fn(),
+    create: vi.fn(),
+    update: vi.fn(),
+    delete: vi.fn(),
+    prebuilt: vi.fn(),
+    discover: vi.fn(),
+  },
 }));
 
 const STORED = {
@@ -51,14 +67,44 @@ const STORED = {
   data: { url: "https://pd.example/mcp", timeout_seconds: 20, headers: { Authorization: "***" } },
 };
 
+const DATADOG = {
+  id: "datadog",
+  kind: "mcp",
+  label: "Datadog",
+  revision: 3,
+  url_template: "https://mcp.{site}/api/mcp",
+  params: [{ name: "site", label: "Site", options: ["datadoghq.com"], default: "datadoghq.com" }],
+  headers: [{ name: "DD-API-KEY" }],
+  allowed_tools: ["search_logs"],
+  write_tools: [],
+  tool_classes: [{ tool: "search_logs", class: "logs" }],
+};
+
+const OAUTH = {
+  ...STORED,
+  needs_credentials: false,
+  data: {
+    url: "https://dt.example/mcp",
+    timeout_seconds: 30,
+    headers: {},
+    auth: {
+      type: "oauth_client_credentials",
+      token_url: "https://sso.example/token",
+      client_id: "id-1",
+      client_secret: "***",
+    },
+    allowed_tools: ["search_*"],
+  },
+};
+
 async function settle() {
   await flushPromises();
   await new Promise((resolve) => setTimeout(resolve, 0));
   await flushPromises();
 }
 
-async function mountForm(props: Record<string, unknown>) {
-  const h = settingsHarness();
+async function mountForm(props: Record<string, unknown>, zoConfig: Record<string, unknown> = {}) {
+  const h = settingsHarness(zoConfig);
   await h.router.push("/settings/assistant/toolsets");
   const w = mount(AssistantToolsetForm, {
     props: { existing: [], mergeSecrets: true, ...props },
@@ -80,6 +126,8 @@ beforeEach(() => {
   fake.current = fakeAssistant("available");
   vi.mocked(aiToolsets.update).mockResolvedValue({ data: {} } as never);
   vi.mocked(aiToolsets.create).mockResolvedValue({ data: {} } as never);
+  vi.mocked(aiToolsets.prebuilt).mockResolvedValue({ data: { presets: [DATADOG] } } as never);
+  vi.mocked(aiToolsets.discover).mockRejectedValue({ response: { status: 503 } });
 });
 
 afterEach(() => {
@@ -99,10 +147,12 @@ describe("AssistantToolsetForm", () => {
     expect(aiToolsets.update).toHaveBeenCalledWith("acme", "ts_1", {
       description: "Pages people",
       data: {
+        schema: 2,
         url: "https://pd.example/mcp",
         timeout_seconds: 20,
         headers: { Authorization: "***" },
       },
+      region_only: false,
     });
     expect(toast).toHaveBeenCalledWith(expect.objectContaining({ message: "Toolset updated" }));
   });
@@ -257,9 +307,16 @@ describe("AssistantToolsetForm", () => {
     expect(vi.mocked(aiToolsets.update).mock.calls[0][2]).toMatchObject({ description: "" });
   });
 
-  it("offers MCP and skill when adding a toolset", async () => {
+  it("offers MCP and skill when adding a toolset, and locks the type on edit", async () => {
     const w = (wrapper = await mountForm({}));
-    expect(w.getComponent(OFormSelect).props("options")).toEqual([
+    expect(w.find('[data-test="ai-toolset-type-step"]').exists()).toBe(true);
+    expect(w.find('[data-test="ai-toolsets-add-custom-mcp"]').exists()).toBe(true);
+    expect(w.find('[data-test="ai-toolsets-add-skill"]').exists()).toBe(true);
+    w.unmount();
+    vi.mocked(aiToolsets.get).mockResolvedValue({ data: STORED } as never);
+    const edit = (wrapper = await mountForm({ editId: "ts_1" }));
+    expect(edit.find('[data-test="ai-toolset-type-step"]').exists()).toBe(false);
+    expect(edit.getComponent(OFormSelect).props("options")).toEqual([
       expect.objectContaining({ value: "mcp" }),
       expect.objectContaining({ value: "skill" }),
     ]);
@@ -284,7 +341,10 @@ describe("AssistantToolsetForm", () => {
 
   it("previews the agent name and confirms the create in a toast", async () => {
     const w = (wrapper = await mountForm({}));
-    await w.find('[data-test="ai-toolset-name-input"] input').setValue("My_Tool");
+    await w.find('[data-test="ai-toolsets-add-custom-mcp"]').trigger("click");
+    await w.find('[data-test="ai-toolset-continue-btn"]').trigger("click");
+    await settle();
+    await w.find('[data-test="ai-toolset-name-input"] input').setValue("my-tool");
     await settle();
     expect(w.find('[data-test="ai-toolset-agent-name"]').text()).toBe(
       `${en.brand.autobot} calls this my-tool`,
@@ -293,12 +353,85 @@ describe("AssistantToolsetForm", () => {
     await save(w);
     expect(aiToolsets.create).toHaveBeenCalledWith(
       "acme",
-      expect.objectContaining({ name: "My_Tool", kind: "mcp" }),
+      expect.objectContaining({
+        name: "my-tool",
+        kind: "mcp",
+        region_only: false,
+        // A new custom MCP starts with every tool off until the picker turns some on.
+        data: expect.objectContaining({ schema: 2, allowed_tools: [] }),
+      }),
     );
     expect(toast).toHaveBeenCalledWith(
       expect.objectContaining({
         message: "Toolset added",
       }),
     );
+  });
+
+  it("fills a preset's URL, headers and tools, and remembers the preset", async () => {
+    const w = (wrapper = await mountForm({}));
+    await w.find('[data-test="ai-toolsets-add-datadog"]').trigger("click");
+    await w.find('[data-test="ai-toolset-continue-btn"]').trigger("click");
+    await settle();
+    expect(w.find('[data-test="ai-toolset-mcp-url"] input').element).toHaveProperty(
+      "value",
+      "https://mcp.datadoghq.com/api/mcp",
+    );
+    await w.find('[data-test="ai-toolset-header-0-input"] input').setValue("k");
+    await save(w);
+    const body = vi.mocked(aiToolsets.create).mock.calls[0][1];
+    expect(body).toMatchObject({ name: "datadog", kind: "mcp" });
+    expect(body.data).toMatchObject({
+      url: "https://mcp.datadoghq.com/api/mcp",
+      headers: { "DD-API-KEY": "k" },
+      allowed_tools: ["search_logs"],
+      write_tools: [],
+      tool_classes: [{ tool: "search_logs", class: "logs" }],
+      preset: { id: "datadog", revision: 3 },
+    });
+  });
+
+  it("keeps a stored OAuth client secret and lists the tools on open", async () => {
+    vi.mocked(aiToolsets.get).mockResolvedValue({ data: OAUTH } as never);
+    vi.mocked(aiToolsets.discover).mockResolvedValue({
+      data: { tools: [{ name: "search_logs", read_only_hint: true }] },
+    } as never);
+    const w = (wrapper = await mountForm({ editId: "ts_1" }));
+    expect(aiToolsets.discover).toHaveBeenCalledWith("acme", {
+      id: "ts_1",
+      overrides: expect.objectContaining({
+        url: "https://dt.example/mcp",
+        auth: expect.objectContaining({ client_id: "id-1", client_secret: "***" }),
+      }),
+    });
+    expect(w.html()).not.toContain("***");
+    await save(w);
+    const data = vi.mocked(aiToolsets.update).mock.calls[0][2].data!;
+    expect(data.auth).toMatchObject({ client_id: "id-1", client_secret: "***" });
+    expect(data.tools_verified_at).toBeTypeOf("number");
+  });
+
+  it("warns about a long skill and saves an edit of only its content", async () => {
+    const skill = { ...STORED, kind: "skill", data: { content: "## Old" } };
+    vi.mocked(aiToolsets.get).mockResolvedValue({ data: skill } as never);
+    const w = (wrapper = await mountForm({ editId: "ts_1" }));
+    expect(w.find('[data-test="ai-toolset-skill-long"]').exists()).toBe(false);
+    const editor = w.findComponent({ name: "QueryEditorStub" });
+    editor.vm.$emit("update:query", "x".repeat(40_001));
+    await settle();
+    expect(w.find('[data-test="ai-toolset-skill-long"]').exists()).toBe(true);
+    editor.vm.$emit("update:query", "## New");
+    await settle();
+    await save(w);
+    expect(vi.mocked(aiToolsets.update).mock.calls[0][2].data).toEqual({ content: "## New" });
+  });
+
+  it("offers the region-only switch only on a super cluster", async () => {
+    vi.mocked(aiToolsets.get).mockResolvedValue({ data: STORED } as never);
+    const plain = (wrapper = await mountForm({ editId: "ts_1" }));
+    expect(plain.find('[data-test="ai-toolset-region-only"]').exists()).toBe(false);
+    plain.unmount();
+    const w = (wrapper = await mountForm({ editId: "ts_1" }, { super_cluster_enabled: true }));
+    expect(w.find('[data-test="ai-toolset-region-only"]').exists()).toBe(true);
   });
 });

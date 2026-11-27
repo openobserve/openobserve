@@ -101,7 +101,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import type { I18nKey } from "@/types/i18n";
 
 export type AssistantSettingsTab =
-  "status" | "access" | "data" | "history" | "usage" | "toolsets" | "permissions" | "activity";
+  | "status"
+  | "access"
+  | "data"
+  | "history"
+  | "usage"
+  | "toolsets"
+  | "memory"
+  | "permissions"
+  | "activity";
 
 export interface AssistantSettingsViewProps {
   tab?: AssistantSettingsTab;
@@ -121,6 +129,7 @@ export const SETTINGS_TABS: {
   { id: "history", labelKey: "assistant.settings.tabs.history", writes: false, list: false },
   { id: "usage", labelKey: "assistant.settings.tabs.usage", writes: false, list: false },
   { id: "toolsets", labelKey: "assistant.settings.tabs.toolsets", writes: false, list: true },
+  { id: "memory", labelKey: "assistant.settings.tabs.memory", writes: false, list: true },
   { id: "permissions", labelKey: "assistant.settings.tabs.permissions", writes: false, list: true },
   { id: "activity", labelKey: "assistant.settings.tabs.activity", writes: false, list: true },
 ];
@@ -153,16 +162,18 @@ import HistoryTab from "./HistoryTab.vue";
 import PermissionsTab from "./PermissionsTab.vue";
 import StatusTab from "./StatusTab.vue";
 import ToolsetsTab from "./ToolsetsTab.vue";
+import MemoryTab from "./MemoryTab.vue";
 import UsageTab from "./UsageTab.vue";
 import { useAssistantSettingsPage } from "./useAssistantSettingsPage";
 
 // Overlays opened from here are teleported to body, so they carry the assistant colour roles with them.
 provideAssistantSurface();
 
-// Toolsets is self-hosted enterprise only, as its old Settings page was.
+// Toolsets and AI Memory are self-hosted enterprise only, as their old Settings pages were.
 const TABS = SETTINGS_TABS.filter(
   (entry) =>
-    entry.id !== "toolsets" || checkFeatureAccess("aiToolsets", buildFeatureGateContext()).allowed,
+    (entry.id !== "toolsets" && entry.id !== "memory") ||
+    checkFeatureAccess("aiToolsets", buildFeatureGateContext()).allowed,
 );
 
 const FORM_BODY = { size: "lg", align: "left", padded: false, class: "px-page-edge py-3" } as const;
@@ -175,6 +186,7 @@ const TAB_COMPONENTS: Partial<Record<AssistantSettingsTab, Component>> = {
   history: HistoryTab,
   usage: UsageTab,
   toolsets: ToolsetsTab,
+  memory: MemoryTab,
   permissions: PermissionsTab,
   activity: ActivityTab,
 };

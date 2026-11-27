@@ -312,6 +312,30 @@ pub async fn finish_with<C: ConnectionTrait>(
     Ok(result.rows_affected == 1)
 }
 
+/// One turn record by its key, from the primary so a just-admitted turn is seen.
+pub async fn get(
+    org_id: &str,
+    session_id: &str,
+    turn_id: &str,
+) -> Result<Option<Model>, errors::Error> {
+    get_with(get_orm_client_rw().await, org_id, session_id, turn_id).await
+}
+
+pub async fn get_with<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    session_id: &str,
+    turn_id: &str,
+) -> Result<Option<Model>, errors::Error> {
+    Entity::find()
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::SessionId.eq(session_id))
+        .filter(Column::TurnId.eq(turn_id))
+        .one(conn)
+        .await
+        .map_err(db_err)
+}
+
 /// Stamps the turn's first forwarded o2-ai event once; `false` if it already had one.
 pub async fn set_first_event_at(
     org_id: &str,
@@ -420,30 +444,6 @@ pub async fn get_many_with<C: ConnectionTrait>(
                 .any(|(sid, tid)| *sid == r.session_id && *tid == r.turn_id)
         })
         .collect())
-}
-
-pub async fn get(
-    org_id: &str,
-    session_id: &str,
-    turn_id: &str,
-) -> Result<Option<Model>, errors::Error> {
-    get_with(get_orm_client_ro().await, org_id, session_id, turn_id).await
-}
-
-pub async fn get_with<C: ConnectionTrait>(
-    conn: &C,
-    org_id: &str,
-    session_id: &str,
-    turn_id: &str,
-) -> Result<Option<Model>, errors::Error> {
-    Entity::find_by_id((
-        org_id.to_string(),
-        session_id.to_string(),
-        turn_id.to_string(),
-    ))
-    .one(conn)
-    .await
-    .map_err(db_err)
 }
 
 /// Remove the turn records of chats whose index row is gone (retention).
@@ -583,6 +583,16 @@ mod tests {
             .await
             .unwrap()
             .unwrap()
+    }
+
+    #[tokio::test]
+    async fn a_turn_is_found_only_by_its_whole_key() {
+        let db = db().await;
+        admit_with(&db, ORG, SID, "t1", 0, 10).await.unwrap();
+        let found = get_with(&db, ORG, SID, "t1").await.unwrap().unwrap();
+        assert_eq!(found, record(&db, "t1").await);
+        assert!(get_with(&db, "other", SID, "t1").await.unwrap().is_none());
+        assert!(get_with(&db, ORG, SID, "t2").await.unwrap().is_none());
     }
 
     #[tokio::test]

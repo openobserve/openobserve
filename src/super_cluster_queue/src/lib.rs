@@ -15,6 +15,8 @@
 
 #![cfg(feature = "enterprise")]
 
+mod ai_memory;
+mod ai_toolsets;
 mod alert_acks;
 mod alert_composites;
 mod alert_states;
@@ -133,6 +135,7 @@ pub(crate) fn payload<T: serde::de::DeserializeOwned>(msg: &Message) -> infra::e
 /// polling messages from each queue in a separate thread.
 pub async fn init() -> Result<(), anyhow::Error> {
     let meta_queue = MetaQueue {
+        on_ai_memory_msg: ai_memory::process,
         on_meta_msg: meta::process,
         on_distinct_values_msg: distinct_values::process,
         on_short_url_msg: short_urls::process,
@@ -153,6 +156,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         on_service_identity_msg: service_identity_msg,
         on_rum_analytics_msg: rum_analytics::process,
         on_system_settings_msg: system_settings::process,
+        on_ai_toolsets_msg: ai_toolsets::process,
     };
     let schema_queue = SchemasQueue {
         on_schema_msg: schemas::process,

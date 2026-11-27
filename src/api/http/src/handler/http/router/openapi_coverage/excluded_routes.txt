@@ -63,6 +63,7 @@ POST /datadog/{org_id}/v1/input | Datadog Agent protocol
 ANY /datadog/{org_id}/{*rest} | Datadog Agent protocol, unsupported routes answered and dropped
 GET /docs | browser redirect to the Swagger page
 HEAD /healthz | second mount of the published GET /healthz probe
+POST /internal/ai/memory | internal agent memory write, authenticated by the internal secret
 POST /marketplace/aws/register | third-party callback from AWS Marketplace
 GET /metrics | internal Prometheus scrape endpoint of the node
 POST /node/consistent_hash | internal node management

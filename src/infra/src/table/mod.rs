@@ -30,6 +30,7 @@ pub mod ai_chat_sessions;
 pub mod ai_chat_shares;
 pub mod ai_chat_turns;
 pub mod ai_grants;
+pub mod ai_memory;
 pub mod ai_turn_marks;
 pub mod alert_acks;
 pub mod alert_calibration;
@@ -263,6 +264,8 @@ pub async fn create_user_tables() -> Result<(), anyhow::Error> {
     org_users::create_table().await?;
     user_password_history::create_table().await?;
     user_auth_state::create_table().await?;
+    // Removing a user or a membership deletes the user's AI memory in the same transaction.
+    migration::create_ai_memory_tables(get_orm_client_ddl().await).await?;
 
     Ok(())
 }

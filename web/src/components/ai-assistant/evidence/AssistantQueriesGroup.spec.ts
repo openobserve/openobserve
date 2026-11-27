@@ -142,6 +142,44 @@ describe("AssistantQueriesGroup", () => {
     expect(wrapper.get('[data-test="assistant-queries-row-a"]').find("button").exists()).toBe(true);
   });
 
+  it("links a memory step to the memory page where it is offered, never in a read-only view", async () => {
+    const memory: ContentBlock = {
+      type: "tool_call",
+      tool: "update_memory",
+      call_id: "m1",
+      stepState: "done",
+      resultMessage: "Saved to org memory · rev 4",
+    };
+    const blank = { render: () => null };
+    const mountWith = (routes: { path: string; name: string }[], readonly = false) => {
+      const evidence = fakeEvidence();
+      return mount(AssistantQueriesGroup, {
+        props: {
+          message: message([memory, query("a", "default")]),
+          turn: evidence.turn(),
+          readonly,
+        },
+        global: {
+          plugins: [fakeRouter(routes.map((route) => ({ ...route, component: blank })))],
+          provide: evidence.provide,
+        },
+      });
+    };
+    const offered = mountWith([{ path: "/ai_memory", name: "aiMemory" }]);
+    await offered.get('[data-test="assistant-queries-line"]').trigger("click");
+    const row = offered.get('[data-test="assistant-queries-row-m1"]');
+    expect(row.text()).toContain("Saved to org memory · rev 4");
+    const link = row.get('[data-test="assistant-queries-memory-link-m1"]');
+    expect(link.text()).toBe("Open AI Memory");
+    expect(link.attributes("href")).toContain("/ai_memory");
+    const absent = mountWith([]);
+    await absent.get('[data-test="assistant-queries-line"]').trigger("click");
+    expect(absent.find('[data-test="assistant-queries-memory-link-m1"]').exists()).toBe(false);
+    const readonly = mountWith([{ path: "/ai_memory", name: "aiMemory" }], true);
+    await readonly.get('[data-test="assistant-queries-line"]').trigger("click");
+    expect(readonly.find('[data-test="assistant-queries-memory-link-m1"]').exists()).toBe(false);
+  });
+
   it("opens to numbered rows that read each query from its start, with the row count and the table only when it differs", async () => {
     const { wrapper } = mountGroup([
       query("a", "default"),

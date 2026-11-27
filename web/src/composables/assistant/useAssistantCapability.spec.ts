@@ -311,6 +311,20 @@ describe("B-06 capabilities", () => {
       expect(cap(handle)).not.toHaveProperty(flag);
   });
 
+  it("reads the enabled toolsets by the name the agent calls them, and none when unlisted", async () => {
+    const toolsets = [
+      { id: "a", name: "Datadog Prod", enabled: true },
+      { id: "b", name: "grafana", enabled: false },
+      { id: "c", name: "pagerduty", enabled: true },
+    ];
+    const { handle } = setup({ b06: { can_chat: true, toolsets } });
+    await flushPromises();
+    expect(cap(handle).toolsets).toEqual(["datadog-prod", "pagerduty"]);
+    const none = setup({ b06: { can_chat: true, toolsets: [] } });
+    await flushPromises();
+    expect(cap(none.handle)).not.toHaveProperty("toolsets");
+  });
+
   it("reads the server's unreachable health as down, so the gate says unhealthy", async () => {
     const { handle } = setup({ b06: { can_chat: true, health: { status: "unreachable" } } });
     await flushPromises();

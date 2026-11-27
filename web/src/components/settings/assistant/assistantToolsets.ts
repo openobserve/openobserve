@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { toolsetBadges, type ToolsetBadge } from "@/components/ai_toolsets/toolPicker";
 import type { ToolsetKind } from "@/services/ai_toolsets";
 import type { I18nKey } from "@/types/i18n";
 
@@ -32,6 +33,14 @@ export interface ToolsetRow {
   failingSince?: number;
   lastError?: string;
   lastUsedAt?: number;
+  /** Kept out of super-cluster replication. */
+  regionOnly?: boolean;
+  /** A secret it names has no value in this region, as a replicated toolset has. */
+  needsCredentials?: boolean;
+  /** MCP only: what its tool lists and listing say, e.g. every tool offered. */
+  badges?: ToolsetBadge[];
+  /** The redacted stored config, which a preset review compares with the shipped preset. */
+  data?: Record<string, unknown>;
 }
 
 export const MAX_TOOLSETS = 1000;
@@ -96,6 +105,12 @@ function parseToolsetRow(value: unknown): ToolsetRow | null {
     agentName: agentNameOf(name),
   };
   if (typeof value.enabled === "boolean") row.enabled = value.enabled;
+  if (value.region_only === true) row.regionOnly = true;
+  if (value.needs_credentials === true) row.needsCredentials = true;
+  if (isRecord(value.data)) {
+    row.data = value.data;
+    if (row.kind === "mcp") row.badges = toolsetBadges(value.data);
+  }
   readStatus(row, value.status);
   row.lastUsedAt = time(value.last_used_at);
   return row;

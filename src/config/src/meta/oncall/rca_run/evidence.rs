@@ -112,6 +112,8 @@ fn prometheus_time_us(v: Option<&Value>) -> Option<i64> {
 /// Stream, time range and query of one call, from its unwrapped input.
 pub fn evidence_target(tool: &str, input: &Value) -> EvidenceTarget {
     let mut target = EvidenceTarget {
+        // The ledger replaces it with the toolset-aware class, which needs the org's
+        // `tool_classes`.
         signal: signal_class(tool, input),
         streams: Vec::new(),
         sql: None,

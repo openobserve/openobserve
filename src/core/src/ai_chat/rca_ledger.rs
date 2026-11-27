@@ -21,7 +21,10 @@ use config::{
             MAX_AGENT_NOTE_CHARS, STEER_NOTICE, SteerHeader, SteerStatus, parse_steer_header,
         },
         oncall::{
-            confidence::{SignalClass, ToolCallRecord, signal_class, stream_type},
+            confidence::{
+                SignalClass, ToolCallRecord, ToolClassMap, ToolClassRule, signal_class,
+                stream_type, toolset_signal_class,
+            },
             rca_run::{
                 LedgerCall, LedgerTool, RcaSubmit, change_rows, evidence_target, exit_code,
                 observed_window, parse_submit, summarize_result,
@@ -30,7 +33,10 @@ use config::{
     },
     utils::json::{Map, Value},
 };
-use o2_enterprise::enterprise::ai::chat::batcher::DurableEvent;
+use infra::table::{org_ai_toolsets::OrgToolset, rca_runs};
+use o2_enterprise::enterprise::ai::{
+    chat::batcher::DurableEvent, toolsets::push::normalize_tool_name,
+};
 
 use super::{
     projection::{Folded, obj},
@@ -208,8 +214,41 @@ fn closes_question(call: &ToolPart<'_>) -> bool {
     .contains(&call.tool)
 }
 
-/// Decode the committed events of an RCA session.
-pub fn decode_run(events: &[DurableEvent]) -> RunTranscript {
+/// [`decode_run_with`] for an org without toolsets.
+#[cfg(test)]
+pub(crate) fn decode_run(events: &[DurableEvent]) -> RunTranscript {
+    decode_run_with(events, &ToolClassMap::default())
+}
+
+/// The org's MCP toolsets by the name the agent uses, with their `tool_classes`; a read that
+/// fails knows none.
+pub async fn org_tool_classes(org_id: &str) -> ToolClassMap {
+    let filter = infra::table::org_ai_toolsets::ListFilter {
+        name: None,
+        kind: Some("mcp".to_string()),
+    };
+    let rows = match infra::table::org_ai_toolsets::list(org_id, filter, None).await {
+        Ok(rows) => rows,
+        Err(e) => {
+            log::warn!("[AI] org={org_id}: reading the toolsets failed: {e}");
+            return ToolClassMap::default();
+        }
+    };
+    ToolClassMap::new(
+        rows.into_iter()
+            .map(|row| (normalize_tool_name(&row.name), tool_class_rules(&row))),
+    )
+}
+
+/// [`org_tool_classes`], plus the toolsets `run` was given that the org has since deleted.
+pub async fn run_tool_classes(run: &rca_runs::Model) -> ToolClassMap {
+    org_tool_classes(&run.org_id)
+        .await
+        .with_toolsets(given_toolsets(run.context_used.as_deref()))
+}
+
+/// Decode the committed events of an RCA session, grading toolset calls by `classes`.
+pub fn decode_run_with(events: &[DurableEvent], classes: &ToolClassMap) -> RunTranscript {
     let folded = Folded::fold(events);
     let seqs: HashMap<String, i64> = events
         .iter()
@@ -310,7 +349,7 @@ pub fn decode_run(events: &[DurableEvent]) -> RunTranscript {
                 }
                 ThreadPart::Hidden => {}
                 ThreadPart::Row => {
-                    if let Some(record) = tool_record(&call) {
+                    if let Some(record) = tool_record(&call, classes) {
                         transcript.tool_log.push(record);
                     }
                 }
@@ -344,7 +383,7 @@ pub fn decode_run(events: &[DurableEvent]) -> RunTranscript {
 }
 
 /// The tool log entry of a visible tool part that completed or failed.
-fn tool_record(call: &ToolPart<'_>) -> Option<ToolCallRecord> {
+fn tool_record(call: &ToolPart<'_>, classes: &ToolClassMap) -> Option<ToolCallRecord> {
     let completed = match call.status {
         "completed" => true,
         "error" => false,
@@ -353,7 +392,12 @@ fn tool_record(call: &ToolPart<'_>) -> Option<ToolCallRecord> {
     let args = call.args();
     let key_arg = key_arg(call.tool, &args).unwrap_or_default();
     let input = Value::Object(args);
-    let target = evidence_target(call.tool, &input);
+    let signal = match call.vendor(classes.names()) {
+        Some((toolset, tool)) => toolset_signal_class(toolset, tool, &input, classes),
+        None => signal_class(call.tool, &input),
+    };
+    let mut target = evidence_target(call.tool, &input);
+    target.signal = signal;
     let empty = Map::new();
     let state = call.state.unwrap_or(&empty);
     let body = completed.then(|| tool_body(state));
@@ -369,7 +413,7 @@ fn tool_record(call: &ToolPart<'_>) -> Option<ToolCallRecord> {
     let signal = if change_rows.is_some() {
         SignalClass::Change
     } else {
-        signal_class(call.tool, &input)
+        signal
     };
     let (result_summary, result_count, error_type, observed) = match (body, failure) {
         (Some(body), None) => {
@@ -408,6 +452,22 @@ fn tool_record(call: &ToolPart<'_>) -> Option<ToolCallRecord> {
         change_rows,
         result_summary,
     })
+}
+
+/// A row's `tool_classes`; none when absent or unreadable, as the toolset itself is still known.
+fn tool_class_rules(row: &OrgToolset) -> Vec<ToolClassRule> {
+    row.data
+        .as_deref()
+        .and_then(|data| serde_json::from_str::<Value>(data).ok())
+        .and_then(|data| serde_json::from_value(data.get("tool_classes")?.clone()).ok())
+        .unwrap_or_default()
+}
+
+/// The toolset names a run's `context_used` records.
+fn given_toolsets(context_used: Option<&str>) -> Vec<String> {
+    rca_runs::decode::<Value>(context_used)
+        .and_then(|used| serde_json::from_value(used.get("toolsets")?.clone()).ok())
+        .unwrap_or_default()
 }
 
 /// Why a completed shell or `cli_*` call failed: a non-zero exit, or the CLI endpoint's error.
@@ -841,6 +901,166 @@ pub(crate) mod tests {
             })
         );
         assert_eq!(run.tool_log[1].observed, None);
+    }
+
+    #[test]
+    fn a_toolset_s_calls_are_tool_log_rows_and_never_control_tools() {
+        let mut s = Session::new();
+        s.message("msg_u1", "user", json!({"created": T}));
+        s.message("msg_a1", "assistant", json!({"created": T + 100}));
+        let parts = [
+            (
+                "toolset_read_output",
+                json!({"ref": "call_1", "offset": 16000}),
+            ),
+            (
+                "record_search",
+                json!({"stage": "metrics", "title": "vendor"}),
+            ),
+            ("submit_search", json!({"markdown": "## Vendor"})),
+            (
+                "record_step",
+                json!({"stage": "metrics", "title": "Metrics"}),
+            ),
+            ("submit_report", json!({"markdown": "## Root cause"})),
+        ];
+        for (i, (tool, input)) in parts.into_iter().enumerate() {
+            s.tool(
+                "msg_a1",
+                &format!("prt_v{i}"),
+                tool,
+                "completed",
+                input,
+                json!({"output": "{}"}),
+                1_000 + i as i64 * 10,
+                1_005 + i as i64 * 10,
+            );
+        }
+        let classes = ToolClassMap::default()
+            .with_toolsets(["record", "submit", "toolset"].map(String::from));
+        let run = decode_run_with(&s.events, &classes);
+
+        assert_eq!(run.stages_run, ["metrics"], "only the agent's own step");
+        assert_eq!(run.submit.unwrap().markdown, "## Root cause");
+        let tools: Vec<&str> = run.tool_log.iter().map(|r| r.tool.as_str()).collect();
+        assert_eq!(tools, ["record_search", "submit_search"]);
+    }
+
+    #[test]
+    fn a_toolset_call_is_classed_by_its_own_toolset_and_tool_never_by_shell_rules() {
+        let mut s = Session::new();
+        s.message("msg_u1", "user", json!({"created": T}));
+        s.message("msg_a1", "assistant", json!({"created": T + 100}));
+        let calls = [
+            ("vendor_search_logs", json!({"q": "x"})),
+            ("vendor_run_query", json!({"command": "git diff HEAD~1"})),
+            ("vendor-eu_search_logs", json!({"q": "x"})),
+            ("cli_search_logs", json!({"command": "x"})),
+        ];
+        for (i, (tool, args)) in calls.into_iter().enumerate() {
+            s.tool(
+                "msg_a1",
+                &format!("prt_g{i}"),
+                tool,
+                "completed",
+                args,
+                json!({"output": "{}"}),
+                1_000 + i as i64 * 10,
+                1_005 + i as i64 * 10,
+            );
+        }
+        let rules = || -> Vec<ToolClassRule> {
+            serde_json::from_value(json!([{"tool": "search_logs", "class": "logs"}])).unwrap()
+        };
+        let classes = ToolClassMap::new([
+            ("vendor".to_string(), rules()),
+            ("vendor-eu".to_string(), vec![]),
+            ("cli".to_string(), rules()),
+        ]);
+        let run = decode_run_with(&s.events, &classes);
+        let signals: Vec<SignalClass> = run.tool_log.iter().map(|r| r.signal).collect();
+        assert_eq!(
+            signals,
+            [
+                SignalClass::Logs,
+                SignalClass::Unclassified,
+                SignalClass::Unclassified,
+                SignalClass::Infra,
+            ],
+            "a cli_* call is the operator's, whatever the org's toolsets are called"
+        );
+    }
+
+    #[test]
+    fn a_run_s_own_toolsets_stay_known_after_the_org_deletes_them() {
+        assert_eq!(
+            given_toolsets(Some(r#"{"toolsets": ["vendor"], "skills": []}"#)),
+            ["vendor"]
+        );
+        for unread in [None, Some("{}"), Some("not json")] {
+            assert!(given_toolsets(unread).is_empty());
+        }
+
+        let mut s = Session::new();
+        s.message("msg_a1", "assistant", json!({"created": T}));
+        s.tool(
+            "msg_a1",
+            "prt_g1",
+            "vendor_run_query",
+            "completed",
+            json!({"command": "git diff HEAD~1"}),
+            json!({"output": "{}"}),
+            100,
+            105,
+        );
+        let deleted = ToolClassMap::default().with_toolsets(["vendor".to_string()]);
+        let signal =
+            |classes: &ToolClassMap| decode_run_with(&s.events, classes).tool_log[0].signal;
+        assert_eq!(signal(&deleted), SignalClass::Unclassified);
+    }
+
+    #[test]
+    fn a_toolset_s_tool_classes_grade_its_calls() {
+        let mut s = Session::new();
+        s.message("msg_u1", "user", json!({"created": T}));
+        s.message("msg_a1", "assistant", json!({"created": T + 100}));
+        for (i, query) in ["fetch logs | limit 5", "fetch bizevents"]
+            .iter()
+            .enumerate()
+        {
+            s.tool(
+                "msg_a1",
+                &format!("prt_d{i}"),
+                "dynatrace-prod_execute-dql",
+                "completed",
+                json!({"query": query}),
+                json!({"output": "{}"}),
+                1_000 + i as i64 * 10,
+                1_005 + i as i64 * 10,
+            );
+        }
+        let rules = serde_json::from_value(json!([
+            {"tool": "execute-dql", "class": "logs", "args": {"query": "^\\s*fetch\\s+logs\\b"}}
+        ]))
+        .unwrap();
+        let classes = ToolClassMap::new([("dynatrace-prod".to_string(), rules)]);
+        let run = decode_run_with(&s.events, &classes);
+        let signals: Vec<(SignalClass, SignalClass)> = run
+            .tool_log
+            .iter()
+            .map(|r| (r.signal, r.target.signal))
+            .collect();
+        assert_eq!(
+            signals,
+            [
+                (SignalClass::Logs, SignalClass::Logs),
+                (SignalClass::Unclassified, SignalClass::Unclassified)
+            ]
+        );
+        assert_eq!(
+            decode_run(&s.events).tool_log[0].signal,
+            SignalClass::Unclassified
+        );
     }
 
     /// A SearchSQL that returned a deploy row with old and new values is a change read.

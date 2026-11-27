@@ -21,7 +21,7 @@ use std::{
 };
 
 use config::{
-    meta::oncall::confidence::strip_call_ref,
+    meta::oncall::confidence::{ToolsetNames, strip_call_ref},
     utils::{
         json::{Map, Value, json},
         redact::redact_internal_details,
@@ -166,8 +166,9 @@ const REFUSED_PREFIX: &str = "Refused by this organization's assistant policy";
 const REFUSED_ADVICE: &str = " Tell the user; do not retry.";
 
 /// Tools no projection shows; the sentinels at the end are RCA and AutoResolve thread structure.
-pub(crate) const HIDDEN_TOOLS: [&str; 28] = [
+pub(crate) const HIDDEN_TOOLS: [&str; 29] = [
     "tool_search",
+    "toolset_read_output",
     "convert_time_to_microseconds",
     "calculate_time_range",
     "format_timestamp_for_display",
@@ -312,6 +313,7 @@ struct CallInfo {
 /// The per-turn state of o2-ai's live mapper (`StreamState`) that history uses.
 #[derive(Default)]
 struct StreamState {
+    toolsets: ToolsetNames,
     text_buffer: String,
     scrub_carry: String,
     pending_tool_calls: HashMap<String, CallInfo>,
@@ -585,7 +587,8 @@ impl StreamState {
         if !call_id.is_empty() && !self.turn_call_ids.iter().any(|id| id == call_id) {
             self.turn_call_ids.push(call_id.to_string());
         }
-        let Some(mut event) = format_tool_call_event(tool_name, &tool_input) else {
+        let vendor = self.toolsets.split(tool_name);
+        let Some(mut event) = format_tool_call_event(tool_name, vendor, &tool_input) else {
             // No frame splits the client's text block, so the next part carries the break.
             self.hidden_break = true;
             return;
@@ -1252,13 +1255,14 @@ impl DeleteRequest {
 }
 
 /// o2-ai's `project_events` output for ascending events, plus each turn's `first_seq`/`last_seq`.
-/// `o2_session_id` is the chat's, so a delete card gets the id the live stream gave it.
-pub fn project(events: &[DurableEvent], o2_session_id: &str) -> Value {
+/// `o2_session_id` is the chat's, so a delete card gets the id the live stream gave it; a call of
+/// one of `toolsets` shows as `toolset · tool`, any other under its own name.
+pub fn project(events: &[DurableEvent], o2_session_id: &str, toolsets: &ToolsetNames) -> Value {
     let folded = Folded::fold_v1(events);
-    let mut turns = project_v1(&folded);
+    let mut turns = project_v1(&folded, toolsets);
     let mut title = folded.title.clone();
     if events.iter().any(is_v2_record) {
-        let (v2_turns, v2_title) = project_v2(events, &folded.infos);
+        let (v2_turns, v2_title) = project_v2(events, &folded.infos, toolsets);
         turns.extend(v2_turns);
         title = v2_title.or(title);
         // Only a log holding 2.x records is ordered by creation, so a 1.x chat projects as before.
@@ -1527,7 +1531,7 @@ pub fn attach_query_frame(turn: &mut Value) {
 }
 
 /// The 1.x turns: each user message, answered by the assistant messages naming it as parent.
-fn project_v1(folded: &Folded) -> Vec<Turn> {
+fn project_v1(folded: &Folded, toolsets: &ToolsetNames) -> Vec<Turn> {
     let empty = Map::new();
     let mut turns: HashMap<&str, usize> = HashMap::new();
     let mut projected: Vec<Turn> = Vec::new();
@@ -1544,6 +1548,10 @@ fn project_v1(folded: &Folded) -> Vec<Turn> {
                 .and_then(|t| t.get("created"))
                 .cloned()
                 .unwrap_or(Value::Null),
+            state: StreamState {
+                toolsets: toolsets.clone(),
+                ..Default::default()
+            },
             ..Default::default()
         };
         turn.cover(folded.spans.get(msg_id));
@@ -1570,7 +1578,11 @@ fn project_v1(folded: &Folded) -> Vec<Turn> {
 }
 
 /// The 2.x turns and generated title; `held` is the 1.x messages, whose 2.x copies are skipped.
-fn project_v2(events: &[DurableEvent], held: &Map<String, Value>) -> (Vec<Turn>, Option<String>) {
+fn project_v2(
+    events: &[DurableEvent],
+    held: &Map<String, Value>,
+    toolsets: &ToolsetNames,
+) -> (Vec<Turn>, Option<String>) {
     let mut title = None;
     // As o2-ai's dict: a re-recorded message keeps its first position and takes its latest record.
     let mut messages: Vec<(String, &Map<String, Value>)> = Vec::new();
@@ -1618,6 +1630,10 @@ fn project_v2(events: &[DurableEvent], held: &Map<String, Value>) -> (Vec<Turn>,
                     .and_then(|t| t.get("created"))
                     .cloned()
                     .unwrap_or(Value::Null),
+                state: StreamState {
+                    toolsets: toolsets.clone(),
+                    ..Default::default()
+                },
                 ..Default::default()
             };
             turn.collect_v2_user(message);
@@ -2209,10 +2225,20 @@ fn hidden_in_chat(tool_name: &str) -> bool {
     HIDDEN_TOOLS.contains(&tool_name) || HIDDEN_V2_TOOLS.contains(&tool_name)
 }
 
+/// What a toolset call shows instead of its part's name.
+pub(crate) fn vendor_label((toolset, tool): (&str, &str)) -> String {
+    format!("{toolset} · {tool}")
+}
+
+/// `vendor` is the part's own `(toolset, tool)`, for a toolset call.
 fn resolve_tool_call(
     tool_name: &str,
+    vendor: Option<(&str, &str)>,
     args: &Map<String, Value>,
 ) -> Option<(String, Map<String, Value>)> {
+    if let Some(vendor) = vendor {
+        return Some((vendor_label(vendor), args.clone()));
+    }
     let tool_name = strip_mcp_prefix(tool_name);
     if hidden_in_chat(tool_name) {
         return None;
@@ -2230,9 +2256,10 @@ fn resolve_tool_call(
 
 fn format_tool_call_event(
     tool_name: &str,
+    vendor: Option<(&str, &str)>,
     args: &Map<String, Value>,
 ) -> Option<Map<String, Value>> {
-    let (tool_name, args) = resolve_tool_call(tool_name, args)?;
+    let (tool_name, args) = resolve_tool_call(tool_name, vendor, args)?;
     let mut message = tool_description(&tool_name);
     if tool_name == "StreamList" {
         let stream_type = py_strip(args.get("type").and_then(Value::as_str).unwrap_or_default());
@@ -2268,6 +2295,16 @@ fn format_tool_call_event(
     event.insert("message".into(), Value::String(message));
     event.insert("context".into(), Value::Object(context));
     Some(event)
+}
+
+/// `update_memory` answers in one line ("Saved to org memory · rev 4"), which the chat shows as is.
+fn memory_result_line(tool: &str, result: &Map<String, Value>) -> Option<String> {
+    if tool != "update_memory" {
+        return None;
+    }
+    let text = result.get("output")?.as_str()?;
+    let line = text.trim().lines().next()?.trim();
+    (!line.is_empty()).then(|| line.to_string())
 }
 
 fn format_tool_result_event(
@@ -2327,6 +2364,8 @@ fn format_tool_result_event(
         };
         event.insert("error_type".into(), Value::String(error_type));
         event.insert("message".into(), message);
+    } else if let Some(line) = memory_result_line(&actual_tool, result) {
+        event.insert("message".into(), Value::String(line));
     } else {
         event.insert(
             "message".into(),
@@ -3453,7 +3492,7 @@ mod tests {
         assert!(names.len() >= 5, "{names:?}");
         for name in names {
             let (events, expected) = load(&name);
-            let actual = project(&events, "");
+            let actual = project(&events, "", &ToolsetNames::default());
             if let Some(diff) = first_difference("", &actual, &expected) {
                 panic!("{name}: {diff}");
             }
@@ -3476,7 +3515,7 @@ mod tests {
                 json!({"id": "msg_i", "type": "idle", "outcome": "failed"}),
             ),
         ];
-        let projected = project(&events, "");
+        let projected = project(&events, "", &Default::default());
         assert_eq!(projected["turns"][0]["error_code"], "provider_error");
         assert_eq!(
             projected["turns"][0]["error"],
@@ -3493,14 +3532,117 @@ mod tests {
                 .iter()
                 .any(|e| e.data.pointer("/part/tool") == Some(&json!("record_step")))
         );
-        let projected = project(&events, "").to_string();
+        let projected = project(&events, "", &ToolsetNames::default()).to_string();
         assert!(!projected.contains("record_step"), "{projected}");
+    }
+
+    fn tool_part(id: &str, tool: &str, status: &str, input: Value, output: &str) -> Value {
+        json!({"id": id, "callID": format!("call_{id}"), "type": "tool", "tool": tool,
+            "state": {"status": status, "input": input, "output": output}})
+    }
+
+    fn frames_of(parts: &[Value], toolsets: &[&str]) -> Vec<Value> {
+        let toolsets: ToolsetNames = toolsets.iter().map(|t| t.to_string()).collect();
+        let mut state = StreamState {
+            toolsets,
+            ..Default::default()
+        };
+        let mut frames = Vec::new();
+        for part in parts {
+            state.handle_tool_part(part.as_object().unwrap(), &mut frames);
+        }
+        frames
+    }
+
+    #[test]
+    fn a_toolset_call_projects_as_toolset_and_tool() {
+        let toolsets = ["datadog", "datadog-prod"];
+        for (part_tool, want) in [
+            ("datadog-prod_search_logs", "datadog-prod · search_logs"),
+            ("datadog_search_logs", "datadog · search_logs"),
+            (
+                "datadog_observability_get_topology",
+                "datadog · observability_get_topology",
+            ),
+        ] {
+            let input = json!({"query": "service:checkout"});
+            let frames = frames_of(
+                &[
+                    tool_part("p1", part_tool, "running", input.clone(), ""),
+                    tool_part("p1", part_tool, "completed", input, "{\"hits\":3}"),
+                ],
+                &toolsets,
+            );
+            assert_eq!(frames.len(), 2, "{frames:?}");
+            assert_eq!(frames[0]["type"], "tool_call");
+            assert_eq!(frames[0]["tool"], want);
+            assert_eq!(frames[0]["message"], format!("Executing {want}"));
+            assert_eq!(frames[0]["context"], json!({"query": "service:checkout"}));
+            assert_eq!(frames[1]["type"], "tool_result");
+            assert_eq!(frames[1]["tool"], want);
+            assert_eq!(frames[1]["success"], true);
+        }
+    }
+
+    #[test]
+    fn a_deleted_or_unknown_toolset_s_call_keeps_its_raw_name() {
+        for part_tool in ["datadog-prod_search_logs", "some-server_do_it"] {
+            let parts = [
+                tool_part("p1", part_tool, "running", json!({"q": 1}), ""),
+                tool_part("p1", part_tool, "completed", json!({"q": 1}), "{}"),
+            ];
+            for frame in frames_of(&parts, &["datadog"]) {
+                assert_eq!(frame["tool"], part_tool);
+            }
+        }
+    }
+
+    #[test]
+    fn a_first_party_tool_is_never_read_as_a_toolset_s() {
+        let toolsets = ["record", "submit", "toolset", "update", "o2", "datadog"];
+        for part_tool in ["record_step", "submit_report", "toolset_read_output"] {
+            let parts = [
+                tool_part("p1", part_tool, "running", json!({}), ""),
+                tool_part("p1", part_tool, "completed", json!({}), "{}"),
+            ];
+            let frames = frames_of(&parts, &toolsets);
+            assert!(frames.is_empty(), "{part_tool}: {frames:?}");
+        }
+        for (part_tool, want) in [
+            ("update_memory", "update_memory"),
+            ("o2_datadog_search", "datadog_search"),
+        ] {
+            let parts = [
+                tool_part("p1", part_tool, "running", json!({}), ""),
+                tool_part("p1", part_tool, "completed", json!({}), "{}"),
+            ];
+            let frames = frames_of(&parts, &toolsets);
+            assert_eq!(frames.len(), 2);
+            for frame in frames {
+                assert_eq!(frame["tool"], want);
+            }
+        }
+    }
+
+    #[test]
+    fn an_update_memory_result_shows_its_own_line() {
+        let output =
+            "Sent for approval: org memory changes need a memory admin's approval.\nUse it.";
+        let mut result = Map::new();
+        result.insert("output".into(), Value::String(output.to_string()));
+        let event = format_tool_result_event("update_memory", &result, false, None).unwrap();
+        assert_eq!(
+            event["message"],
+            "Sent for approval: org memory changes need a memory admin's approval."
+        );
+        let other = format_tool_result_event("search_logs", &result, false, None).unwrap();
+        assert_eq!(other["message"], "search_logs completed successfully");
     }
 
     #[test]
     fn turns_carry_the_seq_range_of_their_events() {
         let (events, _) = load("structure.json");
-        let projected = project(&events, "");
+        let projected = project(&events, "", &ToolsetNames::default());
         for turn in projected["turns"].as_array().unwrap() {
             let (first, last) = (
                 turn["first_seq"].as_i64().unwrap(),
@@ -3508,14 +3650,17 @@ mod tests {
             );
             assert!(0 <= first && first <= last, "{turn}");
         }
-        assert_eq!(project(&[], "")["last_seq"], -1);
-        assert_eq!(project(&[], "")["turns"], json!([]));
+        assert_eq!(project(&[], "", &ToolsetNames::default())["last_seq"], -1);
+        assert_eq!(
+            project(&[], "", &ToolsetNames::default())["turns"],
+            json!([])
+        );
     }
 
     #[test]
     fn redaction_keeps_text_and_tool_names_only() {
         let (events, _) = load("tool_heavy.json");
-        let mut projected = project(&events, "");
+        let mut projected = project(&events, "", &ToolsetNames::default());
         let full = projected.clone();
         redact(&mut projected);
         let frames = projected["turns"][0]["frames"].as_array().unwrap();
@@ -3768,8 +3913,15 @@ mod tests {
             assert!(v2.iter().all(is_v2_record), "{name}");
             assert!(!calls(&v1).is_empty(), "{name}");
             assert_eq!(calls(&v2), calls(&v1), "{name}");
-            assert!(!cards(&project(&v1, "")).is_empty(), "{name}");
-            assert_eq!(cards(&project(&v2, "")), cards(&project(&v1, "")), "{name}");
+            assert!(
+                !cards(&project(&v1, "", &Default::default())).is_empty(),
+                "{name}"
+            );
+            assert_eq!(
+                cards(&project(&v2, "", &Default::default())),
+                cards(&project(&v1, "", &Default::default())),
+                "{name}"
+            );
         }
         // A timed delete gives both generations the same expiring card.
         let mut timed = golden_events("tool_heavy.json");
@@ -3780,12 +3932,15 @@ mod tests {
                 e.data["part"]["state"]["time"] = json!({"start": 900, "end": 1_000});
             }
         }
-        let v1_cards = cards(&project(&timed, ""));
+        let v1_cards = cards(&project(&timed, "", &Default::default()));
         assert_eq!(
             v1_cards[0]["expires_at"],
             1_000 + DELETE_CONFIRMATION_TTL_MS
         );
-        assert_eq!(cards(&project(&to_v2(&timed), "")), v1_cards);
+        assert_eq!(
+            cards(&project(&to_v2(&timed), "", &Default::default())),
+            v1_cards
+        );
     }
 
     /// What the web client's rendered record and the server's frames must agree on.
@@ -4045,7 +4200,7 @@ mod tests {
     #[test]
     fn a_delete_awaiting_approval_is_kept_as_its_request() {
         let (events, _) = load("tool_heavy.json");
-        let projected = project(&events, "");
+        let projected = project(&events, "", &Default::default());
         let asked: Vec<&Value> = projected["turns"]
             .as_array()
             .unwrap()
@@ -4336,7 +4491,7 @@ mod tests {
     }
 
     fn last_frames(events: &[DurableEvent]) -> Vec<Value> {
-        let projected = project(events, "");
+        let projected = project(events, "", &Default::default());
         let turns = projected["turns"].as_array().unwrap();
         turns.last().unwrap()["frames"].as_array().unwrap().clone()
     }
@@ -4526,7 +4681,7 @@ mod tests {
         ] {
             let error = json!({"name": "APIError", "data": {"message": message}});
             let events = session_answering("Partial.", "o2-ai", error);
-            let projected = project(&events, "");
+            let projected = project(&events, "", &Default::default());
             let turn = projected["turns"].as_array().unwrap().last().unwrap();
             assert_eq!(turn["error_code"], code, "{message}");
             let frame = turn["frames"]
@@ -4576,7 +4731,7 @@ mod tests {
 
     #[test]
     fn an_asked_question_leaves_no_step_in_history() {
-        let call = format_tool_call_event("ask_user", &Map::new());
+        let call = format_tool_call_event("ask_user", None, &Map::new());
         assert!(call.is_none());
     }
 
@@ -4584,10 +4739,10 @@ mod tests {
     fn a_2x_shell_call_is_hidden_in_chat_but_stays_an_rca_row() {
         let mut events =
             crate::ai_chat::record_v2::tests::golden_events("v2_user_text_and_tools.json");
-        let projected = project(&events, "").to_string();
+        let projected = project(&events, "", &Default::default()).to_string();
         assert!(projected.contains("tool_call"), "{projected}");
         events[2].data["message"]["content"][0]["name"] = json!("shell");
-        let projected = project(&events, "").to_string();
+        let projected = project(&events, "", &Default::default()).to_string();
         assert!(!projected.contains("tool_call"), "{projected}");
         assert_eq!(
             crate::ai_chat::rca_thread::ThreadPart::of("shell", "completed", None),
@@ -4617,7 +4772,7 @@ mod tests {
             event_type: SESSION_UPDATED.into(),
             data: json!({"info": {"title": "Pool exhaustion"}}),
         });
-        let sorted = project(&mixed, "");
+        let sorted = project(&mixed, "", &Default::default());
         let created: Vec<Option<i64>> = sorted["turns"]
             .as_array()
             .unwrap()

@@ -40,36 +40,44 @@ describe("AddAiToolset.schema", () => {
     expect(schema.safeParse(base()).success).toBe(true);
   });
 
-  describe("name (always required + regex + max256)", () => {
+  describe("name (required; normalized form and max 64 on create)", () => {
     it("requires a non-empty name", () => {
       const msgs = messagesFor({ ...base(), name: "" }, "name");
       expect(msgs).toContain("aiToolset.nameRequired");
     });
 
-    it("rejects names with invalid characters", () => {
-      expect(messagesFor({ ...base(), name: "bad name" }, "name")).toContain(
-        "aiToolset.nameInvalid",
-      );
-      expect(messagesFor({ ...base(), name: "has/slash" }, "name")).toContain(
-        "aiToolset.nameInvalid",
-      );
-      expect(messagesFor({ ...base(), name: "dot.dot" }, "name")).toContain(
-        "aiToolset.nameInvalid",
-      );
+    it("rejects names that normalization would change", () => {
+      for (const name of [
+        "bad name",
+        "has/slash",
+        "dot.dot",
+        "Upper",
+        "under_score",
+        "-lead",
+        "trail-",
+        "dou--ble",
+      ]) {
+        expect(messagesFor({ ...base(), name }, "name")).toContain("aiToolset.nameInvalid");
+      }
     });
 
-    it("accepts alphanumeric + hyphen + underscore", () => {
-      expect(errorPaths({ ...base(), name: "valid_name-123" })).not.toContain("name");
+    it("accepts lowercase letters, digits and single inner hyphens", () => {
+      expect(errorPaths({ ...base(), name: "datadog-prod-2" })).not.toContain("name");
     });
 
-    it("rejects a name longer than 256 chars", () => {
-      expect(messagesFor({ ...base(), name: "a".repeat(257) }, "name")).toContain(
+    it("rejects a name longer than 64 chars", () => {
+      expect(messagesFor({ ...base(), name: "a".repeat(65) }, "name")).toContain(
         "aiToolset.nameTooLong",
       );
     });
 
-    it("accepts a name of exactly 256 chars", () => {
-      expect(errorPaths({ ...base(), name: "a".repeat(256) })).not.toContain("name");
+    it("accepts a name of exactly 64 chars", () => {
+      expect(errorPaths({ ...base(), name: "a".repeat(64) })).not.toContain("name");
+    });
+
+    it("does not re-check the immutable name of a saved toolset", () => {
+      const editSchema = makeAddAiToolsetSchema(t, () => true);
+      expect(editSchema.safeParse({ ...base(), name: "Legacy Name_1" }).success).toBe(true);
     });
   });
 
@@ -184,13 +192,89 @@ describe("AddAiToolset.schema", () => {
     });
   });
 
+  describe("OAuth client credentials", () => {
+    const filled = {
+      token_url: "https://sso.example.com/token",
+      client_id: "svc",
+      client_secret: "s3cret",
+      scope: "",
+    };
+    const withAuth = (auth: Record<string, string>, headers: Record<string, string>[] = []) => ({
+      ...base(),
+      mcp: { ...base().mcp, auth, headers },
+    });
+
+    it("are optional: all empty, or only a preset's token URL, is headers only", () => {
+      expect(errorPaths(withAuth({}))).toEqual([]);
+      expect(errorPaths(withAuth({ token_url: filled.token_url }))).toEqual([]);
+      const headers = [{ key: "Authorization", value: "Bearer t" }];
+      expect(errorPaths(withAuth({ token_url: filled.token_url }, headers))).toEqual([]);
+    });
+
+    it("require a token URL and a client secret once a client ID is filled", () => {
+      expect(errorPaths(withAuth(filled))).toEqual([]);
+      expect(errorPaths(withAuth({ ...filled, client_secret: "***" }))).toEqual([]);
+      const idOnly = withAuth({ client_id: "svc" });
+      expect(messagesFor(idOnly, "mcp.auth.token_url")).toEqual(["aiToolset.tokenUrlRequired"]);
+      expect(messagesFor(idOnly, "mcp.auth.client_secret")).toEqual([
+        "aiToolset.clientSecretRequired",
+      ]);
+    });
+
+    it("require a client ID once a client secret is filled", () => {
+      expect(messagesFor(withAuth({ ...filled, client_id: " " }), "mcp.auth.client_id")).toEqual([
+        "aiToolset.clientIdRequired",
+      ]);
+    });
+
+    it.each(["http://sso.example.com/token", "sso.example.com/token", "not a url"])(
+      "refuse the token URL %s",
+      (token_url) => {
+        expect(messagesFor(withAuth({ ...filled, token_url }), "mcp.auth.token_url")).toEqual([
+          "aiToolset.tokenUrlHttps",
+        ]);
+      },
+    );
+
+    it.each(["Authorization", " authorization "])(
+      "refuse a filled %s header but not an empty one",
+      (key) => {
+        const rows = (value: string) => [
+          { key: "X-Tenant", value: "t" },
+          { key, value },
+        ];
+        expect(messagesFor(withAuth(filled, rows("Bearer t")), "mcp.headers.1.key")).toEqual([
+          "aiToolset.authorizationWithOauth",
+        ]);
+        expect(errorPaths(withAuth(filled, rows("***")))).toEqual(["mcp.headers.1.key"]);
+        expect(errorPaths(withAuth(filled, rows("")))).toEqual([]);
+      },
+    );
+
+    it("aren't checked for a skill", () => {
+      const skill = { ...withAuth({ client_id: "svc" }), kind: "skill", skill: { content: "# x" } };
+      expect(errorPaths(skill)).toEqual([]);
+    });
+  });
+
   describe("addAiToolsetDefaults", () => {
     it("produces a schema-shaped blank record", () => {
       expect(addAiToolsetDefaults()).toEqual({
         name: "",
         kind: "mcp",
         description: "",
-        mcp: { url: "", timeout_seconds: 30, headers: [] },
+        region_only: false,
+        mcp: {
+          url: "",
+          preset_params: {},
+          timeout_seconds: 30,
+          headers: [],
+          auth: { token_url: "", client_id: "", client_secret: "", scope: "", extra: {} },
+          allowed_tools: [],
+          blocked_tools: null,
+          write_tools: null,
+          extra: {},
+        },
         skill: { content: "" },
       });
     });

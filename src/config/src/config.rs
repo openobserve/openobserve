@@ -175,7 +175,11 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 //      added_connections to autoresolve_runs.
 // 172: add autoresolve_runs.plan_history.
 // 173: add incident_id to autoresolve_runs, with one live run per incident.
-pub const DB_SCHEMA_VERSION: u64 = 173;
+// 174: add org_ai_toolsets.region_only/origin_region and ai_toolset_tombstones.
+// 175: create ai_memory and ai_memory_revisions.
+// 176: add ai_memory_revisions.flags, why a pending edit needs a closer look.
+// 177: add ai_memory.settings_at/settings_region and ai_memory_tombstones for replication.
+pub const DB_SCHEMA_VERSION: u64 = 177;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables

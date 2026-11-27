@@ -58,6 +58,7 @@ struct PendingMigrations {
     logs_pattern_insights: bool,
     service_streams: bool,
     ai_toolsets: bool,
+    ai_memory: bool,
     report_folders: bool,
     incidents: bool,
     model_pricing: bool,
@@ -99,6 +100,7 @@ impl PendingMigrations {
             service_streams: true,
             logs_pattern_insights: true,
             ai_toolsets: true,
+            ai_memory: true,
             incidents: true,
             model_pricing: true,
             online_eval: true,
@@ -552,6 +554,9 @@ fn all_org_ownership_keys(pending: &PendingMigrations) -> Vec<&'static str> {
     if pending.ai_toolsets {
         keys.push("ai_toolsets");
     }
+    if pending.ai_memory {
+        keys.push("ai_memory");
+    }
     if pending.incidents {
         keys.push("incidents");
     }
@@ -846,6 +851,12 @@ fn pending_migrations(latest: &str, existing: &str) -> PendingMigrations {
     }
     // `security` (0.0.64) and `autoresolve` use explicit grants only; 0.0.67 drops
     // `autoflow_connection`. Per-toolset `ai_toolsets` grants are written lazily: no back-fill.
+    // 0.0.65 (`logs_unredacted`) also relies on explicit grants only.
+    let v0_0_70 = version_compare::Version::from("0.0.70").unwrap();
+    if meta_version >= v0_0_70 && existing_model_version < v0_0_70 {
+        log::info!("[OFGA:Local] ai_memory permissions migration needed");
+        pending.ai_memory = true;
+    }
 
     pending
 }
@@ -930,6 +941,7 @@ mod tests {
             LOGS_PATTERN_KEY,
             RESULT_LOGS_CACHE_KEY,
             "ai_toolsets",
+            "ai_memory",
             "incidents",
             "model_pricing",
             "providers",
@@ -1052,6 +1064,18 @@ mod tests {
             vec!["profiles"]
         );
         assert!(OFGA_MODELS.contains_key("profiles"));
+    }
+
+    #[test]
+    fn ai_memory_back_fill_runs_once_across_0_0_70() {
+        // Main's 0.0.66 to 0.0.69 shipped without `ai_memory`, so each of them still needs it.
+        let pending = pending_migrations("0.0.70", "0.0.69");
+        assert!(pending.ai_memory && !pending.incident_integrations);
+        assert_eq!(all_org_ownership_keys(&pending), vec!["ai_memory"]);
+        assert!(pending_migrations("0.0.70", "0.0.65").ai_memory);
+        assert!(!pending_migrations("0.0.70", "0.0.70").ai_memory);
+        assert!(!pending_migrations("0.0.69", "0.0.68").ai_memory);
+        assert!(OFGA_MODELS.contains_key("ai_memory"));
     }
 
     #[test]

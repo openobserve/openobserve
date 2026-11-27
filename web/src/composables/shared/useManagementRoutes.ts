@@ -210,6 +210,15 @@ const useManagementRoutes = () => {
               : featureLockedLocation("aiToolsets", to),
         },
         {
+          // Memory is an Autobot settings tab now; old links land on it, gated like toolsets.
+          path: "ai_memory",
+          name: "aiMemory",
+          redirect: (to: any) =>
+            checkFeatureAccess("aiToolsets", buildFeatureGateContext()).allowed
+              ? { name: "assistantSettings", params: { tab: "memory" }, query: to.query }
+              : featureLockedLocation("aiToolsets", to),
+        },
+        {
           path: "pipeline_destinations",
           name: "pipelineDestinations",
           meta: {

@@ -51,7 +51,7 @@ use super::{
 };
 use crate::ai_chat::{
     CommittedPrefix, ReadError, fork,
-    rca_ledger::{RunTranscript, decode_run},
+    rca_ledger::{RunTranscript, decode_run_with, run_tool_classes},
     rca_thread::{self, RcaThread, Transcript},
     read_committed_prefix,
 };
@@ -366,8 +366,14 @@ impl<'a, R: TranscriptReader> RunParts<'a, R> {
         let turns = ai_chat_turns::list_for_session(self.org_id, &session.session_id)
             .await
             .map_err(PartError::internal)?;
-        let mut thread =
-            rca_thread::project_rca_thread(&prefix.events, &turns, active, show_tool_io);
+        let classes = run_tool_classes(self.run).await;
+        let mut thread = rca_thread::project_rca_thread_with(
+            &prefix.events,
+            &turns,
+            active,
+            show_tool_io,
+            classes.names(),
+        );
         thread.run_id = run_id.clone();
         thread.state_version = session_version(session, self.run, show_tool_io);
         if !active {
@@ -498,7 +504,13 @@ impl<'a, R: TranscriptReader> RunParts<'a, R> {
 
     async fn decoded(&self, session: &SessionRow) -> Result<&RunTranscript, &ReadError> {
         let prefix = self.events(session).await.as_ref()?;
-        Ok(self.decoded.get_or_init(|| decode_run(&prefix.events)))
+        if let Some(decoded) = self.decoded.get() {
+            return Ok(decoded);
+        }
+        let classes = run_tool_classes(self.run).await;
+        Ok(self
+            .decoded
+            .get_or_init(|| decode_run_with(&prefix.events, &classes)))
     }
 }
 
@@ -1026,13 +1038,16 @@ pub(crate) mod tests {
     use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, sea_query::Expr};
 
     use super::*;
-    use crate::alerts::{
-        rca_runs::{
-            complete_run,
-            tests::{age, cancel_write, db, new_incident, start},
-            update_run,
+    use crate::{
+        ai_chat::rca_ledger::decode_run,
+        alerts::{
+            rca_runs::{
+                complete_run,
+                tests::{age, cancel_write, db, new_incident, start},
+                update_run,
+            },
+            rca_steering::guidance_row,
         },
-        rca_steering::guidance_row,
     };
 
     const SESSION: &str = "ses_live_stream";

@@ -110,7 +110,8 @@ export default defineComponent({
       telephonySettings: "telephony",
       storageSettings: "storageSettings",
       cipherKeys: "cipher-keys",
-      aiToolsets: "ai_toolsets",
+      aiToolsets: "assistant",
+      aiMemory: "assistant",
       license: "license",
       orgnizationManagement: "organization_management",
       userManagement: "user_management",
@@ -426,22 +427,6 @@ export default defineComponent({
           licenseLocked: correlationLicense === "locked" && alertsLocked,
           dataTest: "correlation-settings-tab",
           group: "Data",
-        },
-        {
-          key: "ai_toolsets",
-          label: t("aiToolset.header"),
-          description: t("settings.aiToolsetsDesc"),
-          icon: "smart-toy",
-          to: { name: "aiToolsets", query: { org_identifier: org } },
-          visible:
-            aiToolsetsLicense !== "hidden" &&
-            aiAssistantLicense !== "hidden" &&
-            aiToolsetsAccess.visible,
-          locked: !aiToolsetsAccess.allowed,
-          lockedMessage: aiToolsetsAccess.message,
-          licenseLocked: aiToolsetsLicense === "locked" || aiAssistantLicense === "locked",
-          dataTest: "ai-toolsets-tab",
-          group: "Integrations",
         },
         {
           key: "queryManagement",

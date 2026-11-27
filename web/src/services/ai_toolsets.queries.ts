@@ -17,6 +17,7 @@ import { queryOptions } from "@tanstack/vue-query";
 import aiToolsets, { type ToolsetPermission } from "./ai_toolsets";
 import { aiToolsetKeys } from "./ai_toolsets.querykeys";
 import { NORMAL_STALE_TIME } from "@/composables/query/cachePolicy";
+import type { Preset } from "@/components/ai_toolsets/presets";
 import type { AutoResolveConnectionRef } from "./autoresolve";
 
 /** The toolsets the caller may list, and whether they may create one (`can_create`; absent means yes). */
@@ -48,5 +49,13 @@ export const mcpToolsetsQuery = (org: string, permission: ToolsetPermission = "l
         canCreate: data?.can_create !== false,
       };
     },
+    staleTime: NORMAL_STALE_TIME,
+  });
+
+/** The shipped presets; they change only with a server release. */
+export const aiToolsetPresetsQuery = (org: string) =>
+  queryOptions({
+    queryKey: aiToolsetKeys.prebuilt(org),
+    queryFn: async (): Promise<Preset[]> => (await aiToolsets.prebuilt(org)).data?.presets ?? [],
     staleTime: NORMAL_STALE_TIME,
   });
