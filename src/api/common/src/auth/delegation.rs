@@ -453,7 +453,10 @@ pub(crate) async fn authorize(
         .await;
     if !allowed {
         log::debug!("delegated token refused: permission denied");
-        return Err(AuthError::RoleRefused("Unauthorized Access".to_string()));
+        return Err(AuthError::RoleRefused {
+            user_email: result.user_email,
+            message: "Unauthorized Access".to_string(),
+        });
     }
     // A run token's link id is a run id, never a Slack link to keep fresh.
     #[cfg(feature = "enterprise")]
@@ -780,7 +783,7 @@ mod tests {
         match result {
             Ok(_) => 200,
             Err(AuthError::Unauthorized(_)) => 401,
-            Err(AuthError::Forbidden(_) | AuthError::RoleRefused(_)) => 403,
+            Err(AuthError::Forbidden(_) | AuthError::RoleRefused { .. }) => 403,
             Err(AuthError::NotFound(_)) => 404,
             Err(AuthError::Locked { .. }) => 429,
             Err(AuthError::Unavailable(_)) => 503,

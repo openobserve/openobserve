@@ -1299,7 +1299,11 @@ pub async fn cache_status() -> impl IntoResponse {
     axum::Json(stats)
 }
 
-pub async fn config_reload(Headers(user_email): Headers<UserEmail>) -> impl IntoResponse {
+pub async fn config_reload(
+    Headers(user_email): Headers<UserEmail>,
+    #[cfg(feature = "enterprise")] headers: HeaderMap,
+    #[cfg(feature = "enterprise")] real_ip: Option<Extension<RealIp>>,
+) -> impl IntoResponse {
     let user_id = user_email.user_id.as_str();
     if !is_root_user(user_id) {
         return (
@@ -1324,8 +1328,8 @@ pub async fn config_reload(Headers(user_email): Headers<UserEmail>) -> impl Into
     // Audit this event
     #[cfg(feature = "enterprise")]
     audit(AuditMessage {
-        login_ip: None,
-        user_agent: None,
+        login_ip: real_ip.map(|Extension(ip)| ip.0.to_string()),
+        user_agent: crate::request::audit_user_agent(&headers),
         user_email: user_id.to_string(),
         org_id: "".to_string(),
         _timestamp: now_micros(),
@@ -1443,7 +1447,7 @@ pub async fn redirect(
 
     let mut audit_message = AuditMessage {
         login_ip: real_ip.map(|Extension(ip)| ip.0.to_string()),
-        user_agent: super::users::login_user_agent(&headers),
+        user_agent: crate::request::audit_user_agent(&headers),
         user_email: "".to_string(),
         org_id: "".to_string(),
         _timestamp: now_micros(),
@@ -1706,6 +1710,8 @@ pub fn with_login_state_cookie(mut resp: Response, state: &str) -> Response {
 #[cfg(feature = "enterprise")]
 pub async fn refresh_token_with_dex(
     cookies: CookieJar,
+    headers: HeaderMap,
+    real_ip: Option<Extension<RealIp>>,
     Query(query): Query<std::collections::HashMap<String, String>>,
 ) -> Response {
     use axum_extra::extract::cookie::{Cookie, SameSite};
@@ -1723,8 +1729,8 @@ pub async fn refresh_token_with_dex(
         .collect::<Vec<_>>()
         .join("&");
     let mut audit_message = AuditMessage {
-        login_ip: None,
-        user_agent: None,
+        login_ip: real_ip.map(|Extension(ip)| ip.0.to_string()),
+        user_agent: crate::request::audit_user_agent(&headers),
         user_email: "".to_string(),
         org_id: "".to_string(),
         _timestamp: now_micros(),
@@ -2167,6 +2173,7 @@ async fn validate_login_state<'a>(
 pub async fn logout(
     cookies: CookieJar,
     #[cfg(feature = "enterprise")] headers: axum::http::HeaderMap,
+    #[cfg(feature = "enterprise")] real_ip: Option<Extension<RealIp>>,
 ) -> Response {
     // remove the session
     let conf = get_config();
@@ -2199,8 +2206,8 @@ pub async fn logout(
     #[cfg(feature = "enterprise")]
     if let Some(user_email) = user_email {
         audit(AuditMessage {
-            login_ip: None,
-            user_agent: None,
+            login_ip: real_ip.map(|Extension(ip)| ip.0.to_string()),
+            user_agent: crate::request::audit_user_agent(&headers),
             user_email,
             org_id: "".to_string(),
             _timestamp: now_micros(),
@@ -3616,9 +3623,13 @@ mod tests {
                 config["sso_enabled"],
                 get_dex_config().dex_enabled && active
             );
-            let denied =
-                refresh_token_with_dex(CookieJar::new(), Query(std::collections::HashMap::new()))
-                    .await;
+            let denied = refresh_token_with_dex(
+                CookieJar::new(),
+                HeaderMap::new(),
+                None,
+                Query(std::collections::HashMap::new()),
+            )
+            .await;
             assert_eq!(
                 denied.status(),
                 if active {
