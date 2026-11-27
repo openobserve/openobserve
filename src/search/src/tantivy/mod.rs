@@ -241,9 +241,6 @@ pub async fn tantivy_search(
             })
         }
 
-        // if more than cpu_num's file returned many row_ids, we skip tantivy search
-        let mut threshold_num = cfg.limit.cpu_num;
-        let mut total_row_ids_percent = 0;
         let mut tasks = stream::iter(tasks).buffer_unordered(target_partitions);
         while let Some(result) = tasks.next().await {
             // Each result corresponds to a file in the file list
@@ -253,22 +250,6 @@ pub async fn tantivy_search(
                     // because the index result is not accurate
                     if has_skipped_conditions {
                         is_add_filter_back = true;
-                    }
-                    if file_name.is_empty() {
-                        // no need inverted index for this file, need add filter back
-                        let took = start.elapsed().as_millis() as usize;
-                        threshold_num -= 1;
-                        total_row_ids_percent += result.percent();
-                        if threshold_num == 0 {
-                            log::warn!(
-                                "[trace_id {trace_id}] search->tantivy: skip tantivy search, too many row_ids returned from tantivy index, avg percent: {}, took: {took} ms",
-                                total_row_ids_percent as f64 / cfg.limit.cpu_num as f64,
-                            );
-                            file_list.extend(file_list_map.into_values());
-                            return Ok((took, true, TantivyMultiResult::RowNums(0)));
-                        }
-                        is_add_filter_back = true;
-                        continue;
                     }
                     match result {
                         TantivyResult::RowIdsSelection(row_ids) => {
@@ -305,11 +286,6 @@ pub async fn tantivy_search(
                         }
                         TantivyResult::RowIds(_) => {
                             unreachable!("RowIds should not be returned");
-                        }
-                        TantivyResult::Skipped { .. } => {
-                            // skipped results always come with an empty file
-                            // name and are handled before this match
-                            unreachable!("Skipped should not be returned with a file name");
                         }
                     }
                 }
@@ -546,7 +522,7 @@ async fn search_tantivy_index(
         TantivyResult::Distinct(distinct) => TantivyResult::Distinct(distinct),
         TantivyResult::RowIds(row_ids) => {
             let max_doc_id = row_ids.iter().copied().max();
-            match guard_matched_rows(trace_id, parquet_file, row_ids.len(), max_doc_id)? {
+            match guard_matched_rows(parquet_file, row_ids.len(), max_doc_id)? {
                 Some(result) => result,
                 None => TantivyResult::RowIdsSelection(Arc::new(selection_from_row_ids(
                     parquet_file.meta.records as usize,
@@ -556,22 +532,18 @@ async fn search_tantivy_index(
         }
         TantivyResult::SelectCandidates(candidates) => {
             let max_doc_id = candidates.iter().map(|(_, doc_id)| *doc_id).max();
-            match guard_matched_rows(trace_id, parquet_file, candidates.len(), max_doc_id)? {
+            match guard_matched_rows(parquet_file, candidates.len(), max_doc_id)? {
                 Some(result) => result,
                 None => TantivyResult::SelectCandidates(candidates),
             }
         }
-        TantivyResult::RowIdsSelection(_)
-        | TantivyResult::NoMatch
-        | TantivyResult::Skipped { .. } => {
+        TantivyResult::RowIdsSelection(_) | TantivyResult::NoMatch => {
             unreachable!("unsupported tantivy search result in search_tantivy_index")
         }
     };
 
-    match &result {
-        TantivyResult::NoMatch => return Ok((key, result, false)),
-        TantivyResult::Skipped { .. } => return Ok((String::new(), result, true)),
-        _ => {}
+    if matches!(result, TantivyResult::NoMatch) {
+        return Ok((key, result, false));
     }
 
     if !cache_key.is_empty()
@@ -584,29 +556,15 @@ async fn search_tantivy_index(
     Ok((key, result, has_skipped_conditions))
 }
 
-/// Common guards for matched row ids: returns `Some(NoMatch)` when there is
-/// nothing to select, `Some(Skipped)` when the match count exceeds the skip
-/// threshold (the caller falls back to datafusion), and an error when a doc
-/// id is out of range.
+/// Returns `Some(NoMatch)` when there is nothing to select, and an error when
+/// a doc id is out of range.
 fn guard_matched_rows(
-    trace_id: &str,
     parquet_file: &FileKey,
     matched: usize,
     max_doc_id: Option<u32>,
 ) -> anyhow::Result<Option<TantivyResult>> {
     if matched == 0 || parquet_file.meta.records == 0 {
         return Ok(Some(TantivyResult::NoMatch));
-    }
-    let skip_threshold = get_config().search.inverted_index_skip_threshold;
-    let row_ids_percent = matched as f64 / parquet_file.meta.records as f64 * 100.0;
-    if skip_threshold > 0 && row_ids_percent > skip_threshold as f64 {
-        log::info!(
-            "[trace_id {trace_id}] search->tantivy: file: {}, result percent {row_ids_percent}% is too large, back to datafusion",
-            parquet_file.key
-        );
-        return Ok(Some(TantivyResult::Skipped {
-            percent: row_ids_percent as usize,
-        }));
     }
     if let Some(max_doc_id) = max_doc_id
         && max_doc_id as i64 >= parquet_file.meta.records
@@ -640,7 +598,7 @@ fn get_cache_entry(tantivy_result: TantivyResult) -> CacheEntry {
         }
         TantivyResult::TopN(top_n) => CacheEntry::TopN(top_n),
         TantivyResult::Distinct(distinct) => CacheEntry::Distinct(distinct),
-        TantivyResult::RowIds(_) | TantivyResult::NoMatch | TantivyResult::Skipped { .. } => {
+        TantivyResult::RowIds(_) | TantivyResult::NoMatch => {
             unreachable!("unsupported tantivy search result in search_tantivy_index")
         }
     }
