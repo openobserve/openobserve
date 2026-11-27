@@ -881,7 +881,8 @@ export function usePanelDrilldown({
       return {
         name: panelSchema.value?.type === "funnel" ? funnelStage(params) : params?.name,
         seriesValue: clickedSeriesName(params),
-        path: params?.data?.path,
+        // A tile keeps its raw path when a level stands in for NULL or "".
+        path: params?.data?.rawPath ?? params?.data?.path,
         fieldValues: family === "category" ? axisFieldValues(params, query) : undefined,
       };
     }

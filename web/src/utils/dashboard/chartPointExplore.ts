@@ -15,7 +15,11 @@
 
 import { formatInTimeZone } from "date-fns-tz";
 import { getDataValue } from "@/utils/dashboard/aliasUtils";
-import { NULL_BREAKDOWN_VALUE, OTHERS_BREAKDOWN_VALUE } from "@/utils/dashboard/sqlProcessData";
+import {
+  NULL_BREAKDOWN_VALUE,
+  OTHERS_BREAKDOWN_VALUE,
+  categoryAxisLabel,
+} from "@/utils/dashboard/sqlProcessData";
 import type { I18nText } from "@/types/i18n";
 import { drawnQueryIndex } from "@/utils/dashboard/chartTypeGroups";
 
@@ -315,14 +319,15 @@ export const groupFieldColumn = (
   return field.column ?? null;
 };
 
-// A clicked label is always text; the row it came from keeps the value's own type. An empty label is
-// an empty string when a row holds one, else a NULL row drawn blank.
+// A clicked label is text; the row it came from keeps the raw value. A row's own value matches first
+// (a real "(null)" stays itself), then the label the axis drew for it ("(null)" → NULL, "(empty)" → "").
 const rowValue = (rows: any[] | undefined, alias: string, label: unknown): unknown => {
   const text = String(label ?? "");
   const all = rows ?? [];
   const value = (r: any) => getDataValue(r, alias);
   const row =
     all.find((r) => value(r) !== null && value(r) !== undefined && String(value(r)) === text) ??
+    all.find((r) => String(categoryAxisLabel(value(r))) === text) ??
     (text === "" ? all.find((r) => value(r) === null || value(r) === undefined) : undefined);
   return row ? value(row) : label;
 };

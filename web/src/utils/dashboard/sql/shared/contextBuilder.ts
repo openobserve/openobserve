@@ -38,7 +38,12 @@ import {
   dataZoomBrushStyle,
 } from "@/utils/chartTheme";
 import { getPropsByChartTypeForSeries } from "../../sqlChartSeriesProps";
-import { NULL_BREAKDOWN_VALUE, breakdownValueLabel, processData } from "../../sqlProcessData";
+import {
+  NULL_BREAKDOWN_VALUE,
+  breakdownValueLabel,
+  categoryAxisLabel,
+  processData,
+} from "../../sqlProcessData";
 import { isTimeSeries, isTimeStamp } from "../../dateTimeUtils";
 import { fillMissingValues } from "../../sqlMissingValueFiller";
 import { buildDataLookupMap, createSeriesBuilders } from "./seriesBuilder";
@@ -203,7 +208,7 @@ export function buildSQLContext(
 
   const xAxisCategoryKey = (value: unknown) => (isMissing(value) ? NULL_BREAKDOWN_VALUE : value);
 
-  const xAxisCategory = (value: unknown) => breakdownValueLabel(xAxisCategoryKey(value) as string);
+  const xAxisCategory = categoryAxisLabel;
 
   const getAxisRows = (): Record<string, unknown>[] =>
     missingValueData?.filter((item: Record<string, unknown>) => {
