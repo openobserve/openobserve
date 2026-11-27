@@ -16505,7 +16505,7 @@
       "logoLightHelp": "라이트 모드에 표시됩니다. PNG, JPG, GIF 또는 BMP, 최대 150 × 30 px.",
       "logoDarkLabel": "사용자 지정 로고(다크 모드)",
       "logoTitle": "사용자 지정 로고",
-      "logoHelp": "앱 헤더에 표시됩니다. PNG, JPG, GIF, BMP, WEBP 또는 SVG, 최대 150 × 30px.",
+      "logoHelp": "앱 헤더에 표시됩니다. PNG, JPG, GIF, BMP, WEBP 또는 SVG, 최대 150 × 30 px.",
       "logoLightTitle": "라이트 모드",
       "logoDarkTitle": "다크 모드",
       "logoSaved": "저장됨",

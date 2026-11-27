@@ -24194,8 +24194,8 @@
     },
     "file": {
       "removeNamed": "Usuń {name}",
-      "attachPrompt": "Upuść plik, aby go dołączyć, lub {browse}",
-      "attachPromptMultiple": "Upuść pliki, aby je dołączyć, lub {browse}",
+      "attachPrompt": "Przeciągnij plik, aby załączyć, lub {browse}",
+      "attachPromptMultiple": "Przeciągnij pliki, aby załączyć, lub {browse}",
       "browseLink": "przeglądaj",
       "supports": "Obsługiwane pliki {types}",
       "dropFileToAttach": "Upuść plik, aby go dołączyć",

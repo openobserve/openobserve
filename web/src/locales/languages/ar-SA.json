@@ -16505,7 +16505,7 @@
       "logoLightHelp": "يُعرض في الوضع الفاتح. PNG أو JPG أو GIF أو BMP، حتى 150 × 30 بكسل.",
       "logoDarkLabel": "شعار مخصص (الوضع الداكن)",
       "logoTitle": "شعار مخصص",
-      "logoHelp": "يظهر في رأس التطبيق. PNG أو JPG أو GIF أو BMP أو WEBP أو SVG، حتى 150 × 30 بكسل.",
+      "logoHelp": "يظهر في رأس التطبيق. PNG، JPG، GIF، BMP، WEBP أو SVG، حتى 150 × 30 بكسل.",
       "logoLightTitle": "الوضع الفاتح",
       "logoDarkTitle": "الوضع الداكن",
       "logoSaved": "محفوظ",
@@ -24195,7 +24195,7 @@
     "file": {
       "removeNamed": "إزالة {name}",
       "attachPrompt": "أفلت ملفًا لإرفاقه، أو {browse}",
-      "attachPromptMultiple": "أفلت الملفات لإرفاقها، أو {browse}",
+      "attachPromptMultiple": "أفلت ملفات لإرفاقها، أو {browse}",
       "browseLink": "استعرض",
       "supports": "الملفات المدعومة {types}",
       "dropFileToAttach": "أفلت الملف لإرفاقه",

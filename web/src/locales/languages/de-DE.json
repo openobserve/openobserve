@@ -16505,7 +16505,7 @@
       "logoLightHelp": "Wird im hellen Modus angezeigt. PNG, JPG, GIF oder BMP, bis zu 150 × 30 px.",
       "logoDarkLabel": "Benutzerdefiniertes Logo (dunkler Modus)",
       "logoTitle": "Eigenes Logo",
-      "logoHelp": "Wird in der Kopfzeile der App angezeigt. PNG, JPG, GIF, BMP, WEBP oder SVG, bis 150 × 30 px.",
+      "logoHelp": "Wird in der Kopfzeile der App angezeigt. PNG, JPG, GIF, BMP, WEBP oder SVG, bis zu 150 × 30 px.",
       "logoLightTitle": "Heller Modus",
       "logoDarkTitle": "Dunkler Modus",
       "logoSaved": "Gespeichert",

@@ -16505,7 +16505,7 @@
       "logoLightHelp": "Açık modda gösterilir. PNG, JPG, GIF veya BMP, en fazla 150 × 30 px.",
       "logoDarkLabel": "Özel logo (koyu mod)",
       "logoTitle": "Özel logo",
-      "logoHelp": "Uygulama başlığında gösterilir. PNG, JPG, GIF, BMP, WEBP veya SVG, en fazla 150 × 30 piksel.",
+      "logoHelp": "Uygulama başlığında gösterilir. PNG, JPG, GIF, BMP, WEBP veya SVG, en fazla 150 × 30 px.",
       "logoLightTitle": "Açık mod",
       "logoDarkTitle": "Koyu mod",
       "logoSaved": "Kaydedildi",

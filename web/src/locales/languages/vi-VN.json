@@ -16505,7 +16505,7 @@
       "logoLightHelp": "Hiển thị ở chế độ sáng. PNG, JPG, GIF hoặc BMP, tối đa 150 × 30 px.",
       "logoDarkLabel": "Logo tùy chỉnh (chế độ tối)",
       "logoTitle": "Logo tùy chỉnh",
-      "logoHelp": "Hiển thị ở thanh đầu ứng dụng. PNG, JPG, GIF, BMP, WEBP hoặc SVG, tối đa 150 × 30 px.",
+      "logoHelp": "Hiển thị trong tiêu đề ứng dụng. PNG, JPG, GIF, BMP, WEBP hoặc SVG, tối đa 150 × 30 px.",
       "logoLightTitle": "Chế độ sáng",
       "logoDarkTitle": "Chế độ tối",
       "logoSaved": "Đã lưu",

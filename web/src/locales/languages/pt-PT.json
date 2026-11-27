@@ -16505,7 +16505,7 @@
       "logoLightHelp": "Apresentado no modo claro. PNG, JPG, GIF ou BMP, até 150 × 30 px.",
       "logoDarkLabel": "Logótipo personalizado (modo escuro)",
       "logoTitle": "Logótipo personalizado",
-      "logoHelp": "Mostrado no cabeçalho da aplicação. PNG, JPG, GIF, BMP, WEBP ou SVG, até 150 × 30 px.",
+      "logoHelp": "Apresentado no cabeçalho da aplicação. PNG, JPG, GIF, BMP, WEBP ou SVG, até 150 × 30 px.",
       "logoLightTitle": "Modo claro",
       "logoDarkTitle": "Modo escuro",
       "logoSaved": "Guardado",

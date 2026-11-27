@@ -16505,7 +16505,7 @@
       "logoLightHelp": "Отображается в светлой теме. PNG, JPG, GIF или BMP, до 150 × 30 px.",
       "logoDarkLabel": "Пользовательский логотип (тёмная тема)",
       "logoTitle": "Свой логотип",
-      "logoHelp": "Показывается в шапке приложения. PNG, JPG, GIF, BMP, WEBP или SVG, до 150 × 30 пикс.",
+      "logoHelp": "Отображается в шапке приложения. PNG, JPG, GIF, BMP, WEBP или SVG, до 150 × 30 px.",
       "logoLightTitle": "Светлая тема",
       "logoDarkTitle": "Тёмная тема",
       "logoSaved": "Сохранено",

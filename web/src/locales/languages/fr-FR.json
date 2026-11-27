@@ -24194,8 +24194,8 @@
     },
     "file": {
       "removeNamed": "Supprimer {name}",
-      "attachPrompt": "Déposez un fichier à joindre, ou {browse}",
-      "attachPromptMultiple": "Déposez des fichiers à joindre, ou {browse}",
+      "attachPrompt": "Déposez un fichier pour le joindre, ou {browse}",
+      "attachPromptMultiple": "Déposez des fichiers pour les joindre, ou {browse}",
       "browseLink": "parcourez",
       "supports": "Fichiers acceptés {types}",
       "dropFileToAttach": "Déposez le fichier à joindre",
