@@ -69,7 +69,9 @@
               class="o-field-list__row group px-page-edge rounded-default mt-1 flex min-h-6 w-full cursor-pointer items-center text-xs leading-[0.8rem]"
               :class="[
                 { 'o-field-list__row--draggable': draggable },
-                isExpanded(row) ? 'bg-surface-panel sticky top-7 z-2' : 'relative',
+                isExpanded(row)
+                  ? ['bg-surface-panel sticky z-2', hasGroupHeaders ? 'top-7' : 'top-0']
+                  : 'relative',
               ]"
               :data-test="`o-field-list-row-${row.name}`"
               :draggable="draggable && isDragEnabled(row, row._index ?? 0) && isDragArmed()"
@@ -299,6 +301,9 @@ watch(
     pageSizeModel.value = val;
   },
 );
+
+// An open row pins below the sticky group header, or at the top when the list has none.
+const hasGroupHeaders = computed(() => filteredFields.value.some((row) => row.isGroup));
 
 // Header rows ride along with their fields, so only field rows count toward a page.
 const fieldRows = computed(() => filteredFields.value.filter((row) => !row.isGroup));

@@ -306,6 +306,16 @@ describe("OFieldList opening a row", () => {
     expect(item.querySelector(".o-field-list__expansion")).not.toBeNull();
   });
 
+  it("pins an open row at the top when the list has no group header to sit under", async () => {
+    wrapper = mount(OFieldList, {
+      props: { fields: FIELDS.filter((row) => !row.isGroup), expandedIds: ["/a"] },
+      slots: { expansion: () => h("div", "values") },
+    });
+    const open = wrapper.findAll(".o-field-list__row")[0];
+    expect(open.classes()).toEqual(expect.arrayContaining(["sticky", "top-0"]));
+    expect(open.classes()).not.toContain("top-7");
+  });
+
   it("never scrolls the list, wherever the opened row sits", async () => {
     wrapper = mount(OFieldList, {
       props: { fields: FIELDS },
