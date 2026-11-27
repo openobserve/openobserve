@@ -33,9 +33,8 @@ use ::search::types::QueryParams;
 
 pub type SearchTable = Result<(Vec<Arc<dyn TableProvider>>, ScanStats, HashSet<u64>)>;
 
-/// Create tables from files, automatically splitting them based on time range overlap:
-/// - Files completely within the query time range: no timestamp filter applied
-/// - Files partially overlapping with the query time range: timestamp filter applied
+/// Create the tables over `files`; only the files that reach outside the query
+/// time range get the timestamp filter.
 #[allow(clippy::too_many_arguments)]
 pub async fn create_tables_from_files(
     files: Vec<FileKey>,
@@ -47,66 +46,24 @@ pub async fn create_tables_from_files(
     index_condition: Option<IndexCondition>,
     fst_fields: Vec<String>,
 ) -> Result<Vec<Arc<dyn TableProvider>>> {
-    let mut tables: Vec<Arc<dyn TableProvider>> = Vec::new();
     let schema_ref = Arc::new(
         schema_ref
             .as_ref()
             .clone()
             .with_metadata(Metadata::default()),
     );
-
-    // Helper to create table with common configuration
-    let create_table = |files: Vec<FileKey>, timestamp_filter: Option<(i64, i64)>| {
-        let mut session = session.clone();
-        // Note: avoid the files be replaced by the same session id in file_list::set
-        session.id = format!("{}-{}", session.id, timestamp_filter.is_some());
-        let schema_ref = schema_ref.clone();
-        let file_stat_cache = file_stat_cache.clone();
-        let index_condition = index_condition.clone();
-        let fst_fields = fst_fields.clone();
-
-        async move {
-            let mut builder = TableBuilder::new()
-                .sort_order(sort_order)
-                .file_stat_cache(file_stat_cache)
-                .index_condition(index_condition)
-                .fst_fields(fst_fields);
-
-            if let Some(time_range) = timestamp_filter {
-                builder = builder.timestamp_filter(time_range);
-            }
-
-            builder.build(session, files, schema_ref).await
-        }
-    };
-
-    // If the stream is enrichment tables, create a table for all files
-    // this is used for add enrich before the stream name(usually for join with the stream)
-    if let Some(schema) = query.stream.schema()
-        && (schema == "enrich" || schema == "enrichment_tables")
-    {
-        let table = create_table(files, None).await?;
-        tables.extend(table);
-        return Ok(tables);
+    let mut builder = TableBuilder::new()
+        .sort_order(sort_order)
+        .file_stat_cache(file_stat_cache)
+        .index_condition(index_condition)
+        .fst_fields(fst_fields);
+    // enrichment tables are joined to the stream as a whole, so they keep every row
+    let is_enrich = query
+        .stream
+        .schema()
+        .is_some_and(|schema| schema == "enrich" || schema == "enrichment_tables");
+    if !is_enrich {
+        builder = builder.timestamp_filter(query.time_range);
     }
-
-    // Split files into two groups based on time range overlap
-    let (start_time, end_time) = query.time_range;
-    let (files_without_filter, files_with_filter): (Vec<_>, Vec<_>) = files
-        .into_iter()
-        .partition(|file| file.meta.min_ts >= start_time && file.meta.max_ts < end_time);
-
-    // Create table for files without timestamp filter
-    if !files_without_filter.is_empty() {
-        let table = create_table(files_without_filter, None).await?;
-        tables.extend(table);
-    }
-
-    // Create table for files with timestamp filter
-    if !files_with_filter.is_empty() {
-        let table = create_table(files_with_filter, Some(query.time_range)).await?;
-        tables.extend(table);
-    }
-
-    Ok(tables)
+    Ok(builder.build(session, files, schema_ref).await?)
 }
