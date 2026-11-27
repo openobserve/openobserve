@@ -6,6 +6,14 @@ import { createRouter, createWebHistory } from "vue-router";
 import AddExternalAlertSource from "./AddExternalAlertSource.vue";
 import alertSources from "@/services/alert_sources";
 import destinationService from "@/services/alert_destination";
+import { queryClient } from "@/composables/query/queryClient";
+
+const listTeamsMock = vi.fn().mockResolvedValue({ data: [] });
+vi.mock("@/services/oncall", () => ({
+  default: {
+    listTeams: (...args: unknown[]) => listTeamsMock(...args),
+  },
+}));
 
 vi.mock("@/services/alert_sources", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
@@ -33,14 +41,14 @@ const ODrawerStub = {
 
 let mountedWrappers: Array<ReturnType<typeof mount>> = [];
 
-function buildWrapper(open = true, editingIntegration: any = undefined) {
+function buildWrapper(open = true, editingIntegration: any = undefined, zoConfig: any = {}) {
   const store = createStore({
     state: {
       selectedOrganization: { identifier: "myorg" },
       // CopyContent reads these in setup(); omitting them aborts that subtree.
       userInfo: { email: "admin@example.com" },
       organizationData: { organizationPasscode: "passcode" },
-      zoConfig: {},
+      zoConfig,
       API_ENDPOINT: "http://localhost:5080",
     },
   });
@@ -81,6 +89,7 @@ describe("AddExternalAlertSource", () => {
     // next test's flush under fake timers.
     mountedWrappers.forEach((w) => w.unmount());
     mountedWrappers = [];
+    queryClient.clear();
     vi.useRealTimers();
   });
 
@@ -372,6 +381,115 @@ describe("AddExternalAlertSource", () => {
       await (wrapper.vm as any).onSubmit({ name: "renamed", destinations: ["sre-pages"] });
       expect(alertSources.create).not.toHaveBeenCalled();
       expect(alertSources.update).toHaveBeenCalledWith("myorg", "int-1", { name: "renamed" });
+    });
+  });
+  describe("on-call team picker", () => {
+    const TEAM_SOURCE = {
+      id: "int-2",
+      org_id: "myorg",
+      name: "grafana",
+      source_type: "auto",
+      enabled: true,
+      config: {},
+      destinations: [],
+      oncall_team: "tm_sre",
+      created_by: "admin@example.com",
+      created_at: 1,
+      updated_at: 1,
+    };
+    const SELECT = '[data-test="add-alert-source-oncall-team-select"]';
+
+    it("stays hidden and asks for no teams when on-call is off", async () => {
+      const wrapper = buildWrapper(false);
+      await wrapper.setProps({ open: true });
+      await flushPromises();
+      expect(wrapper.find(SELECT).exists()).toBe(false);
+      expect(listTeamsMock).not.toHaveBeenCalled();
+    });
+
+    it("offers the org's teams when on-call is on", async () => {
+      listTeamsMock.mockResolvedValueOnce({
+        data: [
+          { id: "tm_sre", name: "SRE" },
+          { id: "tm_web", name: "Web" },
+        ],
+      });
+      const wrapper = buildWrapper(false, undefined, { oncall_enabled: true });
+      await wrapper.setProps({ open: true });
+      await flushPromises();
+      expect(wrapper.find(SELECT).exists()).toBe(true);
+      expect((wrapper.vm as any).oncallTeamOptions).toEqual([
+        { label: "SRE", value: "tm_sre" },
+        { label: "Web", value: "tm_web" },
+      ]);
+    });
+
+    it("creates the source with the chosen team", async () => {
+      (alertSources.create as any).mockResolvedValue({
+        data: { id: "int-1", token: "o2iat_abc", name: "grafana" },
+      });
+      const wrapper = buildWrapper(true, undefined, { oncall_enabled: true });
+      await (wrapper.vm as any).submit({
+        name: "grafana",
+        destinations: [],
+        oncall_team: "tm_sre",
+      });
+      expect(alertSources.create).toHaveBeenCalledWith("myorg", {
+        name: "grafana",
+        source_type: "auto",
+        destinations: [],
+        oncall_team: "tm_sre",
+      });
+    });
+
+    it.each([
+      ["a cleared team as null", undefined, { oncall_team: null }],
+      ["a changed team", "tm_web", { oncall_team: "tm_web" }],
+    ])("edit sends only %s", async (_case, team, sent) => {
+      (alertSources.update as any).mockResolvedValue({ data: {} });
+      const wrapper = buildWrapper(false, TEAM_SOURCE, { oncall_enabled: true });
+      await wrapper.setProps({ open: true });
+      expect((wrapper.vm as any).defaultValues.oncall_team).toBe("tm_sre");
+      await (wrapper.vm as any).submitEdit({
+        name: "grafana",
+        destinations: [],
+        oncall_team: team,
+      });
+      expect(alertSources.update).toHaveBeenCalledWith("myorg", "int-2", sent);
+    });
+
+    it("edit sends nothing when the team is unchanged", async () => {
+      const wrapper = buildWrapper(false, TEAM_SOURCE, { oncall_enabled: true });
+      await wrapper.setProps({ open: true });
+      await (wrapper.vm as any).submitEdit({
+        name: "grafana",
+        destinations: [],
+        oncall_team: "tm_sre",
+      });
+      expect(alertSources.update).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ["on", true, "alert_sources.incidentDestinationHintOncall"],
+      ["off", false, "alert_sources.incidentDestinationHint"],
+    ])("with On-Call %s, the destination hint uses its own key", async (_label, enabled, key) => {
+      const wrapper = buildWrapper(true, undefined, { oncall_enabled: enabled });
+      await flushPromises();
+      const hint = wrapper.find('[data-test="add-alert-source-destination-hint"]');
+      expect(hint.text()).toBe(key);
+    });
+
+    it("shows a locked license's saved team so it can still be seen or cleared", async () => {
+      const locked = { oncall_enabled: false, features: { oncall: "locked" } };
+      const wrapper = buildWrapper(false, TEAM_SOURCE, locked);
+      await wrapper.setProps({ open: true });
+      await flushPromises();
+      expect(wrapper.find(SELECT).exists()).toBe(true);
+      expect(wrapper.find('[data-test="add-alert-source-oncall-team-locked"]').exists()).toBe(true);
+      expect((wrapper.vm as any).oncallTeamOptions).toEqual([
+        { label: "alerts.lockedTeamFallback", value: "tm_sre" },
+      ]);
+      expect(listTeamsMock).not.toHaveBeenCalled();
     });
   });
 });

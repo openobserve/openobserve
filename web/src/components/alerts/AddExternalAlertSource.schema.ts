@@ -28,13 +28,15 @@ export const makeAlertSourceSchema = (
       .min(1, t("common.nameRequired"))
       .max(256, t("common.nameMaxLength", { max: 256 })),
     destinations: z.array(z.string()).default([]),
+    oncall_team: z.string().optional(),
   });
 
 export type AlertSourceForm = z.infer<ReturnType<typeof makeAlertSourceSchema>>;
 
 export const alertSourceDefaults = (
-  integration?: { name: string; destinations: string[] } | undefined,
+  integration?: { name: string; destinations: string[]; oncall_team?: string | null } | undefined,
 ): AlertSourceForm => ({
   name: integration?.name ?? "",
   destinations: [...(integration?.destinations ?? [])],
+  oncall_team: integration?.oncall_team ?? undefined,
 });
