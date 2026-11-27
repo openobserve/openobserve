@@ -735,7 +735,7 @@
   height: 0.875rem;
 }
 
-/* Toolbar secondary buttons use the standard outline button: a 1px edge in both themes, white in light, a tonal fill in dark; hover and open keep the ghost fills. */
+/* Toolbar secondary buttons are a borderless tonal fill in both themes; hover and open keep the ghost fills. */
 :root
   .toolbar-btn-rest:not(:hover):not([aria-expanded="true"]):not([data-state="open"]):not(
     [aria-pressed="true"]
@@ -750,7 +750,9 @@
 }
 :root {
   --toolbar-btn-rest-bg: var(--color-surface-band);
-  --toolbar-btn-rest-edge: var(--color-border-button);
+  --toolbar-btn-rest-edge: transparent;
+  /* Borderless fills need a cut in the page colour so the date step arrows read as their own buttons. */
+  --toolbar-group-cut: var(--color-surface-card);
   --toolbar-btn-rest-shadow: 0 0 #0000;
   --toolbar-btn-rest-fg: var(--color-text-body);
 }
@@ -760,11 +762,15 @@
   span.inline-flex.shrink-0.align-middle:not([data-destructive-icon]) {
   color: var(--toolbar-btn-rest-fg);
 }
-/* A grey fill on a light page reads as disabled, so light-mode buttons are white instead. */
+/* Light toolbar buttons are a borderless fill a step lighter than the band, so a dense row reads as one quiet set. */
 :root:not(.dark) {
-  --toolbar-btn-rest-bg: var(--color-surface-raised);
+  --toolbar-btn-rest-bg: #eeeef2;
   /* On white, near-black glyphs feel heavy; mid grey still reads as enabled. */
   --toolbar-btn-rest-fg: var(--color-text-body);
+}
+/* The light rest fill is close to the shared hover grey, so toolbar buttons hover one step darker. */
+:root:not(.dark) :is(.toolbar-btn-rest, #date-time-button) {
+  --color-button-ghost-hover-bg: #e4e4e9;
 }
 /* Between the step arrows the borderless picker draws its top, bottom and left edge (its 1px overlap hides the left arrow's), so arrows + picker read as one outlined group. */
 :root .date-time-container > #date-time-button:not(:first-child):not(:focus-visible) {
@@ -772,6 +778,14 @@
     inset 0 0.0625rem 0 var(--toolbar-btn-rest-edge),
     inset 0 -0.0625rem 0 var(--toolbar-btn-rest-edge),
     inset 0.0625rem 0 0 var(--toolbar-btn-rest-edge),
+    inset 0.0625rem 0 0 var(--toolbar-group-cut, transparent),
+    var(--toolbar-btn-rest-shadow);
+}
+/* The next arrow overlaps the picker by 1px, so it draws the right-hand cut itself. */
+:root .date-time-container > [data-test="date-time-next-btn"]:not(:focus-visible) {
+  box-shadow:
+    inset 0.0625rem 0 0 var(--toolbar-group-cut, transparent),
+    inset 0 0 0 0.0625rem var(--toolbar-btn-rest-edge),
     var(--toolbar-btn-rest-shadow);
 }
 /* Toolbar time pickers (not the full-width form field) and outlined actions in page headers and table toolbars join the same set. */
