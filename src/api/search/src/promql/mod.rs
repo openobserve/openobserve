@@ -97,6 +97,15 @@ impl MetricGrants {
             }
         }
     }
+
+    /// A limit applied before filtering would cut permitted metrics; `0` stays so the read is
+    /// skipped.
+    fn take_limit(&self, limit: &mut Option<usize>) -> Option<usize> {
+        match self {
+            Self::Only(_) if *limit != Some(0) => limit.take(),
+            _ => None,
+        }
+    }
 }
 
 /// prometheus remote-write endpoint for metrics
@@ -803,12 +812,8 @@ pub async fn metadata(
             Err(res) => return res,
         },
     };
-    // a limit applied before filtering would cut permitted metrics
     #[cfg(feature = "enterprise")]
-    let limit = match grants {
-        MetricGrants::All => None,
-        MetricGrants::Only(_) => req.limit.take(),
-    };
+    let limit = grants.take_limit(&mut req.limit);
 
     match metrics::prom::get_metadata(&org_id, req).await {
         Ok(resp) => {
@@ -2212,6 +2217,23 @@ mod tests {
             ["a", "b"].map(|k| (k.to_string(), ())).into();
         MetricGrants::All.retain_keys(&mut map, None);
         assert_eq!(map.len(), 2);
+    }
+
+    #[test]
+    fn metadata_limit_moves_after_the_filter_except_zero() {
+        let only = MetricGrants::from_objects("default", "metrics", &objects(&["metrics:b"]));
+
+        let mut limit = Some(2);
+        assert_eq!(only.take_limit(&mut limit), Some(2));
+        assert_eq!(limit, None);
+
+        let mut limit = Some(0);
+        assert_eq!(only.take_limit(&mut limit), None);
+        assert_eq!(limit, Some(0));
+
+        let mut limit = Some(2);
+        assert_eq!(MetricGrants::All.take_limit(&mut limit), None);
+        assert_eq!(limit, Some(2));
     }
 
     async fn parse_tree_response(query: &str) -> (StatusCode, serde_json::Value) {
