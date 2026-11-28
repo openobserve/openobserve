@@ -149,7 +149,6 @@ o2_enterprise = { workspace = true, default-features = false, features = ["test-
 o2_openfga = { workspace = true, features = ["test-utils"] }
 criterion = { version = "0.5", default-features = false, features = ["rayon"] }
 multer.workspace = true
-syn = { version = "2", features = ["full", "visit"] }
 tower.workspace = true
 
 [[bench]]

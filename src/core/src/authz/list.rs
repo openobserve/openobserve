@@ -58,7 +58,7 @@ pub const SITE_SERVICE_GRAPH: Site = "service_graph";
 pub const SITE_GEN_AI: Site = "gen_ai";
 
 /// At or below this many objects, Checks cost less: at 1 CPU the OpenFGA probes and lists cost
-/// about 55 ms and one Check about 10.5 ms (authz_list_bench).
+/// about 55 ms and one Check about 10.5 ms.
 pub const SMALL_REQUEST_OBJECTS: usize = 5;
 
 /// OpenFGA accepts every id of this length in the covered alphabet, so a type answer decides it.

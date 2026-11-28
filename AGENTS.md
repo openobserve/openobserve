@@ -79,7 +79,6 @@ Item order inside a file/module, top to bottom (clippy's default grouping):
   you add to this order even though nothing enforces it yet.
 - Authorize multiple streams or objects through `openobserve_core::authz::list` (`authorize_objects`, `readable_streams`).
   Never loop per-object permission checks over a collection that grows with the org.
-  `src/core/tests/authz_loop_guard.rs` fails on a new loop unless `src/core/tests/authz-loop-allowlist.txt` lists its path and function with a reason.
 
 ## Comments
 

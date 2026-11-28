@@ -681,7 +681,10 @@ async fn filter_catalog(
             .iter()
             .any(|row| row.scope_key == key && row.has_version)
     };
-    if filter.split(',').all(|code| code == "no_version") {
+    let on = crate::authz::active_checker().list_settings(&ctx.user).mode
+        == crate::authz::list::ListMode::On;
+    // Off and shadow keep main's 503 when the verdict queries fail, even for a no_version filter.
+    if on && filter.split(',').all(|code| code == "no_version") {
         scopes.retain(|scope| !has_version(scope["scope_key"].as_str().unwrap_or_default()));
         return Ok(());
     }

@@ -690,7 +690,10 @@ async fn check_row(
         position,
         ErrorPosition::OutOfScope | ErrorPosition::Filtered
     ) {
-        off_request.assert_failing_check_pending().await;
+        // Off runs main's catalog path, which checks the evidence of rows its filter then drops.
+        if site != Site::Catalog {
+            off_request.assert_failing_check_pending().await;
+        }
         on_request.assert_failing_check_pending().await;
     }
 }

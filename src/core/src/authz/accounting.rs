@@ -87,9 +87,17 @@ fn finish_request(route: &str, counts: &CallCounts) {
     metrics::AUTHZ_OPENFGA_CALLS_PER_REQUEST
         .with_label_values(&[route])
         .observe(f64::from(calls));
-    let budget = o2_openfga::config::get_config().check_budget_per_request;
+    let cfg = o2_openfga::config::get_config();
+    let budget = cfg.check_budget_per_request;
     if calls > budget {
-        log::warn!("[authz] {route} sent {calls} OpenFGA calls, over the budget of {budget}");
+        let level = match cfg.list_authz_mode() {
+            o2_openfga::config::ListAuthzMode::Off => log::Level::Debug,
+            _ => log::Level::Warn,
+        };
+        log::log!(
+            level,
+            "[authz] {route} sent {calls} OpenFGA calls, over the budget of {budget}"
+        );
         metrics::AUTHZ_CHECK_BUDGET_EXCEEDED_TOTAL
             .with_label_values(&[route])
             .inc();

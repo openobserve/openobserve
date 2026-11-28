@@ -179,30 +179,6 @@ pub fn trace_stream_object<'a>(stream: &'a str, placeholder: &str) -> Option<Obj
     (stream != placeholder).then(|| ObjectRef::stream(StreamType::Traces, stream))
 }
 
-/// The production trace authorization path with a supplied stream inventory for the Level B bench.
-#[cfg(feature = "enterprise")]
-pub async fn readable_trace_streams_among<F: Future<Output = Vec<String>>>(
-    org_id: &str,
-    user_id: &str,
-    list: impl Fn() -> F,
-    selected: Option<&str>,
-    scope: &Scope,
-) -> Result<Option<Vec<String>>, AuthzUnavailable> {
-    let checker = crate::authz::active_checker();
-    let placeholder = &config::get_config().common.dashboard_placeholder;
-    readable_among(
-        checker.as_ref(),
-        &crate::authz::list::TodayChecks,
-        org_id,
-        user_id,
-        list,
-        placeholder,
-        selected,
-        scope,
-    )
-    .await
-}
-
 /// GetEdgeTrend (Enterprise)
 #[utoipa::path(
     get,
@@ -465,10 +441,15 @@ async fn readable_trace_streams(
     selected: Option<&str>,
     scope: &Scope,
 ) -> Result<Option<Vec<String>>, AuthzUnavailable> {
-    readable_trace_streams_among(
+    let checker = crate::authz::active_checker();
+    let placeholder = &config::get_config().common.dashboard_placeholder;
+    readable_among(
+        checker.as_ref(),
+        &crate::authz::list::TodayChecks,
         org_id,
         user_id,
         || crate::db::schema::list_streams_from_cache(org_id, StreamType::Traces),
+        placeholder,
         selected,
         scope,
     )

@@ -25,10 +25,10 @@ use crate::{
     authz::{
         StreamReadMemo, active_checker,
         list::{
-            AuthzUnavailable, Calls, Decision, Folded, ModeAnswers, ObjectRef, ObjectsQuery,
-            Outcome, SITE_SERVICE_EVIDENCE, SITE_SERVICE_IDENTITY, Scope, UnavailableReason,
-            all_of, answer_in_mode, legacy_readable_streams, shadow_verdict,
-            stream_answers_for_query, stream_read_query, unavailable,
+            AuthzUnavailable, Calls, Decision, Folded, ModeAnswers, ObjectRef, Outcome,
+            SITE_SERVICE_EVIDENCE, SITE_SERVICE_IDENTITY, Scope, UnavailableReason, all_of,
+            answer_in_mode, legacy_readable_streams, shadow_verdict, stream_answers_for_query,
+            stream_read_query, unavailable,
         },
     },
 };
@@ -257,10 +257,6 @@ impl ReadableStreams {
             _ => false,
         }
     }
-}
-
-pub fn service_identity_read_query<'a>(org: &'a str, user: &'a str) -> ObjectsQuery<'a> {
-    stream_read_query(SITE_SERVICE_IDENTITY, org, user, &EVIDENCE_TYPES)
 }
 
 pub async fn endpoint(org: &str, user: &str, method: &str) -> bool {
