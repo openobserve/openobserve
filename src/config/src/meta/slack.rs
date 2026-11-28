@@ -32,6 +32,12 @@ pub const ANOMALY_GROUP_KEY: &str = "anomaly";
 /// Group key of the per destination and detector order watermark row.
 pub const ANOMALY_MARK_GROUP_KEY: &str = "anomaly-mark";
 
+/// Every title marker `status_dot` writes; a message with a color bar drops it from its title.
+pub const STATUS_DOTS: [&str; 4] = ["🔴", "🟠", "🟢", "🔵"];
+
+/// The prefix a test send puts in front of the title.
+pub const TEST_MARKER: &str = "[TEST] ";
+
 /// Consumer email domains: never a link domain, and they turn automatic linking off at install.
 pub const PUBLIC_EMAIL_DOMAINS: &[&str] = &[
     "gmail.com",
@@ -697,9 +703,45 @@ pub struct HeldAction {
     pub firing_started_at: i64,
 }
 
+/// The title without one leading severity dot, for a message whose color bar shows the severity.
+pub fn without_status_dot(title: &str) -> String {
+    let (marker, rest) = match title.strip_prefix(TEST_MARKER) {
+        Some(rest) => (TEST_MARKER, rest),
+        None => ("", title),
+    };
+    let trimmed = rest.trim_start();
+    STATUS_DOTS
+        .iter()
+        .find_map(|dot| trimmed.strip_prefix(dot))
+        .map(str::trim_start)
+        // A title that is only the dot keeps it; Slack refuses an empty text object.
+        .filter(|left| !left.is_empty())
+        .map_or_else(|| title.to_string(), |left| format!("{marker}{left}"))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn without_status_dot_drops_one_leading_dot_only() {
+        for (title, want) in [
+            ("🔴 cpu firing", "cpu firing"),
+            ("🟠  cpu no data", "cpu no data"),
+            (" 🟢 cpu recovered", "cpu recovered"),
+            ("🔵notice", "notice"),
+            ("🔴 🔴 twice", "🔴 twice"),
+            ("cpu 🔴 firing", "cpu 🔴 firing"),
+            ("⚪ cpu", "⚪ cpu"),
+            ("🔴 ", "🔴 "),
+            ("[TEST] 🔴 cpu", "[TEST] cpu"),
+            ("[TEST] cpu", "[TEST] cpu"),
+            ("[TEST] 🔴", "[TEST] 🔴"),
+            ("", ""),
+        ] {
+            assert_eq!(without_status_dot(title), want, "{title:?}");
+        }
+    }
 
     #[test]
     fn manifest_options_read_missing_fields_as_defaults() {

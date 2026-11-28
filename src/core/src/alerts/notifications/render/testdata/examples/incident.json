@@ -1,16 +1,18 @@
 {
   "slack_firing": {
+    "blocks": [
+      {
+        "type": "section",
+        "text": {
+          "type": "mrkdwn",
+          "text": "*<https://o2.acme.com/web/incidents/inc_7f3a?org_identifier=acme|High error rate firing>*"
+        }
+      }
+    ],
     "attachments": [
       {
         "color": "#E01E5A",
         "blocks": [
-          {
-            "type": "section",
-            "text": {
-              "type": "mrkdwn",
-              "text": "*<https://o2.acme.com/web/incidents/inc_7f3a?org_identifier=acme|🔴 High error rate firing>*"
-            }
-          },
           {
             "type": "section",
             "text": {
@@ -86,17 +88,19 @@
     ]
   },
   "slack_resolved": {
+    "blocks": [
+      {
+        "type": "section",
+        "text": {
+          "type": "mrkdwn",
+          "text": "*<https://o2.acme.com/web/incidents/inc_7f3a?org_identifier=acme|High error rate resolved>*"
+        }
+      }
+    ],
     "attachments": [
       {
         "color": "#2EB67D",
         "blocks": [
-          {
-            "type": "section",
-            "text": {
-              "type": "mrkdwn",
-              "text": "*<https://o2.acme.com/web/incidents/inc_7f3a?org_identifier=acme|🟢 High error rate resolved>*"
-            }
-          },
           {
             "type": "section",
             "text": {
@@ -229,6 +233,7 @@
       "notification_kind_label": "Incident",
       "notification_event_label": "Firing",
       "status_dot": "🔴",
+      "status_color": "#E01E5A",
       "alert_level_label": "P2",
       "alert_trigger_time_utc": "2026-11-02 10:05:00 UTC",
       "cluster_name": "o2-acme",

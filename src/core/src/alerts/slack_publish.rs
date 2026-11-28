@@ -1355,6 +1355,14 @@ mod tests {
             !wire.body.contains("[firing] checkout-errors"),
             "the bold title line is not repeated in the body: {wire:?}"
         );
+        // The fields and the status line sit in the attachment and are still read.
+        assert!(
+            wire.fields
+                .iter()
+                .any(|(k, v)| k == "Stream" && v == "checkout"),
+            "{wire:?}"
+        );
+        assert!(wire.body.contains("*Status:* firing"), "{wire:?}");
         let starred = NotificationContext {
             alert_name: "cpu_high*".into(),
             ..ctx.clone()
@@ -1365,6 +1373,31 @@ mod tests {
             !wire.body.contains("[firing] cpu_high*"),
             "a name ending in * is not shown twice: {wire:?}"
         );
+    }
+
+    #[test]
+    fn the_prebuilt_slack_webhook_body_draws_the_bar_in_the_status_color() {
+        use config::meta::alerts::notification_kind::NotificationEvent;
+        let built_in = config::prebuilt_loader::get_prebuilt_template("slack").expect("built in");
+        let color = |ctx: &NotificationContext| {
+            let msg: Value =
+                serde_json::from_str(&apply_custom_template(&built_in.body, ctx, false)).unwrap();
+            // The title stays above the bar: one top-level block, the rest in the attachment.
+            assert_eq!(msg["blocks"].as_array().unwrap().len(), 1, "{msg}");
+            msg["attachments"][0]["color"].as_str().unwrap().to_string()
+        };
+        let firing = ctx();
+        assert_eq!(color(&firing), "#E01E5A");
+        let warning = NotificationContext {
+            level: Some(AlertLevel::Warning),
+            ..firing.clone()
+        };
+        assert_eq!(color(&warning), "#F2952F");
+        let resolved = NotificationContext {
+            event: NotificationEvent::Resolved,
+            ..firing.clone()
+        };
+        assert_eq!(color(&resolved), "#2EB67D");
     }
 
     #[test]

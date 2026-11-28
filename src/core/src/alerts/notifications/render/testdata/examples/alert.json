@@ -1,16 +1,18 @@
 {
   "slack_firing": {
+    "blocks": [
+      {
+        "type": "section",
+        "text": {
+          "type": "mrkdwn",
+          "text": "*<https://example.openobserve.ai/alerts/sample|Sample CPU alert firing>*"
+        }
+      }
+    ],
     "attachments": [
       {
         "color": "#E01E5A",
         "blocks": [
-          {
-            "type": "section",
-            "text": {
-              "type": "mrkdwn",
-              "text": "*<https://example.openobserve.ai/alerts/sample|🔴 Sample CPU alert firing>*"
-            }
-          },
           {
             "type": "section",
             "text": {
@@ -86,17 +88,19 @@
     ]
   },
   "slack_resolved": {
+    "blocks": [
+      {
+        "type": "section",
+        "text": {
+          "type": "mrkdwn",
+          "text": "*<https://example.openobserve.ai/alerts/sample|Sample CPU alert resolved>*"
+        }
+      }
+    ],
     "attachments": [
       {
         "color": "#2EB67D",
         "blocks": [
-          {
-            "type": "section",
-            "text": {
-              "type": "mrkdwn",
-              "text": "*<https://example.openobserve.ai/alerts/sample|🟢 Sample CPU alert resolved>*"
-            }
-          },
           {
             "type": "section",
             "text": {

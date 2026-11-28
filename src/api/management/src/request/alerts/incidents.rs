@@ -52,6 +52,13 @@ fn default_limit() -> u64 {
     50
 }
 
+/// The SQL binders take `i64`, and a larger page value panics the request.
+#[cfg(any(feature = "enterprise", test))]
+fn bounded_page(limit: u64, offset: u64) -> (u64, u64) {
+    let max = i64::MAX as u64;
+    (limit.min(max), offset.min(max))
+}
+
 /// Severity values for incident updates
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub enum IncidentSeverity {
@@ -220,12 +227,13 @@ pub async fn list_incidents(
     } else {
         security::visible_cases(&org_id, &user_email.user_id).await
     };
+    let (limit, offset) = bounded_page(query.limit, query.offset);
     match openobserve_core::alerts::incidents::list_incidents_filtered(
         &org_id,
         query.status.as_deref(),
         cases,
-        query.limit,
-        query.offset,
+        limit,
+        offset,
     )
     .await
     {
@@ -2555,6 +2563,13 @@ mod tests {
     #[test]
     fn test_default_limit() {
         assert_eq!(default_limit(), 50);
+    }
+
+    #[test]
+    fn a_page_larger_than_i64_is_clamped_for_the_sql_binder() {
+        let max = i64::MAX as u64;
+        assert_eq!(bounded_page(50, 0), (50, 0));
+        assert_eq!(bounded_page(max + 1, u64::MAX), (max, max));
     }
 
     #[test]

@@ -614,6 +614,10 @@ mod tests {
             "Template body should not be empty"
         );
         assert!(matches!(template.template_type, TemplateType::Http));
+        // The title sits above a bar that the attachment draws in the status color.
+        let body: serde_json::Value = serde_json::from_str(&template.body).unwrap();
+        assert_eq!(body["blocks"].as_array().unwrap().len(), 1);
+        assert_eq!(body["attachments"][0]["color"], "{status_color}");
     }
 
     #[test]

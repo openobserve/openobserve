@@ -367,6 +367,8 @@ export function usePrebuiltDestinations() {
       alert_trigger_time: String(now),
       alert_trigger_time_millis: String(now / 1000),
       alert_trigger_time_seconds: String(Math.floor(now / 1000 / 1000)),
+      // The bar color of the prebuilt Slack body; the sample is a firing alert.
+      status_color: "#E01E5A",
     };
 
     // Override with actual credentials if provided

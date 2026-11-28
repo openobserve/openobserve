@@ -3248,6 +3248,22 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn the_largest_page_the_handler_lets_through_binds_on_sqlite() {
+        let db = incidents_db().await;
+        let backend = db.get_database_backend();
+        let stmt = Schema::new(backend).create_table_from_entity(alert_incident_alerts::Entity);
+        db.execute(backend.build(&stmt)).await.unwrap();
+        fired_into(&db, "open", 1).await;
+        let max = i64::MAX as u64;
+        let all = list_with_cases(&db, "acme", None, CaseFilter::All, max, 0).await;
+        assert_eq!(all.unwrap().len(), 1);
+        let past = list_with_cases(&db, "acme", None, CaseFilter::All, max, max).await;
+        assert!(past.unwrap().is_empty());
+        let small = list_with_cases(&db, "acme", None, CaseFilter::All, 1, max).await;
+        assert!(small.unwrap().is_empty());
+    }
+
+    #[tokio::test]
     async fn a_firing_after_the_window_finds_the_resolved_incidents_but_not_the_open_one() {
         let db = incidents_db().await;
         let backend = db.get_database_backend();

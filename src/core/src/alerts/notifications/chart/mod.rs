@@ -871,11 +871,31 @@ fn merge_current(
             );
         }
     }
+    drop_disproved_absence(&mut by_bucket);
     by_bucket
         .into_values()
         .map(|s| s.point)
         .filter(|p| p.ts_us >= start_us && p.ts_us < end_us)
         .collect()
+}
+
+/// An absence and a scored point of one bucket contradict; the later judgment wins.
+/// A partial drop sits beside the scored point on purpose, so it is not compared.
+fn drop_disproved_absence(by_bucket: &mut BTreeMap<(i64, u8), StoredPoint>) {
+    let absent: Vec<i64> = by_bucket
+        .keys()
+        .filter(|(_, kind)| *kind == 1)
+        .map(|(ts, _)| *ts)
+        .collect();
+    for ts in absent {
+        let judged = |kind: u8| by_bucket.get(&(ts, kind)).and_then(|s| s.judged_end_us);
+        if let (Some(absence), Some(scored)) = (judged(1), judged(0))
+            && absence != scored
+        {
+            let older = if absence < scored { 1 } else { 0 };
+            by_bucket.remove(&(ts, older));
+        }
+    }
 }
 
 /// How far a point sits outside its band, in band widths; events rank above every value.
@@ -1151,6 +1171,92 @@ mod tests {
         let legacy = merge_current(vec![stored(100.0, None)], &current, T0 + 5 * B, T0, end);
         assert_eq!(legacy[0].value, 500.0);
         assert_eq!(merge_current(Vec::new(), &current, 0, T0 + B, end).len(), 1);
+    }
+
+    #[test]
+    fn the_later_of_an_absence_and_a_scored_point_wins_its_bucket() {
+        let absence = AnomalySeriesPoint {
+            is_absence: true,
+            ..pt(0, 0.0)
+        };
+        let drop = AnomalySeriesPoint {
+            is_partial_drop: true,
+            ..pt(0, 20.0)
+        };
+        let at = |point: AnomalySeriesPoint, judged: i64| StoredPoint {
+            point,
+            judged_end_us: Some(judged),
+        };
+        let end = T0 + 10 * B;
+        let stale = merge_current(
+            vec![at(pt(0, 100.0), T0 + 9 * B)],
+            std::slice::from_ref(&absence),
+            T0 + 5 * B,
+            T0,
+            end,
+        );
+        assert_eq!(stale.len(), 1, "{stale:?}");
+        assert!(!stale[0].is_absence);
+        let returned = merge_current(
+            vec![at(absence.clone(), T0 + 5 * B)],
+            &[pt(0, 100.0)],
+            T0 + 9 * B,
+            T0,
+            end,
+        );
+        assert_eq!(returned.len(), 1, "{returned:?}");
+        assert!(!returned[0].is_absence);
+        let gone = merge_current(
+            vec![at(pt(0, 100.0), T0 + 5 * B)],
+            std::slice::from_ref(&absence),
+            T0 + 9 * B,
+            T0,
+            end,
+        );
+        assert_eq!(gone.len(), 1, "{gone:?}");
+        assert!(gone[0].is_absence);
+        let legacy = StoredPoint {
+            point: pt(0, 100.0),
+            judged_end_us: None,
+        };
+        assert_eq!(
+            merge_current(
+                vec![legacy],
+                std::slice::from_ref(&absence),
+                T0 + 5 * B,
+                T0,
+                end
+            )
+            .len(),
+            2
+        );
+        let history = vec![
+            at(pt(0, 100.0), T0 + 5 * B),
+            at(absence.clone(), T0 + 9 * B),
+        ];
+        let only_history = merge_current(history, &[], T0 + 9 * B, T0, end);
+        assert_eq!(only_history.len(), 1, "{only_history:?}");
+        assert!(only_history[0].is_absence);
+        let tie = merge_current(
+            vec![at(pt(0, 100.0), T0 + 5 * B)],
+            std::slice::from_ref(&absence),
+            T0 + 5 * B,
+            T0,
+            end,
+        );
+        assert_eq!(tie.len(), 2, "equal judged ends keep both");
+        let beside = merge_current(
+            vec![at(pt(0, 100.0), T0 + 9 * B)],
+            std::slice::from_ref(&drop),
+            T0 + 5 * B,
+            T0,
+            end,
+        );
+        assert_eq!(
+            beside.len(),
+            2,
+            "a partial drop stays beside its scored point"
+        );
     }
 
     #[test]

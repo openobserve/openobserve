@@ -408,6 +408,19 @@ describe("AnomalySummaryStrip", () => {
     expect(w.emitted("open")?.[0]).toEqual(["https://o2.example/web/logs?stream=k8s_logs"]);
   });
 
+  it("names the button by target with a translated key, not the endpoint's English label", () => {
+    for (const [target, want] of [
+      ["logs", "View logs"],
+      ["traces", "View traces"],
+      ["metrics", "View metrics"],
+    ] as const) {
+      const w = mountStrip({ response: response({ target, label: "English from the server" }) });
+      expect(text(w, "open").text()).toBe(want);
+    }
+    const unknown = response({ target: "other" as never, label: "English from the server" });
+    expect(text(mountStrip({ response: unknown }), "open").text()).toBe("View data");
+  });
+
   it("has no primary button when the endpoint has nothing to open", () => {
     const w = mountStrip({ response: response({ url: "" }) });
     expect(text(w, "open").exists()).toBe(false);

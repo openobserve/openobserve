@@ -788,7 +788,7 @@ mod tests {
             title
                 .as_str()
                 .unwrap()
-                .contains("🔴 error rate on web-logs firing")
+                .contains("|error rate on web-logs firing>")
         );
     }
 
@@ -808,7 +808,7 @@ mod tests {
         assert_eq!(example(NotificationKind::Synthetics), want);
         let flat = crate::alerts::notifications::render::slack::flat_blocks(&want["slack_firing"]);
         let title = &flat["blocks"][0]["text"]["text"];
-        assert!(title.as_str().unwrap().contains("🔴 checkout API failing"));
+        assert!(title.as_str().unwrap().contains("|checkout API failing"));
     }
 
     #[test]

@@ -47,6 +47,19 @@ describe("slack template", () => {
     it("body contains alert placeholders", () => {
       expect(slackTemplate.body).toContain("{alert_name}");
     });
+
+    it("puts the title above a bar in the status color", () => {
+      const body = JSON.parse(slackTemplate.body);
+      expect(body.blocks).toHaveLength(1);
+      expect(body.blocks[0].text.text).toBe("*[{alert_status}] {alert_name}*");
+      expect(body.attachments).toHaveLength(1);
+      expect(body.attachments[0].color).toBe("{status_color}");
+      expect(body.attachments[0].blocks.map((b: { type: string }) => b.type)).toEqual([
+        "section",
+        "section",
+        "actions",
+      ]);
+    });
   });
 
   describe("slackConfig", () => {

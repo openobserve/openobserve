@@ -15252,7 +15252,7 @@
     "systemReadOnlyEdit": "Prebuilt template — editing is disabled. Clone it to make a modifiable copy.",
     "systemReadOnlyDelete": "Prebuilt template — deleting is disabled. Clone it to make a modifiable copy.",
     "prebuiltBadge": "Prebuilt",
-    "prebuiltBadgeHint": "Managed by the system. You can edit, but deletion is disabled.",
+    "prebuiltBadgeHint": "จัดการโดยระบบ คุณไม่สามารถแก้ไขหรือลบได้ โคลนเพื่อสร้างสำเนาที่แก้ไขได้",
     "customBadge": "Custom",
     "filterAll": "ทั้งหมด",
     "filterPrebuilt": "Prebuilt",

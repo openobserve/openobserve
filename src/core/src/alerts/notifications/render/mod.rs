@@ -469,7 +469,11 @@ mod tests {
         // Empty link label gets the renderer default; both attachments carry the dot's color.
         let buttons = slack_block(&v, "actions");
         assert_eq!(buttons["elements"][1]["text"]["text"], DEFAULT_LINK_LABEL);
-        assert!(raw.get("blocks").is_none(), "{raw}");
+        assert_eq!(
+            raw["blocks"].as_array().map(Vec::len),
+            Some(1),
+            "title above the bar: {raw}"
+        );
         let bars: Vec<&serde_json::Value> = raw["attachments"]
             .as_array()
             .unwrap()

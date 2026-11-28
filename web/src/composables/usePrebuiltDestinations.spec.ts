@@ -1261,6 +1261,15 @@ describe("usePrebuiltDestinations", () => {
       expect(mockTemplatePreview).not.toHaveBeenCalled();
     });
 
+    it("fills the bar color of the prebuilt Slack body", async () => {
+      const { renderTemplateBody } = usePrebuiltDestinations();
+      fetchedTemplate('{"attachments": [{"color": "{status_color}"}]}');
+
+      const parsed = JSON.parse(await renderTemplateBody("tmpl"));
+
+      expect(parsed.attachments[0].color).toBe("#E01E5A");
+    });
+
     it("fills numeric variables so an unquoted token still yields valid JSON", async () => {
       const { renderTemplateBody } = usePrebuiltDestinations();
       fetchedTemplate(

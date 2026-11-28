@@ -149,6 +149,19 @@ export function anomalyIntervalMs(interval: string | undefined): number | null {
   return seconds === null ? null : seconds * 1000;
 }
 
+/** Browsers fire a delay above 2^31-1 ms at once, so a long schedule would refresh in a loop. */
+export const MAX_TIMER_DELAY_MS = 2_147_483_647;
+
+export function timerDelayMs(ms: number): number {
+  return Math.min(ms, MAX_TIMER_DELAY_MS);
+}
+
+/** The root font size in px; rem offsets must use it, not a fixed 16. */
+export function rootFontPx(root: Element = document.documentElement): number {
+  const px = Number.parseFloat(getComputedStyle(root).fontSize);
+  return Number.isFinite(px) && px > 0 ? px : 16;
+}
+
 /** The query emits no row for an empty bucket, so a null row marks each gap and breaks the line. */
 export function withGapBreaks(rows: AnomalyBandRow[], intervalMs: number | null): AnomalyBandRow[] {
   if (intervalMs === null || intervalMs <= 0) return rows;

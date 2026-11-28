@@ -1,15 +1,17 @@
 {
+  "blocks": [
+    {
+      "type": "section",
+      "text": {
+        "type": "mrkdwn",
+        "text": "*<https://o2.example/short/abc|CPU \"high\" &amp; &lt;fire&gt; on web-1>*"
+      }
+    }
+  ],
   "attachments": [
     {
       "color": "#E01E5A",
       "blocks": [
-        {
-          "type": "section",
-          "text": {
-            "type": "mrkdwn",
-            "text": "*<https://o2.example/short/abc|CPU \"high\" &amp; &lt;fire&gt; on web-1>*"
-          }
-        },
         {
           "type": "section",
           "text": {
