@@ -15,7 +15,14 @@
 
 import { describe, expect, it } from "vitest";
 
-import { agentHomeState, aiTabMode, askOffReason } from "./homeState";
+import {
+  agentHomeState,
+  aiTabMode,
+  askOffReason,
+  periodToMs,
+  readHomeUrl,
+  threadPeriodOf,
+} from "./homeState";
 
 const ent = { isEnterprise: true, isCloud: false };
 
@@ -66,5 +73,49 @@ describe("aiTabMode", () => {
     expect(aiTabMode({ ...oss, gate: "loading", menu: "enabled", configLoaded: false })).toBe(
       "hidden",
     );
+  });
+});
+
+describe("readHomeUrl", () => {
+  it("reads a relative period", () => {
+    expect(readHomeUrl({ period: "1h" })).toEqual({
+      range: { type: "relative", period: "1h" },
+    });
+  });
+
+  it("reads an absolute range in microseconds", () => {
+    expect(readHomeUrl({ from: "100", to: "200" }).range).toEqual({
+      type: "absolute",
+      from: 100,
+      to: 200,
+    });
+  });
+
+  it.each([
+    [{ period: "soon" }, { range: null }],
+    [{ period: "1h", from: "1", to: "2" }, { range: null }],
+    [{ from: "200", to: "100" }, { range: null }],
+    [{ from: "100" }, { range: null }],
+    [{ from: "1e5", to: "2e5" }, { range: null }],
+  ])("restores nothing from a malformed part %#", (query, expected) => {
+    expect(readHomeUrl(query)).toEqual(expected);
+  });
+});
+
+describe("periodToMs", () => {
+  it("reads relative periods and falls back to 15 minutes", () => {
+    expect(periodToMs("24h")).toBe(86_400_000);
+    expect(periodToMs("15m")).toBe(900_000);
+    expect(periodToMs("bogus")).toBe(900_000);
+  });
+});
+
+describe("threadPeriodOf", () => {
+  it("gives a thread on Home no window of its own when the URL names none, so it reads the 15 min default", () => {
+    expect(threadPeriodOf({})).toBeNull();
+  });
+
+  it("follows the range the URL names", () => {
+    expect(threadPeriodOf({ period: "1h" })).toEqual({ period: "1h", ms: 3_600_000 });
   });
 });
