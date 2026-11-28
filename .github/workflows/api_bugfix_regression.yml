@@ -93,6 +93,8 @@ jobs:
       # CI executes a stripped binary; omitting dependency debuginfo keeps the
       # shared compile cache small while preserving dev-profile debug assertions.
       CARGO_PROFILE_DEV_DEBUG: "0"
+      # Must match the cache writers' RUSTFLAGS, which are part of the rust-cache key.
+      RUSTFLAGS: "-C target-feature=+aes,+sse2,+ssse3,+sse4.1,+sse4.2 -Zthreads=8"
     permissions:
       contents: read
     steps:
