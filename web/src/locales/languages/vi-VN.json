@@ -37465,7 +37465,8 @@
         "ask": "Hỏi",
         "inputName": "Hỏi {product}",
         "recentThreads": "Cuộc trò chuyện gần đây",
-        "askEmpty": "Nhập câu hỏi hoặc đính kèm ảnh để hỏi"
+        "askEmpty": "Nhập câu hỏi hoặc đính kèm ảnh để hỏi",
+        "askEmptyText": "Nhập câu hỏi"
       },
       "prefill": {
         "append": "Thêm vào",

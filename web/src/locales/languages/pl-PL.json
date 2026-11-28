@@ -37465,7 +37465,8 @@
         "ask": "Zapytaj",
         "inputName": "Zapytaj {product}",
         "recentThreads": "Ostatnie rozmowy",
-        "askEmpty": "Wpisz pytanie lub załącz obraz, aby zapytać"
+        "askEmpty": "Wpisz pytanie lub załącz obraz, aby zapytać",
+        "askEmptyText": "Wpisz pytanie"
       },
       "prefill": {
         "append": "Dopisz",

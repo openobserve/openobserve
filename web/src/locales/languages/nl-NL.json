@@ -37465,7 +37465,8 @@
         "ask": "Vraag",
         "inputName": "Vraag {product}",
         "recentThreads": "Recente chats",
-        "askEmpty": "Typ een vraag of voeg een afbeelding toe om te vragen"
+        "askEmpty": "Typ een vraag of voeg een afbeelding toe om te vragen",
+        "askEmptyText": "Typ een vraag"
       },
       "prefill": {
         "append": "Toevoegen",

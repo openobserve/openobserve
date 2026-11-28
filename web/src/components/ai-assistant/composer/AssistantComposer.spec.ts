@@ -19,7 +19,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 
-import type { ContextChip, PendingApproval } from "@/composables/assistant";
+import type { AssistantCapability, ContextChip, PendingApproval } from "@/composables/assistant";
 import { registerAssistantFocusTarget, runEscapeLadder } from "@/composables/assistant/shortcuts";
 import { trackAssistant } from "@/services/assistantAnalytics";
 import { raw } from "@/types/i18n";
@@ -82,8 +82,12 @@ const NOTICE = '[data-test="assistant-composer-notice"]';
 
 const FOLLOWING = Node.DOCUMENT_POSITION_FOLLOWING;
 
-function setup(props: Partial<AssistantComposerProps> = {}, withSession = true) {
-  fake.current = fakeAssistant();
+function setup(
+  props: Partial<AssistantComposerProps> = {},
+  withSession = true,
+  capability: Partial<AssistantCapability> & { imageInput?: boolean } = { imageInput: true },
+) {
+  fake.current = fakeAssistant("available", capability);
   if (fake.member)
     fake.current.capability.value = { ...fake.current.capability.value, isAdmin: false };
   const store = fake.current.store;
@@ -1044,6 +1048,40 @@ describe("images (CT-10)", () => {
   const png = (name: string, size = 10) =>
     new File([new Uint8Array(size)], name, { type: "image/png" });
 
+  it("ignores a pasted image when image input is disabled", async () => {
+    vi.useFakeTimers({ toFake: ["setImmediate"] });
+    try {
+      const { textarea, store, sid } = setup({}, true, { imageInput: false });
+      await textarea().trigger("paste", {
+        clipboardData: { files: [png("image.png")], getData: () => "" },
+      });
+      await vi.runAllTimersAsync();
+      expect(store.state.sessions[sid].composer.images).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it.each([
+    { state: "absent", capability: {}, filenames: [] },
+    { state: "enabled", capability: { imageInput: true }, filenames: ["image.png"] },
+  ])("handles a dropped image when image input is $state", async ({ capability, filenames }) => {
+    vi.useFakeTimers({ toFake: ["setImmediate"] });
+    try {
+      const { host, store, sid } = setup({}, true, capability);
+      const drop = new Event("drop", { bubbles: true, cancelable: true });
+      Object.defineProperty(drop, "dataTransfer", {
+        value: { types: ["Files"], files: [png("image.png")] },
+      });
+      host.dispatchEvent(drop);
+      await vi.runAllTimersAsync();
+      const images = store.state.sessions[sid].composer.images;
+      expect(images.map((image: { filename: string }) => image.filename)).toEqual(filenames);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("names pasted shots uniquely (AC 1)", async () => {
     const { textarea, store, sid } = setup();
     for (let i = 0; i < 2; i++) {
@@ -1229,11 +1267,22 @@ describe("one frame, the + menu and long pastes (D4 §3.1, §3.6, §3.9)", () =>
     expect(wrapper.get('[data-test="assistant-composer-plus"]').attributes("aria-label")).toBe(
       "Add to message",
     );
+    expect(wrapper.getComponent(AssistantComposerPlusMenu).props("actions")).toContain("attach");
     const click = vi.spyOn(HTMLInputElement.prototype, "click").mockImplementation(() => {});
     plus(wrapper, "attach");
     expect(click).toHaveBeenCalledTimes(1);
     expect((click.mock.contexts[0] as HTMLInputElement).type).toBe("file");
     click.mockRestore();
+  });
+
+  it.each([
+    ["disabled", { imageInput: false }],
+    ["absent", {}],
+  ] as const)("offers only Connectors when image input is %s", (_, capability) => {
+    const { wrapper } = setup({}, true, { attachments: true, ...capability });
+    expect(wrapper.findComponent(AssistantComposerPlusMenu).props("actions")).toEqual([
+      "connectors",
+    ]);
   });
 
   it("keeps the agent on the right as quiet text and a chevron, with no box and no auto-open switch", async () => {

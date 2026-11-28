@@ -37465,7 +37465,8 @@
         "ask": "Perguntar",
         "inputName": "Pergunte ao {product}",
         "recentThreads": "Conversas recentes",
-        "askEmpty": "Escreva uma pergunta ou anexe uma imagem para perguntar"
+        "askEmpty": "Escreva uma pergunta ou anexe uma imagem para perguntar",
+        "askEmptyText": "Escreva uma pergunta"
       },
       "prefill": {
         "append": "Acrescentar",

@@ -311,6 +311,23 @@ describe("B-06 capabilities", () => {
       expect(cap(handle)).not.toHaveProperty(flag);
   });
 
+  it("maps the server's image_input capability to imageInput", async () => {
+    const { handle } = setup({ b06: CAPABILITIES_FIXTURE.body as AssistantCapabilitiesResponse });
+    await flushPromises();
+    expect(cap(handle)).toMatchObject({ imageInput: true });
+  });
+
+  it.each([
+    ["omits image_input", { can_chat: true, attachments: true }],
+    ["sets image_input to false", { can_chat: true, attachments: true, image_input: false }],
+    ['sets image_input to "true"', { can_chat: true, attachments: true, image_input: "true" }],
+  ])("leaves imageInput absent when the server %s", async (_scenario, b06) => {
+    const { handle } = setup({ b06: b06 as AssistantCapabilitiesResponse });
+    await flushPromises();
+    expect(cap(handle)).toMatchObject({ attachments: true });
+    expect(cap(handle)).not.toHaveProperty("imageInput");
+  });
+
   it("reads the server's unreachable health as down, so the gate says unhealthy", async () => {
     const { handle } = setup({ b06: { can_chat: true, health: { status: "unreachable" } } });
     await flushPromises();

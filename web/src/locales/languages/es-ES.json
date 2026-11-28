@@ -37465,7 +37465,8 @@
         "ask": "Preguntar",
         "inputName": "Pregunta a {product}",
         "recentThreads": "Chats recientes",
-        "askEmpty": "Escribe una pregunta o adjunta una imagen para preguntar"
+        "askEmpty": "Escribe una pregunta o adjunta una imagen para preguntar",
+        "askEmptyText": "Escribe una pregunta"
       },
       "prefill": {
         "append": "Añadir",

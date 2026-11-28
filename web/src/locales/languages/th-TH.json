@@ -37463,7 +37463,8 @@
         "ask": "ถาม",
         "inputName": "ถาม {product}",
         "recentThreads": "แชตล่าสุด",
-        "askEmpty": "พิมพ์คำถามหรือแนบรูปภาพเพื่อถาม"
+        "askEmpty": "พิมพ์คำถามหรือแนบรูปภาพเพื่อถาม",
+        "askEmptyText": "พิมพ์คำถาม"
       },
       "prefill": {
         "append": "ต่อท้าย",

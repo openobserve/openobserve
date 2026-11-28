@@ -598,6 +598,8 @@ export interface AssistantCapability {
   agents?: CapabilityAgent[];
   /** B-09: the server takes typed `attachments` and echoes `context_used`. */
   attachments?: boolean;
+  /** The client offers Photo only when image input is advertised. */
+  imageInput?: boolean;
   /** `/confirm {id, extend:true}` gives a card more time. */
   approvalExtend?: boolean;
   /** The server counts `by:"user"` and `by:"background"` apart; approvals are gated without it (PO A14, B96). */

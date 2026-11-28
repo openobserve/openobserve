@@ -109,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <template v-if="mentionsOn" #plus>
               <AssistantComposerPlusMenu
-                :actions="['attach', 'connectors']"
+                :actions="plusActions"
                 :disabled="fieldLoading"
                 @select="onPlus"
               />
@@ -143,9 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :label="t('assistant.welcome.launcher.ask')"
                 :icon="assistantGlyph.send"
                 :disabled="!canSend"
-                :disabled-reason="
-                  fieldLoading ? undefined : (fixedOff ?? t('assistant.welcome.launcher.askEmpty'))
-                "
+                :disabled-reason="fieldLoading ? undefined : (fixedOff ?? askEmpty)"
                 :class="SEND_ACTION_CLASS"
                 data-test="assistant-launcher-ask"
                 @click="ask()"
@@ -155,7 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </AssistantComposerFrame>
       <OFile
-        v-if="mentionsOn"
+        v-if="mentionsOn && imageInput"
         ref="file"
         class="hidden"
         accept="image/png,image/jpeg"
@@ -309,6 +307,15 @@ const org = computed<string>(() => vuex.state.selectedOrganization?.identifier ?
 const state = computed(() => launcherState(capability.gate.value));
 const fieldReady = computed(() => launcherState(capability.gate.value) === "ready");
 const fieldLoading = computed(() => capability.gate.value === "loading");
+const imageInput = computed(() => capability.value.imageInput === true);
+const plusActions = computed<ComposerPlusAction[]>(() =>
+  imageInput.value ? ["attach", "connectors"] : ["connectors"],
+);
+const askEmpty = computed(() =>
+  imageInput.value
+    ? t("assistant.welcome.launcher.askEmpty")
+    : t("assistant.welcome.launcher.askEmptyText"),
+);
 // While dictating the words may still be interim; Send commits them, as Enter does.
 const canSend = computed(
   () =>
@@ -602,8 +609,7 @@ function ask(): void {
   const line = text.value.trim();
   const attached = images.value;
   // Home's box is the assistant there, so an empty ask only says why instead of leaving the page.
-  if (!line && attached.length === 0)
-    return announceComposer(LAUNCHER_DRAFT, t("assistant.welcome.launcher.askEmpty"));
+  if (!line && attached.length === 0) return announceComposer(LAUNCHER_DRAFT, askEmpty.value);
   text.value = "";
   const chips = mentionChips.value;
   const picked = props.fixedAgent ?? agent.value;

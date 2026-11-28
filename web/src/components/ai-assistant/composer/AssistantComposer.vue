@@ -1336,9 +1336,11 @@ function openPicker(): void {
   file.value?.open();
 }
 
+const imageInput = computed(() => store.state.capability.imageInput === true);
+
 // A reply carries no context, so its + menu offers nothing.
 const plusActions = computed<ComposerPlusAction[]>(() =>
-  replying.value ? [] : ["attach", "connectors"],
+  replying.value ? [] : imageInput.value ? ["attach", "connectors"] : ["connectors"],
 );
 
 function onPlus(action: ComposerPlusAction): void {
@@ -1351,6 +1353,7 @@ function onPicked(value: FileValue): void {
 }
 
 function onPaste(event: ClipboardEvent): void {
+  if (!imageInput.value) return void pasteLong(event);
   const files = Array.from(event.clipboardData?.files ?? []).filter((f) =>
     f.type.startsWith("image/"),
   );
@@ -1483,6 +1486,7 @@ function hasFiles(event: DragEvent): boolean {
 function onDragOver(event: DragEvent): void {
   if (!hasFiles(event)) return;
   event.preventDefault();
+  if (!imageInput.value) return;
   const shell = shellRoot();
   if (shell) shell.dataset.dragging = "";
 }
@@ -1497,7 +1501,7 @@ function onDrop(event: DragEvent): void {
   if (shell) delete shell.dataset.dragging;
   if (!hasFiles(event)) return;
   event.preventDefault();
-  void addFiles(Array.from(event.dataTransfer?.files ?? []));
+  if (imageInput.value) void addFiles(Array.from(event.dataTransfer?.files ?? []));
 }
 
 watch(

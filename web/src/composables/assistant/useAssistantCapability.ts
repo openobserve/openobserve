@@ -351,6 +351,7 @@ function resolveCapability(input: CapabilityInput): AssistantCapability {
   if (typeof input.b06?.retention_days === "number")
     capability.retentionDays = input.b06.retention_days;
   if (input.b06?.attachments === true) capability.attachments = true;
+  if (input.b06?.image_input === true) capability.imageInput = true;
   if (input.b06?.approval_extend === true || extendsOffered(input.b06?.approval_extend_budgets))
     capability.approvalExtend = true;
   if (input.b06?.approval_extend_budgets) capability.approvalExtendBudgets = true;

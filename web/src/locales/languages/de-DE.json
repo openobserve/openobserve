@@ -37465,7 +37465,8 @@
         "ask": "Fragen",
         "inputName": "{product} fragen",
         "recentThreads": "Letzte Chats",
-        "askEmpty": "Geben Sie eine Frage ein oder hängen Sie ein Bild an, um zu fragen"
+        "askEmpty": "Geben Sie eine Frage ein oder hängen Sie ein Bild an, um zu fragen",
+        "askEmptyText": "Geben Sie eine Frage ein"
       },
       "prefill": {
         "append": "Anhängen",
