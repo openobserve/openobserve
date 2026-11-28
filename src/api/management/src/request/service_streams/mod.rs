@@ -13,6 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+// Only the enterprise handler calls it; OSS builds compile it for its tests.
+#[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
+mod has_data;
+
 use axum::{
     Json,
     extract::Path,
@@ -354,11 +358,28 @@ pub async fn correlate_streams(
                 response.source_stream = Some(req.source_stream.clone());
                 response.source_type = Some(req.source_type.clone());
                 let checker = openobserve_core::authz::active_checker();
-                response.related_streams = openobserve_core::authz::readable_related_streams(
-                    checker.as_ref(),
-                    &user_email.user_id,
-                    &org_id,
-                    response.related_streams,
+                let (org, user) = (org_id.as_str(), user_email.user_id.as_str());
+                let readable = move |streams: config::meta::service_streams::RelatedStreams| async move {
+                    openobserve_core::authz::readable_related_streams(
+                        checker.as_ref(),
+                        user,
+                        org,
+                        streams,
+                    )
+                    .await
+                };
+                let probe = has_data::LiveProbe {
+                    org_id: org,
+                    user_id: user,
+                };
+                has_data::filter_then_annotate(
+                    &req,
+                    &mut response,
+                    &semantic_groups,
+                    readable,
+                    &probe,
+                    config::utils::time::now_micros(),
+                    has_data::BUDGET,
                 )
                 .await;
                 // all_streams is a flattened copy, so it would still list the dropped streams
@@ -422,6 +443,9 @@ pub struct CorrelationRequest {
     /// Correlation window end in microseconds
     #[serde(default)]
     pub end_time: Option<i64>,
+    /// Answer `has_data` per returned metric stream over the window, or the last hour without one
+    #[serde(default)]
+    pub check_data: bool,
 }
 
 #[cfg(feature = "enterprise")]
@@ -838,6 +862,7 @@ mod tests {
         assert_eq!(req.source_stream, "default");
         assert_eq!(req.source_type, "logs");
         assert!(!req.resolve_from_source, "an old client keeps today's pick");
+        assert!(!req.check_data, "an old client runs no existence queries");
         assert_eq!(req.available_dimensions.len(), 2);
         assert_eq!(req.available_dimensions.get("k8s-cluster").unwrap(), "prod");
         assert_eq!(
@@ -859,6 +884,7 @@ mod tests {
             source_dimensions: None,
             start_time: None,
             end_time: None,
+            check_data: false,
         };
 
         let json = serde_json::to_string(&req).unwrap();
