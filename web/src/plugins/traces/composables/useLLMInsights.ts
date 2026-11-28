@@ -18,7 +18,7 @@ import { gt } from "@/types/i18n";
 import { b64EncodeUnicode, generateTraceContext } from "@/utils/zincutils";
 import type { GenAiAgentListItem } from "@/services/gen-ai-agent-mapping.service";
 import { buildAgentTraceFilter } from "../llmAgentFilter";
-import { agentParentsJoin, compactSql } from "../config/llmInsightsPanels";
+import { agentParentsJoin, compactSql, LLM_SPAN_FILTER } from "../config/llmInsightsPanels";
 import { traceUsageSum } from "../llmAttribution";
 import { streamHasParentSpan } from "../llmStreamColumns";
 import { TRACE_ERRORED_SQL } from "../llmTraceOutcome";
@@ -44,13 +44,14 @@ export interface LLMSparklineSeries {
   errorRate: number[];
 }
 
-/** `WHERE <agent> AND <page filters>`, or "" for the whole stream. */
+/** `WHERE <spans> AND <agent> AND <page filters>`, or "" for the whole stream. */
 function scopeWhere(
   agent: GenAiAgentListItem | null | undefined,
   streamName: string,
   extraFilter: string,
+  spanFilter = "",
 ): string {
-  const clause = [buildAgentTraceFilter(agent, streamName), extraFilter]
+  const clause = [spanFilter, buildAgentTraceFilter(agent, streamName), extraFilter]
     .filter(Boolean)
     .join(" AND ");
   return clause ? `WHERE ${clause}` : "";
@@ -179,18 +180,8 @@ export function useLLMInsights() {
     });
   }
 
-  /**
-   * Internal — fetch the whole-window P95 latency (the one KPI card that
-   * can't be derived from the histogram, since percentiles aren't
-   * additive across buckets — you can't average per-bucket P95s to get
-   * the overall P95).
-   *
-   * Scoped to LLM calls via a per-aggregate FILTER on
-   * `gen_ai_operation_name IS NOT NULL` — "P95 Latency" means "how slow
-   * are the model calls", so the fast child/tool spans must be excluded
-   * or they drag the tail down. This matches the dedicated Latency trend
-   * panel and the sparkline's per-bucket P95.
-   */
+  // Own query because percentiles don't add across buckets. LLM calls only;
+  // child/tool spans would drag the tail down.
   async function fetchLatency(
     streamName: string,
     startTime: number,
@@ -200,9 +191,9 @@ export function useLLMInsights() {
   ): Promise<number> {
     const sql = compactSql(`
       SELECT
-        COALESCE(approx_percentile_cont(duration, 0.95) FILTER (WHERE gen_ai_operation_name IS NOT NULL), 0) as p95_duration
+        COALESCE(approx_percentile_cont(duration, 0.95), 0) as p95_duration
       FROM ${quoteStream(streamName)}
-      ${scopeWhere(agent, streamName, extraFilter)}
+      ${scopeWhere(agent, streamName, extraFilter, LLM_SPAN_FILTER)}
     `);
 
     let p95 = 0;
