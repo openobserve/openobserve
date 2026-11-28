@@ -269,6 +269,36 @@ pub async fn purge_with<C: ConnectionTrait>(conn: &C, now: i64) -> Result<u64, e
     Ok(expired.rows_affected + deleted.rows_affected)
 }
 
+/// A deleted chat's pending cards must stop holding answer slots.
+pub async fn expire_for_sessions(
+    org_id: &str,
+    session_ids: &[String],
+    now: i64,
+) -> Result<u64, errors::Error> {
+    expire_for_sessions_with(get_orm_client_rw().await, org_id, session_ids, now).await
+}
+
+pub async fn expire_for_sessions_with<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    session_ids: &[String],
+    now: i64,
+) -> Result<u64, errors::Error> {
+    if session_ids.is_empty() {
+        return Ok(0);
+    }
+    let result = Entity::update_many()
+        .col_expr(Column::Status, Expr::value(STATUS_EXPIRED))
+        .col_expr(Column::DecidedAt, Expr::value(Some(now)))
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::SessionId.is_in(session_ids.iter().map(String::as_str)))
+        .filter(Column::Status.eq(STATUS_PENDING))
+        .exec(conn)
+        .await
+        .map_err(db_err)?;
+    Ok(result.rows_affected)
+}
+
 /// Remove every row of `org_id`, for the org's deletion; returns how many.
 pub async fn delete_by_org(org_id: &str) -> Result<u64, errors::Error> {
     delete_by_org_with(get_orm_client_rw().await, org_id).await
@@ -432,6 +462,41 @@ mod tests {
         let row = get_with(&db, ORG, "apr_2").await.unwrap().unwrap();
         assert_eq!(row.status, STATUS_PENDING);
         assert!(waiting(row.expires_at).await.unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn deleting_a_chat_expires_only_its_own_waiting_cards() {
+        let db = db().await;
+        for approval in [
+            card("apr_1"),
+            NewApproval {
+                session_id: "0199e7b2-6f0c-7a3e-a1b2-c3d4e5f60719",
+                ..card("apr_2")
+            },
+            card("apr_3"),
+            NewApproval {
+                org_id: "globex",
+                ..card("apr_4")
+            },
+        ] {
+            insert_pending_with(&db, &approval, NOW).await.unwrap();
+        }
+        decide_with(&db, ORG, "apr_3", &APPROVE, NOW).await.unwrap();
+
+        expire_for_sessions_with(&db, ORG, &[SESSION.to_string()], NOW)
+            .await
+            .unwrap();
+
+        let waiting = list_waiting_with(&db, ORG, NOW).await.unwrap();
+        assert_eq!(waiting.len(), 1);
+        assert_eq!(waiting[0].id, "apr_2");
+        let expired = get_with(&db, ORG, "apr_1").await.unwrap().unwrap();
+        assert_eq!(expired.status, STATUS_EXPIRED);
+        assert_eq!(expired.decided_at, Some(NOW));
+        let approved = get_with(&db, ORG, "apr_3").await.unwrap().unwrap();
+        assert_eq!(approved.status, STATUS_APPROVED);
+        let other_org = get_with(&db, "globex", "apr_4").await.unwrap().unwrap();
+        assert_eq!(other_org.status, STATUS_PENDING);
     }
 
     #[tokio::test]
