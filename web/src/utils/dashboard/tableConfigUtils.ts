@@ -28,6 +28,7 @@ import { getDataValue } from "./aliasUtils";
 import { RE2JS } from "re2js";
 import { metricThresholdColor, type Thresholds } from "./thresholds";
 import { isSeriesOverrideEntry } from "./seriesOverrides";
+import { breakdownValueLabel, NULL_BREAKDOWN_VALUE } from "./sqlProcessData";
 
 /** Persisted `override_config` item type discriminants (mirrored in the Rust schema). */
 export const OVERRIDE_CONFIG_TYPES = {
@@ -248,6 +249,21 @@ export const missingCellText = (
   // Only special mappings, so a value mapping on the text "null" keeps missing cells on the replacement.
   const text = special ? cache?.get(`${SPECIAL_KEY_PREFIX}${special}`)?.text : null;
   return text != null && text !== "" ? text : String(missingValue);
+};
+
+/** True for the cell values a table treats as missing: null, undefined and "". */
+export const isMissingCell = (value: unknown): boolean =>
+  value === null || value === undefined || value === "";
+
+/** A missing table cell's text, falling back to (null) / (empty) so NULL and "" rows stay distinguishable. */
+export const tableMissingCellText = (
+  value: unknown,
+  cache: ReturnType<typeof buildValueMappingCache>,
+  missingValue: string,
+): string => {
+  const text = missingCellText(value, cache, missingValue);
+  if (text !== "") return text;
+  return breakdownValueLabel(value === "" ? "" : NULL_BREAKDOWN_VALUE);
 };
 
 /** Look up the mapped display text for a value (null when none has text). */

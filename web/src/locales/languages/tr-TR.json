@@ -527,7 +527,9 @@
       "linkedDomains": "bağlantılı alan adları",
       "domainMappings": "alan adı eşlemeleri",
       "domainRequests": "bağlantı istekleri",
-      "blockedUsers": "engellenen kullanıcılar"
+      "blockedUsers": "engellenen kullanıcılar",
+      "autoresolveRuns": "çalıştırmalar",
+      "savedAutoResolve": "kaydedilmiş AutoResolve'lar"
     },
     "demo": {
       "pageTitle": "Boş durumlar — inceleme için tam set",
@@ -652,6 +654,23 @@
     "noOncallUnrouted": {
       "title": "Sahip gerektiren bir şey yok",
       "description": "Tetiklenen her uyarı bir ekibe ulaştı."
+    },
+    "noAutoResolveRuns": {
+      "title": "Henüz çalıştırma yok",
+      "description": "Sizin ve ekibinizin başlattığı çalıştırmalar burada görünür."
+    },
+    "noAutoResolveConnections": {
+      "title": "Önce bir MCP ekleyin",
+      "description": "Bir AutoResolve, kuruluşunuzun eklediği MCP'ler aracılığıyla işlem yapar; bunlar bir kod barındırma servisi, bir dağıtım aracı veya bir küme olabilir. Bu kuruluşta henüz hiçbiri yok."
+    },
+    "noUsable": {
+      "mcps": "Kullanabileceğiniz MCP yok",
+      "aiToolsets": "Kullanabileceğiniz yapay zeka araç seti yok",
+      "askAdmin": "Erişim için IAM › Roller bölümünden bir yöneticiye başvurun."
+    },
+    "noSavedAutoResolve": {
+      "title": "Henüz kaydedilmiş AutoResolve yok",
+      "description": "Tamamlanmış bir çalıştırmayı açın ve hedefini yeniden çalıştırmak ya da bir uyarı tetiklendiğinde başlatmak için AutoResolve olarak kaydet'i seçin."
     }
   },
   "accessBoundary": {
@@ -2075,6 +2094,7 @@
   },
   "menu": {
     "alertCalibration": "Uyarı Kalibrasyonu",
+    "autoresolve": "AutoResolve",
     "autoobserve": "AutoObserve",
     "upgradeToProPlan": "PRO Planına Yükselt",
     "home": "Ana Sayfa",
@@ -9224,6 +9244,9 @@
     "logsMessageField": "Mesaj alanı",
     "logsLevelField": "Seviye alanı",
     "logsTimeField": "Zaman alanı",
+    "logsTimeFieldNoValues": "Zaman alanı \"{field}\" geçerli zaman damgaları içermiyor",
+    "logsLevelFieldNoValues": "Seviye alanı \"{field}\" sonuçlarda değer içermiyor",
+    "logsMessageFieldNoValues": "Mesaj alanı \"{field}\" sonuçlarda değer içermiyor",
     "htmlPanelFieldTooltip": "Sorgu sonuçlarından sütunu algılamak için boş bırakın",
     "logsOrder": "Sıra",
     "logsOrderNewest": "Önce en yeni",
@@ -9613,6 +9636,7 @@
       "promqlFiltersAndOnly": "PromQL filtreleri yalnızca AND destekler. OR ve grupları kaldırın ya da SQL'e geçin.",
       "cappedHint": "İlk {count} değer gösteriliyor",
       "cappedAllHint": "“Tümü”, listelenmeyen değerleri de kapsar",
+      "metricsTruncatedHint": "Bazı metrikler kontrol edilmedi. Tüm değerleri görmek için bir metrik adı belirtin.",
       "metric": "Metrik",
       "label": "Etiket",
       "metricSelectTooltip": "Bir metrik seçin veya başka bir değere göre seçmek için $metricVariable gibi bir değişken kullanın.",
@@ -15419,7 +15443,9 @@
     "incidentDestination": "Vaka hedefi",
     "incidentDestinationPlaceholder": "Kuruluş varsayılanını kullan",
     "incidentDestinationHint": "Bu kaynağın uyarıları bir vaka oluşturduğunda veya bir vakaya katıldığında bildirimlerin gideceği yer. Kuruluş varsayılanını kullanmak için boş bırakın — hiçbiri ayarlanmazsa, eşleşen vakalar sessizce tetiklenir.",
+    "incidentDestinationHintOncall": "Bu kaynağın uyarıları bir vaka oluşturduğunda veya bir vakaya katıldığında, On-Call çağrısına ek olarak bildirimlerin gideceği yer. Kuruluş varsayılanını kullanmak için boş bırakın.",
     "noDestinationSet": "Vaka hedefi ayarlanmadı",
+    "oncallOnly": "Yalnızca On-Call",
     "setupStep1Title": "1. Bir webhook oluşturun",
     "setupStep1Body": "Grafana, Alertmanager veya JSON POST edebilen herhangi bir araçta bir webhook iletişim noktası / alıcı oluşturun.",
     "setupRemainingStepsHint": "Bu kaynağı kaydederek URL'sini ve token'ını alın, ardından bunları ilgili webhook yapılandırmasına yapıştırın.",
@@ -16502,6 +16528,13 @@
       "logoLightLabel": "Özel logo (açık mod)",
       "logoLightHelp": "Açık modda gösterilir. PNG, JPG, GIF veya BMP, en fazla 150 × 30 px.",
       "logoDarkLabel": "Özel logo (koyu mod)",
+      "logoTitle": "Özel logo",
+      "logoHelp": "Uygulama başlığında gösterilir. PNG, JPG, GIF, BMP, WEBP veya SVG, en fazla 150 × 30 px.",
+      "logoLightTitle": "Açık mod",
+      "logoDarkTitle": "Koyu mod",
+      "logoSaved": "Kaydedildi",
+      "logoNotSaved": "Kaydedilmedi",
+      "logoDimensions": "{width} × {height} piksel",
       "logoDarkHelp": "Koyu modda gösterilir. PNG, JPG, GIF veya BMP, en fazla 150 × 30 px."
     },
     "modelPricingEditor": {
@@ -18521,7 +18554,16 @@
     "panelTimeSeriesFor": "{stream} için zaman serisi",
     "panelTimeSeriesForWithType": "{stream} için zaman serisi ({type})",
     "logsPanelTitle": "Günlükler - {stream}",
-    "logsPanelDescription": "{service} hizmeti için ilişkili günlükler"
+    "logsPanelDescription": "{service} hizmeti için ilişkili günlükler",
+    "noDataInScope": "Bu kapsamda veri yok",
+    "noDataInScopeReason": "Bu zaman aralığında bu filtrelerle eşleşen satır yok.",
+    "droppedCount": "+{count} çıkarıldı | +{count} çıkarıldı",
+    "droppedTitle": "Filtre olarak kullanılmadı",
+    "droppedNoRows": "{value} içeren satır yok",
+    "droppedNoField": "Alan bu akışlarda yok",
+    "allNoDataTitle": "Bu kapsamda verisi olan metrik yok",
+    "allNoDataScope": "{scope}, {window}",
+    "allNoDataAction": "Verisi olmayan metrikleri göster"
   },
   "search_scheduler_job": {
     "title": "Arama İşi Zamanlayıcısı",
@@ -20587,6 +20629,13 @@
       "sampleExpected": "Beklenen Çıktı",
       "fromTrace": "İz spanı {id}'den",
       "openInPlaygroundFailed": "Bu span Playground'da açılamadı."
+    },
+    "largeStream": {
+      "notice": "{stream}: bu aralıkta yaklaşık {size}, ajan filtresi yok. Dakikalar sürebilir.",
+      "pickAgent": "Bir ajan seç",
+      "addFilter": "Filtre ekle",
+      "runAnyway": "Yine de çalıştır",
+      "notRun": "Çalıştırılmadı"
     }
   },
   "onlineEvals": {
@@ -21884,7 +21933,10 @@
       "excludeFromQuery": "Hariç tut",
       "createAlertAction": "Uyarı oluştur",
       "noMatchTerms": "Bu desenin filtrelenecek ayırt edici metni yok.",
-      "noDistinctTextTooltip": "Bu desendeki sabit metnin her parçası başka bir desende de geçiyor, bu nedenle bir filtre onların günlüklerini de eşleştirir.",
+      "noDistinctTextTooltip": "Bu desenin metni başka bir desenin günlüklerinde de görünür; genellikle aynı mesaj farklı bir günlük seviyesindedir, bu nedenle bir filtre bunu tek başına sayamaz.",
+      "volumeUnsupported": "WITH, JOIN, UNION, tablo takma adı veya alt sorgu kullanan aramalarda hacim gösterilemez.",
+      "volumeFailedRetry": "Hacim yüklenemedi. Sunucu meşgul olabilir, tekrar deneyin.",
+      "volumeFailed": "Bu desenin hacmi yüklenemedi.",
       "noStreamSelected": "Akış seçilmedi. Uyarı oluşturmadan önce lütfen bir akış seçin.",
       "alertBroadMatch": "Bu desenin ayırt edici sabit metni yok — uyarı sorgusu geniş bir şekilde eşleşecek. Manuel filtre eklemeyi düşünün."
     },
@@ -24184,8 +24236,19 @@
       "clear": "Temizle"
     },
     "file": {
-      "removeFile": "Dosyayı kaldır",
-      "clearAll": "Tümünü temizle"
+      "removeNamed": "{name} öğesini kaldır",
+      "attachPrompt": "Eklemek için bir dosya bırakın veya {browse}",
+      "attachPromptMultiple": "Eklemek için dosyaları bırakın veya {browse}",
+      "browseLink": "göz atın",
+      "supports": "Desteklenen dosyalar {types}",
+      "dropFileToAttach": "Eklemek için dosyayı bırakın",
+      "dropFilesToAttach": "Eklemek için dosyaları bırakın",
+      "typeRejected": "Yalnızca {allowed} dosyaları kabul edilir",
+      "sizeRejected": "{size}, {max} sınırını aşıyor",
+      "countRejected": "Bir seferde yalnızca {count} dosya | Bir seferde yalnızca {count} dosya",
+      "invalidJson": "Geçerli JSON değil: {detail}",
+      "invalidImage": "Geçerli bir görüntü dosyası değil",
+      "unavailable": "Dosya yükleme kullanılamıyor"
     },
     "date": {
       "openCalendar": "Takvimi aç",
@@ -28011,8 +28074,8 @@
     "awayMark": "İzinli olarak işaretle",
     "awayClear": "Uzakta durumunu temizle",
     "awayClearConfirm": "Temizle",
-    "awayClearMessage": "{name} kişisinin uzakta durumu, {range} aralığında temizlensin mi? Tüm ekiplerde geçerli olur.",
-    "awayConsequence": "{name} kişisinin bulunduğu her ekipte geçerli olur. Vardiyaları, varsa her rotasyondaki bir sonraki kişiye geçer.",
+    "awayClearMessage": "{name} kişisinin izin durumu {range} için kaldırılsın mı? Bu, bu kuruluştaki her ekipte geçerli olur.",
+    "awayConsequence": "Bu kuruluştaki, {name} kişisinin üye olduğu her ekipte geçerli olur. Vardiyaları, varsa her rotasyonda sıradaki kişiye geçer.",
     "awayNextWeek": "Gelecek hafta, Pzt–Paz",
     "awayTitle": "İzinli olarak işaretle",
     "membersAddOpen": "Üye ekle",
@@ -34638,6 +34701,464 @@
     "fixedToNow": "Şimdi bitiyor, hareket etmez",
     "gateOrder": "Başlangıç bitişten önce olmalı.",
     "gateInvalid": "Geçerli bir aralık değil."
+  },
+  "autoresolve": {
+    "title": "AutoResolve",
+    "runTitle": "AutoResolve çalıştırması",
+    "runNotFound": "Bu çalıştırma bulunamadı",
+    "runNotFoundHint": "Kaldırılmış olabilir veya bağlantı yanlış olabilir.",
+    "runForbidden": "Bu çalıştırmaya erişiminiz yok",
+    "namesMore": "{count} tane daha | {count} tane daha",
+    "mcp": {
+      "count": "{count} MCP | {count} MCP",
+      "the": "{names} MCP'si | {names} MCP'leri",
+      "theDescribed": "{name} MCP'si ({description})",
+      "described": "{name} ({description})"
+    },
+    "stage": {
+      "investigate": "İnceleme",
+      "ask": "Sorma",
+      "proceed": "İlerleme",
+      "check": "Kontrol",
+      "outcome": "Sonuç"
+    },
+    "state": {
+      "investigating": "İnceleniyor",
+      "waitingApproval": "Onay bekleniyor",
+      "proceeding": "İlerliyor",
+      "checking": "Kontrol ediliyor",
+      "worked": "İşe yaradı",
+      "noChange": "Değişiklik yok",
+      "cantFix": "Bu MCP'lerle düzeltilemez",
+      "notNeeded": "Artık gerekmiyor",
+      "worse": "Daha kötü",
+      "declined": "Reddedildi",
+      "lapsed": "Süresi doldu",
+      "stepFailed": "Adım başarısız",
+      "outcomeUnknown": "Sonuç bilinmiyor",
+      "failed": "Başarısız",
+      "proposed": "Önerildi",
+      "approved": "Onaylandı",
+      "running": "Çalışıyor",
+      "done": "Tamamlandı",
+      "held": "Beklemede",
+      "notRun": "Çalıştırılmadı",
+      "superseded": "Geçersiz kılındı"
+    },
+    "subtitle": "Yapılmasını istediğinizi yazın. İnceler, herhangi bir değişiklikten önce sorar, ilerler ve kontrol eder.",
+    "tabs": {
+      "home": "Ana Sayfa",
+      "runs": "Çalıştırmalar",
+      "saved": "Kaydedilenler"
+    },
+    "home": {
+      "examplesTitle": "Bunlardan birini deneyin",
+      "examples": {
+        "checkout": "Checkout hizmetinin neden 5xx hataları döndürdüğünü bulun ve düzeltin",
+        "payment": "Hangi son değişiklikler ödeme hizmetini etkiledi?",
+        "ingestion": "Son bir saatte veri alımı gecikmesi neden arttı?"
+      },
+      "startFailed": "Çalıştırma başlatılamadı. Tekrar deneyin."
+    },
+    "goalBox": {
+      "heading": "Ne yapılmalı?",
+      "placeholder": "İstediğiniz sonucu açıklayın, örneğin: bir hizmetin neden başarısız olduğunu bulun ve düzeltin",
+      "productData": "{product} verisi",
+      "canUse": "{mcps} ve {data} | {mcps} ve {data}",
+      "start": "Başlat",
+      "asksFirst": "Serbestçe inceleyebilir. Herhangi bir şeyi değiştirmeden önce size sorar.",
+      "addConnection": "Bir MCP ekle",
+      "connectionsLabel": "Bu çalıştırmanın kullanabileceği MCP'ler"
+    },
+    "connectionPicker": {
+      "chooseOne": "En az bir MCP seçin.",
+      "upTo": "En fazla {mcps}",
+      "noneYouCanUse": "Kullanabileceğiniz MCP yok. Erişim için IAM › Roller bölümünden bir yöneticiye başvurun.",
+      "noneYet": "Bu kuruluşta henüz MCP yok. Önce Ayarlar › AI Araç Setleri bölümünden bir tane ekleyin."
+    },
+    "runs": {
+      "regionNote": "Çalıştırmalar ve kaydedilmiş AutoResolve'lar, oluşturuldukları bölgeye aittir.",
+      "recent": "Son çalıştırmalar",
+      "viewAll": "Tüm çalıştırmaları görüntüle",
+      "search": "Hedeflerde ara",
+      "stateGroup": {
+        "live": "Canlı",
+        "waiting": "Bekliyor",
+        "ended": "Sonlandı"
+      },
+      "startedBy": "Başlatan",
+      "anyone": "Herkes",
+      "me": "Ben",
+      "connection": "MCP",
+      "column": {
+        "lastRun": "Son çalıştırma",
+        "goal": "Hedef",
+        "state": "Durum",
+        "startedBy": "Başlatan",
+        "connections": "MCP'ler",
+        "took": "Süre"
+      },
+      "tookSoFar": "{time} şu ana kadar"
+    },
+    "orgAdmins": "Kuruluş yöneticileri",
+    "approvers": {
+      "roles": "rol {names} | roller {names}",
+      "groups": "grup {names} | gruplar {names}",
+      "separator": "; "
+    },
+    "connection": {
+      "removeConnection": "{name} kaldır",
+      "removedChip": "{name} (kaldırıldı)",
+      "moreRemoved": "ve {count} tane daha kaldırıldı | ve {count} tane daha kaldırıldı",
+      "writeCredential": "Onaylanan değişiklikler için kimlik bilgisi (isteğe bağlı)",
+      "writeCredentialHelp": "Yalnızca bir kişinin onayladığı adımlar için kullanılır. Boş bırakılırsa, onaylanan adımlar yukarıdaki MCP başlıklarını kullanır.",
+      "writeValueSet": "Ayarlı. Değiştirmek için yeni bir değer yazın.",
+      "writeValueRequired": "Bir değer girin",
+      "addWriteHeader": "Kimlik bilgisi başlığı ekle",
+      "draftWriteHeader": "Onaylanan değişiklik başlığı {name}"
+    },
+    "duration": {
+      "minutesSeconds": "{minutes} dk {seconds} sn"
+    },
+    "run": {
+      "reconnecting": "Yeniden bağlanıyor…",
+      "working": "Çalışıyor…",
+      "investigating": "İnceleniyor",
+      "investigatingNote": "Yalnızca okuyan çağrılar doğrudan geçer. Çalışma, ilk değişiklikten önce size sorar.",
+      "investigated": "İncelendi",
+      "investigatedMeta": "{count} çağrı, {duration} | {count} çağrı, {duration}",
+      "investigatedWithEvidence": "{calls} · {cited}",
+      "steps": "Adımlar",
+      "passCorrected": "{name} tarafından {time} tarihinde düzeltildi",
+      "passNotFixed": "{name} tarafından {time} tarihinde düzeltilmedi olarak işaretlendi",
+      "passPlannedAgain": "{time} tarihinde yeniden planlandı",
+      "calls": "Çağrılar",
+      "approvedBy": "{name} tarafından {time} tarihinde onaylandı",
+      "stepCount": "{count} adım | {count} adım",
+      "stepLabel": "adım {seq}",
+      "proceedingNote": "Yalnızca onaylanan çağrılar sırayla ve her biri bir kez geçer. Başka herhangi bir değişiklik çalışmayı duraklatır ve yeniden sorar.",
+      "checking": "{elapsed} boyunca sonuç kontrol ediliyor",
+      "checkingAgain": "{elapsed} boyunca sonuç yeniden kontrol ediliyor",
+      "investigatingFor": "{elapsed} boyunca inceleniyor",
+      "proceedingFor": "{elapsed} boyunca ilerleniyor",
+      "silent": "Yapay zeka modeli {quiet} boyunca yanıt vermedi. {time} tarihinde yeniden deneyecek veya duracak.",
+      "silentOn": "Yapay zeka modeli {quiet} boyunca yanıt vermedi. {time} tarihinde yeniden deneyecek veya duracak.",
+      "revertHint": "Geri alma başlatmak, herhangi bir şey değişmeden önce yeniden onay ister.",
+      "raiseRevert": "Geri alma başlat",
+      "revertNote": "Kontrol daha kötü olduğunu söylüyor. Onaylanan adımları geri alan bir değişiklik önerin.",
+      "planChanged": "Plan değişti; yeniden inceleyin",
+      "approveFailed": "Onay kaydedilemedi. Tekrar deneyin.",
+      "declineFailed": "İstek reddedilemedi. Tekrar deneyin.",
+      "replanFailed": "Yeni bir plan talep edilemedi. Tekrar deneyin.",
+      "notice": {
+        "stepFailed": "Adım {step} başarısız oldu. Çalışan: {ran}. Çalışmayan: {notRun}.",
+        "noSteps": "yok",
+        "outcomeUnknown": "Bir adım gönderildi ancak yanıt gelmedi. Yeniden denenmeyecek.",
+        "failed": "Çalışma başarısız oldu ve durdu.",
+        "failedWith": "Çalışma başarısız oldu ve durdu. {reason}",
+        "stepFailedWith": "{reason} Çalışan: {ran}. Çalışmayan: {notRun}.",
+        "stepFailedAlone": "Adım {step} başarısız oldu.",
+        "outcomeUnknownWith": "Bir adım gönderildi ancak yanıt gelmedi. Yeniden denenmeyecek. {reason}",
+        "held": "Çalışma duraklatıldı: onaylanmamış bir çağrı denedi, bu nedenle o çağrı tutuldu."
+      },
+      "outcome": {
+        "checkedAt": "{time} tarihinde kontrol edildi",
+        "endedAt": "{time} tarihinde sona erdi",
+        "error": "Çalışma bir hata bildirdi: {reason}"
+      },
+      "timeline": {
+        "title": "Zaman çizelgesi",
+        "planned": "Ajan bir plan önerdi",
+        "optionBand": "{title} ({band})",
+        "correctionOn": "{name} tarafından {option} üzerine düzeltme gönderildi: {kind}",
+        "notFixedOn": "{option} sorunu çözmedi: {note}",
+        "attemptEnded": "Sona erdi: {result}"
+      },
+      "evidence": {
+        "started": "{name} tarafından başlatıldı",
+        "approved": "{name}, {option} seçeneğini onayladı",
+        "approvedPlan": "{name} planı onayladı",
+        "stepSent": "Adım {seq} gönderildi: {tool}",
+        "stepDone": "Adım {seq} tamamlandı: {tool}",
+        "stepDoneWith": "Adım {seq} tamamlandı: {detail}",
+        "stepFailed": "Adım {seq} başarısız oldu: {tool}",
+        "stepFailedWith": "Adım {seq} başarısız oldu: {detail}",
+        "span": "{from} - {to}",
+        "ended": "Çalıştırma sona erdi",
+        "correction": "{name} tarafından düzeltme gönderildi: {kind}",
+        "planAgain": "{name} yeniden plan talep etti",
+        "notFixedNote": "Sorun giderilmedi: {note}",
+        "remembered": "{time} · Gelecekteki çalıştırmalar için hatırlandı",
+        "connectionAdded": "{name}, bu AutoResolve'a {mcp} ekledi ve yeni bir plan istedi",
+        "connectionAddedRun": "{name}, bu çalıştırmaya {mcp} ekledi ve yeni bir plan istedi",
+        "triggerOff": "Uyarı tetikleyicisi, biri yeniden onaylayana kadar kapalı.",
+        "planningAgain": "Yeniden planlanıyor",
+        "markedFixed": "{name} düzeltildi olarak işaretledi"
+      },
+      "facts": {
+        "title": "Bu çalıştırma",
+        "startedBy": "Başlatan",
+        "started": "Başlangıç",
+        "canUse": "Kullanabilir",
+        "canApprove": "Onaylayabilir",
+        "option": "Seçenek",
+        "approval": "Onay",
+        "check": "Kontrol",
+        "outcome": "Sonuç",
+        "notChosen": "Henüz seçilmedi",
+        "noneChosen": "Hiçbiri seçilmedi",
+        "notAsked": "Henüz sorulmadı",
+        "notAskedEnded": "Sorulmadı",
+        "correctedNotApproved": "Düzeltildi, hiç onaylanmadı",
+        "waitingForYou": "Sizi bekliyor. {time} itibarıyla süresi dolacak",
+        "waitingForYouOn": "Sizi bekliyor. Süresi {time} dolacak",
+        "waitingFor": "{names} bekleniyor. {time} itibarıyla süresi dolacak",
+        "waitingForOn": "{names} bekleniyor. Süresi {time} dolacak",
+        "lapsedAt": "{time} itibarıyla süresi doldu",
+        "lapsedOn": "Süresi {time} doldu",
+        "checkNotRun": "Henüz çalıştırılmadı",
+        "checkRunning": "Devam ediyor",
+        "checkMet": "Karşılandı",
+        "checkNotMet": "Karşılanmadı",
+        "checkDidNotRun": "Çalıştırılmadı",
+        "notKnown": "Henüz bilinmiyor",
+        "evidenceNote": "Her çağrı, argümanları ve sonucuyla birlikte kanıt olarak saklanır.",
+        "notInAutoResolve": "Bu AutoResolve'da yok: {mcps}"
+      }
+    },
+    "approval": {
+      "optionsLabel": "Seçenekler",
+      "recommended": "Önerilen",
+      "ruledOut": "Elendi: {list}",
+      "evidenceSummary": "{count} atıf yapılan okuma, {decisive} belirleyici | {count} atıf yapılan okuma, {decisive} belirleyici",
+      "unverified": "{count} alıntı doğrulanmadı | {count} alıntı doğrulanmadı",
+      "viewEvidence": "Kanıtları görüntüle",
+      "stepSummary": "{count} adım {mcps} üzerinden | {count} adım {mcps} üzerinden",
+      "omitted": "{count} diğer seçenek dışarıda bırakıldı: {reason} | {count} diğer seçenek dışarıda bırakıldı: {reason}",
+      "omittedNoReason": "{count} diğer seçenek dışarıda bırakıldı. | {count} diğer seçenek dışarıda bırakıldı.",
+      "missingCapability": "Bu çalıştırmadaki MCP'lerin hiçbiri bunu yapamaz: {capability}",
+      "inFull": "{title} tam hali",
+      "changes": "Değişiklikler onaylanıyor: {mcps}.",
+      "canApprove": "Onaylayabilenler: {names}",
+      "lapsesAt": "Süresi {time} itibarıyla doluyor",
+      "lapsesOn": "{time} tarihinde sona eriyor",
+      "decline": "Reddet",
+      "askDifferent": "Farklı bir plan iste",
+      "approve": "Onayla ve devam et",
+      "noteLabel": "Yeni plan neyi farklı yapmalı?",
+      "notePlaceholder": "Örneğin: değişikliği bir pull request'te tut",
+      "sendNote": "Yeni bir plan iste",
+      "cannotApprove": "{mcps} üzerinden değişiklikleri onaylayamazsınız. Onaylayabilenler: {approvers}.",
+      "connectionRemoved": "Bu plan oluşturulduktan sonra {mcps} kaldırıldı, bu nedenle bu seçenek onaylanamaz. | Bu plan oluşturulduktan sonra {mcps} kaldırıldı, bu nedenle bu seçenek onaylanamaz.",
+      "connectionRemovedOther": "Bu plan oluşturulduktan sonra {mcps} kaldırıldı, bu nedenle bu seçenek onaylanamaz. Başka bir seçenek seçin veya farklı bir plan isteyin. | Bu plan oluşturulduktan sonra {mcps} kaldırıldı, bu nedenle bu seçenek onaylanamaz. Başka bir seçenek seçin veya farklı bir plan isteyin.",
+      "aRemovedConnection": "Bu seçeneğin bir MCP'si",
+      "removedNote": "{mcps} kullanmayan bir plan yapın; kaldırıldı. | {mcps} kullanmayan bir plan yapın; kaldırıldı.",
+      "lapsedAt": "Bu istek {time} itibarıyla sona erdi.",
+      "lapsedOn": "Bu istek {time} tarihinde sona erdi.",
+      "lapsed": "Bu istek sona erdi.",
+      "lapsedBody": "Kimse zamanında onaylamadı, bu nedenle hiçbir şey değiştirilmedi. Hedef o zamandan beri değişmiş olabilir; güncel bir plan almak için yeniden başlayın.",
+      "startAgain": "Yeniden başlat",
+      "startAgainFailed": "Çalıştırma yeniden başlatılamadı. Tekrar deneyin.",
+      "connectionsGone": "Bu çalıştırmanın kullandığı MCP kaldırıldı. | Bu çalıştırmanın kullandığı MCP'ler kaldırıldı.",
+      "chooseConnections": "MCP'leri seç",
+      "heldCall": "{mcp} üzerinden {tool}",
+      "changedSincePlan": "Başka bir çalıştırma, bu plan oluşturulduktan sonra {mcps} üzerinde değişiklik yaptı. Onaylamadan önce değişikliğin hâlâ gerekli olup olmadığını kontrol edin. | {count} başka çalıştırma, bu plan oluşturulduktan sonra {mcps} üzerinde değişiklik yaptı. Onaylamadan önce değişikliğin hâlâ gerekli olup olmadığını kontrol edin.",
+      "viewChangedRun": "O çalıştırmayı görüntüle | En son çalıştırmayı görüntüle",
+      "heldWhilePlanning": "İncelerken bir değişiklik denedi, bu nedenle o çağrı bekletildi ve çalıştırılmadı: {tools}. | İncelerken {count} değişiklik denedi, bu nedenle o çağrılar bekletildi ve çalıştırılmadı: {tools}.",
+      "declined": "Bu istek reddedildi. Hiçbir şey değiştirilmedi.",
+      "correctPlan": "Bu planı düzelt",
+      "partialFix": "Kısmi düzeltme",
+      "partialFixLeaves": "Yapılmadan kalanlar: {text}"
+    },
+    "step": {
+      "runningFor": "{elapsed} süredir çalışıyor",
+      "reason": "Agent'ın gerekçesi",
+      "arguments": "Argümanlar",
+      "preview": "Önizleme",
+      "dryRunAfter": "Deneme çalıştırması onayladıktan sonra çalışır; başarısız olursa çalıştırma durur.",
+      "result": "Sonuç",
+      "error": "Hata",
+      "held": "Onaylanan planda değil",
+      "showAll": "Tüm argümanları göster",
+      "showFullResult": "Tam sonucu göster",
+      "showLess": "Daha az göster",
+      "refChip": "{step}. adımdan {arg}",
+      "refNote": "Adım {steps} sonucundan sistem tarafından doldurulur, ajan tarafından değil. | {steps} adımlarının sonuçlarından sistem tarafından doldurulur, ajan tarafından değil."
+    },
+    "savedTitle": "Kaydedilmiş AutoResolve",
+    "saved": {
+      "back": "Kaydedilmiş AutoResolve'lar",
+      "newTitle": "AutoResolve olarak kaydet",
+      "saveAsAutoResolve": "AutoResolve olarak kaydet",
+      "runNow": "Şimdi çalıştır",
+      "deleteTitle": "Bu AutoResolve silinsin mi?",
+      "deleteMessage": "Tetikleyicisi durur ve artık çalıştırılamaz. Geçmiş çalışmaları kalır.",
+      "deleted": "AutoResolve silindi",
+      "deleteFailed": "AutoResolve silinmedi. Tekrar deneyin.",
+      "runFailed": "AutoResolve başlatılamadı. Tekrar deneyin.",
+      "saveFailed": "AutoResolve kaydedilmedi. Tekrar deneyin.",
+      "notFoundHint": "Silinmiş olabilir.",
+      "runNotLoaded": "Kaydedilecek çalışma yüklenemedi",
+      "field": {
+        "goal": "Hedef",
+        "connections": "MCP'ler",
+        "runsWhen": "Çalışma koşulu",
+        "trigger": "Tetikleyici",
+        "approval": "Onay",
+        "savedBy": "Kaydeden"
+      },
+      "kind": {
+        "person": "Bir kişi başlatır",
+        "alert": "Bir uyarı tetiklenir",
+        "incident": "Bir vaka açılır"
+      },
+      "runsWhenAlert": "Bir uyarı tetiklenir: {alert}",
+      "runsWhenIncident": "{alert} kaynağından bir vaka açılır",
+      "runsWhenAlertGone": "Bir uyarı tetiklenir, ancak bağlı uyarı silinmiş",
+      "runsWhenIncidentGone": "Bir vaka açılır, ancak bağlı uyarı silinmiş",
+      "triggerSwitch": "Bu tetikleyiciden çalışma başlat",
+      "triggerApproved": "{name} tarafından {time} tarihinde onaylandı",
+      "paused": "Yeniden onaylanana kadar duraklatıldı: bir düzenleme bu tetikleyiciyi kapattı. Açmak, onu sizin adınıza onaylar.",
+      "approval": "{slack} kanalında onay istendi.",
+      "savedBy": "{name}, {time}",
+      "openSourceRun": "Kaydedildiği çalışmayı aç",
+      "regionNotice": "Bu bölge uyarıları ve vakaları çalıştırmaz, bu nedenle bu tetikleyici burada tetiklenmez.",
+      "connectionsRemoved": "{mcps} kaldırıldı. Bunu bu AutoResolve'dan çıkarın veya yeniden ekleyin. | {mcps} kaldırıldı. Bunları bu AutoResolve'dan çıkarın veya yeniden ekleyin.",
+      "slackUnavailable": "Bu dağıtımda Slack onayı kullanılamıyor, bu nedenle uyarı ve vaka tetikleyicileri açılamaz.",
+      "slackUnavailableOn": "Bu dağıtımda Slack onayı kullanılamıyor, bu nedenle bu tetikleyicinin çalışmaları Slack'te onaylanamaz. Tetikleyiciyi kapatın veya çalışmaları ekranda onaylayın.",
+      "lastRuns": "Son çalışmalar",
+      "lastRunsMore": "{total} çalışmanın en yeni {shown} tanesi gösteriliyor.",
+      "lastRunsEmpty": "Bu AutoResolve'un çalışmaları, ister bir kişi ister tetikleyicisi başlatmış olsun, burada görünür.",
+      "triggerState": {
+        "on": "Açık",
+        "off": "Kapalı",
+        "paused": "Yeniden onaylanana kadar duraklatıldı"
+      },
+      "form": {
+        "name": "Ad",
+        "goal": "Hedef",
+        "connections": "MCP'ler",
+        "connectionsHelp": "Çalışmaları yalnızca bu MCP'leri kullanabilir.",
+        "connectionsPlaceholder": "MCP ekle",
+        "connectionsNotFilled": "Bu çalışma {mcps} kullandı, ancak kaldırıldığı için doldurulmadı. | Bu çalışma {mcps} kullandı, ancak kaldırıldıkları için doldurulmadı.",
+        "runsWhen": "Çalışma koşulu",
+        "alert": "Uyarı",
+        "incidentAlert": "Vakayı açan uyarı",
+        "alertPlaceholder": "Bir uyarı seçin",
+        "alertGone": "Silinmiş uyarı",
+        "alertsForbidden": "Uyarılara erişiminiz yok, bu nedenle burada hiçbiri listelenemez.",
+        "alertsFailed": "Uyarılar yüklenemedi. Tekrar denemek için bu formu yeniden açın.",
+        "connectionsFailed": "MCP'ler yüklenemedi. Tekrar denemek için bu formu yeniden açın.",
+        "alertsNone": "Bu kuruluşta henüz uyarı yok. Önce Uyarılar bölümünde bir tane oluşturun.",
+        "createTriggerHelp": "Kaydetmek bu tetikleyiciyi etkinleştirir. Her çalıştırma, onay almak için {slack} onay kanalında onay talep eder.",
+        "editPausesHelp": "Hedefi, MCP'leri veya tetikleyiciyi değiştirmek, onaylayabilecek biri tekrar açana kadar tetikleyiciyi kapatır.",
+        "nameRequired": "Bir ad girin.",
+        "goalRequired": "Bir hedef girin.",
+        "tooLong": "En fazla {max} karakter kullanın.",
+        "alertRequired": "Bir uyarı seçin.",
+        "save": "AutoResolve'u kaydet",
+        "saveChanges": "Değişiklikleri kaydet"
+      },
+      "list": {
+        "search": "Kaydedilmiş AutoResolve'ları ara",
+        "column": {
+          "name": "Ad",
+          "runsWhen": "Çalışma koşulu",
+          "trigger": "Tetikleyici",
+          "connections": "MCP'ler",
+          "savedBy": "Kaydeden",
+          "updated": "Güncellendi"
+        }
+      },
+      "loadFailed": "AutoResolve yüklenemedi"
+    },
+    "andMore": "ve {count} tane daha | ve {count} tane daha",
+    "correction": {
+      "title": "Bu planın nesi yanlış?",
+      "kindsLabel": "Nesi yanlış",
+      "kind": {
+        "wrongCause": "Yanlış neden",
+        "wrongFix": "Yanlış düzeltme",
+        "outOfScope": "Bu AutoResolve'un kapsamını aşıyor",
+        "notFixed": "Düzeltmedi"
+      },
+      "help": {
+        "none": "Neyin yanlış olduğunu seçin, ardından notta belirtin.",
+        "wrongCause": "Yanlış neden: ajan yanlış şeyi sorumlu tuttu, bu nedenle düzeltmesi yanlış yeri hedefliyor.",
+        "wrongFix": "Yanlış düzeltme: neden doğru, ancak değişiklik istediğiniz şey değil.",
+        "outOfScope": "Bu AutoResolve'un kapsamını aşıyor: plan, bu AutoResolve'un dokunmaması gereken şeyleri değiştiriyor."
+      },
+      "draft": {
+        "wrongCause": "\"{option}\" yanlış nedeni hedefliyor.",
+        "wrongFix": "\"{option}\" istediğim değişiklik değil.",
+        "outOfScope": "\"{option}\" bu AutoResolve'un değiştirmesi gerekenden daha fazlasını değiştiriyor."
+      },
+      "noteLabel": "Not",
+      "noteHelp": "Ajan yeniden planlamadan önce bunu okur.",
+      "notePickFirst": "Önce neyin yanlış olduğunu seçin",
+      "remember": "Gelecekteki \"{name}\" çalıştırmaları için hatırla",
+      "rememberHelp": "Sonraki çalıştırmalar bu notu görür. Bunu AutoResolve'dan kaldırabilirsiniz.",
+      "send": "Düzeltme gönder"
+    },
+    "correctionsUsed": {
+      "chip": "{count} düzeltme kullanıldı | {count} düzeltme kullanıldı",
+      "title": "Bu planın kullandığı düzeltmeler",
+      "thisRun": "{name}, bu çalıştırma, {time}",
+      "earlierRun": "{name}, daha önceki bir çalıştırma, {time}",
+      "manage": "AutoResolve üzerindeki düzeltmeleri yönet"
+    },
+    "missing": {
+      "title": "Bu düzeltme, bu AutoResolve'da bulunmayan {mcp} gerektiriyor",
+      "titleRun": "Bu düzeltme için bu çalıştırmada bulunmayan {mcp} gerekiyor",
+      "add": "{mcp} ekle ve yeniden planla",
+      "orPartial": "Veya aşağıdaki kısmi düzeltmeyi onaylayın. | Veya aşağıdaki kısmi düzeltmelerden birini onaylayın.",
+      "cannotAdd": "Yalnızca {mcp} üzerinden değişiklikleri onaylayabilen kişiler bunu ekleyebilir.",
+      "dialogAutoResolve": "AutoResolve",
+      "dialogConnection": "Eklenecek MCP",
+      "dialogTriggerOff": "Bir MCP eklemek, biri yeniden onaylayana kadar AutoResolve'un uyarı tetikleyicisini kapatır.",
+      "dialogThen": "Bu çalıştırma daha sonra {mcp} ile yeniden planlar. Biri yeni planı onaylayana kadar hiçbir şey değişmez.",
+      "dialogConfirm": "Ekle ve yeniden planla",
+      "addFailed": "{mcp} eklenemedi. Tekrar deneyin.",
+      "needs": "Bu düzeltme için {mcp} gerekiyor: {action}"
+    },
+    "verdict": {
+      "question": "Bu sorunu çözdü mü?",
+      "yes": "Evet",
+      "no": "Hayır, çözmedi",
+      "noteLabel": "Hâlâ ne yanlış?",
+      "stillFiring": "{trigger} hâlâ tetiklenmiş durumda",
+      "filledFrom": "{trigger} bilgisinden dolduruldu.",
+      "planAgain": "Yeniden planla",
+      "agent": "Ajan",
+      "fixed": "Düzeltildi",
+      "notFixed": "Düzeltmedi",
+      "byAt": "{name}, {time}",
+      "noteAt": "{note} · {time}",
+      "failed": "Yanıtınız kaydedilmedi. Tekrar deneyin."
+    },
+    "corrections": {
+      "title": "Düzeltmeler",
+      "help": "Bu AutoResolve'un her yeni çalıştırması bunları okur. Bunlar hiçbir şeyi onaylamaz.",
+      "source": "Kaynak: {run}, {name} tarafından",
+      "runOf": "{time} çalıştırması",
+      "sourceGone": "Artık mevcut olmayan bir çalıştırmadan, {time} tarihli, {name} tarafından",
+      "removeFailed": "Düzeltme kaldırılmadı. Tekrar deneyin."
+    },
+    "incident": {
+      "title": "AutoResolve",
+      "note": "Vaka başına bir çalıştırma. Herhangi bir şeyi değiştirmeden önce sorar.",
+      "loading": "AutoResolve yükleniyor…",
+      "loadFailed": "Bu vaka için AutoResolve yüklenemedi.",
+      "newRun": "Bu vaka için yeni çalıştırma",
+      "liveRun": "Bu, vakanın çalıştırmasıdır. Bittiğinde yeni bir çalıştırma başlayabilir.",
+      "openRun": "Çalıştırmayı aç",
+      "related": "Bu vakanın uyarıları için kaydedilmiş AutoResolve'lar",
+      "suggestedFor": "{alert} kaynaklı vakalar için önerilir",
+      "startsOn": "{alert} ile başlar",
+      "run": "Çalıştırma",
+      "runLocked": "{run}, bu vakanın canlı çalıştırmasıdır. Bittiğinde yeni bir çalıştırma başlayabilir.",
+      "empty": "Bu vakada hiçbir AutoResolve çalıştırılmadı ve uyarıları için kaydedilmiş hiçbir AutoResolve yok."
+    }
   },
   "autobotInvestigate": {
     "greeting": "Neyi incelemeliyiz?",

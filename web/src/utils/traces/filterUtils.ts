@@ -98,6 +98,10 @@ export const applyFilterTerm = (filterTerm: string, baseValue: string): string =
       .replace(/'null'/, "null");
   }
 
+  // ANDing onto a bare top-level OR would bind only to its last branch.
+  const base = baseValue.trim();
+  if (base && splitTopLevel(base, "or").length > 1) return `${wrapInParens(base)} and ${filter}`;
+
   // The whole base value is the where clause — never split it on "|". The split
   // is quote-unaware, so a pipe inside a term such as match_all('text | error')
   // would be rejoined as "| " and silently alter the search term.

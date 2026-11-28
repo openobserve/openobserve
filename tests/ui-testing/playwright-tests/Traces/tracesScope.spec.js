@@ -49,9 +49,20 @@ test.describe("Traces scope select testcases", () => {
     capture.stop();
     await expect(page).toHaveURL(/[?&]scope=root(&|$)/, { timeout: 10000 });
 
+    // A slow schema used to let the first search go out before the scope could apply.
+    await page.route('**/streams/*/schema*', async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      await route.continue();
+    });
+    const landing = pm.tracesPage.captureSearchRequests();
     await page.reload();
     await pm.tracesPage.isStreamSelectVisible();
     await expect(pm.tracesPage.getScopeValue()).toHaveAttribute('aria-label', 'Root spans', { timeout: 20000 });
+    const firstList = () =>
+      landing.requests.find((r) => r.panel === 'results' && r.sql.startsWith('SELECT *'))?.sql;
+    await expect.poll(firstList, { timeout: 20000 }).toContain(`WHERE ${ROOT} ORDER BY`);
+    landing.stop();
+    await page.unroute('**/streams/*/schema*');
   });
 
   test("P2: Reset returns the scope to All spans and drops it from the link", {

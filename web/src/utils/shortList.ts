@@ -13,6 +13,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+/** The items `shortList` joins: the first `max` names, then one "N more" item; a lone leftover is named. */
+export function shortListItems(
+  given: readonly string[],
+  max: number,
+  more: (count: number) => string,
+): string[] {
+  const names = given.filter((name) => name.trim());
+  if (names.length <= max + 1) return names;
+  return [...names.slice(0, max), more(names.length - max)];
+}
+
 /** Joins names in the locale's list style, ending in "and N more" past `max`; a lone leftover is named, not counted. */
 export function shortList(
   given: readonly string[],
@@ -20,8 +31,7 @@ export function shortList(
   locale: string,
   more: (count: number) => string,
 ): string {
-  const names = given.filter((name) => name.trim());
-  const format = new Intl.ListFormat(locale, { type: "conjunction" });
-  if (names.length <= max + 1) return format.format(names);
-  return format.format([...names.slice(0, max), more(names.length - max)]);
+  return new Intl.ListFormat(locale, { type: "conjunction" }).format(
+    shortListItems(given, max, more),
+  );
 }

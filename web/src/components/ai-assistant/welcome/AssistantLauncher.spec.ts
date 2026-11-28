@@ -581,7 +581,8 @@ describe("AssistantLauncher", () => {
       pick(wrapper, [new File([new Uint8Array(4)], "a.gif", { type: "image/gif" })]);
       await vi.waitFor(() => expect(toastCall).toHaveBeenCalledTimes(2));
       expect(toastCall.mock.calls[1][0].message).toBe("Only PNG and JPEG images can be attached");
-      wrapper.findComponent(OFile).vm.$emit("size-error", [png("big.png", 3 * 1024 * 1024)]);
+      const big = png("big.png", 3 * 1024 * 1024);
+      wrapper.findComponent(OFile).vm.$emit("rejected", [{ file: big, reason: "too large" }]);
       expect(toastCall.mock.calls[2][0].message).toMatch(/^big\.png is .+ Up to 4 images/);
       await input(wrapper).setValue("why?");
       await input(wrapper).trigger("keydown", { key: "Enter" });

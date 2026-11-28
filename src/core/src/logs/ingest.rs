@@ -84,7 +84,6 @@ struct FinalizeRecordContext<'a> {
     flatten_level: u32,
     min_ts: i64,
     max_ts: i64,
-    index_all_max_value_length: usize,
     columns_limit: usize,
     user_defined_schema_map: &'a HashMap<String, Option<HashSet<String>>>,
     streams_need_original_map: &'a HashMap<String, bool>,
@@ -384,7 +383,7 @@ async fn ingest_inner(
         bulk_plan,
     )
     .await;
-    // JsonColumnar::plan already refuses the fast path under enterprise, before this is consulted.
+    // JsonColumnar::plan already refuses the fast path for streams SDR acts on.
     let needs_json_records = extend_json.is_some() || needs.json_records(&stream_name);
     let StreamRecordNeeds {
         executable_pipelines,
@@ -542,7 +541,6 @@ async fn ingest_inner(
                 flatten_level,
                 min_ts,
                 max_ts,
-                index_all_max_value_length,
                 columns_limit,
                 user_defined_schema_map: &user_defined_schema_map,
                 streams_need_original_map: &streams_need_original_map,
@@ -661,11 +659,10 @@ async fn ingest_inner(
                             need_original: streams_need_original_map
                                 .get(&destination_stream)
                                 .is_some_and(|v| *v),
-                            need_all_values: streams_need_all_values_map
-                                .get(&destination_stream)
-                                .is_some_and(|v| *v),
-                            all_values_max_len: index_all_max_value_length,
                         };
+                        let need_all_values = streams_need_all_values_map
+                            .get(&destination_stream)
+                            .is_some_and(|v| *v);
 
                         for (idx, mut res) in stream_pl_results {
                             // handle timestamp
@@ -713,6 +710,11 @@ async fn ingest_inner(
                                 &destination_stream,
                                 &local_val,
                                 columns_limit,
+                                if need_all_values {
+                                    &[config::ALL_VALUES_COL_NAME]
+                                } else {
+                                    &[]
+                                },
                             ) {
                                 stream_status.status.failed += 1;
                                 stream_status.status.error = e.to_string();
@@ -760,7 +762,6 @@ async fn ingest_inner(
                         flatten_level,
                         min_ts,
                         max_ts,
-                        index_all_max_value_length,
                         columns_limit,
                         user_defined_schema_map: &user_defined_schema_map,
                         streams_need_original_map: &streams_need_original_map,
@@ -789,7 +790,6 @@ async fn ingest_inner(
 
     // drop memory-intensive variables
     drop(streams_need_original_map);
-    drop(streams_need_all_values_map);
     drop(executable_pipelines);
     drop(original_options);
     drop(user_defined_schema_map);
@@ -843,7 +843,6 @@ async fn ingest_inner(
             if !should_apply_sdr(org_id, stream) {
                 continue;
             }
-            let before = super::snapshot_derived_sources(&data.0);
             if let Err(e) =
                 pattern_manager.process_at_ingestion(org_id, StreamType::Logs, stream, &mut data.0)
             {
@@ -851,9 +850,15 @@ async fn ingest_inner(
                     "[LOGS:JSON] error in processing records for patterns for stream {org_id}/{stream} : {e}"
                 );
             }
-            super::refresh_derived_columns(&before, &mut data.0);
         }
     }
+
+    super::insert_all_values(
+        &mut json_data_by_stream,
+        &streams_need_all_values_map,
+        index_all_max_value_length,
+    );
+    drop(streams_need_all_values_map);
 
     let (metric_rpt_status_code, response_body, stream_skipped) = {
         let mut status = if usage_type == UsageType::Bulk {
@@ -956,6 +961,17 @@ pub(super) async fn resolve_stream_name(org_id: &str, in_stream_name: &str) -> R
     })
 }
 
+/// Whether SDR rewrites or counts this stream's records, which it reads only as JSON.
+/// Fails toward JSON: without the pattern manager the fail-open evidence counts the JSON records.
+#[cfg(feature = "enterprise")]
+pub(super) async fn sdr_acts_on(org_id: &str, stream_name: &str) -> bool {
+    should_apply_sdr(org_id, stream_name)
+        && match get_pattern_manager().await {
+            Ok(manager) => manager.has_stream_associations(org_id, StreamType::Logs, stream_name),
+            Err(_) => true,
+        }
+}
+
 /// A body is an array of records or a single record.
 fn parse_json_body(body: &[u8]) -> Result<Vec<json::Value>> {
     match json::from_slice(body) {
@@ -1052,8 +1068,7 @@ fn discard_warn_permitted(key: &str, now: Instant) -> bool {
 }
 
 /// Finalize a log record (flatten, resolve timestamp, apply UDS, add
-/// `_original` / `_all_values` if configured) and push it into
-/// `json_data_by_stream`.
+/// `_original` if configured) and push it into `json_data_by_stream`.
 ///
 /// Returns `true` on success, `false` when the record should be skipped
 /// (the caller should `continue`).
@@ -1130,20 +1145,25 @@ fn finalize_and_buffer_record(
             .streams_need_original_map
             .get(ctx.stream_name)
             .is_some_and(|v| *v),
-        need_all_values: ctx
-            .streams_need_all_values_map
-            .get(ctx.stream_name)
-            .is_some_and(|v| *v),
-        all_values_max_len: ctx.index_all_max_value_length,
     };
     let local_val = settings.apply(local_val, original_data.map(Cow::Owned), None);
-    // after UDS packing and `_original`, so it counts the columns the batch check will see
+    let need_all_values = ctx
+        .streams_need_all_values_map
+        .get(ctx.stream_name)
+        .is_some_and(|v| *v);
+    // after UDS packing and `_original`, and counting the `_all_values` added after SDR, so it
+    // counts the columns the batch check will see
     if let Err(e) = crate::ingestion::check_record_columns_limit(
         ctx.org_id,
         StreamType::Logs,
         ctx.stream_name,
         &local_val,
         ctx.columns_limit,
+        if need_all_values {
+            &[config::ALL_VALUES_COL_NAME]
+        } else {
+            &[]
+        },
     ) {
         ctx.stream_status.status.failed += 1;
         ctx.stream_status.status.error = e.to_string();
@@ -1827,10 +1847,12 @@ mod tests {
     #[test]
     fn feature_writers_pass_the_rollup_guard_and_sdr_fail_closed() {
         use config::meta::{
-            alerts::alert_calibration::DIGEST_STREAM, self_reporting::redaction::is_platform_write,
+            alerts::alert_calibration::DIGEST_STREAM, autoresolve::AUTORESOLVE_RUNS_STREAM,
+            self_reporting::redaction::is_platform_write,
         };
         for job in [
             SystemJobType::AlertCalibration,
+            SystemJobType::AutoResolve,
             SystemJobType::AutoObserve,
             SystemJobType::SessionReplay,
         ] {
@@ -1838,6 +1860,7 @@ mod tests {
             assert!(is_internal_writer(&writer, false), "{job:?}");
             for stream in [
                 DIGEST_STREAM,
+                AUTORESOLVE_RUNS_STREAM,
                 "_o2_autoobserve_health",
                 "_o2_sessionreplay_resources",
             ] {
@@ -2202,7 +2225,6 @@ mod tests {
                         flatten_level: 0,
                         min_ts: 1,
                         max_ts: i64::MAX,
-                        index_all_max_value_length: 0,
                         columns_limit: limit,
                         user_defined_schema_map: &schema_map,
                         streams_need_original_map: &settings,
@@ -2437,7 +2459,6 @@ mod tests {
                         flatten_level: 0,
                         min_ts: 1,
                         max_ts: i64::MAX,
-                        index_all_max_value_length: 0,
                         columns_limit: usize::MAX,
                         user_defined_schema_map: &schema_map,
                         streams_need_original_map: &settings,

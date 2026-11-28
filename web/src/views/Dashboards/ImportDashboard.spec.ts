@@ -423,6 +423,51 @@ describe("ImportDashboard.vue", () => {
     expect(wrapper.findComponent({ name: "SelectFolderDropdown" }).props("disabled")).toBe(false);
   });
 
+  it("clears the editor once every file is removed, so Import has nothing stale to send", async () => {
+    const content = JSON.stringify({ title: "From A", tabs: [{ tabId: "t1", panels: [] }] });
+    wrapper = mountComponent();
+    await nextTick();
+    wrapper.vm.form.setFieldValue("jsonFiles", [
+      new File([content], "a.json", { type: "application/json" }),
+    ]);
+    await vi.waitFor(() => expect(wrapper.vm.jsonStr).toContain("From A"));
+    wrapper.vm.form.setFieldValue("jsonFiles", []);
+    await vi.waitFor(() => expect(wrapper.vm.jsonStr).toBe(""));
+  });
+
+  it("asks for a JSON object when Import is clicked after every file was removed", async () => {
+    const useNotifications = (await import("@/composables/useNotifications")).default as any;
+    const content = JSON.stringify({ title: "From A", tabs: [{ tabId: "t1", panels: [] }] });
+    wrapper = mountComponent();
+    await nextTick();
+    const { showErrorNotification } = useNotifications.mock.results.at(-1).value;
+    wrapper.vm.form.setFieldValue("jsonFiles", [
+      new File([content], "a.json", { type: "application/json" }),
+    ]);
+    await vi.waitFor(() => expect(wrapper.vm.jsonStr).toContain("From A"));
+    wrapper.vm.form.setFieldValue("jsonFiles", []);
+    await vi.waitFor(() => expect(wrapper.vm.jsonStr).toBe(""));
+    wrapper.vm.importDashboard();
+    expect(showErrorNotification).toHaveBeenCalledWith("Please Enter a JSON object for import");
+  });
+
+  it("keeps a pick's valid file when another file in the same pick is refused", async () => {
+    const dash = (title: string) =>
+      new File([JSON.stringify({ title, tabs: [{ tabId: "t1", panels: [] }] })], `${title}.json`, {
+        type: "application/json",
+      });
+    wrapper = mountComponent();
+    await nextTick();
+    wrapper.vm.form.setFieldValue("jsonFiles", [dash("From A")]);
+    await vi.waitFor(() => expect(wrapper.vm.jsonStr).toContain("From A"));
+    const refused = new File(["x"], "c.txt", { type: "text/plain" });
+    wrapper.findComponent({ name: "OFile" }).vm.$emit("rejected", [{ file: refused, reason: "x" }]);
+    wrapper.vm.form.setFieldValue("jsonFiles", [dash("From B")]);
+    await vi.waitFor(() => expect(wrapper.vm.jsonStr).toContain("From B"));
+    await flushPromises();
+    expect(wrapper.vm.jsonFiles).toHaveLength(1);
+  });
+
   it("keeps the folder picker locked while uploaded files are importing", async () => {
     const dashboardService = (await import("@/services/dashboards")).default;
     let settle: (v: unknown) => void = () => {};
@@ -641,6 +686,152 @@ describe("ImportDashboard.vue", () => {
       await flushPromises();
 
       expect(analytics.track).not.toHaveBeenCalled();
+    });
+  });
+  describe("target folder", () => {
+    const routeTo = async (folder: string) => {
+      const { useRoute } = await import("vue-router");
+      vi.mocked(useRoute).mockReturnValue({ query: { folder }, params: {} } as any);
+    };
+
+    afterEach(async () => {
+      const { useRoute } = await import("vue-router");
+      vi.mocked(useRoute).mockReturnValue({ query: { folder: "default" }, params: {} } as any);
+    });
+
+    it("imports into default from the Favorites view, which is not a folder", async () => {
+      const dashboardService = (await import("@/services/dashboards")).default;
+      (dashboardService.create as any).mockResolvedValue({ data: {} });
+      await routeTo("__favorites__");
+      wrapper = mountComponent();
+      await flushPromises();
+
+      expect(wrapper.vm.selectedFolder).toEqual({ label: "default", value: "default" });
+      wrapper.vm.jsonStr = JSON.stringify({ title: "Fav", tabs: [{ tabId: "t1", panels: [] }] });
+      await wrapper.vm.importFromJsonStr();
+      await flushPromises();
+      expect((dashboardService.create as any).mock.calls[0][2]).toBe("default");
+    });
+
+    it("keeps a real folder from the route", async () => {
+      store.state.organizationData.folders.push({ folderId: "f-ops", name: "Ops" });
+      await routeTo("f-ops");
+      wrapper = mountComponent();
+      await flushPromises();
+
+      expect(wrapper.vm.selectedFolder).toEqual({ label: "Ops", value: "f-ops" });
+    });
+  });
+
+  describe("import request errors", () => {
+    const rejected = (message?: string) =>
+      Object.assign(new Error("Request failed with status code 422"), {
+        response: { status: 422, data: message ? { code: 422, message } : "" },
+      });
+    const backendMessage =
+      'Failed to deserialize the JSON body into the target type: invalid type: string "yes", expected a boolean';
+    const dashboard = { title: "Bad", tabs: [{ tabId: "t1", panels: [] }] };
+
+    const importFile = async () => {
+      const content = JSON.stringify(dashboard);
+      wrapper = mountComponent();
+      await nextTick();
+      wrapper.vm.form.setFieldValue("jsonFiles", [
+        new File([content], "a.json", { type: "application/json" }),
+      ]);
+      await flushPromises();
+      wrapper.vm.jsonStr = JSON.stringify([dashboard]);
+      await wrapper.vm.importFiles();
+      await flushPromises();
+      return wrapper.vm.filesImportResults[0].reason.error;
+    };
+
+    it("shows the backend's message for a refused uploaded file", async () => {
+      const dashboardService = (await import("@/services/dashboards")).default;
+      (dashboardService.create as any).mockRejectedValue(rejected(backendMessage));
+      expect(await importFile()).toBe(backendMessage);
+      expect(wrapper.find('[data-test="dashboard-import-file-rejected"]').text()).toContain(
+        backendMessage,
+      );
+    });
+
+    it("falls back to the request error when the response has no message", async () => {
+      const dashboardService = (await import("@/services/dashboards")).default;
+      (dashboardService.create as any).mockRejectedValue(rejected());
+      expect(await importFile()).toBe("Request failed with status code 422");
+    });
+
+    it("shows a plain-text error body, which is how the backend reports a bad JSON field", async () => {
+      const dashboardService = (await import("@/services/dashboards")).default;
+      (dashboardService.create as any).mockRejectedValue(
+        Object.assign(new Error("Request failed with status code 422"), {
+          response: { status: 422, data: `  ${backendMessage}\n` },
+        }),
+      );
+      expect(await importFile()).toBe(backendMessage);
+    });
+
+    it("shows a JSON message ahead of anything else, as for a missing folder", async () => {
+      const dashboardService = (await import("@/services/dashboards")).default;
+      (dashboardService.create as any).mockRejectedValue(
+        Object.assign(new Error("Request failed with status code 404"), {
+          response: { status: 404, data: { code: 404, message: "Folder not found" } },
+        }),
+      );
+      expect(await importFile()).toBe("Folder not found");
+    });
+
+    it("falls back to the request error for a blank text body", async () => {
+      const dashboardService = (await import("@/services/dashboards")).default;
+      (dashboardService.create as any).mockRejectedValue(
+        Object.assign(new Error("Request failed with status code 422"), {
+          response: { status: 422, data: "   " },
+        }),
+      );
+      expect(await importFile()).toBe("Request failed with status code 422");
+    });
+
+    it("shows a plain-text error body for refused pasted JSON", async () => {
+      const dashboardService = (await import("@/services/dashboards")).default;
+      const useNotifications = (await import("@/composables/useNotifications")).default;
+      (dashboardService.create as any).mockRejectedValue(
+        Object.assign(new Error("Request failed with status code 422"), {
+          response: { status: 422, data: backendMessage },
+        }),
+      );
+      wrapper = mountComponent();
+      await nextTick();
+      wrapper.vm.jsonStr = JSON.stringify(dashboard);
+      await wrapper.vm.importFromJsonStr();
+      await flushPromises();
+      const { showErrorNotification } = vi.mocked(useNotifications).mock.results.at(-1)!.value;
+      expect(showErrorNotification).toHaveBeenCalledWith(backendMessage);
+    });
+
+    it("shows the backend's message for a refused URL import", async () => {
+      const dashboardService = (await import("@/services/dashboards")).default;
+      (dashboardService.create as any).mockRejectedValue(rejected(backendMessage));
+      wrapper = mountComponent();
+      await nextTick();
+      wrapper.vm.form.setFieldValue("url", "https://example.com/d.json");
+      await flushPromises();
+      wrapper.vm.jsonStr = JSON.stringify(dashboard);
+      await wrapper.vm.importFromUrl();
+      await flushPromises();
+      expect(wrapper.vm.filesImportResults[0].reason.error).toBe(backendMessage);
+    });
+
+    it("shows the backend's message for refused pasted JSON", async () => {
+      const dashboardService = (await import("@/services/dashboards")).default;
+      const useNotifications = (await import("@/composables/useNotifications")).default;
+      (dashboardService.create as any).mockRejectedValue(rejected(backendMessage));
+      wrapper = mountComponent();
+      await nextTick();
+      wrapper.vm.jsonStr = JSON.stringify(dashboard);
+      await wrapper.vm.importFromJsonStr();
+      await flushPromises();
+      const { showErrorNotification } = vi.mocked(useNotifications).mock.results.at(-1)!.value;
+      expect(showErrorNotification).toHaveBeenCalledWith(backendMessage);
     });
   });
 });

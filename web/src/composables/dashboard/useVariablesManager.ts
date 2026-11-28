@@ -19,6 +19,7 @@ import { ref, computed, reactive, watch, getCurrentScope, onScopeDispose } from 
 import { cloneDeep, isEqual } from "lodash-es";
 import {
   buildScopedDependencyGraph,
+  describeVariableCycle,
   detectCyclesInScopedGraph,
   type ScopedDependencyGraph,
 } from "@/utils/dashboard/variables/variablesDependencyUtils";
@@ -80,6 +81,8 @@ export interface VariableRuntimeState extends VariableConfig {
   tabId?: string;
   panelId?: string;
   error?: string;
+  /** Names the dependency loop this variable is part of; it can never load while the loop stands. */
+  cycleError?: string;
 }
 
 // Helper to generate variable keys
@@ -496,6 +499,24 @@ export const useVariablesManager = (t: TranslateFn) => {
     return mapping;
   };
 
+  // The search path can lead into the loop, which starts where its closing variable was first visited.
+  const markCycle = (path: string[]) => {
+    const loopKeys = path.slice(path.indexOf(path[path.length - 1]), -1);
+    const byKey = new Map(
+      getAllVariablesFlat().map((v) => [getVariableKey(v.name, v.scope, v.tabId, v.panelId), v]),
+    );
+    const loop = loopKeys.flatMap((key) => byKey.get(key) ?? []);
+    const names = loop.map((v) => v.name);
+    // Shaped so the editor's describer names exactly this loop, closing back on its first variable.
+    const message = describeVariableCycle(
+      { [names[names.length - 1]]: { parentVariables: [names[0]] } },
+      names,
+    );
+    loop.forEach((v) => {
+      v.cycleError = message;
+    });
+  };
+
   // ========== INITIALIZATION ==========
   const initialize = async (
     config: VariableConfig[],
@@ -568,6 +589,7 @@ export const useVariablesManager = (t: TranslateFn) => {
     // Step 4: Detect cycles
     const cycle = detectCyclesInScopedGraph(dependencyGraph.value);
     if (cycle) {
+      markCycle(cycle);
       throw new Error(`Circular dependency detected: ${cycle.join(" → ")}`);
     }
 

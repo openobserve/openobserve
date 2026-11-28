@@ -20,12 +20,13 @@ import { searchState } from "@/composables/useLogs/searchState";
 import usePatterns from "@/composables/useLogs/usePatterns";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import {
-  resolvePatternMatchTerms,
+  patternWhere,
   patternFilterBlockedReason,
   FILTER_BLOCKED_MESSAGE,
   escapeForMatchAll,
   patternSeverityKeyForPattern,
   type PatternFilterBlock,
+  type PatternTerms,
   type PatternSeverityKey,
 } from "./patternUtils";
 import { buildPrefillFromPatterns } from "@/utils/alerts/prefill/fromPatterns";
@@ -101,17 +102,16 @@ export const usePatternActions = () => {
     }
   };
 
-  const allTemplates = (): string[] =>
-    (patternsState.value.patterns?.patterns ?? []).map((p: any) => p.template);
+  const allPatterns = (): PatternTerms[] => patternsState.value.patterns?.patterns ?? [];
 
   /** Why a filter cannot be built for the pattern, or null when it can. */
   const filterBlockedReason = (pattern: any): PatternFilterBlock | null =>
-    pattern ? patternFilterBlockedReason(pattern.template, allTemplates()) : "none";
+    pattern ? patternFilterBlockedReason(pattern.template, [pattern]) : "none";
 
   const addPatternToSearch = (pattern: any, action: "include" | "exclude") => {
-    const terms = resolvePatternMatchTerms(pattern.template, allTemplates());
+    const clause = patternWhere(pattern);
 
-    if (!terms) {
+    if (!clause) {
       toast({
         variant: "warning",
         message: t(FILTER_BLOCKED_MESSAGE[filterBlockedReason(pattern) ?? "none"]),
@@ -119,13 +119,11 @@ export const usePatternActions = () => {
       return;
     }
 
-    const matchAllClauses = terms.map((term) => `match_all('${escapeForMatchAll(term)}')`);
-
-    let filterExpression = matchAllClauses.join(" AND ");
+    let filterExpression = clause;
 
     if (action === "exclude") {
-      filterExpression =
-        matchAllClauses.length > 1 ? `NOT (${filterExpression})` : `NOT ${filterExpression}`;
+      const single = pattern.match_terms.length === 1 && !pattern.exclude_terms?.length;
+      filterExpression = single ? `NOT ${clause}` : `NOT (${clause})`;
     }
 
     searchObj.data.stream.addToFilter = filterExpression;
@@ -194,7 +192,7 @@ export const usePatternActions = () => {
       streamName: searchObj.data.stream.selectedStream?.[0] ?? "",
       streamType: searchObj.data.stream.streamType,
       templates: visible.map((p: any) => p.template),
-      allTemplates: allTemplates(),
+      patterns: allPatterns(),
       totalCount: all.length,
       filtered: visible.length !== all.length,
       mode: options.patternMode ?? "exclude",
@@ -219,7 +217,7 @@ export const usePatternActions = () => {
       streamName: searchObj.data.stream.selectedStream?.[0] ?? "",
       streamType: searchObj.data.stream.streamType,
       templates: [pattern?.template ?? ""],
-      allTemplates: allTemplates(),
+      patterns: allPatterns(),
       totalCount: 1,
       mode: "include",
       // The user named this pattern; falling back to an alert on the whole

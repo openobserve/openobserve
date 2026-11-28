@@ -159,13 +159,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ref="file"
         class="hidden"
         accept="image/png,image/jpeg"
-        :type-error-toast="false"
         multiple
         :model-value="null"
-        :max-file-size="MAX_IMAGE_SIZE_BYTES"
+        :max-size="MAX_IMAGE_SIZE_BYTES"
         @change="onPicked"
-        @size-error="(files) => files.forEach(refuseSize)"
-        @type-error="() => refuse('type', t('assistant.context.imageType'))"
+        @rejected="onRejected"
       />
       <span role="status" aria-live="polite" class="sr-only" data-test="assistant-launcher-status">
         <span v-if="status" :key="status.seq">{{ status.text }}</span>
@@ -236,7 +234,7 @@ import { onOverviewFocusRequest } from "@/composables/goto/goToRequests";
 import useBreakpoint from "@/composables/useBreakpoint";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OFile from "@/lib/forms/File/OFile.vue";
-import type { FileValue } from "@/lib/forms/File/OFile.types";
+import type { FileRejection, FileValue } from "@/lib/forms/File/OFile.types";
 import { trackAssistant } from "@/services/assistantAnalytics";
 import { MAX_IMAGE_SIZE_BYTES, type ImageAttachment } from "@/ts/interfaces/chat";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
@@ -539,6 +537,13 @@ function refuse(cap: ImageCap, line: I18nText): void {
 
 function refuseSize(picked: File): void {
   refuse("size", imageTooBigLine(t, picked));
+}
+
+// The hidden field refuses by type or size before onPicked runs; say why with the launcher's own lines.
+function onRejected(rejections: FileRejection[]): void {
+  const tooBig = rejections.filter(({ file }) => file.size > MAX_IMAGE_SIZE_BYTES);
+  tooBig.forEach(({ file }) => refuseSize(file));
+  if (tooBig.length < rejections.length) refuse("type", t("assistant.context.imageType"));
 }
 
 function focusField(clear: boolean): void {

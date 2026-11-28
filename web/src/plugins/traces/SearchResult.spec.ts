@@ -1031,6 +1031,20 @@ describe("SearchResult in a kept-alive page", () => {
       expect(wrapper.findComponent({ name: "TracesSearchResultList" }).exists()).toBe(true);
     });
 
+    it("shows the selected columns, not the span table, for a non-* query with both ids", async () => {
+      await showResults(
+        `SELECT trace_id, span_id, count(*) AS n FROM "default" GROUP BY trace_id, span_id`,
+        [{ trace_id: "t", span_id: "s", n: 2 }],
+      );
+      expect(wrapper.findComponent({ name: "TracesSearchResultList" }).exists()).toBe(false);
+      expect(sqlTable().props("shape")).toBe("traces");
+      expect(
+        sqlTable()
+          .props("columns")
+          .map((c: any) => c.id),
+      ).toEqual(["trace_id", "span_id", "n"]);
+    });
+
     it.each([
       `SELECT * FROM "default" LIMIT 10`,
       `SELECT a FROM "default" UNION SELECT a FROM "default"`,
@@ -1310,7 +1324,7 @@ describe("SearchResult in a kept-alive page", () => {
 
     it("opens a span row without span times inside the page time range", async () => {
       const push = vi.spyOn(router, "push").mockResolvedValue(undefined as any);
-      await showResults(`SELECT trace_id, span_id FROM "default"`, [
+      await showResults(`SELECT * FROM (SELECT trace_id, span_id FROM "default")`, [
         { trace_id: "t", span_id: "s" },
       ]);
       await wrapper.vm.expandRowDetail({ trace_id: "t", span_id: "s" });
