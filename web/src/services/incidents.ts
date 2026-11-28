@@ -1134,6 +1134,7 @@ const incidents = {
       resolve_from_source: true,
       start_time: firings.window.startTime,
       end_time: Math.min(firings.window.endTime, Date.now() * 1000),
+      check_data: true,
     };
 
     const response = await serviceStreamsApi.correlate(org_identifier, request);

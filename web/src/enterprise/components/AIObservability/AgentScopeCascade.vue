@@ -39,6 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :data-test="`${prefix}-cascade-agent-id`"
     >
       <OSelect
+        ref="agentSelectRef"
         :model-value="selectedAgentName"
         :label="t('aiObservability.scope.agent')"
         label-position="inside"
@@ -87,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
@@ -135,6 +136,9 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18nTyped();
+
+const agentSelectRef = ref<{ focus: () => void } | null>(null);
+defineExpose({ openAgentPicker: () => agentSelectRef.value?.focus() });
 
 const showStream = computed(() => props.agentStreams.length > 1);
 

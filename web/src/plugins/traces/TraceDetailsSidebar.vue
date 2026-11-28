@@ -1227,11 +1227,7 @@ import { getOrSetServiceColor } from "@/utils/traces/serviceColorRegistry";
 import llmPromptsService from "@/services/llm-prompts.service";
 import { aiPromptsRoute } from "@/views/AIObservability/promptRoutes";
 import searchService from "@/services/search";
-import {
-  correlationWindow,
-  quoteSqlIdentifier,
-  quoteSqlLiteral,
-} from "@/utils/telemetryCorrelation";
+import { quoteSqlIdentifier, quoteSqlLiteral } from "@/utils/telemetryCorrelation";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import { queryClient } from "@/composables/query/queryClient";
 import { streamNameListQuery, streamSchemaQuery } from "@/services/stream.queries";
@@ -2750,23 +2746,24 @@ export default defineComponent({
         // Merge span dimensions into context fields for semantic extraction
         Object.assign(context.fields, spanDimensions);
 
-        // Find related telemetry
+        const spanStartUs = convertTimeFromNsToUs(props.span.start_time);
+        const spanEndUs = convertTimeFromNsToUs(props.span.end_time);
+        const bufferUs = 5 * 60 * 1000000;
+        // `has_data` is judged over the request window, so it must be the window the panels query.
+        const panelWindow = { start: spanStartUs - bufferUs, end: spanEndUs + bufferUs };
+
         const result = await findRelatedTelemetry(
           context,
           "traces",
-          5, // 5 minute time window
+          5,
           props.streamName,
-          correlationWindow(convertTimeFromNsToUs(props.span.start_time)),
+          panelWindow,
+          true,
         );
         if (isStale()) return;
 
         if (result && result.correlationData) {
           const correlationData = result.correlationData;
-
-          // Calculate time range (span start/end with buffer)
-          const spanStartUs = convertTimeFromNsToUs(props.span.start_time);
-          const spanEndUs = convertTimeFromNsToUs(props.span.end_time);
-          const bufferUs = 5 * 60 * 1000000; // 5 minutes buffer
           // Microseconds, from the trace's own spans (TraceDetails).
           const selectedTrace = searchObj.data?.traceDetails?.selectedTrace;
 
@@ -2839,10 +2836,7 @@ export default defineComponent({
             // semantic group under different field names (F35).
             semanticGroups: semanticGroups.value,
             ftsFields: [],
-            timeRange: {
-              startTime: spanStartUs - bufferUs,
-              endTime: spanEndUs + bufferUs,
-            },
+            timeRange: { startTime: panelWindow.start, endTime: panelWindow.end },
             // Fallback window for when View Logs widens from the span to the trace.
             traceTimeRange:
               selectedTrace?.trace_start_time && selectedTrace?.trace_end_time

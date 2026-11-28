@@ -159,4 +159,47 @@ describe("CorrelationEventHeader.vue", () => {
       expect(badge.text()).toBe("Node = node-1");
     });
   });
+
+  describe("+N dropped", () => {
+    const dropped = [
+      { id: "k8s-pod-ip", field: "k8s_pod_ip", reason: "relaxed" as const, value: "10.0.0.1" },
+      { id: "service-version", field: "service_version", reason: "missing" as const },
+    ];
+    const contextChip = {
+      key: "k8s-cluster",
+      label: "K8s cluster",
+      value: "c1",
+      kind: "context" as const,
+      active: false,
+    };
+
+    it("is hidden when nothing was dropped", () => {
+      wrapper = createWrapper({ contextChips: [contextChip], droppedDimensions: [] });
+      expect(wrapper.find('[data-test="correlation-event-header-dropped"]').exists()).toBe(false);
+    });
+
+    it("shows the count after the chips and lists each dim with its reason", async () => {
+      wrapper = createWrapper({ contextChips: [contextChip], droppedDimensions: dropped });
+      const trigger = wrapper.find('[data-test="correlation-event-header-dropped"]');
+      expect(trigger.text()).toBe("+2 dropped");
+      await trigger.trigger("mouseenter");
+      const popover = document.querySelector(
+        '[data-test="correlation-event-header-dropped-popover"]',
+      );
+      expect(popover?.textContent).toContain("Not used as filters");
+      expect(
+        document.querySelector('[data-test="correlation-event-header-dropped-k8s_pod_ip"]')
+          ?.textContent,
+      ).toContain("No rows with 10.0.0.1");
+      expect(
+        document.querySelector('[data-test="correlation-event-header-dropped-service_version"]')
+          ?.textContent,
+      ).toContain("Field not on these streams");
+    });
+
+    it("still shows the row when every dimension was dropped", () => {
+      wrapper = createWrapper({ contextChips: [], subjectChips: [], droppedDimensions: dropped });
+      expect(wrapper.find('[data-test="correlation-event-header-dropped"]').exists()).toBe(true);
+    });
+  });
 });

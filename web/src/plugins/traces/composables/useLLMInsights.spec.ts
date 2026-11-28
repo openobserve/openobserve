@@ -845,14 +845,66 @@ describe("useLLMInsights — error rate is always [0%, 100%]", () => {
     expect(p95Call).toBeTruthy();
     const sql: string = (p95Call as any)[0].queryReq.query.sql;
 
-    // Latency must be LLM-only — otherwise fast child/tool spans drag the tail
-    // down. Scoped via FILTER (not a top-level WHERE).
-    expect(sql).toMatch(
-      /approx_percentile_cont\(duration, 0\.95\)\s+FILTER\s*\(WHERE\s+gen_ai_operation_name\s+IS\s+NOT\s+NULL\)/,
+    // LLM-only via WHERE, so non-LLM spans never reach the aggregate.
+    expect(sql).toBe(
+      'SELECT COALESCE(approx_percentile_cont(duration, 0.95), 0) as p95_duration FROM "default" WHERE gen_ai_operation_name IS NOT NULL',
     );
     // It's a dedicated query — no bucketing, no token/cost rollups.
     expect(sql).not.toContain("histogram(");
     expect(sql).not.toContain("gen_ai_usage_cost");
+  });
+
+  it("P95 query puts the LLM-span predicate before the agent and page filters in WHERE", async () => {
+    const { fetchAll } = useLLMInsights();
+    fetchAll(
+      "default",
+      100,
+      200,
+      { name: "support-agent", source_stream: "default", source_stream_type: "traces" },
+      'trace_id IN (SELECT trace_id FROM "default" WHERE (x = 1))',
+    );
+    await flushPromises();
+
+    const sql: string = mockFetchQueryDataWithHttpStream.mock.calls
+      .map(([p]: any) => p.queryReq.query.sql as string)
+      .find((s) => s.includes("p95_duration") && !s.includes("GROUP BY"))!;
+    expect(sql).toBe(
+      'SELECT COALESCE(approx_percentile_cont(duration, 0.95), 0) as p95_duration FROM "default" ' +
+        "WHERE gen_ai_operation_name IS NOT NULL AND gen_ai_agent_name = 'support-agent' " +
+        "AND (gen_ai_agent_env IS NULL OR gen_ai_agent_env = '') " +
+        'AND trace_id IN (SELECT trace_id FROM "default" WHERE (x = 1))',
+    );
+  });
+
+  it("P95 query with only a page filter ANDs it after the LLM-span predicate", async () => {
+    const { fetchAll } = useLLMInsights();
+    fetchAll("default", 100, 200, null, "service_name = 'checkout'");
+    await flushPromises();
+
+    const sql: string = mockFetchQueryDataWithHttpStream.mock.calls
+      .map(([p]: any) => p.queryReq.query.sql as string)
+      .find((s) => s.includes("p95_duration") && !s.includes("GROUP BY"))!;
+    expect(sql).toBe(
+      'SELECT COALESCE(approx_percentile_cont(duration, 0.95), 0) as p95_duration FROM "default" ' +
+        "WHERE gen_ai_operation_name IS NOT NULL AND service_name = 'checkout'",
+    );
+  });
+
+  // Trace and error counts include non-LLM spans, so this query must keep scanning every span.
+  it("summary queries keep non-LLM spans for the trace, error and usage totals", async () => {
+    const { fetchAll } = useLLMInsights();
+    fetchAll("default", 100, 200);
+    await flushPromises();
+
+    const summarySqls = mockFetchQueryDataWithHttpStream.mock.calls
+      .map(([p]: any) => p.queryReq.query.sql as string)
+      .filter((s) => s.includes("GROUP BY ts") || s.includes("GROUP BY trace_id"));
+    expect(summarySqls).toHaveLength(2);
+    for (const sql of summarySqls) {
+      expect(sql).toMatch(/= agent_parent_span GROUP BY (ts|trace_id)\b/);
+      // The LLM predicate may appear only in aggregate FILTERs; a top-level WHERE drops error spans.
+      expect(sql).not.toMatch(/[^(]WHERE gen_ai_operation_name IS NOT NULL/);
+    }
   });
 
   it("sparkline SQL scopes p95 latency to LLM calls via per-aggregate FILTER", async () => {

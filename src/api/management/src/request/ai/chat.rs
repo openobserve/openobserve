@@ -518,6 +518,8 @@ struct TurnAudit {
     delegated: Option<DelegatedAudit>,
     /// The Slack message a delegated turn answers.
     slack_event: Option<String>,
+    login_ip: Option<String>,
+    user_agent: Option<String>,
 }
 
 #[cfg(feature = "enterprise")]
@@ -552,11 +554,25 @@ impl TurnAudit {
             protocol: Protocol::Http,
             delegated: None,
             slack_event: None,
+            login_ip: None,
+            user_agent: None,
         }
     }
 
     fn on_route(mut self, route: &'static str) -> Self {
         self.route = route;
+        self
+    }
+
+    fn with_client(
+        mut self,
+        extensions: &axum::http::Extensions,
+        headers: &axum::http::HeaderMap,
+    ) -> Self {
+        self.login_ip = extensions
+            .get::<config::axum::middlewares::RealIp>()
+            .map(|ip| ip.0.to_string());
+        self.user_agent = crate::request::audit_user_agent(headers);
         self
     }
 
@@ -624,8 +640,8 @@ impl TurnAudit {
     /// Built here, not by `report_with_protocol`, which has no `delegated` parameter.
     fn message(&self, status: StatusCode, error_message: Option<&str>) -> AuditMessage {
         AuditMessage {
-            login_ip: None,
-            user_agent: None,
+            login_ip: self.login_ip.clone(),
+            user_agent: self.user_agent.clone(),
             user_email: self.user_id.clone(),
             org_id: self.org_id.clone(),
             _timestamp: config::utils::time::now_micros(),
@@ -2620,6 +2636,7 @@ pub async fn chat(Path(org_id): Path<String>, in_req: axum::extract::Request) ->
         )
         .on_route("chat")
         .delegated_by(parts.extensions.get::<DelegatedCaller>(), &parts.headers)
+        .with_client(&parts.extensions, &parts.headers)
     };
 
     // Parse JSON body
@@ -3578,7 +3595,8 @@ async fn stream_turn(
             Some(&prompt_body),
             body_bytes.len(),
         )
-        .delegated_by(parts.extensions.get::<DelegatedCaller>(), &parts.headers);
+        .delegated_by(parts.extensions.get::<DelegatedCaller>(), &parts.headers)
+        .with_client(&parts.extensions, &parts.headers);
 
         // Check if AI/agent is enabled
         if !get_o2_config().ai.enabled {

@@ -1977,6 +1977,13 @@ const sortNeedsSchema = () => {
   return !!sortBy && sortBy !== "start_time" && sortBy !== "duration";
 };
 
+// Root and Entry read hasParentColumn from the schema; before it loads, Root adds no condition.
+const scopeNeedsSchema = () =>
+  searchObj.meta.searchMode === "spans" &&
+  !searchObj.meta.sqlMode &&
+  isTracesScope(searchObj.meta.scope) &&
+  searchObj.meta.scope !== "all";
+
 // An assistant link applies its stream, window and filter but never runs them.
 const fromAssistant = () => router.currentRoute.value.query.type === "ai_chat_query";
 
@@ -2027,7 +2034,7 @@ async function loadPageData({ leftOrg = "" } = {}) {
   if (generation !== pageGeneration) return;
   await parserReady;
   if (generation !== pageGeneration) return;
-  if (fields && sortNeedsSchema()) await fields.fieldsReady;
+  if (fields && (sortNeedsSchema() || scopeNeedsSchema())) await fields.fieldsReady;
   if (generation !== pageGeneration) return;
   pageLoaded = true;
   pendingLanding = null;

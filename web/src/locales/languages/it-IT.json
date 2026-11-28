@@ -18554,7 +18554,16 @@
     "panelTimeSeriesFor": "Serie temporali per {stream}",
     "panelTimeSeriesForWithType": "Serie temporali per {stream} ({type})",
     "logsPanelTitle": "Log - {stream}",
-    "logsPanelDescription": "Log correlati per il servizio {service}"
+    "logsPanelDescription": "Log correlati per il servizio {service}",
+    "noDataInScope": "Nessun dato in questo ambito",
+    "noDataInScopeReason": "Nessuna riga corrisponde a questi filtri in questo intervallo di tempo.",
+    "droppedCount": "+{count} escluso | +{count} esclusi",
+    "droppedTitle": "Non usati come filtri",
+    "droppedNoRows": "Nessuna riga con {value}",
+    "droppedNoField": "Campo non presente in questi stream",
+    "allNoDataTitle": "Nessuna metrica ha dati in questo ambito",
+    "allNoDataScope": "{scope}, {window}",
+    "allNoDataAction": "Mostra metriche senza dati"
   },
   "search_scheduler_job": {
     "title": "Cerca Job Scheduler",
@@ -20620,6 +20629,13 @@
       "sampleExpected": "Output atteso",
       "fromTrace": "Dallo span della traccia {id}",
       "openInPlaygroundFailed": "Impossibile aprire questo span nel Playground."
+    },
+    "largeStream": {
+      "notice": "{stream}: circa {size} in questo intervallo, nessun filtro agente. Potrebbe richiedere minuti.",
+      "pickAgent": "Scegli un agente",
+      "addFilter": "Aggiungi un filtro",
+      "runAnyway": "Esegui comunque",
+      "notRun": "Non eseguito"
     }
   },
   "onlineEvals": {

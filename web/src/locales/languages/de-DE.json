@@ -18554,7 +18554,16 @@
     "panelTimeSeriesFor": "Zeitreihe für {stream}",
     "panelTimeSeriesForWithType": "Zeitreihe für {stream} ({type})",
     "logsPanelTitle": "Logs - {stream}",
-    "logsPanelDescription": "Korrelierte Logs für Dienst {service}"
+    "logsPanelDescription": "Korrelierte Logs für Dienst {service}",
+    "noDataInScope": "Keine Daten in diesem Bereich",
+    "noDataInScopeReason": "Keine Zeilen entsprechen diesen Filtern in diesem Zeitraum.",
+    "droppedCount": "+{count} verworfen | +{count} verworfen",
+    "droppedTitle": "Nicht als Filter verwendet",
+    "droppedNoRows": "Keine Zeilen mit {value}",
+    "droppedNoField": "Feld nicht in diesen Streams",
+    "allNoDataTitle": "Keine Metrik hat Daten in diesem Bereich",
+    "allNoDataScope": "{scope}, {window}",
+    "allNoDataAction": "Metriken ohne Daten anzeigen"
   },
   "search_scheduler_job": {
     "title": "Suchauftrags-Planer",
@@ -20620,6 +20629,13 @@
       "sampleExpected": "Erwartete Ausgabe",
       "fromTrace": "Aus Trace-Span {id}",
       "openInPlaygroundFailed": "Dieser Span konnte nicht im Playground geöffnet werden."
+    },
+    "largeStream": {
+      "notice": "{stream}: etwa {size} in diesem Zeitraum, kein Agentenfilter. Kann Minuten dauern.",
+      "pickAgent": "Agenten wählen",
+      "addFilter": "Filter hinzufügen",
+      "runAnyway": "Trotzdem ausführen",
+      "notRun": "Nicht ausgeführt"
     }
   },
   "onlineEvals": {

@@ -517,6 +517,14 @@ describe("useTracesTableColumns", () => {
       );
     });
 
+    it("leaves the cell empty for a row with no timestamp", () => {
+      const col = buildCols(false, "spans", []).find((c) => c.id === "_timestamp");
+      const accessorFn = (col as any)?.accessorFn as (row: any) => string;
+
+      expect(accessorFn({ trace_id: "t", span_id: "s" })).toBe("");
+      expect(vi.mocked(timestampToTimezoneDate)).not.toHaveBeenCalled();
+    });
+
     it("should return the formatted string from timestampToTimezoneDate", () => {
       const col = buildCols(false, "spans", []).find((c) => c.id === "_timestamp");
       const accessorFn = (col as any)?.accessorFn as (row: any) => string;

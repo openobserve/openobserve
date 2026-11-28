@@ -18554,7 +18554,16 @@
     "panelTimeSeriesFor": "{stream} için zaman serisi",
     "panelTimeSeriesForWithType": "{stream} için zaman serisi ({type})",
     "logsPanelTitle": "Günlükler - {stream}",
-    "logsPanelDescription": "{service} hizmeti için ilişkili günlükler"
+    "logsPanelDescription": "{service} hizmeti için ilişkili günlükler",
+    "noDataInScope": "Bu kapsamda veri yok",
+    "noDataInScopeReason": "Bu zaman aralığında bu filtrelerle eşleşen satır yok.",
+    "droppedCount": "+{count} çıkarıldı | +{count} çıkarıldı",
+    "droppedTitle": "Filtre olarak kullanılmadı",
+    "droppedNoRows": "{value} içeren satır yok",
+    "droppedNoField": "Alan bu akışlarda yok",
+    "allNoDataTitle": "Bu kapsamda verisi olan metrik yok",
+    "allNoDataScope": "{scope}, {window}",
+    "allNoDataAction": "Verisi olmayan metrikleri göster"
   },
   "search_scheduler_job": {
     "title": "Arama İşi Zamanlayıcısı",
@@ -20620,6 +20629,13 @@
       "sampleExpected": "Beklenen Çıktı",
       "fromTrace": "İz spanı {id}'den",
       "openInPlaygroundFailed": "Bu span Playground'da açılamadı."
+    },
+    "largeStream": {
+      "notice": "{stream}: bu aralıkta yaklaşık {size}, ajan filtresi yok. Dakikalar sürebilir.",
+      "pickAgent": "Bir ajan seç",
+      "addFilter": "Filtre ekle",
+      "runAnyway": "Yine de çalıştır",
+      "notRun": "Çalıştırılmadı"
     }
   },
   "onlineEvals": {

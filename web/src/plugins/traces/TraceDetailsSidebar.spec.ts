@@ -807,6 +807,29 @@ describe("TraceDetailsSidebar", async () => {
         });
       });
 
+      it("asks check_data over the same window the metrics panels query", async () => {
+        mockFindRelatedTelemetry.mockResolvedValueOnce({
+          correlationData: {
+            service_name: "svc",
+            matched_dimensions: {},
+            related_streams: {
+              logs: [{ stream_name: "app_logs", filters: {} }],
+              metrics: [],
+              traces: [],
+              profiles: [],
+            },
+          },
+        });
+
+        await viewLogsWrapper.vm.viewSpanLogs();
+        await flushPromises();
+
+        const [, , , , window, checkData] = mockFindRelatedTelemetry.mock.calls[0];
+        const { timeRange } = mockNavigateToCorrelatedLogs.mock.calls[0][0];
+        expect(checkData).toBe(true);
+        expect(window).toEqual({ start: timeRange.startTime, end: timeRange.endTime });
+      });
+
       it("never reuses, applies or navigates with another span's lookup", async () => {
         const lookupFor = (stream: string) => ({
           correlationData: {
@@ -3108,10 +3131,9 @@ describe("TraceDetailsSidebar — correlation license lock", () => {
     await flushPromises();
     expect(w.find(LOGS_TAB).attributes("suffix-icon")).toBeUndefined();
     expect(mockFindRelatedTelemetry).toHaveBeenCalled();
-    const spanStartUs = mockSpan.start_time / 1000;
     expect(mockFindRelatedTelemetry.mock.calls[0][4]).toEqual({
-      start: spanStartUs - 300_000_000,
-      end: spanStartUs + 300_000_000,
+      start: mockSpan.start_time / 1000 - 300_000_000,
+      end: Math.floor(mockSpan.end_time / 1000) + 300_000_000,
     });
     w.unmount();
   });

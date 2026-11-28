@@ -500,6 +500,7 @@ describe("incidents service", () => {
         resolve_from_source: true,
         start_time: window.startTime,
         end_time: end,
+        check_data: true,
       });
     });
 
@@ -569,6 +570,7 @@ describe("incidents service", () => {
         resolve_from_source: true,
         start_time: noFirings.window.startTime,
         end_time: noFirings.window.endTime,
+        check_data: true,
       });
       expect(result.serviceName).toBe(row.service_name);
       expect(result.displayServiceName).toBe(row.display_name);
@@ -616,6 +618,7 @@ describe("incidents service", () => {
         resolve_from_source: true,
         start_time: noFirings.window.startTime,
         end_time: noFirings.window.endTime,
+        check_data: true,
       });
 
       expect(result.serviceName).toBe("api-gateway");
@@ -653,6 +656,7 @@ describe("incidents service", () => {
         resolve_from_source: true,
         start_time: noFirings.window.startTime,
         end_time: noFirings.window.endTime,
+        check_data: true,
       });
     });
 
@@ -685,6 +689,7 @@ describe("incidents service", () => {
         resolve_from_source: true,
         start_time: noFirings.window.startTime,
         end_time: noFirings.window.endTime,
+        check_data: true,
       });
     });
   });

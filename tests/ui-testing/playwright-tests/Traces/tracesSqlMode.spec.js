@@ -10,6 +10,8 @@ const FILTER = "service_name = 'api-gateway'";
 const PREFILLED = `SELECT * FROM "default" WHERE ${FILTER} ORDER BY start_time DESC`;
 const GROUPED = `SELECT service_name, count(*) AS spans FROM "default" GROUP BY service_name`;
 const GROUPED_WHERE = `SELECT service_name, count(*) AS spans FROM "default" WHERE ${FILTER} GROUP BY service_name`;
+const SPAN_IDS_COUNTED =
+  'SELECT trace_id, span_id, count(*) AS span_rows FROM "default" GROUP BY trace_id, span_id LIMIT 20';
 const TYPO = `SELECT servce_name, count(*) AS spans FROM "default" GROUP BY servce_name`;
 const PER_TRACE =
   "SELECT trace_id, min(_timestamp) AS first_seen, count(*) AS spans, " +
@@ -70,6 +72,24 @@ test.describe("Traces SQL mode testcases", () => {
     await expect(pm.tracesPage.getRedMetricsDashboard()).toBeVisible();
     const caption = await pm.tracesPage.openRedRateCaption();
     await expect(caption).toContainText('GROUP BY not applied', { timeout: 20000 });
+  });
+
+  test("P1: A result with trace_id and span_id shows the selected columns and no made-up values", {
+    tag: ['@tracesSqlMode', '@traces', '@query', '@P1', '@all']
+  }, async () => {
+    await pm.tracesPage.toggleSqlModeFromToolbar();
+    await pm.tracesPage.expectSqlMode(true);
+    await pm.tracesPage.setQueryEditorValue(SPAN_IDS_COUNTED);
+    await pm.tracesPage.setTimeRange('15m');
+    await pm.tracesPage.runSearch();
+
+    const table = pm.tracesPage.getSqlResultTable();
+    await expect(table).toBeVisible({ timeout: 20000 });
+    for (const column of ['trace_id', 'span_id', 'span_rows']) {
+      await expect(table).toContainText(column);
+    }
+    await expect(table).not.toContainText('Invalid DateTime');
+    await expect(pm.tracesPage.getSearchResultList()).toHaveCount(0);
   });
 
   test("P1: Turning SQL mode off shows and runs the filter with no dialog, and keeps the SQL", {

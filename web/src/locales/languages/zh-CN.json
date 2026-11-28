@@ -18554,7 +18554,16 @@
     "panelTimeSeriesFor": "{stream} 的时间序列",
     "panelTimeSeriesForWithType": "{stream} 的时间序列（{type}）",
     "logsPanelTitle": "日志 - {stream}",
-    "logsPanelDescription": "服务 {service} 的关联日志"
+    "logsPanelDescription": "服务 {service} 的关联日志",
+    "noDataInScope": "此范围内无数据",
+    "noDataInScopeReason": "此时间范围内没有与这些筛选条件匹配的行。",
+    "droppedCount": "+{count} 个已舍弃 | +{count} 个已舍弃",
+    "droppedTitle": "未用作筛选条件",
+    "droppedNoRows": "没有值为 {value} 的行",
+    "droppedNoField": "这些流中没有此字段",
+    "allNoDataTitle": "此范围内没有指标有数据",
+    "allNoDataScope": "{scope}，{window}",
+    "allNoDataAction": "显示无数据的指标"
   },
   "search_scheduler_job": {
     "title": "搜索任务调度器",
@@ -20620,6 +20629,13 @@
       "sampleExpected": "预期输出",
       "fromTrace": "来自追踪 Span {id}",
       "openInPlaygroundFailed": "无法在 Playground 中打开此 Span"
+    },
+    "largeStream": {
+      "notice": "{stream}：此范围内约 {size}，没有代理筛选。可能需要数分钟。",
+      "pickAgent": "选择代理",
+      "addFilter": "添加筛选条件",
+      "runAnyway": "仍然运行",
+      "notRun": "未运行"
     }
   },
   "onlineEvals": {

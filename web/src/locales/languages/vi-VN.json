@@ -18554,7 +18554,16 @@
     "panelTimeSeriesFor": "Chuỗi thời gian cho {stream}",
     "panelTimeSeriesForWithType": "Chuỗi thời gian cho {stream} ({type})",
     "logsPanelTitle": "Nhật ký - {stream}",
-    "logsPanelDescription": "Các log tương quan cho dịch vụ {service}"
+    "logsPanelDescription": "Các log tương quan cho dịch vụ {service}",
+    "noDataInScope": "Không có dữ liệu trong phạm vi này",
+    "noDataInScopeReason": "Không có hàng nào khớp với các bộ lọc này trong khoảng thời gian này.",
+    "droppedCount": "+{count} bị bỏ | +{count} bị bỏ",
+    "droppedTitle": "Không dùng làm bộ lọc",
+    "droppedNoRows": "Không có hàng nào với {value}",
+    "droppedNoField": "Trường không có trên các luồng này",
+    "allNoDataTitle": "Không có chỉ số nào có dữ liệu trong phạm vi này",
+    "allNoDataScope": "{scope}, {window}",
+    "allNoDataAction": "Hiện các chỉ số không có dữ liệu"
   },
   "search_scheduler_job": {
     "title": "Bộ lập lịch tìm kiếm",
@@ -20620,6 +20629,13 @@
       "sampleExpected": "Đầu ra dự kiến",
       "fromTrace": "Từ span {id} trong trace",
       "openInPlaygroundFailed": "Không thể mở span này trong Playground"
+    },
+    "largeStream": {
+      "notice": "{stream}: khoảng {size} trong khoảng này, không có bộ lọc agent. Có thể mất vài phút.",
+      "pickAgent": "Chọn một agent",
+      "addFilter": "Thêm bộ lọc",
+      "runAnyway": "Vẫn chạy",
+      "notRun": "Chưa chạy"
     }
   },
   "onlineEvals": {

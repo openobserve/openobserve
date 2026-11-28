@@ -5825,7 +5825,7 @@ describe("Index.vue (Main Traces Page)", () => {
   describe("SQL mode", () => {
     const grouped = `SELECT service_name, count(*) AS n FROM "default" WHERE a = 1 GROUP BY service_name`;
 
-    const mountSql = async () => {
+    const mountPage = () => {
       mockSearchObj.meta.searchMode = "spans";
       mockSearchObj.data.stream.selectedStream = { label: "default", value: "default" };
       wrapper = mount(Index, {
@@ -5843,6 +5843,10 @@ describe("Index.vue (Main Traces Page)", () => {
           },
         },
       });
+    };
+
+    const mountSql = async () => {
+      mountPage();
       await flushPromises();
       await vi.waitFor(() => expect(mockSearchObj.loadingStream).toBe(false));
       await flushPromises();
@@ -6862,6 +6866,38 @@ describe("Index.vue (Main Traces Page)", () => {
         expect(mockSearchObj.data.resultGrid.currentPage).toBe(0);
         const [request] = ownCalls().at(-1)!;
         expect(b64DecodeUnicode(request.queryReq.query.sql)).toContain(`WHERE ${ROOT}`);
+      });
+
+      it("waits for the stream schema before a Root or Entry landing search", async () => {
+        const base = mockStreamList.list.find((st: any) => st.name === "default")!;
+        const expected = {
+          root: ROOT,
+          entrypoint: `CAST(span_kind AS VARCHAR) IN ('2','5') OR ${ROOT}`,
+        };
+        for (const [scope, predicate] of Object.entries(expected)) {
+          let release = () => {};
+          mockGetStream.mockImplementation(
+            () =>
+              new Promise((resolve) => {
+                release = () =>
+                  resolve({
+                    ...base,
+                    schema: [...base.schema, { name: "reference_parent_span_id", type: "Utf8" }],
+                  });
+              }),
+          );
+          mockSearchObj.meta.scope = scope;
+          mockSearchObj.data.stream.hasParentColumn = false;
+          mockFetchQueryDataWithHttpStream.mockClear();
+          mountPage();
+          await flushPromises();
+          expect(ownCalls()).toHaveLength(0);
+          release();
+          await vi.waitFor(() => expect(ownCalls().length).toBeGreaterThan(0));
+          const [request] = ownCalls()[0];
+          expect(b64DecodeUnicode(request.queryReq.query.sql)).toContain(predicate);
+          wrapper.unmount();
+        }
       });
 
       it("reads whether the stream records reference_parent_span_id", async () => {

@@ -110,7 +110,13 @@ use std::fmt;
 use axum::response::Response;
 use openobserve_api_common::request::{BulkDeleteRequest, BulkDeleteResponse};
 #[cfg(feature = "enterprise")]
-use {axum::http::StatusCode, o2_enterprise::enterprise::common::auditor::AuditMessage};
+use {
+    axum::http::{HeaderMap, StatusCode, header},
+    o2_enterprise::enterprise::common::auditor::AuditMessage,
+};
+
+#[cfg(feature = "enterprise")]
+const MAX_AUDIT_USER_AGENT_BYTES: usize = 1024;
 
 /// Where an outbound test went and how each call ended; the audit layer records it at any status.
 #[derive(Clone, Debug, PartialEq)]
@@ -229,11 +235,44 @@ async fn audit_login_failure(message: AuditMessage, failure: LoginFailure, statu
     audit::audit(failure.prepare(message, status, config::utils::time::now_micros())).await;
 }
 
-#[cfg(test)]
-mod tests {
-    use axum::response::IntoResponse;
+/// The `User-Agent` an audit row stores; an oversized or control-character value is left out.
+#[cfg(feature = "enterprise")]
+pub fn audit_user_agent(headers: &HeaderMap) -> Option<String> {
+    let agent = headers.get(header::USER_AGENT)?.to_str().ok()?;
+    if agent.len() > MAX_AUDIT_USER_AGENT_BYTES || agent.chars().any(char::is_control) {
+        return None;
+    }
+    Some(agent.to_string())
+}
 
-    use super::{OutboundAudit, OutboundOutcome, OutboundTarget, with_outbound_audit};
+#[cfg(all(test, feature = "enterprise"))]
+mod tests {
+    use axum::{http::HeaderValue, response::IntoResponse};
+
+    use super::*;
+
+    fn headers_with_agent(agent: &str) -> HeaderMap {
+        let mut headers = HeaderMap::new();
+        headers.insert(header::USER_AGENT, HeaderValue::from_str(agent).unwrap());
+        headers
+    }
+
+    #[test]
+    fn a_normal_user_agent_is_kept() {
+        let headers = headers_with_agent("Mozilla/5.0 (X11; Linux x86_64)");
+        assert_eq!(
+            audit_user_agent(&headers).as_deref(),
+            Some("Mozilla/5.0 (X11; Linux x86_64)")
+        );
+    }
+
+    #[test]
+    fn a_missing_oversized_or_control_character_user_agent_is_left_out() {
+        assert_eq!(audit_user_agent(&HeaderMap::new()), None);
+        let oversized = "a".repeat(MAX_AUDIT_USER_AGENT_BYTES + 1);
+        assert_eq!(audit_user_agent(&headers_with_agent(&oversized)), None);
+        assert_eq!(audit_user_agent(&headers_with_agent("bad\tagent")), None);
+    }
 
     #[test]
     fn an_outbound_target_keeps_the_origin_and_names_the_outcome() {

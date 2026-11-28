@@ -13,6 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+#[cfg(any(feature = "enterprise", test))]
+use std::collections::HashSet;
+
 use ::promql;
 use axum::{
     body::{Body, Bytes},
@@ -41,6 +44,69 @@ use crate::{
     },
     search::error_utils::map_error_to_http_response,
 };
+
+#[cfg(any(feature = "enterprise", test))]
+#[derive(Debug, PartialEq)]
+enum MetricGrants {
+    All,
+    Only(HashSet<String>),
+}
+
+#[cfg(any(feature = "enterprise", test))]
+impl MetricGrants {
+    /// Reads OpenFGA objects `{model}:{id}`; an `{model}:_all_{org}` object grants every metric.
+    fn from_objects(org_id: &str, model: &str, objects: &[String]) -> Self {
+        let all = format!("{model}:_all_{org_id}");
+        if objects.contains(&all) {
+            return Self::All;
+        }
+        let prefix = format!("{model}:");
+        Self::Only(
+            objects
+                .iter()
+                .filter_map(|object| object.strip_prefix(&prefix))
+                .map(str::to_string)
+                .collect(),
+        )
+    }
+
+    /// Grants name a metric by its OpenFGA id, as `check_stream_permissions` checks it.
+    fn allows(&self, metric: &str) -> bool {
+        match self {
+            Self::All => true,
+            Self::Only(ids) => {
+                ids.contains(&config::utils::str::into_ofga_supported_format(metric))
+            }
+        }
+    }
+
+    fn retain_names(&self, names: &mut Vec<String>) {
+        names.retain(|name| self.allows(name));
+    }
+
+    /// Applies `limit` after filtering, keeping the alphabetically first metrics as listing does.
+    fn retain_keys<V>(&self, map: &mut hashbrown::HashMap<String, V>, limit: Option<usize>) {
+        map.retain(|name, _| self.allows(name));
+        if let Some(limit) = limit
+            && map.len() > limit
+        {
+            let mut names = map.keys().cloned().collect::<Vec<_>>();
+            names.sort();
+            for name in names.into_iter().skip(limit) {
+                map.remove(&name);
+            }
+        }
+    }
+
+    /// A limit applied before filtering would cut permitted metrics; `0` stays so the read is
+    /// skipped.
+    fn take_limit(&self, limit: &mut Option<usize>) -> Option<usize> {
+        match self {
+            Self::Only(_) if *limit != Some(0) => limit.take(),
+            _ => None,
+        }
+    }
+}
 
 /// prometheus remote-write endpoint for metrics
 #[utoipa::path(
@@ -682,7 +748,7 @@ async fn query_range(
     tag = "Metrics",
     operation_id = "PrometheusMetadata",
     summary = "Get metric metadata",
-    description = "Retrieves metadata information about metrics including their type, help text, and units. Provides essential information for understanding metric semantics and proper usage in queries and visualizations.",
+    description = "Retrieves metadata information about metrics including their type, help text, and units. Provides essential information for understanding metric semantics and proper usage in queries and visualizations. With RBAC, `metric` is checked against that metric; without it the result holds only the metrics the caller may read, and `limit` applies after that filter.",
     security(
         ("Authorization"= [])
     ),
@@ -716,7 +782,7 @@ async fn query_range(
               ]
             }
         })),
-        (status = 403, description = "No permission to read metrics", content_type = "application/json", body = ()),
+        (status = 403, description = "No read permission on the requested metric", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -730,63 +796,39 @@ pub async fn metadata(
     Headers(_user_email): Headers<UserEmail>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
-    {
-        use openobserve_core::auth::AuthExtractor;
-
-        if !db::user::is_root_user(&_user_email.user_id) {
-            use db::org_users::get_cached_user_org;
-            let user = match get_cached_user_org(&org_id, &_user_email.user_id) {
-                Some(u) => u,
-                None => return MetaHttpResponse::forbidden("Unauthorized Access"),
-            };
-            let stream_type_str = StreamType::Metrics.as_str();
-            // When filtering to a specific metric, check that stream; otherwise check org-level
-            let o2_type = match &req.metric {
-                Some(metric_name) => format!(
-                    "{}:{}",
-                    OFGA_MODELS
-                        .get(stream_type_str)
-                        .map_or(stream_type_str, |model| model.key),
-                    metric_name
-                ),
-                None => format!(
-                    "{}:{}",
-                    OFGA_MODELS
-                        .get(stream_type_str)
-                        .map_or(stream_type_str, |model| model.key),
-                    org_id
-                ),
-            };
-            if !openobserve_core::authz::check_permissions(
-                &_user_email.user_id,
-                AuthExtractor {
-                    auth: "".to_string(),
-                    method: "GET".to_string(),
-                    o2_type,
-                    org_id: org_id.clone(),
-                    bypass_check: false,
-                    parent_id: "".to_string(),
-                    use_all_org: false,
-                    use_self_context: false,
-                    use_self_parent: true,
-                    feature: None,
-                },
-                user.role,
-                user.is_external,
-            )
-            .await
+    let mut req = req;
+    #[cfg(feature = "enterprise")]
+    let grants = match req.metric.clone() {
+        Some(metric) => {
+            if let Some(res) =
+                check_metric_permissions(&org_id, &_user_email.user_id, [metric]).await
             {
-                return MetaHttpResponse::forbidden("Unauthorized Access");
+                return res;
             }
+            MetricGrants::All
         }
-    }
+        None => match metric_grants(&org_id, &_user_email.user_id).await {
+            Ok(grants) => grants,
+            Err(res) => return res,
+        },
+    };
+    #[cfg(feature = "enterprise")]
+    let limit = grants.take_limit(&mut req.limit);
 
     match metrics::prom::get_metadata(&org_id, req).await {
-        Ok(resp) => (
-            StatusCode::OK,
-            axum::Json(config::meta::promql::ApiFuncResponse::ok(resp, None)),
-        )
-            .into_response(),
+        Ok(resp) => {
+            #[cfg(feature = "enterprise")]
+            let resp = {
+                let mut resp = resp;
+                grants.retain_keys(&mut resp, limit);
+                resp
+            };
+            (
+                StatusCode::OK,
+                axum::Json(config::meta::promql::ApiFuncResponse::ok(resp, None)),
+            )
+                .into_response()
+        }
         Err(err) => {
             log::error!("get_metadata failed: {err}");
             (
@@ -961,7 +1003,7 @@ async fn series(
     tag = "Metrics",
     operation_id = "PrometheusLabels",
     summary = "Get metric label names",
-    description = "Returns a list of label names available in the metric data within the specified time range. Optionally filter by series selector to get labels for specific metrics. Useful for building dynamic queries and understanding data structure.",
+    description = "Returns a list of label names available in the metric data within the specified time range. Optionally filter by series selector to get labels for specific metrics. Useful for building dynamic queries and understanding data structure. With RBAC, the metric in `match[]` is checked per metric; without `match[]` the caller needs read on all metrics.",
     security(
         ("Authorization"= [])
     ),
@@ -999,7 +1041,7 @@ async fn series(
             ]
         })),
         (status = 400, description = "Invalid match[] or time range", content_type = "application/json", body = ()),
-        (status = 403, description = "No permission to read metrics", content_type = "application/json", body = ()),
+        (status = 403, description = "No read permission on the requested metric, or on all metrics when match[] is absent", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -1029,6 +1071,7 @@ pub async fn labels_get(
     request_body(content = inline(config::meta::promql::RequestLabels), description = "Form fields; they win over the same fields in the query string", content_type = "application/x-www-form-urlencoded"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = config::meta::promql::ApiFuncResponse<Vec<String>>),
+        (status = 403, description = "No read permission on the requested metric, or on all metrics when match[] is absent", content_type = "application/json", body = ()),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Metrics", "operation": "get"})),
@@ -1054,47 +1097,6 @@ async fn labels(
     req: config::meta::promql::RequestLabels,
     _user_email: &str,
 ) -> Response {
-    #[cfg(feature = "enterprise")]
-    {
-        use openobserve_core::auth::AuthExtractor;
-
-        if !db::user::is_root_user(_user_email) {
-            use db::org_users::get_cached_user_org;
-            let user = match get_cached_user_org(org_id, _user_email) {
-                Some(u) => u,
-                None => return MetaHttpResponse::forbidden("Unauthorized Access"),
-            };
-            let stream_type_str = StreamType::Metrics.as_str();
-            if !openobserve_core::authz::check_permissions(
-                _user_email,
-                AuthExtractor {
-                    auth: "".to_string(),
-                    method: "GET".to_string(),
-                    o2_type: format!(
-                        "{}:{}",
-                        OFGA_MODELS
-                            .get(stream_type_str)
-                            .map_or(stream_type_str, |model| model.key),
-                        org_id
-                    ),
-                    org_id: org_id.to_string(),
-                    bypass_check: false,
-                    parent_id: "".to_string(),
-                    use_all_org: false,
-                    use_self_context: false,
-                    use_self_parent: true,
-                    feature: None,
-                },
-                user.role,
-                user.is_external,
-            )
-            .await
-            {
-                return MetaHttpResponse::forbidden("Unauthorized Access");
-            }
-        }
-    }
-
     let config::meta::promql::RequestLabels {
         matcher,
         start,
@@ -1112,6 +1114,23 @@ async fn labels(
                 .into_response();
         }
     };
+
+    #[cfg(feature = "enterprise")]
+    {
+        // without match[] the label names of every metric are returned
+        let denied = match selector
+            .as_ref()
+            .and_then(metrics::prom::try_into_metric_name)
+        {
+            Some(metric) => check_metric_permissions(org_id, _user_email, [metric]).await,
+            None => (!reads_all_metrics(org_id, _user_email).await)
+                .then(|| MetaHttpResponse::forbidden("Unauthorized Access")),
+        };
+        if let Some(res) = denied {
+            return res;
+        }
+    }
+
     match metrics::prom::get_labels(org_id, selector, start, end).await {
         Ok(resp) => (
             StatusCode::OK,
@@ -1142,7 +1161,7 @@ async fn labels(
     tag = "Metrics",
     operation_id = "PrometheusLabelValues",
     summary = "Get label values",
-    description = "Returns values for a label within the specified time range. Labels other than __name__ require match[] to identify a metric; requests without a metric return 400 because querying all metrics streams is unsupported.",
+    description = "Returns values for a label within the specified time range. Labels other than __name__ require match[] to identify a metric; requests without a metric return 400 because querying all metrics streams is unsupported. With RBAC, the metric in `match[]` is checked per metric, and __name__ values without a metric list only the metrics the caller may read.",
     security(
         ("Authorization"= [])
     ),
@@ -1162,7 +1181,7 @@ async fn labels(
             ]
         })),
         (status = 400, description = "Invalid parameters or match[] does not identify a metric", content_type = "application/json", body = ()),
-        (status = 403, description = "No permission to read metrics", content_type = "application/json", body = ()),
+        (status = 403, description = "No read permission on the requested metric", content_type = "application/json", body = ()),
         (status = 500, description = "Failure", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -1175,47 +1194,6 @@ pub async fn label_values(
     Query(req): Query<config::meta::promql::RequestLabelValues>,
     Headers(_user_email): Headers<UserEmail>,
 ) -> Response {
-    #[cfg(feature = "enterprise")]
-    {
-        use openobserve_core::auth::AuthExtractor;
-
-        if !db::user::is_root_user(&_user_email.user_id) {
-            use db::org_users::get_cached_user_org;
-            let user = match get_cached_user_org(&org_id, &_user_email.user_id) {
-                Some(u) => u,
-                None => return MetaHttpResponse::forbidden("Unauthorized Access"),
-            };
-            let stream_type_str = StreamType::Metrics.as_str();
-            if !openobserve_core::authz::check_permissions(
-                &_user_email.user_id,
-                AuthExtractor {
-                    auth: "".to_string(),
-                    method: "GET".to_string(),
-                    o2_type: format!(
-                        "{}:{}",
-                        OFGA_MODELS
-                            .get(stream_type_str)
-                            .map_or(stream_type_str, |model| model.key),
-                        org_id
-                    ),
-                    org_id: org_id.clone(),
-                    bypass_check: false,
-                    parent_id: "".to_string(),
-                    use_all_org: false,
-                    use_self_context: false,
-                    use_self_parent: true,
-                    feature: None,
-                },
-                user.role,
-                user.is_external,
-            )
-            .await
-            {
-                return MetaHttpResponse::forbidden("Unauthorized Access");
-            }
-        }
-    }
-
     let config::meta::promql::RequestLabelValues {
         matcher,
         start,
@@ -1234,12 +1212,49 @@ pub async fn label_values(
                     .into_response();
             }
         };
+
+    // only `__name__` values may be asked for without naming a metric
+    #[cfg(feature = "enterprise")]
+    let grants = match selector
+        .as_ref()
+        .and_then(metrics::prom::try_into_metric_name)
+    {
+        Some(metric) => {
+            if let Some(res) =
+                check_metric_permissions(&org_id, &_user_email.user_id, [metric]).await
+            {
+                return res;
+            }
+            MetricGrants::All
+        }
+        None if label_name == config::meta::promql::NAME_LABEL => {
+            match metric_grants(&org_id, &_user_email.user_id).await {
+                Ok(grants) => grants,
+                Err(res) => return res,
+            }
+        }
+        None => {
+            if !reads_all_metrics(&org_id, &_user_email.user_id).await {
+                return MetaHttpResponse::forbidden("Unauthorized Access");
+            }
+            MetricGrants::All
+        }
+    };
+
     match metrics::prom::get_label_values(&org_id, label_name, selector, start, end).await {
-        Ok(resp) => (
-            StatusCode::OK,
-            axum::Json(config::meta::promql::ApiFuncResponse::ok(resp, None)),
-        )
-            .into_response(),
+        Ok(resp) => {
+            #[cfg(feature = "enterprise")]
+            let resp = {
+                let mut resp = resp;
+                grants.retain_names(&mut resp);
+                resp
+            };
+            (
+                StatusCode::OK,
+                axum::Json(config::meta::promql::ApiFuncResponse::ok(resp, None)),
+            )
+                .into_response()
+        }
         Err(err) => {
             log::error!("get_label_values failed: {err}");
             (
@@ -1536,6 +1551,67 @@ fn series_metric_names(selector: Option<&parser::VectorSelector>) -> Vec<String>
         .and_then(metrics::prom::try_into_metric_name)
         .into_iter()
         .collect()
+}
+
+/// A Check, not `org_wide_readable`, so an unreachable OpenFGA still admits offline-access roles.
+#[cfg(feature = "enterprise")]
+async fn reads_all_metrics(org_id: &str, user_id: &str) -> bool {
+    use openobserve_core::auth::AuthExtractor;
+
+    if db::user::is_root_user(user_id) {
+        return true;
+    }
+    let Some(user) = db::org_users::get_cached_user_org(org_id, user_id) else {
+        return false;
+    };
+    // `use_all_org` rewrites the org id in the object to `_all_{org}`
+    openobserve_core::authz::check_permissions(
+        user_id,
+        AuthExtractor {
+            auth: "".to_string(),
+            method: "GET".to_string(),
+            o2_type: format!("{}:{org_id}", metrics_model()),
+            org_id: org_id.to_string(),
+            bypass_check: false,
+            parent_id: "".to_string(),
+            use_all_org: true,
+            use_self_context: false,
+            use_self_parent: false,
+            feature: None,
+        },
+        user.role,
+        user.is_external,
+    )
+    .await
+}
+
+/// Ignores `list_only_permitted`: this list is the only gate on the metric names a caller sees.
+#[cfg(feature = "enterprise")]
+async fn metric_grants(org_id: &str, user_id: &str) -> Result<MetricGrants, Response> {
+    if reads_all_metrics(org_id, user_id).await {
+        return Ok(MetricGrants::All);
+    }
+    if db::org_users::get_cached_user_org(org_id, user_id).is_none() {
+        return Err(MetaHttpResponse::forbidden("Unauthorized Access"));
+    }
+    let model = metrics_model();
+    match db::authz::list_permitted_objects(org_id, user_id, "GET", model).await {
+        Ok(None) => Ok(MetricGrants::All),
+        // ListObjects answers `_all_` for admin/editor/viewer unasked; only the Check may grant all
+        Ok(Some(objects)) => match MetricGrants::from_objects(org_id, model, &objects) {
+            MetricGrants::All => Err(MetaHttpResponse::forbidden("Unauthorized Access")),
+            grants => Ok(grants),
+        },
+        Err(e) => Err(MetaHttpResponse::forbidden(e.to_string())),
+    }
+}
+
+#[cfg(feature = "enterprise")]
+fn metrics_model() -> &'static str {
+    let type_str = StreamType::Metrics.as_str();
+    OFGA_MODELS
+        .get(type_str)
+        .map_or(type_str, |model| model.key)
 }
 
 fn search_timeout(timeout: Option<String>) -> i64 {
@@ -1944,6 +2020,9 @@ mod tests {
             "async fn query(",
             "async fn query_range(",
             "async fn series(",
+            "async fn labels(",
+            "pub async fn label_values(",
+            "pub async fn metadata(",
         ] {
             let start = text
                 .find(signature)
@@ -1953,6 +2032,10 @@ mod tests {
             assert!(
                 body.contains("check_metric_permissions("),
                 "{signature} must check every metric it reads"
+            );
+            assert!(
+                !body.contains(concat!("AuthExtractor", " {")),
+                "{signature} must check metrics through the shared helpers"
             );
         }
         let flat = text.split_whitespace().collect::<Vec<_>>().join(" ");
@@ -2061,6 +2144,98 @@ mod tests {
             other => panic!("unexpected {other:?}"),
         };
         assert_eq!(series_metric_names(Some(&selector)), ["up"]);
+    }
+
+    fn objects(ids: &[&str]) -> Vec<String> {
+        ids.iter().map(|id| id.to_string()).collect()
+    }
+
+    #[test]
+    fn a_grant_on_the_org_named_metric_unlocks_only_that_metric() {
+        let grants =
+            MetricGrants::from_objects("default", "metrics", &objects(&["metrics:default"]));
+        assert!(grants.allows("default"));
+        assert!(!grants.allows("m_secret"));
+        assert_ne!(grants, MetricGrants::All);
+    }
+
+    #[test]
+    fn only_the_all_metrics_object_of_this_org_grants_every_metric() {
+        let all = MetricGrants::from_objects(
+            "default",
+            "metrics",
+            &objects(&["metrics:m_open", "metrics:_all_default"]),
+        );
+        assert_eq!(all, MetricGrants::All);
+        for other in [
+            "metrics:_all_other",
+            "logs:_all_default",
+            "stream:_all_default",
+        ] {
+            let grants = MetricGrants::from_objects("default", "metrics", &objects(&[other]));
+            assert!(!grants.allows("m_open"), "{other}");
+        }
+    }
+
+    #[test]
+    fn metric_grants_match_the_openfga_id_of_the_name() {
+        let grants = MetricGrants::from_objects(
+            "default",
+            "metrics",
+            &objects(&["metrics:job.rate5m", "logs:m_secret", "metrics:m_open"]),
+        );
+        assert!(grants.allows("job:rate5m"));
+        assert!(grants.allows("m_open"));
+        assert!(!grants.allows("m_secret"));
+    }
+
+    #[test]
+    fn metric_names_keep_only_permitted_ones() {
+        let grants = MetricGrants::from_objects("default", "metrics", &objects(&["metrics:b"]));
+        let mut names = objects(&["a", "b", "c"]);
+        grants.retain_names(&mut names);
+        assert_eq!(names, ["b"]);
+
+        let mut names = objects(&["a", "b", "c"]);
+        MetricGrants::All.retain_names(&mut names);
+        assert_eq!(names, ["a", "b", "c"]);
+    }
+
+    #[test]
+    fn metadata_limit_counts_only_permitted_metrics_in_name_order() {
+        let grants = MetricGrants::from_objects(
+            "default",
+            "metrics",
+            &objects(&["metrics:d", "metrics:b", "metrics:c"]),
+        );
+        let mut map: hashbrown::HashMap<String, ()> =
+            ["a", "b", "c", "d"].map(|k| (k.to_string(), ())).into();
+        grants.retain_keys(&mut map, Some(2));
+        let mut keys = map.into_keys().collect::<Vec<_>>();
+        keys.sort();
+        assert_eq!(keys, ["b", "c"]);
+
+        let mut map: hashbrown::HashMap<String, ()> =
+            ["a", "b"].map(|k| (k.to_string(), ())).into();
+        MetricGrants::All.retain_keys(&mut map, None);
+        assert_eq!(map.len(), 2);
+    }
+
+    #[test]
+    fn metadata_limit_moves_after_the_filter_except_zero() {
+        let only = MetricGrants::from_objects("default", "metrics", &objects(&["metrics:b"]));
+
+        let mut limit = Some(2);
+        assert_eq!(only.take_limit(&mut limit), Some(2));
+        assert_eq!(limit, None);
+
+        let mut limit = Some(0);
+        assert_eq!(only.take_limit(&mut limit), None);
+        assert_eq!(limit, Some(0));
+
+        let mut limit = Some(2);
+        assert_eq!(MetricGrants::All.take_limit(&mut limit), None);
+        assert_eq!(limit, Some(2));
     }
 
     async fn parse_tree_response(query: &str) -> (StatusCode, serde_json::Value) {
@@ -2245,6 +2420,35 @@ mod tests {
                     matcher: Some("up".to_owned()),
                     start: None,
                     end: None,
+                }),
+                user(),
+            )
+            .await,
+            labels_get(
+                Path("default".to_owned()),
+                Query(config::meta::promql::RequestLabels {
+                    matcher: None,
+                    start: None,
+                    end: None,
+                }),
+                user(),
+            )
+            .await,
+            label_values(
+                Path(("default".to_owned(), "__name__".to_owned())),
+                Query(config::meta::promql::RequestLabelValues {
+                    matcher: None,
+                    start: None,
+                    end: None,
+                }),
+                user(),
+            )
+            .await,
+            metadata(
+                Path("default".to_owned()),
+                Query(config::meta::promql::RequestMetadata {
+                    limit: None,
+                    metric: None,
                 }),
                 user(),
             )

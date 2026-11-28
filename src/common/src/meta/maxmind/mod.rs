@@ -14,4 +14,4 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 mod client;
-pub use client::MaxmindClient;
+pub use client::{GeoInfoData, MaxmindClient};
