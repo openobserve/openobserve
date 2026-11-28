@@ -289,6 +289,63 @@ describe("AlertCalibrationDigestDetail declined list", () => {
     wrapper.unmount();
   });
 
+  it("names a noise decline's pattern and numbers, and keeps one row per pattern", async () => {
+    const wrapper = await mountDetail([
+      skip(2, 1, {
+        pattern: "short_blips",
+        skip_reason: "candidate_not_above_current",
+        skip_detail: JSON.stringify({ current_secs: 600, candidate_secs: 300 }),
+      }),
+      skip(2, 1, {
+        pattern: "recovery_hold",
+        skip_reason: "candidate_not_above_current",
+        skip_detail: JSON.stringify({ current_secs: 120, candidate_secs: 60 }),
+      }),
+    ]);
+    const rows = wrapper.findAll('[data-test="alert-calibration-digest-skip"]');
+    expect(rows.map((r) => r.text())).toEqual([
+      "Noise: Short blipsqueue_001The suggestion is not above the current setting, or removes no firingSuggested 5 minutes, now 10 minutes",
+      "Noise: Recovery holdqueue_001The suggestion is not above the current setting, or removes no firingSuggested 1 minute, now 2 minutes",
+    ]);
+    wrapper.unmount();
+  });
+
+  it("says why a category is empty when every decline was only counted", async () => {
+    const breakdown = [
+      { rule_id: "noise", pattern: "short_blips", reason: "insufficient_samples", count: 12 },
+      { rule_id: "failure", reason: "insufficient_history", count: 1 },
+    ];
+    const wrapper = await mountDetail([
+      {
+        ...runColumns(0),
+        kind: "run",
+        skip_count: 13,
+        omitted_routine_skip_count: 13,
+        omitted_routine_skips: JSON.stringify(breakdown),
+      },
+    ]);
+    const routine = wrapper.find('[data-test="alert-calibration-digest-routine"]');
+    expect(routine.text()).toContain("Counted, not listed");
+    expect(
+      routine.findAll('[data-test="alert-calibration-digest-routine-row"]').map((r) => r.text()),
+    ).toEqual([
+      "Noise: Short blipsToo few samples12 alerts",
+      "Alert not workingToo little history1 alert",
+    ]);
+    expect(wrapper.find('[data-test="alert-calibration-digest-skips"]').text()).toContain(
+      "13 routine declines counted, not listed",
+    );
+    wrapper.unmount();
+  });
+
+  it("shows no breakdown for a scoped reader, whose count is withheld", async () => {
+    const wrapper = await mountDetail([
+      { ...runColumns(0), kind: "run", omitted_routine_skips: null },
+    ]);
+    expect(wrapper.find('[data-test="alert-calibration-digest-routine"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
+
   it("flags a capped findings read in the same amber as a capped declined list", async () => {
     const total = SEARCH_SIZE + 30;
     const wrapper = await mountDetail(

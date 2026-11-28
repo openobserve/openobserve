@@ -11666,7 +11666,24 @@
       "blipsWouldNotAlert": "Sẽ không kích hoạt nếu dùng thời gian giữ được đề xuất",
       "checkInterval": "Khoảng thời gian kiểm tra",
       "holdNow": "Thời gian giữ hiện tại",
-      "holdSuggested": "Thời gian giữ đề xuất"
+      "holdSuggested": "Thời gian giữ đề xuất",
+      "longEpisodes": "Các lần kích hoạt dài hơn, không bị loại bỏ",
+      "measuredClears": "Số lần hết kích hoạt đã đo",
+      "undoneClears": "Số lần hết kích hoạt bị hoàn tác trong hai lần kiểm tra",
+      "recoveryHoldNow": "Thời gian giữ phục hồi hiện tại",
+      "recoveryHoldSuggested": "Thời gian giữ phục hồi đề xuất",
+      "firingShare": "Tỷ lệ thời gian đang kích hoạt",
+      "span": "Khoảng thời gian",
+      "firingsInSpan": "Số lần kích hoạt trong khoảng thời gian",
+      "episodesInSpan": "Số đợt trong khoảng thời gian",
+      "stretchStarted": "Chuỗi hiện tại bắt đầu lúc",
+      "longestEpisode": "Đợt dài nhất",
+      "stillFiring": "Vẫn đang kích hoạt",
+      "lastResponse": "Phản hồi gần nhất",
+      "orgResponses": "Phản hồi đã ghi nhận trong tổ chức",
+      "noneRecorded": "Chưa ghi nhận",
+      "atLeastDuration": "Ít nhất {duration}",
+      "stillFiringFor": "Có, ít nhất {duration}"
     },
     "errorClass": {
       "streamMissing": "Không tìm thấy stream",
@@ -11715,7 +11732,10 @@
       "checkFieldNotFound": "Kiểm tra các trường mà truy vấn dùng: các lần đánh giá ghi nhận một trường không tìm thấy.",
       "checkQuerySyntax": "Kiểm tra truy vấn của cảnh báo: công cụ tìm kiếm đã từ chối vì không hợp lệ. Lỗi không cho biết phần nào sai.",
       "reduceQueryTime": "Truy vấn liên tục chạm giới hạn thời gian. Mỗi lựa chọn làm truy vấn nhẹ hơn nhưng giảm độ phủ:",
-      "reduceQueryMemory": "Truy vấn liên tục hết bộ nhớ. Mỗi lựa chọn làm truy vấn nhẹ hơn nhưng giảm độ phủ:"
+      "reduceQueryMemory": "Truy vấn liên tục hết bộ nhớ. Mỗi lựa chọn làm truy vấn nhẹ hơn nhưng giảm độ phủ:",
+      "addPendingPeriod": "Đặt thời gian chờ để điều kiện phải duy trì chừng đó trước khi cảnh báo kích hoạt.",
+      "addRecoveryHold": "Đặt Tiếp tục kích hoạt trong để việc hết kích hoạt bị lần kiểm tra kế tiếp hoàn tác không kết thúc lần kích hoạt.",
+      "reviewThreshold": "Xem xét liệu ngưỡng có còn đánh dấu một điều kiện cần phản hồi hay không. Thẻ này chỉ hiển thị bằng chứng và không đề xuất giá trị nào."
     },
     "resourceOption": {
       "window": "Cửa sổ truy vấn ngắn hơn",
@@ -11739,7 +11759,12 @@
       "failureMayPredateWindow": "Các lỗi đã xảy ra khi khung thời gian này bắt đầu, nên lần lỗi đầu tiên có thể sớm hơn.",
       "editTimingOnly": "Chỉnh sửa gần nhất chỉ được hiển thị để tham khảo thời điểm; đó không phải là nguyên nhân đã được xác nhận.",
       "limitMayDiffer": "Các lần đánh giá này đã dừng trước giới hạn thời gian truy vấn của nút này, nên có thể đã áp dụng một giới hạn khác; các tùy chọn vẫn hữu ích.",
-      "searchedWindow": "Chỉ tìm kiếm trong {window} gần nhất; không loại trừ khả năng có các hàng khớp hiếm hơn."
+      "searchedWindow": "Chỉ tìm kiếm trong {window} gần nhất; không loại trừ khả năng có các hàng khớp hiếm hơn.",
+      "attendedLowerBound": "Một số phản hồi không thể khớp với một nhóm cảnh báo, nên số lượng đã xử lý là mức tối thiểu.",
+      "onScheduleEstimate": "Độ dài được tính theo số lần kiểm tra trên lịch đã lưu của cảnh báo; lần kiểm tra bị bỏ lỡ sẽ không hiển thị.",
+      "durationUpperBound": "{count} lần kích hoạt ngắn bị tạm dừng bởi thời gian chờ {cooldown} của cảnh báo, nên giá trị đề xuất theo thời gian chờ chứ không phải độ dài kích hoạt đã đo. | {count} lần kích hoạt ngắn bị tạm dừng bởi thời gian chờ {cooldown} của cảnh báo, nên giá trị đề xuất theo thời gian chờ chứ không phải độ dài kích hoạt đã đo.",
+      "recoveryReportedLater": "Với thời gian giữ, mỗi lần phục hồi được báo muộn hơn tối đa {hold}.",
+      "firingTimeLowerBound": "Thời gian kích hoạt cộng độ dài ngắn nhất có thể của từng đợt, nên tỷ lệ là mức tối thiểu."
     },
     "qualityReason": {
       "scanTruncated": "các tìm kiếm rộng hơn đã hết thời gian chờ",
@@ -11747,7 +11772,9 @@
       "errorClassesTimedOut": "các loại lỗi không được đọc kịp",
       "errorClassesFailed": "không thể đọc loại lỗi",
       "evaluationTimesUnread": "không đọc được thời điểm đánh giá",
-      "scheduleUnreadable": "không thể đọc lịch chạy của cảnh báo"
+      "scheduleUnreadable": "không thể đọc lịch chạy của cảnh báo",
+      "transitionsTruncated": "chưa đọc hết mọi thay đổi trạng thái",
+      "responsesTruncated": "chưa đọc hết mọi phản hồi"
     },
     "headroom": {
       "title": "Hiệu chỉnh cảnh báo",
@@ -11802,7 +11829,12 @@
       "enrichmentTimeout": "Hết thời gian chờ đọc bằng chứng",
       "other": "Lý do khác",
       "healthySilence": "Chạy không lỗi và chưa từng kích hoạt; im lặng tự nó không phải là vấn đề.",
-      "definitionNotChecked": "Định nghĩa chưa được kiểm tra"
+      "definitionNotChecked": "Định nghĩa chưa được kiểm tra",
+      "insufficientShortEpisodes": "Có quá ít lần kích hoạt ngắn để đề xuất thời gian chờ",
+      "insufficientShortClearGaps": "Có quá ít lần hết kích hoạt ngắn để đề xuất thời gian giữ phục hồi",
+      "candidateNotAboveCurrent": "Đề xuất không cao hơn cài đặt hiện tại hoặc không loại bỏ lần kích hoạt nào",
+      "silenceExceedsCap": "Thời gian chờ tạm dừng mọi lần kích hoạt vượt quá thời gian chờ đề xuất dài nhất, nên không lần nào được tính là ngắn",
+      "responseSignalUnusable": "Có quá ít phản hồi được ghi nhận trong tổ chức để nhận ra phản hồi bị thiếu"
     },
     "notChecked": {
       "title": "Định nghĩa chưa được kiểm tra",
@@ -11925,7 +11957,13 @@
       "proposedActions": "Hành động đề xuất",
       "qualityReasons": "Lý do: {reasons} | Lý do: {reasons}",
       "openAlert": "Mở cảnh báo",
-      "advice": "Cần kiểm tra gì"
+      "advice": "Cần kiểm tra gì",
+      "declinedRequired": "{actual} trên {required} cần thiết",
+      "declinedNotRead": "Chưa đọc; cần {required}",
+      "declinedCandidate": "Đề xuất {candidate}, hiện tại {current}",
+      "declinedCap": "Thời gian chờ {silence}, giới hạn {cap}",
+      "routineHeading": "Đã đếm, không liệt kê",
+      "routineAlerts": "{count} cảnh báo | {count} cảnh báo"
     },
     "dashboard": {
       "latestRunAgo": "Lượt chạy gần nhất {time}",
@@ -11992,6 +12030,11 @@
       "showingCappedUnread": "Đang hiển thị {shown} phát hiện: tìm kiếm đã dừng ở {count} bản ghi.",
       "countsPending": "Số liệu trên các cảnh báo bạn có thể truy cập chưa sẵn sàng. Vui lòng làm mới sau ít phút.",
       "countsPendingBadge": "Đang chờ"
+    },
+    "noisePattern": {
+      "shortBlips": "Đột biến ngắn",
+      "recoveryHold": "Thời gian giữ phục hồi",
+      "sustainedNoResponse": "Kích hoạt kéo dài, không có phản hồi"
     }
   },
   "alerts": {

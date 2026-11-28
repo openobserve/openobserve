@@ -27,7 +27,9 @@ export type EvidenceFormat =
   | "errorClass"
   | "durationMs"
   | "evaluationTimes"
-  | "nearLimit";
+  | "nearLimit"
+  | "atLeastSeconds"
+  | "stillFiring";
 
 export interface EvidenceField {
   column: `evidence_${string}`;
@@ -35,6 +37,8 @@ export interface EvidenceField {
   format: EvidenceFormat;
   /** Written only by some records, so a record without it shows no row rather than a dash. */
   optional?: true;
+  /** An unwritten column is a fact, not a gap: the row shows this text instead of hiding. */
+  absentKey?: I18nKey;
 }
 
 export interface LagListField {
@@ -85,6 +89,18 @@ export const ERROR_CLASS_LABEL: Record<ErrorClass, I18nKey> = {
   resource_memory: "alertCalibration.errorClass.resourceMemory",
   other: "alertCalibration.errorClass.other",
 };
+
+/** The noise rule's patterns (ENT noise.rs), each a finding and a dismissal of its own. */
+export type NoisePattern = "short_blips" | "recovery_hold" | "sustained_no_response";
+
+export const NOISE_PATTERN_LABEL: Record<NoisePattern, I18nKey> = {
+  short_blips: "alertCalibration.noisePattern.shortBlips",
+  recovery_hold: "alertCalibration.noisePattern.recoveryHold",
+  sustained_no_response: "alertCalibration.noisePattern.sustainedNoResponse",
+};
+
+export const isNoisePattern = (value: unknown): value is NoisePattern =>
+  typeof value === "string" && Object.hasOwn(NOISE_PATTERN_LABEL, value);
 
 export const isErrorClass = (value: unknown): value is ErrorClass =>
   typeof value === "string" && Object.hasOwn(ERROR_CLASS_LABEL, value);
@@ -426,14 +442,105 @@ const SHORT_BLIPS_EVIDENCE: EvidenceField[] = [
     labelKey: "alertCalibration.evidence.holdSuggested",
     format: "seconds",
   },
+  {
+    column: "evidence_shortblips_long_episodes",
+    labelKey: "alertCalibration.evidence.longEpisodes",
+    format: "count",
+  },
 ];
+
+/** No "removes M of N" row: a hold changes when recovery is reported, not how often it fires (R7). */
+const RECOVERY_HOLD_EVIDENCE: EvidenceField[] = [
+  {
+    column: "evidence_recoveryhold_short_clear_gaps",
+    labelKey: "alertCalibration.evidence.undoneClears",
+    format: "count",
+  },
+  {
+    column: "evidence_recoveryhold_clear_gaps",
+    labelKey: "alertCalibration.evidence.measuredClears",
+    format: "count",
+  },
+  {
+    column: "evidence_recoveryhold_interval_secs",
+    labelKey: "alertCalibration.evidence.checkInterval",
+    format: "seconds",
+  },
+  {
+    column: "evidence_recoveryhold_current_keep_firing_for_secs",
+    labelKey: "alertCalibration.evidence.recoveryHoldNow",
+    format: "seconds",
+  },
+  {
+    column: "evidence_recoveryhold_suggested_keep_firing_for_secs",
+    labelKey: "alertCalibration.evidence.recoveryHoldSuggested",
+    format: "seconds",
+  },
+];
+
+/** Evidence only (tier C): every duration is a lower bound, and no row draws a conclusion (R8). */
+const SUSTAINED_FIRING_EVIDENCE: EvidenceField[] = [
+  {
+    column: "evidence_sustainedfiring_firing_share",
+    labelKey: "alertCalibration.evidence.firingShare",
+    format: "ratio",
+  },
+  {
+    column: "evidence_sustainedfiring_span_secs",
+    labelKey: "alertCalibration.evidence.span",
+    format: "seconds",
+  },
+  {
+    column: "evidence_sustainedfiring_firings_in_span",
+    labelKey: "alertCalibration.evidence.firingsInSpan",
+    format: "count",
+  },
+  {
+    column: "evidence_sustainedfiring_episodes_in_span",
+    labelKey: "alertCalibration.evidence.episodesInSpan",
+    format: "count",
+  },
+  {
+    column: "evidence_sustainedfiring_stretch_started_at",
+    labelKey: "alertCalibration.evidence.stretchStarted",
+    format: "time",
+  },
+  {
+    column: "evidence_sustainedfiring_longest_lower_secs",
+    labelKey: "alertCalibration.evidence.longestEpisode",
+    format: "atLeastSeconds",
+  },
+  {
+    column: "evidence_sustainedfiring_open_lower_secs",
+    labelKey: "alertCalibration.evidence.stillFiring",
+    format: "stillFiring",
+    absentKey: "alertCalibration.evidence.no",
+  },
+  {
+    column: "evidence_sustainedfiring_last_attended_at",
+    labelKey: "alertCalibration.evidence.lastResponse",
+    format: "time",
+    absentKey: "alertCalibration.evidence.noneRecorded",
+  },
+  {
+    column: "evidence_sustainedfiring_org_answer_rows",
+    labelKey: "alertCalibration.evidence.orgResponses",
+    format: "count",
+  },
+];
+
+const NOISE_PATTERN_EVIDENCE: Record<NoisePattern, EvidenceField[]> = {
+  short_blips: SHORT_BLIPS_EVIDENCE,
+  recovery_hold: RECOVERY_HOLD_EVIDENCE,
+  sustained_no_response: SUSTAINED_FIRING_EVIDENCE,
+};
 
 const isNotWorkingPattern = (value: unknown): value is NotWorkingPattern =>
   typeof value === "string" && Object.hasOwn(PATTERN_EVIDENCE, value);
 
 /** A written column shows; an error class this build cannot name shows no row at all. */
 const isShown = (record: DigestRecord, field: EvidenceField): boolean =>
-  record[field.column] != null &&
+  (record[field.column] != null || field.absentKey !== undefined) &&
   (field.format !== "errorClass" || isErrorClass(record[field.column])) &&
   // "0 of 0 took longer" says nothing, so a read without successes shows no near row.
   (field.format !== "nearLimit" || Number(record.evidence_notworking_ok_evaluations_timed) > 0);
@@ -449,8 +556,8 @@ export const evidenceFor = (record: DigestRecord & { rule_id: RuleId }): Evidenc
       return ERROR_ROWS.filter((field) => isShown(record, field));
     }
   }
-  if (record.rule_id === "noise" && record.pattern === "short_blips") {
-    return SHORT_BLIPS_EVIDENCE.filter((field) => isShown(record, field));
+  if (record.rule_id === "noise" && isNoisePattern(record.pattern)) {
+    return NOISE_PATTERN_EVIDENCE[record.pattern].filter((field) => isShown(record, field));
   }
   return RULE_META[record.rule_id].evidence.filter(
     (field) => !field.optional || record[field.column] != null,
@@ -463,7 +570,7 @@ export const ruleLabelKey = (rule: RuleId, version: number): I18nKey =>
     ? "alertCalibration.rules.notWorking"
     : RULE_META[rule].labelKey;
 
-/** The advice codes findings carry (ENT not_working.rs `advice`, failure.rs and no_destination.rs `ADVICE_*`). */
+/** The advice codes findings carry (ENT not_working.rs `advice`, failure.rs, no_destination.rs and noise.rs `ADVICE_*`). */
 export const ADVICE_LABEL: Record<string, I18nKey> = {
   check_stream_not_found: "alertCalibration.advice.checkStreamNotFound",
   check_field_not_found: "alertCalibration.advice.checkFieldNotFound",
@@ -477,6 +584,9 @@ export const ADVICE_LABEL: Record<string, I18nKey> = {
   add_destination: "alertCalibration.advice.addDestination",
   reduce_query_time: "alertCalibration.advice.reduceQueryTime",
   reduce_query_memory: "alertCalibration.advice.reduceQueryMemory",
+  add_pending_period: "alertCalibration.advice.addPendingPeriod",
+  add_recovery_hold: "alertCalibration.advice.addRecoveryHold",
+  review_threshold: "alertCalibration.advice.reviewThreshold",
 };
 
 export const LIMITATION_LABEL: Record<string, I18nKey> = {
@@ -487,9 +597,14 @@ export const LIMITATION_LABEL: Record<string, I18nKey> = {
   failure_may_predate_window: "alertCalibration.limitation.failureMayPredateWindow",
   edit_timing_only: "alertCalibration.limitation.editTimingOnly",
   limit_may_differ: "alertCalibration.limitation.limitMayDiffer",
+  attended_lower_bound: "alertCalibration.limitation.attendedLowerBound",
+  on_schedule_estimate: "alertCalibration.limitation.onScheduleEstimate",
+  duration_upper_bound: "alertCalibration.limitation.durationUpperBound",
+  recovery_reported_later: "alertCalibration.limitation.recoveryReportedLater",
+  firing_time_lower_bound: "alertCalibration.limitation.firingTimeLowerBound",
 };
 
-/** Quality-reason codes (ENT not_working.rs `QUALITY_*`). */
+/** Quality-reason codes (ENT not_working.rs and noise.rs `QUALITY_*`). */
 export const QUALITY_REASON_LABEL: Record<string, I18nKey> = {
   scan_truncated: "alertCalibration.qualityReason.scanTruncated",
   error_classes_capped: "alertCalibration.qualityReason.errorClassesCapped",
@@ -497,6 +612,8 @@ export const QUALITY_REASON_LABEL: Record<string, I18nKey> = {
   error_classes_failed: "alertCalibration.qualityReason.errorClassesFailed",
   evaluation_times_unread: "alertCalibration.qualityReason.evaluationTimesUnread",
   schedule_unreadable: "alertCalibration.qualityReason.scheduleUnreadable",
+  transitions_truncated: "alertCalibration.qualityReason.transitionsTruncated",
+  responses_truncated: "alertCalibration.qualityReason.responsesTruncated",
 };
 
 export type ProposedAction =

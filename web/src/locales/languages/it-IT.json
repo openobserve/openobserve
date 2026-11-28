@@ -11666,7 +11666,24 @@
       "blipsWouldNotAlert": "Non si attiverebbero con l'attesa suggerita",
       "checkInterval": "Intervallo di controllo",
       "holdNow": "Attesa attuale",
-      "holdSuggested": "Attesa suggerita"
+      "holdSuggested": "Attesa suggerita",
+      "longEpisodes": "Attivazioni più lunghe, non rimosse",
+      "measuredClears": "Rientri misurati",
+      "undoneClears": "Rientri annullati entro due controlli",
+      "recoveryHoldNow": "Attesa di recupero attuale",
+      "recoveryHoldSuggested": "Attesa di recupero suggerita",
+      "firingShare": "Quota di tempo in attivazione",
+      "span": "Intervallo",
+      "firingsInSpan": "Attivazioni nell'intervallo",
+      "episodesInSpan": "Episodi nell'intervallo",
+      "stretchStarted": "Il tratto attuale è iniziato",
+      "longestEpisode": "Episodio più lungo",
+      "stillFiring": "Ancora attivo",
+      "lastResponse": "Ultima risposta",
+      "orgResponses": "Risposte registrate nell'organizzazione",
+      "noneRecorded": "Nessuna registrata",
+      "atLeastDuration": "Almeno {duration}",
+      "stillFiringFor": "Sì, da almeno {duration}"
     },
     "errorClass": {
       "streamMissing": "Stream non trovato",
@@ -11715,7 +11732,10 @@
       "checkFieldNotFound": "Verifica i campi usati dalla query: le valutazioni ne hanno registrato uno come non trovato.",
       "checkQuerySyntax": "Verifica la query dell'avviso: il motore di ricerca l'ha rifiutata come non valida. L'errore non indica quale parte sia sbagliata.",
       "reduceQueryTime": "La query continua a raggiungere il limite di tempo. Ogni opzione la rende più leggera a scapito della copertura:",
-      "reduceQueryMemory": "La query continua a esaurire la memoria. Ogni opzione la rende più leggera a scapito della copertura:"
+      "reduceQueryMemory": "La query continua a esaurire la memoria. Ogni opzione la rende più leggera a scapito della copertura:",
+      "addPendingPeriod": "Imposta un periodo di attesa, così la condizione deve persistere per quel tempo prima che l'avviso si attivi.",
+      "addRecoveryHold": "Imposta Mantieni attivo per, così un rientro annullato dal controllo successivo non pone fine all'attivazione.",
+      "reviewThreshold": "Verifica se la soglia indica ancora una condizione che richiede una risposta. Questa scheda mostra solo evidenze e non suggerisce alcun valore."
     },
     "resourceOption": {
       "window": "Finestra della query più breve",
@@ -11739,7 +11759,12 @@
       "failureMayPredateWindow": "Gli errori erano già in corso quando è iniziata questa finestra, quindi il primo errore potrebbe essere precedente.",
       "editTimingOnly": "L'ultima modifica è mostrata solo per riferimento temporale; non è una causa confermata.",
       "limitMayDiffer": "Queste valutazioni si sono fermate prima del limite di tempo di query di questo nodo, quindi potrebbe essere stato applicato un altro limite; le opzioni restano comunque utili.",
-      "searchedWindow": "Ricerca limitata all'ultima finestra di {window}; le righe corrispondenti più rare non sono escluse."
+      "searchedWindow": "Ricerca limitata all'ultima finestra di {window}; le righe corrispondenti più rare non sono escluse.",
+      "attendedLowerBound": "Alcune risposte non sono state associate a un gruppo di avvisi, quindi il conteggio delle gestite è un minimo.",
+      "onScheduleEstimate": "Le durate sono contate in controlli sulla pianificazione salvata dell'avviso; un controllo saltato non risulta.",
+      "durationUpperBound": "{count} attivazione breve è stata sospesa dal periodo di silenzio di {cooldown} dell'avviso, quindi il valore suggerito segue il silenzio e non la durata misurata di un'attivazione. | {count} attivazioni brevi sono state sospese dal periodo di silenzio di {cooldown} dell'avviso, quindi il valore suggerito segue il silenzio e non la durata misurata di un'attivazione.",
+      "recoveryReportedLater": "Con l'attesa, ogni recupero viene segnalato fino a {hold} più tardi.",
+      "firingTimeLowerBound": "Il tempo di attivazione somma la durata minima possibile di ogni episodio, quindi la quota è un minimo."
     },
     "qualityReason": {
       "scanTruncated": "le ricerche più ampie sono andate in timeout",
@@ -11747,7 +11772,9 @@
       "errorClassesTimedOut": "i tipi di errore non sono stati letti in tempo",
       "errorClassesFailed": "non è stato possibile leggere i tipi di errore",
       "evaluationTimesUnread": "i tempi di valutazione non sono stati letti",
-      "scheduleUnreadable": "non è stato possibile leggere la pianificazione dell'avviso"
+      "scheduleUnreadable": "non è stato possibile leggere la pianificazione dell'avviso",
+      "transitionsTruncated": "non tutti i cambi di stato sono stati letti",
+      "responsesTruncated": "non tutte le risposte sono state lette"
     },
     "headroom": {
       "title": "Calibrazione avvisi",
@@ -11802,7 +11829,12 @@
       "enrichmentTimeout": "Timeout durante la lettura delle prove",
       "other": "Un altro motivo",
       "healthySilence": "Ha funzionato senza errori e non si è mai attivato; il silenzio non è un problema di per sé.",
-      "definitionNotChecked": "Definizione non verificata"
+      "definitionNotChecked": "Definizione non verificata",
+      "insufficientShortEpisodes": "Troppe poche attivazioni brevi per suggerire un periodo di attesa",
+      "insufficientShortClearGaps": "Troppi pochi rientri brevi per suggerire un'attesa di recupero",
+      "candidateNotAboveCurrent": "Il suggerimento non supera l'impostazione attuale o non rimuove nessuna attivazione",
+      "silenceExceedsCap": "Il silenzio sospende ogni attivazione oltre la massima attesa suggerita, quindi nessuna conta come breve",
+      "responseSignalUnusable": "Troppe poche risposte registrate nell'organizzazione per rilevarne una mancante"
     },
     "notChecked": {
       "title": "Definizione non verificata",
@@ -11925,7 +11957,13 @@
       "proposedActions": "Azioni proposte",
       "qualityReasons": "Motivo: {reasons} | Motivi: {reasons}",
       "openAlert": "Apri avviso",
-      "advice": "Cosa controllare"
+      "advice": "Cosa controllare",
+      "declinedRequired": "{actual} su {required} necessari",
+      "declinedNotRead": "Non letto; ne servono {required}",
+      "declinedCandidate": "Suggerito {candidate}, ora {current}",
+      "declinedCap": "Silenzio {silence}, limite {cap}",
+      "routineHeading": "Contati, non elencati",
+      "routineAlerts": "{count} avviso | {count} avvisi"
     },
     "dashboard": {
       "latestRunAgo": "Ultima esecuzione {time}",
@@ -11992,6 +12030,11 @@
       "showingCappedUnread": "Mostrati {shown} riscontri: la ricerca si è fermata a {count} record.",
       "countsPending": "I conteggi sugli avvisi a cui puoi accedere non sono ancora pronti. Aggiorna tra poco.",
       "countsPendingBadge": "In attesa"
+    },
+    "noisePattern": {
+      "shortBlips": "Picchi brevi",
+      "recoveryHold": "Attesa di recupero",
+      "sustainedNoResponse": "Attivazione prolungata, nessuna risposta"
     }
   },
   "alerts": {

@@ -11666,7 +11666,24 @@
       "blipsWouldNotAlert": "No se dispararían con la espera sugerida",
       "checkInterval": "Intervalo de comprobación",
       "holdNow": "Espera actual",
-      "holdSuggested": "Espera sugerida"
+      "holdSuggested": "Espera sugerida",
+      "longEpisodes": "Disparos más largos, no eliminados",
+      "measuredClears": "Recuperaciones medidas",
+      "undoneClears": "Recuperaciones revertidas en dos comprobaciones",
+      "recoveryHoldNow": "Espera de recuperación actual",
+      "recoveryHoldSuggested": "Espera de recuperación sugerida",
+      "firingShare": "Proporción de tiempo disparando",
+      "span": "Período",
+      "firingsInSpan": "Disparos en el período",
+      "episodesInSpan": "Episodios en el período",
+      "stretchStarted": "El tramo actual comenzó",
+      "longestEpisode": "Episodio más largo",
+      "stillFiring": "Sigue disparando",
+      "lastResponse": "Última respuesta",
+      "orgResponses": "Respuestas registradas en la organización",
+      "noneRecorded": "Ninguna registrada",
+      "atLeastDuration": "Al menos {duration}",
+      "stillFiringFor": "Sí, durante al menos {duration}"
     },
     "errorClass": {
       "streamMissing": "Stream no encontrado",
@@ -11715,7 +11732,10 @@
       "checkFieldNotFound": "Comprueba los campos que usa la consulta: las evaluaciones registraron uno como no encontrado.",
       "checkQuerySyntax": "Comprueba la consulta de la alerta: el motor de búsqueda la rechazó por no ser válida. El error no indica qué parte es incorrecta.",
       "reduceQueryTime": "La consulta no deja de alcanzar su límite de tiempo. Cada opción la hace más económica a costa de algo de cobertura:",
-      "reduceQueryMemory": "La consulta no deja de quedarse sin memoria. Cada opción la hace más económica a costa de algo de cobertura:"
+      "reduceQueryMemory": "La consulta no deja de quedarse sin memoria. Cada opción la hace más económica a costa de algo de cobertura:",
+      "addPendingPeriod": "Establece un período pendiente para que la condición deba mantenerse ese tiempo antes de que la alerta se dispare.",
+      "addRecoveryHold": "Establece Seguir disparando durante para que una recuperación que revierta la siguiente comprobación no ponga fin al disparo.",
+      "reviewThreshold": "Revisa si el umbral sigue marcando una condición que requiere respuesta. Esta tarjeta solo muestra evidencias y no sugiere ningún valor."
     },
     "resourceOption": {
       "window": "Ventana de consulta más corta",
@@ -11739,7 +11759,12 @@
       "failureMayPredateWindow": "Ya se estaban produciendo fallos cuando comenzó esta ventana, por lo que el primer fallo puede ser anterior.",
       "editTimingOnly": "La última edición se muestra solo a efectos temporales; no es una causa confirmada.",
       "limitMayDiffer": "Estas evaluaciones se detuvieron antes del límite de tiempo de consulta de este nodo, por lo que puede haberse aplicado otro límite; las opciones siguen siendo útiles.",
-      "searchedWindow": "Solo se buscó en el último período de {window}; no se descartan las filas coincidentes menos frecuentes."
+      "searchedWindow": "Solo se buscó en el último período de {window}; no se descartan las filas coincidentes menos frecuentes.",
+      "attendedLowerBound": "Algunas respuestas no se pudieron asociar a un grupo de alertas, por lo que el recuento de atendidas es un mínimo.",
+      "onScheduleEstimate": "Las duraciones se cuentan en comprobaciones según la programación guardada de la alerta; una comprobación perdida no se refleja.",
+      "durationUpperBound": "{count} disparo corto fue pausado por el enfriamiento de {cooldown} de la alerta, por lo que el valor sugerido sigue al enfriamiento y no la duración medida de un disparo. | {count} disparos cortos fueron pausados por el enfriamiento de {cooldown} de la alerta, por lo que el valor sugerido sigue al enfriamiento y no la duración medida de un disparo.",
+      "recoveryReportedLater": "Con la espera, cada recuperación se notifica hasta {hold} más tarde.",
+      "firingTimeLowerBound": "El tiempo disparando suma la duración mínima posible de cada episodio, por lo que la proporción es un mínimo."
     },
     "qualityReason": {
       "scanTruncated": "las búsquedas más amplias agotaron el tiempo de espera",
@@ -11747,7 +11772,9 @@
       "errorClassesTimedOut": "los tipos de error no se leyeron a tiempo",
       "errorClassesFailed": "no se pudieron leer los tipos de error",
       "evaluationTimesUnread": "no se leyeron los tiempos de evaluación",
-      "scheduleUnreadable": "no se pudo leer la programación de la alerta"
+      "scheduleUnreadable": "no se pudo leer la programación de la alerta",
+      "transitionsTruncated": "no se leyeron todos los cambios de estado",
+      "responsesTruncated": "no se leyeron todas las respuestas"
     },
     "headroom": {
       "title": "Calibración de alertas",
@@ -11802,7 +11829,12 @@
       "enrichmentTimeout": "Se agotó el tiempo de espera al leer la evidencia",
       "other": "Otro motivo",
       "healthySilence": "Se ejecutó sin problemas y nunca se disparó; el silencio no es un problema en sí mismo",
-      "definitionNotChecked": "Definición no comprobada"
+      "definitionNotChecked": "Definición no comprobada",
+      "insufficientShortEpisodes": "Hay muy pocos disparos cortos para sugerir un período pendiente",
+      "insufficientShortClearGaps": "Hay muy pocas recuperaciones cortas para sugerir una espera de recuperación",
+      "candidateNotAboveCurrent": "La sugerencia no supera la configuración actual o no elimina ningún disparo",
+      "silenceExceedsCap": "El enfriamiento pausa todos los disparos más allá de la espera sugerida más larga, por lo que ninguno cuenta como corto",
+      "responseSignalUnusable": "Hay muy pocas respuestas registradas en la organización para detectar una ausente"
     },
     "notChecked": {
       "title": "Definición no comprobada",
@@ -11925,7 +11957,13 @@
       "proposedActions": "Acciones propuestas",
       "qualityReasons": "Motivo: {reasons} | Motivos: {reasons}",
       "openAlert": "Abrir alerta",
-      "advice": "Qué revisar"
+      "advice": "Qué revisar",
+      "declinedRequired": "{actual} de las {required} necesarias",
+      "declinedNotRead": "No leído; se necesitan {required}",
+      "declinedCandidate": "Sugerido {candidate}, ahora {current}",
+      "declinedCap": "Enfriamiento {silence}, límite {cap}",
+      "routineHeading": "Contadas, no listadas",
+      "routineAlerts": "{count} alerta | {count} alertas"
     },
     "dashboard": {
       "latestRunAgo": "Última ejecución {time}",
@@ -11992,6 +12030,11 @@
       "showingCappedUnread": "Mostrando {shown} hallazgos: la búsqueda se detuvo en {count} registros.",
       "countsPending": "Los recuentos de las alertas a las que puedes acceder aún no están listos. Actualiza en breve.",
       "countsPendingBadge": "Pendiente"
+    },
+    "noisePattern": {
+      "shortBlips": "Picos breves",
+      "recoveryHold": "Espera de recuperación",
+      "sustainedNoResponse": "Disparo sostenido, sin respuesta"
     }
   },
   "alerts": {

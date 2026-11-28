@@ -11666,7 +11666,24 @@
       "blipsWouldNotAlert": "使用建议的保持时间后将不会触发",
       "checkInterval": "检查间隔",
       "holdNow": "当前保持时间",
-      "holdSuggested": "建议保持时间"
+      "holdSuggested": "建议保持时间",
+      "longEpisodes": "较长的触发，未移除",
+      "measuredClears": "已测得的恢复",
+      "undoneClears": "在两次检查内被撤销的恢复",
+      "recoveryHoldNow": "当前恢复保持时间",
+      "recoveryHoldSuggested": "建议的恢复保持时间",
+      "firingShare": "处于触发状态的时间占比",
+      "span": "时间跨度",
+      "firingsInSpan": "时间跨度内的触发次数",
+      "episodesInSpan": "时间跨度内的触发时段",
+      "stretchStarted": "当前持续段开始于",
+      "longestEpisode": "最长触发时段",
+      "stillFiring": "仍在触发",
+      "lastResponse": "最近一次响应",
+      "orgResponses": "组织中记录的响应",
+      "noneRecorded": "无记录",
+      "atLeastDuration": "至少 {duration}",
+      "stillFiringFor": "是，至少 {duration}"
     },
     "errorClass": {
       "streamMissing": "数据流不存在",
@@ -11715,7 +11732,10 @@
       "checkFieldNotFound": "检查查询使用的字段：评估记录显示其中一个不存在。",
       "checkQuerySyntax": "检查告警的查询：搜索引擎以无效为由拒绝了它。错误信息未指明哪一部分有误。",
       "reduceQueryTime": "查询持续达到时间上限。以下每个选项都能降低开销，但会牺牲部分覆盖范围：",
-      "reduceQueryMemory": "查询持续内存不足。以下每个选项都能降低开销，但会牺牲部分覆盖范围："
+      "reduceQueryMemory": "查询持续内存不足。以下每个选项都能降低开销，但会牺牲部分覆盖范围：",
+      "addPendingPeriod": "设置等待期，条件需持续该时长后告警才会触发。",
+      "addRecoveryHold": "设置持续触发时长，这样被下一次检查撤销的恢复不会结束触发。",
+      "reviewThreshold": "请检查阈值是否仍标记需要响应的情况。此卡片仅显示证据，不建议任何值。"
     },
     "resourceOption": {
       "window": "缩短查询窗口",
@@ -11739,7 +11759,12 @@
       "failureMayPredateWindow": "此窗口开始时故障已经在发生，因此首次故障可能更早。",
       "editTimingOnly": "显示最新编辑仅用于时间参考；它并非已确认的原因。",
       "limitMayDiffer": "这些评估在此节点的查询时间限制之前就停止了，因此可能适用了其他限制；这些选项仍然有帮助。",
-      "searchedWindow": "仅搜索了最近 {window}；不能排除存在更少见的匹配行。"
+      "searchedWindow": "仅搜索了最近 {window}；不能排除存在更少见的匹配行。",
+      "attendedLowerBound": "部分响应无法匹配到某个告警组，因此已处理数量是最小值。",
+      "onScheduleEstimate": "时长按告警已保存计划中的检查次数计算；漏掉的检查不会显示。",
+      "durationUpperBound": "{count} 次短触发被告警的 {cooldown} 冷却时间暂停，因此建议值遵循冷却时间，而不是实测的触发时长。 | {count} 次短触发被告警的 {cooldown} 冷却时间暂停，因此建议值遵循冷却时间，而不是实测的触发时长。",
+      "recoveryReportedLater": "启用保持后，每次恢复最多延迟 {hold} 才会报告。",
+      "firingTimeLowerBound": "触发时间累加每个触发时段可能的最短时长，因此占比是最小值。"
     },
     "qualityReason": {
       "scanTruncated": "更大范围的搜索超时",
@@ -11747,7 +11772,9 @@
       "errorClassesTimedOut": "未及时读取错误类型",
       "errorClassesFailed": "无法读取错误类型",
       "evaluationTimesUnread": "未读取评估时间",
-      "scheduleUnreadable": "无法读取告警的调度计划"
+      "scheduleUnreadable": "无法读取告警的调度计划",
+      "transitionsTruncated": "并未读取所有状态变化",
+      "responsesTruncated": "并未读取所有响应"
     },
     "headroom": {
       "title": "告警校准",
@@ -11802,7 +11829,12 @@
       "enrichmentTimeout": "读取证据超时",
       "other": "其他原因",
       "healthySilence": "运行正常且从未触发；安静本身并不构成问题",
-      "definitionNotChecked": "定义未检查"
+      "definitionNotChecked": "定义未检查",
+      "insufficientShortEpisodes": "短触发太少，无法建议等待期",
+      "insufficientShortClearGaps": "短恢复太少，无法建议恢复保持时间",
+      "candidateNotAboveCurrent": "建议值不高于当前设置，或不会移除任何触发",
+      "silenceExceedsCap": "冷却时间暂停了超过建议最长等待时间的所有触发，因此没有触发算作短触发",
+      "responseSignalUnusable": "组织中记录的响应太少，无法判断是否缺失响应"
     },
     "notChecked": {
       "title": "定义未检查",
@@ -11925,7 +11957,13 @@
       "proposedActions": "建议的操作",
       "qualityReasons": "原因：{reasons} | 原因：{reasons}",
       "openAlert": "打开告警",
-      "advice": "检查建议"
+      "advice": "检查建议",
+      "declinedRequired": "所需 {required} 中的 {actual}",
+      "declinedNotRead": "未读取；需要 {required}",
+      "declinedCandidate": "建议 {candidate}，当前 {current}",
+      "declinedCap": "冷却时间 {silence}，上限 {cap}",
+      "routineHeading": "已计数，未列出",
+      "routineAlerts": "{count} 个告警 | {count} 个告警"
     },
     "dashboard": {
       "latestRunAgo": "最近一次运行 {time}",
@@ -11992,6 +12030,11 @@
       "showingCappedUnread": "显示 {shown} 条发现项：搜索在 {count} 条记录处停止。",
       "countsPending": "您有权访问的告警的计数尚未就绪。请稍后刷新。",
       "countsPendingBadge": "待处理"
+    },
+    "noisePattern": {
+      "shortBlips": "短暂波动",
+      "recoveryHold": "恢复保持时间",
+      "sustainedNoResponse": "持续触发，无响应"
     }
   },
   "alerts": {

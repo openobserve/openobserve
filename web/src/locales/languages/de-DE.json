@@ -11666,7 +11666,24 @@
       "blipsWouldNotAlert": "Würde mit der vorgeschlagenen Haltezeit nicht auslösen",
       "checkInterval": "Prüfintervall",
       "holdNow": "Aktuelle Haltezeit",
-      "holdSuggested": "Vorgeschlagene Haltezeit"
+      "holdSuggested": "Vorgeschlagene Haltezeit",
+      "longEpisodes": "Längere Auslösungen, nicht entfernt",
+      "measuredClears": "Gemessene Beendigungen",
+      "undoneClears": "Innerhalb von zwei Prüfungen rückgängig gemachte Beendigungen",
+      "recoveryHoldNow": "Aktuelle Haltezeit",
+      "recoveryHoldSuggested": "Vorgeschlagene Haltezeit",
+      "firingShare": "Anteil der Zeit im Auslösezustand",
+      "span": "Zeitraum",
+      "firingsInSpan": "Auslösungen im Zeitraum",
+      "episodesInSpan": "Episoden im Zeitraum",
+      "stretchStarted": "Aktuelle Phase begann",
+      "longestEpisode": "Längste Episode",
+      "stillFiring": "Löst noch aus",
+      "lastResponse": "Letzte Reaktion",
+      "orgResponses": "In der Organisation erfasste Reaktionen",
+      "noneRecorded": "Keine erfasst",
+      "atLeastDuration": "Mindestens {duration}",
+      "stillFiringFor": "Ja, seit mindestens {duration}"
     },
     "errorClass": {
       "streamMissing": "Stream nicht gefunden",
@@ -11715,7 +11732,10 @@
       "checkFieldNotFound": "Prüfen Sie die Felder, die die Abfrage verwendet: Auswertungen haben eines als nicht gefunden erfasst.",
       "checkQuerySyntax": "Prüfen Sie die Abfrage des Alarms: Die Suchmaschine hat sie als ungültig abgelehnt. Der Fehler sagt nicht, welcher Teil falsch ist.",
       "reduceQueryTime": "Die Abfrage erreicht immer wieder ihr Zeitlimit. Jede Option macht sie günstiger und kostet etwas Abdeckung:",
-      "reduceQueryMemory": "Der Speicher der Abfrage ist immer wieder erschöpft. Jede Option macht sie günstiger und kostet etwas Abdeckung:"
+      "reduceQueryMemory": "Der Speicher der Abfrage ist immer wieder erschöpft. Jede Option macht sie günstiger und kostet etwas Abdeckung:",
+      "addPendingPeriod": "Legen Sie eine Wartezeit fest, damit die Bedingung so lange gelten muss, bevor der Alarm auslöst.",
+      "addRecoveryHold": "Legen Sie „Weiter auslösen für“ fest, damit eine Beendigung, die die nächste Prüfung rückgängig macht, die Auslösung nicht beendet.",
+      "reviewThreshold": "Prüfen Sie, ob der Schwellenwert noch eine Bedingung markiert, die eine Reaktion erfordert. Diese Karte zeigt nur Belege und schlägt keinen Wert vor."
     },
     "resourceOption": {
       "window": "Kürzeres Abfragefenster",
@@ -11739,7 +11759,12 @@
       "failureMayPredateWindow": "Fehler traten bereits auf, als dieses Zeitfenster begann, daher kann der erste Fehler früher liegen.",
       "editTimingOnly": "Die letzte Bearbeitung wird nur zur zeitlichen Einordnung angezeigt; sie ist keine bestätigte Ursache.",
       "limitMayDiffer": "Diese Auswertungen endeten vor dem Abfragezeitlimit dieses Knotens, daher könnte ein anderes Limit gegolten haben; die Optionen helfen dennoch.",
-      "searchedWindow": "Nur die letzten {window} wurden durchsucht; seltenere passende Zeilen sind nicht ausgeschlossen."
+      "searchedWindow": "Nur die letzten {window} wurden durchsucht; seltenere passende Zeilen sind nicht ausgeschlossen.",
+      "attendedLowerBound": "Einige Reaktionen konnten keiner Alarmgruppe zugeordnet werden, daher ist die Zahl der bearbeiteten Fälle ein Mindestwert.",
+      "onScheduleEstimate": "Längen werden in Prüfungen nach dem gespeicherten Zeitplan des Alarms gezählt; eine verpasste Prüfung ist nicht sichtbar.",
+      "durationUpperBound": "{count} kurze Auslösung wurde durch die Abklingzeit von {cooldown} des Alarms pausiert, daher folgt der vorgeschlagene Wert der Abklingzeit und nicht einer gemessenen Auslösedauer. | {count} kurze Auslösungen wurden durch die Abklingzeit von {cooldown} des Alarms pausiert, daher folgt der vorgeschlagene Wert der Abklingzeit und nicht einer gemessenen Auslösedauer.",
+      "recoveryReportedLater": "Mit der Haltezeit wird jede Wiederherstellung bis zu {hold} später gemeldet.",
+      "firingTimeLowerBound": "Die Auslösezeit addiert die kürzestmögliche Länge jeder Episode, daher ist der Anteil ein Mindestwert."
     },
     "qualityReason": {
       "scanTruncated": "weiter gefasste Suchen liefen in eine Zeitüberschreitung",
@@ -11747,7 +11772,9 @@
       "errorClassesTimedOut": "Fehlertypen wurden nicht rechtzeitig gelesen",
       "errorClassesFailed": "Fehlertypen konnten nicht gelesen werden",
       "evaluationTimesUnread": "Auswertungszeiten wurden nicht gelesen",
-      "scheduleUnreadable": "der Zeitplan des Alarms konnte nicht gelesen werden"
+      "scheduleUnreadable": "der Zeitplan des Alarms konnte nicht gelesen werden",
+      "transitionsTruncated": "nicht jede Zustandsänderung wurde gelesen",
+      "responsesTruncated": "nicht jede Reaktion wurde gelesen"
     },
     "headroom": {
       "title": "Alarmkalibrierung",
@@ -11802,7 +11829,12 @@
       "enrichmentTimeout": "Zeitüberschreitung beim Lesen der Belege",
       "other": "Ein anderer Grund",
       "healthySilence": "Lief sauber und wurde nie ausgelöst; Ruhe ist für sich genommen kein Problem.",
-      "definitionNotChecked": "Definition nicht geprüft"
+      "definitionNotChecked": "Definition nicht geprüft",
+      "insufficientShortEpisodes": "Zu wenige kurze Auslösungen, um eine Wartezeit vorzuschlagen",
+      "insufficientShortClearGaps": "Zu wenige kurze Beendigungen, um eine Haltezeit vorzuschlagen",
+      "candidateNotAboveCurrent": "Der Vorschlag liegt nicht über der aktuellen Einstellung oder entfernt keine Auslösung",
+      "silenceExceedsCap": "Die Abklingzeit pausiert jede Auslösung über die längste vorgeschlagene Wartezeit hinaus, daher zählt keine als kurz",
+      "responseSignalUnusable": "Zu wenige in der Organisation erfasste Reaktionen, um eine fehlende zu erkennen"
     },
     "notChecked": {
       "title": "Definition nicht geprüft",
@@ -11925,7 +11957,13 @@
       "proposedActions": "Vorgeschlagene Aktionen",
       "qualityReasons": "Grund: {reasons} | Gründe: {reasons}",
       "openAlert": "Alarm öffnen",
-      "advice": "Was zu prüfen ist"
+      "advice": "Was zu prüfen ist",
+      "declinedRequired": "{actual} von {required} erforderlichen",
+      "declinedNotRead": "Nicht gelesen; {required} erforderlich",
+      "declinedCandidate": "Vorgeschlagen {candidate}, aktuell {current}",
+      "declinedCap": "Abklingzeit {silence}, Limit {cap}",
+      "routineHeading": "Gezählt, nicht aufgelistet",
+      "routineAlerts": "{count} Alarm | {count} Alarme"
     },
     "dashboard": {
       "latestRunAgo": "Letzter Lauf {time}",
@@ -11992,6 +12030,11 @@
       "showingCappedUnread": "{shown} Befunde werden angezeigt: Die Suche endete bei {count} Datensätzen.",
       "countsPending": "Die Zählungen für die Alarme, auf die Sie zugreifen können, sind noch nicht bereit. Aktualisieren Sie in Kürze.",
       "countsPendingBadge": "Ausstehend"
+    },
+    "noisePattern": {
+      "shortBlips": "Kurze Ausschläge",
+      "recoveryHold": "Haltezeit",
+      "sustainedNoResponse": "Dauerhaftes Auslösen, keine Reaktion"
     }
   },
   "alerts": {

@@ -11666,7 +11666,24 @@
       "blipsWouldNotAlert": "Önerilen bekleme süresiyle tetiklenmezdi",
       "checkInterval": "Kontrol aralığı",
       "holdNow": "Şu anki bekleme",
-      "holdSuggested": "Önerilen bekleme"
+      "holdSuggested": "Önerilen bekleme",
+      "longEpisodes": "Daha uzun tetiklenmeler, kaldırılmadı",
+      "measuredClears": "Ölçülen düzelmeler",
+      "undoneClears": "İki kontrol içinde geri alınan düzelmeler",
+      "recoveryHoldNow": "Şu anki toparlanma beklemesi",
+      "recoveryHoldSuggested": "Önerilen toparlanma beklemesi",
+      "firingShare": "Tetiklenme halinde geçen sürenin payı",
+      "span": "Aralık",
+      "firingsInSpan": "Aralıktaki tetiklenmeler",
+      "episodesInSpan": "Aralıktaki dönemler",
+      "stretchStarted": "Mevcut dizi başladı",
+      "longestEpisode": "En uzun dönem",
+      "stillFiring": "Hâlâ tetikleniyor",
+      "lastResponse": "Son yanıt",
+      "orgResponses": "Kuruluşta kaydedilen yanıtlar",
+      "noneRecorded": "Kayıt yok",
+      "atLeastDuration": "En az {duration}",
+      "stillFiringFor": "Evet, en az {duration} süredir"
     },
     "errorClass": {
       "streamMissing": "Akış bulunamadı",
@@ -11715,7 +11732,10 @@
       "checkFieldNotFound": "Sorgunun kullandığı alanları kontrol edin: değerlendirmeler birini bulunamadı olarak kaydetti.",
       "checkQuerySyntax": "Uyarının sorgusunu kontrol edin: arama motoru onu geçersiz olarak reddetti. Hata, hangi bölümün yanlış olduğunu belirtmiyor.",
       "reduceQueryTime": "Sorgu sürekli süre sınırına ulaşıyor. Her seçenek onu daha ucuz hale getirir ve bir miktar kapsam kaybettirir:",
-      "reduceQueryMemory": "Sorgunun belleği sürekli tükeniyor. Her seçenek onu daha ucuz hale getirir ve bir miktar kapsam kaybettirir:"
+      "reduceQueryMemory": "Sorgunun belleği sürekli tükeniyor. Her seçenek onu daha ucuz hale getirir ve bir miktar kapsam kaybettirir:",
+      "addPendingPeriod": "Bir bekleme süresi belirleyin; böylece uyarı tetiklenmeden önce koşulun o kadar süre devam etmesi gerekir.",
+      "addRecoveryHold": "Tetiklenmiş kalma süresi ayarını belirleyin; böylece sonraki kontrolün geri aldığı bir düzelme tetiklenmeyi sonlandırmaz.",
+      "reviewThreshold": "Eşiğin hâlâ yanıt gerektiren bir koşulu işaretleyip işaretlemediğini gözden geçirin. Bu kart yalnızca kanıt gösterir ve bir değer önermez."
     },
     "resourceOption": {
       "window": "Daha kısa sorgu penceresi",
@@ -11739,7 +11759,12 @@
       "failureMayPredateWindow": "Bu pencere başladığında hatalar zaten meydana geliyordu, bu nedenle ilk hata daha önce olabilir.",
       "editTimingOnly": "En son düzenleme yalnızca zamanlama amacıyla gösterilir; doğrulanmış bir neden değildir.",
       "limitMayDiffer": "Bu değerlendirmeler bu düğümün sorgu süre sınırından önce durdu, bu nedenle başka bir sınır uygulanmış olabilir; seçenekler yine de yardımcı olur.",
-      "searchedWindow": "Yalnızca son {window} arandı; daha seyrek eşleşen satırlar hariç tutulamaz."
+      "searchedWindow": "Yalnızca son {window} arandı; daha seyrek eşleşen satırlar hariç tutulamaz.",
+      "attendedLowerBound": "Bazı yanıtlar tek bir uyarı grubuyla eşleştirilemedi; bu nedenle ilgilenilen sayısı bir alt sınırdır.",
+      "onScheduleEstimate": "Süreler, uyarının kayıtlı zamanlamasındaki kontroller cinsinden sayılır; kaçırılan bir kontrol görünmez.",
+      "durationUpperBound": "{count} kısa tetiklenme, uyarının {cooldown} bekleme süresi nedeniyle duraklatıldı; bu yüzden önerilen değer ölçülen bir tetiklenme süresini değil bekleme süresini izler. | {count} kısa tetiklenme, uyarının {cooldown} bekleme süresi nedeniyle duraklatıldı; bu yüzden önerilen değer ölçülen bir tetiklenme süresini değil bekleme süresini izler.",
+      "recoveryReportedLater": "Beklemeyle her toparlanma {hold} kadar geç bildirilir.",
+      "firingTimeLowerBound": "Tetiklenme süresi her dönemin mümkün olan en kısa uzunluğunu toplar; bu yüzden pay bir alt sınırdır."
     },
     "qualityReason": {
       "scanTruncated": "daha geniş aramalar zaman aşımına uğradı",
@@ -11747,7 +11772,9 @@
       "errorClassesTimedOut": "hata türleri zamanında okunamadı",
       "errorClassesFailed": "hata türleri okunamadı",
       "evaluationTimesUnread": "değerlendirme süreleri okunamadı",
-      "scheduleUnreadable": "uyarının zamanlaması okunamadı"
+      "scheduleUnreadable": "uyarının zamanlaması okunamadı",
+      "transitionsTruncated": "her durum değişikliği okunmadı",
+      "responsesTruncated": "her yanıt okunmadı"
     },
     "headroom": {
       "title": "Uyarı Kalibrasyonu",
@@ -11802,7 +11829,12 @@
       "enrichmentTimeout": "Kanıt okuma zaman aşımına uğradı",
       "other": "Başka bir neden",
       "healthySilence": "Temiz çalıştı ve hiç tetiklenmedi; sessizlik tek başına bir sorun değildir.",
-      "definitionNotChecked": "Tanım kontrol edilmedi"
+      "definitionNotChecked": "Tanım kontrol edilmedi",
+      "insufficientShortEpisodes": "Bir bekleme süresi önermek için çok az kısa tetiklenme var",
+      "insufficientShortClearGaps": "Bir toparlanma beklemesi önermek için çok az kısa düzelme var",
+      "candidateNotAboveCurrent": "Öneri mevcut ayarın üzerinde değil veya hiçbir tetiklenmeyi kaldırmıyor",
+      "silenceExceedsCap": "Bekleme süresi, önerilen en uzun beklemeyi aşan her tetiklenmeyi duraklatır; bu yüzden hiçbiri kısa sayılmaz",
+      "responseSignalUnusable": "Eksik bir yanıtı anlamak için kuruluşta kaydedilen yanıt çok az"
     },
     "notChecked": {
       "title": "Tanım kontrol edilmedi",
@@ -11925,7 +11957,13 @@
       "proposedActions": "Önerilen eylemler",
       "qualityReasons": "Neden: {reasons} | Nedenler: {reasons}",
       "openAlert": "Uyarıyı aç",
-      "advice": "Neler kontrol edilmeli"
+      "advice": "Neler kontrol edilmeli",
+      "declinedRequired": "Gereken {required} içinden {actual}",
+      "declinedNotRead": "Okunmadı; {required} gerekli",
+      "declinedCandidate": "Önerilen {candidate}, şu an {current}",
+      "declinedCap": "Bekleme süresi {silence}, sınır {cap}",
+      "routineHeading": "Sayıldı, listelenmedi",
+      "routineAlerts": "{count} uyarı | {count} uyarı"
     },
     "dashboard": {
       "latestRunAgo": "Son çalıştırma {time}",
@@ -11992,6 +12030,11 @@
       "showingCappedUnread": "{shown} bulgu gösteriliyor: arama {count} kayıtta durdu.",
       "countsPending": "Erişebildiğiniz uyarıların sayıları henüz hazır değil. Kısa süre sonra yenileyin.",
       "countsPendingBadge": "Beklemede"
+    },
+    "noisePattern": {
+      "shortBlips": "Kısa dalgalanmalar",
+      "recoveryHold": "Toparlanma beklemesi",
+      "sustainedNoResponse": "Sürekli tetiklenme, yanıt yok"
     }
   },
   "alerts": {

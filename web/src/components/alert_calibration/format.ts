@@ -106,6 +106,16 @@ export function formatEvidence(
   if (format === "count") return raw(Number(value).toLocaleString(locale));
   if (format === "time") return raw(formatTime(Number(value)));
   if (format === "durationMs") return formatMillis(t, Number(value), locale);
+  if (format === "atLeastSeconds") {
+    return t("alertCalibration.evidence.atLeastDuration", {
+      duration: formatSeconds(t, Number(value)),
+    });
+  }
+  if (format === "stillFiring") {
+    return t("alertCalibration.evidence.stillFiringFor", {
+      duration: formatSeconds(t, Number(value)),
+    });
+  }
   if (format === "errorClass") return isErrorClass(value) ? t(ERROR_CLASS_LABEL[value]) : raw("—");
   if (format === "boolean") {
     return value === true || value === "true"
@@ -126,6 +136,7 @@ export function formatEvidenceField(
   field: EvidenceField,
   locale?: string,
 ): I18nText {
+  if (record[field.column] == null && field.absentKey) return t(field.absentKey);
   const column = (name: string) => record[`${NOT_WORKING}${name}`];
   const millis = (name: string) => formatEvidence(t, column(name), "durationMs", locale);
   if (field.format === "evaluationTimes") {
@@ -280,6 +291,11 @@ const SKIP_REASON_LABEL: Record<string, I18nKey> = {
   enrichment_timeout: "alertCalibration.skipReason.enrichmentTimeout",
   healthy_silence: "alertCalibration.skipReason.healthySilence",
   definition_not_checked: "alertCalibration.skipReason.definitionNotChecked",
+  insufficient_short_episodes: "alertCalibration.skipReason.insufficientShortEpisodes",
+  insufficient_short_clear_gaps: "alertCalibration.skipReason.insufficientShortClearGaps",
+  candidate_not_above_current: "alertCalibration.skipReason.candidateNotAboveCurrent",
+  silence_exceeds_cap: "alertCalibration.skipReason.silenceExceedsCap",
+  response_signal_unusable: "alertCalibration.skipReason.responseSignalUnusable",
 };
 
 /** A reason from a newer writer is named generically, never by its stored name. */
@@ -298,8 +314,71 @@ const SKIP_SIGNAL_LABEL: Record<string, I18nKey> = {
   delivery_attempted: "alertCalibration.evidence.deliveryAttemptRecords",
 };
 
+const finiteOf = (fields: Record<string, unknown>, name: string): number | null => {
+  const value = fields[name];
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+};
+
+/** The numbers a noise pattern's decline names (ENT finding.rs `SkipReason`); null for any other. */
+function noiseSkipDetail(
+  t: TranslateFn,
+  reason: string | undefined,
+  fields: Record<string, unknown>,
+  locale?: string,
+): I18nText | null {
+  const num = (name: string) => finiteOf(fields, name);
+  const count = (n: number) => raw(n.toLocaleString(locale));
+  const required = num("required");
+  if (reason === "insufficient_short_episodes" || reason === "insufficient_short_clear_gaps") {
+    const actual = num("actual");
+    return required !== null && actual !== null
+      ? t("alertCalibration.detail.declinedRequired", {
+          actual: count(actual),
+          required: count(required),
+        })
+      : null;
+  }
+  if (reason === "response_signal_unusable") {
+    if (required === null) return null;
+    const actual = num("actual");
+    // An unread count is not zero answers, so it is never shown as "0 of N".
+    return actual === null
+      ? t("alertCalibration.detail.declinedNotRead", { required: count(required) })
+      : t("alertCalibration.detail.declinedRequired", {
+          actual: count(actual),
+          required: count(required),
+        });
+  }
+  if (reason === "candidate_not_above_current") {
+    const current = num("current_secs");
+    const candidate = num("candidate_secs");
+    return current !== null && candidate !== null
+      ? t("alertCalibration.detail.declinedCandidate", {
+          candidate: formatSeconds(t, candidate),
+          current: formatSeconds(t, current),
+        })
+      : null;
+  }
+  if (reason === "silence_exceeds_cap") {
+    const silence = num("silence_secs");
+    const cap = num("cap_secs");
+    return silence !== null && cap !== null
+      ? t("alertCalibration.detail.declinedCap", {
+          silence: formatSeconds(t, silence),
+          cap: formatSeconds(t, cap),
+        })
+      : null;
+  }
+  return null;
+}
+
 /** A detail this build cannot name points to Logs, never to its stored JSON; null when there is none. */
-export function skipDetailLabel(t: TranslateFn, detail: string | undefined): I18nText | null {
+export function skipDetailLabel(
+  t: TranslateFn,
+  detail: string | undefined,
+  reason?: string,
+  locale?: string,
+): I18nText | null {
   if (!detail) return null;
   const headroom = parseHeadroom(detail);
   const near = headroom && headroomSentence(t, headroom, { form: "short" });
@@ -309,6 +388,10 @@ export function skipDetailLabel(t: TranslateFn, detail: string | undefined): I18
     parsed = JSON.parse(detail);
   } catch {
     parsed = null;
+  }
+  if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) {
+    const noise = noiseSkipDetail(t, reason, parsed as Record<string, unknown>, locale);
+    if (noise) return noise;
   }
   const signal =
     typeof parsed === "object" && parsed !== null && "signal" in parsed ? parsed.signal : null;

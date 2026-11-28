@@ -1211,3 +1211,121 @@ describe("AlertCalibrationFindingCard", () => {
     wrapper.unmount();
   });
 });
+
+describe("AlertCalibrationFindingCard noise patterns", () => {
+  const noise = (overrides: Partial<FindingRecord>) =>
+    finding({
+      schema_version: 2,
+      kind: "finding",
+      rule_id: "noise",
+      tier: "A",
+      alert_id: "a1",
+      alert_name: "ops_cpu",
+      finding_id: "f1",
+      actions: undefined,
+      evidence_schedulerhealth_top_orgs: undefined,
+      ...overrides,
+    });
+  const text = (wrapper: ReturnType<typeof mountCard>, test: string) =>
+    wrapper.find(`[data-test="alert-calibration-finding-${test}"]`).text();
+  const actionTypes = (wrapper: ReturnType<typeof mountCard>) =>
+    wrapper
+      .findAll('[data-test^="alert-calibration-finding-action-"]')
+      .map((row) => row.attributes("data-test"))
+      .filter((test) => !test?.endsWith("-button"));
+
+  it("a recovery-hold card applies the hold and says recovery is reported later", () => {
+    const wrapper = mountCard(
+      noise({
+        pattern: "recovery_hold",
+        title: "ops_cpu: 47 clears were undone within two runs",
+        limitations: JSON.stringify(["recovery_reported_later", "on_schedule_estimate"]),
+        advice: "add_recovery_hold",
+        insight_actions: JSON.stringify([
+          {
+            type: "apply_suggestion",
+            alert_id: "a1",
+            patch: [{ field: "keep_firing_for_secs", from: 0, to: 120 }],
+          },
+          { type: "review_alert", alert_id: "a1", focus: "settings" },
+        ]),
+        evidence_recoveryhold_short_clear_gaps: 47,
+        evidence_recoveryhold_clear_gaps: 79,
+        evidence_recoveryhold_interval_secs: 60,
+        evidence_recoveryhold_current_keep_firing_for_secs: 0,
+        evidence_recoveryhold_suggested_keep_firing_for_secs: 120,
+      }),
+    );
+    expect(text(wrapper, "rule")).toBe("Noise: Recovery hold");
+    const grid = wrapper.find("dl").text();
+    expect(grid).toContain("Clears undone within two checks47");
+    expect(grid).toContain("Suggested recovery hold2 minutes");
+    expect(grid).not.toContain("Would not fire");
+    expect(text(wrapper, "limitations")).toContain(
+      "With the hold, every recovery is reported up to 2 minutes later.",
+    );
+    expect(actionTypes(wrapper)).toEqual([
+      "alert-calibration-finding-action-apply_suggestion",
+      "alert-calibration-finding-action-review_alert",
+    ]);
+    wrapper.unmount();
+  });
+
+  it("a sustained-firing card shows evidence and Review alert, and applies nothing", () => {
+    const wrapper = mountCard(
+      noise({
+        pattern: "sustained_no_response",
+        tier: "C",
+        confidence: "Low",
+        title: "ops_cpu: firing for at least 85% of the last 7 days with no recorded response",
+        limitations: JSON.stringify(["firing_time_lower_bound"]),
+        advice: "review_threshold",
+        insight_actions: JSON.stringify([
+          { type: "review_alert", alert_id: "a1", focus: "threshold" },
+        ]),
+        evidence_sustainedfiring_span_secs: 604_800,
+        evidence_sustainedfiring_firing_share: 0.855,
+        evidence_sustainedfiring_episodes_in_span: 56,
+        evidence_sustainedfiring_longest_lower_secs: 122_400,
+        evidence_sustainedfiring_open_lower_secs: 122_400,
+        evidence_sustainedfiring_org_answer_rows: 25,
+      }),
+    );
+    expect(text(wrapper, "rule")).toBe("Noise: Sustained firing, no response");
+    const grid = wrapper.find("dl").text();
+    expect(grid).toContain("Share of time firing85.5%");
+    expect(grid).toContain("Still firingYes, for at least 34 hours");
+    expect(grid).toContain("Last responseNone recorded");
+    expect(text(wrapper, "advice")).toContain("suggests no value");
+    expect(actionTypes(wrapper)).toEqual(["alert-calibration-finding-action-review_alert"]);
+    expect(wrapper.text().toLowerCase()).not.toMatch(/unimportant|not important/);
+    wrapper.unmount();
+  });
+
+  it("a cooldown-bounded short-blips card says its value follows the cooldown", () => {
+    const wrapper = mountCard(
+      noise({
+        pattern: "short_blips",
+        title: "ops_cpu: 37 of 80 complete episodes would not alert",
+        limitations: JSON.stringify(["duration_upper_bound"]),
+        evidence_shortblips_complete_episodes: 80,
+        evidence_shortblips_would_not_alert: 37,
+        evidence_shortblips_long_episodes: 43,
+        evidence_shortblips_bounded_episodes: 37,
+        evidence_shortblips_silence_secs: 300,
+      }),
+    );
+    expect(text(wrapper, "rule")).toBe("Noise: Short blips");
+    expect(wrapper.find("dl").text()).toContain("Longer firings, not removed43");
+    expect(text(wrapper, "limitations")).toContain(
+      "37 short firings were paused by the alert's 5 minutes cooldown, so the suggested value follows the cooldown, not a measured firing length.",
+    );
+    wrapper.unmount();
+  });
+
+  it("a noise card without a pattern keeps the rule's name alone", () => {
+    const wrapper = mountCard(noise({ title: "ops_cpu fired often", evidence_noise_firings: 4 }));
+    expect(text(wrapper, "rule")).toBe("Noise");
+    wrapper.unmount();
+  });
+});

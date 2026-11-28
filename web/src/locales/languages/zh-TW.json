@@ -11661,7 +11661,24 @@
       "blipsWouldNotAlert": "若採用建議的維持時間，就不會觸發",
       "checkInterval": "檢查間隔",
       "holdNow": "目前維持時間",
-      "holdSuggested": "建議維持時間"
+      "holdSuggested": "建議維持時間",
+      "longEpisodes": "較長的觸發，未移除",
+      "measuredClears": "已測得的恢復",
+      "undoneClears": "在兩次檢查內被撤銷的恢復",
+      "recoveryHoldNow": "目前恢復維持時間",
+      "recoveryHoldSuggested": "建議的恢復維持時間",
+      "firingShare": "處於觸發狀態的時間占比",
+      "span": "時間範圍",
+      "firingsInSpan": "時間範圍內的觸發次數",
+      "episodesInSpan": "時間範圍內的觸發時段",
+      "stretchStarted": "目前持續段開始於",
+      "longestEpisode": "最長觸發時段",
+      "stillFiring": "仍在觸發",
+      "lastResponse": "最近一次回應",
+      "orgResponses": "組織中記錄的回應",
+      "noneRecorded": "無記錄",
+      "atLeastDuration": "至少 {duration}",
+      "stillFiringFor": "是，至少 {duration}"
     },
     "errorClass": {
       "streamMissing": "找不到串流",
@@ -11710,7 +11727,10 @@
       "checkFieldNotFound": "檢查查詢使用的欄位：評估記錄顯示其中一個找不到。",
       "checkQuerySyntax": "檢查警示的查詢：搜尋引擎以無效為由拒絕了它。錯誤訊息未指出哪個部分有誤。",
       "reduceQueryTime": "查詢持續達到時間限制。每個選項都能降低查詢成本，但會犧牲一些涵蓋範圍：",
-      "reduceQueryMemory": "查詢持續發生記憶體不足。每個選項都能降低查詢成本，但會犧牲一些涵蓋範圍："
+      "reduceQueryMemory": "查詢持續發生記憶體不足。每個選項都能降低查詢成本，但會犧牲一些涵蓋範圍：",
+      "addPendingPeriod": "設定等待期，條件需持續該時間後警示才會觸發。",
+      "addRecoveryHold": "設定持續觸發時間，這樣被下一次檢查撤銷的恢復不會結束觸發。",
+      "reviewThreshold": "請檢查閾值是否仍標記需要回應的情況。此卡片僅顯示證據，不建議任何值。"
     },
     "resourceOption": {
       "window": "較短的查詢時間範圍",
@@ -11734,7 +11754,12 @@
       "failureMayPredateWindow": "此視窗開始時就已發生失敗，因此第一次失敗可能更早。",
       "editTimingOnly": "顯示最近一次編輯僅供時間參考；這並非已確認的原因。",
       "limitMayDiffer": "這些評估在到達此節點的查詢時間限制前就停止，因此可能套用了其他限制；這些選項仍有幫助。",
-      "searchedWindow": "僅搜尋最近 {window}；無法排除更罕見的符合資料列。"
+      "searchedWindow": "僅搜尋最近 {window}；無法排除更罕見的符合資料列。",
+      "attendedLowerBound": "部分回應無法對應到某個警示群組，因此已處理數量為最小值。",
+      "onScheduleEstimate": "時間長度依警示已儲存排程中的檢查次數計算；漏掉的檢查不會顯示。",
+      "durationUpperBound": "{count} 次短觸發被警示的 {cooldown} 冷卻時間暫停，因此建議值遵循冷卻時間，而不是實測的觸發時間長度。 | {count} 次短觸發被警示的 {cooldown} 冷卻時間暫停，因此建議值遵循冷卻時間，而不是實測的觸發時間長度。",
+      "recoveryReportedLater": "啟用維持後，每次恢復最多延遲 {hold} 才會回報。",
+      "firingTimeLowerBound": "觸發時間累加每個觸發時段可能的最短長度，因此占比為最小值。"
     },
     "qualityReason": {
       "scanTruncated": "較大範圍的搜尋逾時",
@@ -11742,7 +11767,9 @@
       "errorClassesTimedOut": "未能及時讀取錯誤類型",
       "errorClassesFailed": "無法讀取錯誤類型",
       "evaluationTimesUnread": "未讀取評估時間",
-      "scheduleUnreadable": "無法讀取警示的排程"
+      "scheduleUnreadable": "無法讀取警示的排程",
+      "transitionsTruncated": "並未讀取所有狀態變化",
+      "responsesTruncated": "並未讀取所有回應"
     },
     "headroom": {
       "title": "警示校準",
@@ -11797,7 +11824,12 @@
       "enrichmentTimeout": "讀取證據逾時",
       "other": "其他原因",
       "healthySilence": "運作正常且從未觸發；安靜本身並非問題",
-      "definitionNotChecked": "未檢查定義"
+      "definitionNotChecked": "未檢查定義",
+      "insufficientShortEpisodes": "短觸發太少，無法建議等待期",
+      "insufficientShortClearGaps": "短恢復太少，無法建議恢復維持時間",
+      "candidateNotAboveCurrent": "建議值不高於目前設定，或不會移除任何觸發",
+      "silenceExceedsCap": "冷卻時間暫停了超過建議最長等待時間的所有觸發，因此沒有觸發算作短觸發",
+      "responseSignalUnusable": "組織中記錄的回應太少，無法判斷是否缺少回應"
     },
     "notChecked": {
       "title": "未檢查定義",
@@ -11920,7 +11952,13 @@
       "proposedActions": "建議動作",
       "qualityReasons": "原因：{reasons} | 原因：{reasons}",
       "openAlert": "開啟警示",
-      "advice": "應檢查什麼"
+      "advice": "應檢查什麼",
+      "declinedRequired": "所需 {required} 中的 {actual}",
+      "declinedNotRead": "未讀取；需要 {required}",
+      "declinedCandidate": "建議 {candidate}，目前 {current}",
+      "declinedCap": "冷卻時間 {silence}，上限 {cap}",
+      "routineHeading": "已計數，未列出",
+      "routineAlerts": "{count} 個警示 | {count} 個警示"
     },
     "dashboard": {
       "latestRunAgo": "最近一次執行 {time}",
@@ -11987,6 +12025,11 @@
       "showingCappedUnread": "顯示 {shown} 筆發現：搜尋在 {count} 筆記錄時停止。",
       "countsPending": "您可存取警示的計數尚未就緒。請稍後重新整理。",
       "countsPendingBadge": "待處理"
+    },
+    "noisePattern": {
+      "shortBlips": "短暫波動",
+      "recoveryHold": "恢復維持時間",
+      "sustainedNoResponse": "持續觸發，無回應"
     }
   },
   "alerts": {

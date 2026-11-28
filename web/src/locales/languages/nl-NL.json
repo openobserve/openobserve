@@ -11666,7 +11666,24 @@
       "blipsWouldNotAlert": "Zouden niet afgaan met de voorgestelde vasthoudtijd",
       "checkInterval": "Controle-interval",
       "holdNow": "Huidige vasthoudtijd",
-      "holdSuggested": "Voorgestelde vasthoudtijd"
+      "holdSuggested": "Voorgestelde vasthoudtijd",
+      "longEpisodes": "Langere afvuringen, niet verwijderd",
+      "measuredClears": "Gemeten herstellen",
+      "undoneClears": "Herstellen die binnen twee controles ongedaan zijn gemaakt",
+      "recoveryHoldNow": "Huidige vasthoudtijd voor herstel",
+      "recoveryHoldSuggested": "Voorgestelde vasthoudtijd voor herstel",
+      "firingShare": "Aandeel van de tijd afgaand",
+      "span": "Periode",
+      "firingsInSpan": "Afvuringen in de periode",
+      "episodesInSpan": "Episodes in de periode",
+      "stretchStarted": "Huidige reeks begon",
+      "longestEpisode": "Langste episode",
+      "stillFiring": "Gaat nog af",
+      "lastResponse": "Laatste reactie",
+      "orgResponses": "In de organisatie vastgelegde reacties",
+      "noneRecorded": "Geen vastgelegd",
+      "atLeastDuration": "Minstens {duration}",
+      "stillFiringFor": "Ja, al minstens {duration}"
     },
     "errorClass": {
       "streamMissing": "Stream niet gevonden",
@@ -11715,7 +11732,10 @@
       "checkFieldNotFound": "Controleer de velden die de query gebruikt: evaluaties hebben er een als niet gevonden geregistreerd.",
       "checkQuerySyntax": "Controleer de query van het alarm: de zoekmachine heeft deze als ongeldig afgewezen. De foutmelding zegt niet welk deel onjuist is.",
       "reduceQueryTime": "De query blijft tegen de tijdslimiet aanlopen. Elke optie maakt de query goedkoper, maar kost dekking:",
-      "reduceQueryMemory": "De query loopt steeds tegen een geheugentekort aan. Elke optie maakt de query goedkoper, maar kost dekking:"
+      "reduceQueryMemory": "De query loopt steeds tegen een geheugentekort aan. Elke optie maakt de query goedkoper, maar kost dekking:",
+      "addPendingPeriod": "Stel een wachttijd in, zodat de voorwaarde zo lang moet gelden voordat het alarm afgaat.",
+      "addRecoveryHold": "Stel Blijf afgaan gedurende in, zodat een herstel dat door de volgende controle ongedaan wordt gemaakt het afgaan niet beëindigt.",
+      "reviewThreshold": "Controleer of de drempel nog een voorwaarde markeert die een reactie vereist. Deze kaart toont alleen bewijs en stelt geen waarde voor."
     },
     "resourceOption": {
       "window": "Korter queryvenster",
@@ -11739,7 +11759,12 @@
       "failureMayPredateWindow": "Bij het begin van dit venster waren er al fouten, dus de eerste fout kan eerder liggen.",
       "editTimingOnly": "De laatste bewerking wordt alleen voor de timing getoond; het is geen bevestigde oorzaak.",
       "limitMayDiffer": "Deze evaluaties stopten vóór de querytijdslimiet van dit node, dus er kan een andere limiet hebben gegolden; de opties helpen nog steeds.",
-      "searchedWindow": "Alleen de laatste {window} doorzocht; zeldzamere overeenkomende rijen zijn niet uitgesloten."
+      "searchedWindow": "Alleen de laatste {window} doorzocht; zeldzamere overeenkomende rijen zijn niet uitgesloten.",
+      "attendedLowerBound": "Sommige reacties konden niet aan één alarmgroep worden gekoppeld, dus het aantal afgehandelde is een minimum.",
+      "onScheduleEstimate": "Lengtes worden geteld in controles op het opgeslagen schema van het alarm; een gemiste controle is niet zichtbaar.",
+      "durationUpperBound": "{count} korte afvuring is gepauzeerd door de afkoelperiode van {cooldown} van het alarm, dus de voorgestelde waarde volgt de afkoelperiode en niet een gemeten afvuurduur. | {count} korte afvuringen zijn gepauzeerd door de afkoelperiode van {cooldown} van het alarm, dus de voorgestelde waarde volgt de afkoelperiode en niet een gemeten afvuurduur.",
+      "recoveryReportedLater": "Met de vasthoudtijd wordt elk herstel tot {hold} later gemeld.",
+      "firingTimeLowerBound": "De afvuurtijd telt de kortst mogelijke duur van elke episode op, dus het aandeel is een minimum."
     },
     "qualityReason": {
       "scanTruncated": "bredere zoekopdrachten liepen een time-out op",
@@ -11747,7 +11772,9 @@
       "errorClassesTimedOut": "fouttypen zijn niet op tijd gelezen",
       "errorClassesFailed": "fouttypen konden niet worden gelezen",
       "evaluationTimesUnread": "evaluatietijden zijn niet gelezen",
-      "scheduleUnreadable": "het schema van het alarm kon niet worden gelezen"
+      "scheduleUnreadable": "het schema van het alarm kon niet worden gelezen",
+      "transitionsTruncated": "niet elke statuswijziging is gelezen",
+      "responsesTruncated": "niet elke reactie is gelezen"
     },
     "headroom": {
       "title": "Alarmkalibratie",
@@ -11802,7 +11829,12 @@
       "enrichmentTimeout": "Het lezen van bewijs liep een time-out op",
       "other": "Een andere reden",
       "healthySilence": "Liep zonder problemen en ging nooit af; stilte is op zichzelf geen probleem",
-      "definitionNotChecked": "Definitie niet gecontroleerd"
+      "definitionNotChecked": "Definitie niet gecontroleerd",
+      "insufficientShortEpisodes": "Te weinig korte afvuringen om een wachttijd voor te stellen",
+      "insufficientShortClearGaps": "Te weinig korte herstellen om een vasthoudtijd voor te stellen",
+      "candidateNotAboveCurrent": "De suggestie ligt niet boven de huidige instelling of verwijdert geen afvuring",
+      "silenceExceedsCap": "De afkoelperiode pauzeert elke afvuring na de langste voorgestelde wachttijd, dus geen enkele telt als kort",
+      "responseSignalUnusable": "Te weinig reacties vastgelegd in de organisatie om een ontbrekende te herkennen"
     },
     "notChecked": {
       "title": "Definitie niet gecontroleerd",
@@ -11925,7 +11957,13 @@
       "proposedActions": "Voorgestelde acties",
       "qualityReasons": "Reden: {reasons} | Redenen: {reasons}",
       "openAlert": "Alarm openen",
-      "advice": "Wat te controleren"
+      "advice": "Wat te controleren",
+      "declinedRequired": "{actual} van de {required} nodig",
+      "declinedNotRead": "Niet gelezen; {required} nodig",
+      "declinedCandidate": "Voorgesteld {candidate}, nu {current}",
+      "declinedCap": "Afkoelperiode {silence}, limiet {cap}",
+      "routineHeading": "Geteld, niet vermeld",
+      "routineAlerts": "{count} alarm | {count} alarmen"
     },
     "dashboard": {
       "latestRunAgo": "Laatste uitvoering {time}",
@@ -11992,6 +12030,11 @@
       "showingCappedUnread": "{shown} bevindingen getoond: de zoekopdracht stopte bij {count} records.",
       "countsPending": "De tellingen van de alarmen waartoe je toegang hebt, zijn nog niet gereed. Vernieuw straks.",
       "countsPendingBadge": "In afwachting"
+    },
+    "noisePattern": {
+      "shortBlips": "Korte pieken",
+      "recoveryHold": "Vasthoudtijd voor herstel",
+      "sustainedNoResponse": "Aanhoudend afgaan, geen reactie"
     }
   },
   "alerts": {
