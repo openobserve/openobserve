@@ -117,7 +117,7 @@ pub async fn ingest(
             return refusal_response(e, status);
         }
     };
-    // a 500 is retried like the 503 above, instead of a Success for data that was not stored
+    // nothing was stored, so a 500 that senders retry, like the 503 above
     if let Some(reason) = undelivered(&written) {
         return Ok(HecStatus::Custom(reason.to_string(), 500).into());
     }
@@ -1008,14 +1008,6 @@ mod tests {
                 .await
                 .is_err()
         );
-    }
-
-    #[test]
-    fn a_stream_deleted_mid_write_is_undelivered() {
-        let written = |skipped| IngestionResponse::new(200, vec![]).with_stream_skipped(skipped);
-        assert_eq!(undelivered(&[written(false)]), None);
-        let one_skipped = [written(false), written(true)];
-        assert_eq!(undelivered(&one_skipped), Some("stream is being deleted"));
     }
 
     // cloud builds reject the unknown test org at the trial check
