@@ -148,24 +148,8 @@ pub(super) fn create_str_match_expr(
     case_sensitive: bool,
 ) -> Result<Arc<dyn PhysicalExpr>, anyhow::Error> {
     let index = schema.index_of(name).unwrap();
-    let field = schema.field(index);
-    let col = Arc::new(Column::new(name, index));
-
-    // if the field is Utf8View, we need to cast it to Utf8 for str_match udf
-    let left: Arc<dyn PhysicalExpr> = if *field.data_type() == DataType::Utf8View {
-        Arc::new(CastExpr::new(col, DataType::Utf8, None))
-    } else {
-        col
-    };
-
-    // if the field is Utf8View, we need to cast it to Utf8 for str_match udf
-    let data_type = if *field.data_type() == DataType::Utf8View {
-        DataType::Utf8
-    } else {
-        field.data_type().clone()
-    };
-
-    let right = get_scalar_value(value, &data_type)?;
+    let left = Arc::new(Column::new(name, index));
+    let right = get_scalar_value(value, schema.field(index).data_type())?;
     let udf = if case_sensitive {
         Arc::new(str_match::STR_MATCH_UDF.clone())
     } else {

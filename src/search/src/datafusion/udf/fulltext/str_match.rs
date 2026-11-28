@@ -17,92 +17,70 @@ use std::sync::{Arc, LazyLock as Lazy};
 
 use datafusion::{
     arrow::{
-        array::{ArrayRef, BooleanArray},
+        array::{ArrayRef, BooleanArray, StringArrayType},
         datatypes::DataType,
     },
-    common::cast::as_string_array,
     error::{DataFusionError, Result},
     logical_expr::{
         ColumnarValue, ScalarFunctionArgs, ScalarUDF, ScalarUDFImpl, Signature, Volatility,
     },
-    scalar::ScalarValue,
     sql::sqlparser::parser::ParserError,
 };
 
 use crate::datafusion::udf::{
     MATCH_FIELD_IGNORE_CASE_UDF_NAME, MATCH_FIELD_UDF_NAME, STR_MATCH_UDF_IGNORE_CASE_NAME,
     STR_MATCH_UDF_NAME,
+    string_arg::{coerce_string_params, scalar_str, with_string_arrays},
 };
 
 /// Implementation of str_match
-pub static STR_MATCH_UDF: Lazy<ScalarUDF> = Lazy::new(|| ScalarUDF::from(StrMatchUdf::new()));
+pub static STR_MATCH_UDF: Lazy<ScalarUDF> = Lazy::new(|| ScalarUDF::from(StrMatchUdf::new(false)));
 
 /// Implementation of str_match_ignore_case
 pub static STR_MATCH_IGNORE_CASE_UDF: Lazy<ScalarUDF> =
-    Lazy::new(|| ScalarUDF::from(StrMatchIgnoreCaseUdf::new()));
+    Lazy::new(|| ScalarUDF::from(StrMatchUdf::new(true)));
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
 struct StrMatchUdf {
     signature: Signature,
+    case_insensitive: bool,
 }
 
 impl StrMatchUdf {
-    fn new() -> Self {
+    fn new(case_insensitive: bool) -> Self {
         Self {
-            signature: Signature::exact(vec![DataType::Utf8, DataType::Utf8], Volatility::Stable),
+            signature: Signature::user_defined(Volatility::Stable),
+            case_insensitive,
         }
     }
 }
 
 impl ScalarUDFImpl for StrMatchUdf {
     fn name(&self) -> &str {
-        STR_MATCH_UDF_NAME
+        if self.case_insensitive {
+            STR_MATCH_UDF_IGNORE_CASE_NAME
+        } else {
+            STR_MATCH_UDF_NAME
+        }
     }
 
     fn aliases(&self) -> &[String] {
         static ALIASES: Lazy<Vec<String>> = Lazy::new(|| vec![MATCH_FIELD_UDF_NAME.to_string()]);
-        &ALIASES
-    }
-
-    fn signature(&self) -> &Signature {
-        &self.signature
-    }
-
-    fn return_type(&self, _arg_types: &[DataType]) -> Result<DataType> {
-        Ok(DataType::Boolean)
-    }
-
-    fn invoke_with_args(&self, args: ScalarFunctionArgs) -> Result<ColumnarValue> {
-        str_match_impl(&args.args, false)
-    }
-}
-
-#[derive(Debug, Clone, Hash, Eq, PartialEq)]
-struct StrMatchIgnoreCaseUdf {
-    signature: Signature,
-}
-
-impl StrMatchIgnoreCaseUdf {
-    fn new() -> Self {
-        Self {
-            signature: Signature::exact(vec![DataType::Utf8, DataType::Utf8], Volatility::Stable),
+        static IGNORE_CASE_ALIASES: Lazy<Vec<String>> =
+            Lazy::new(|| vec![MATCH_FIELD_IGNORE_CASE_UDF_NAME.to_string()]);
+        if self.case_insensitive {
+            &IGNORE_CASE_ALIASES
+        } else {
+            &ALIASES
         }
     }
-}
-
-impl ScalarUDFImpl for StrMatchIgnoreCaseUdf {
-    fn name(&self) -> &str {
-        STR_MATCH_UDF_IGNORE_CASE_NAME
-    }
-
-    fn aliases(&self) -> &[String] {
-        static ALIASES: Lazy<Vec<String>> =
-            Lazy::new(|| vec![MATCH_FIELD_IGNORE_CASE_UDF_NAME.to_string()]);
-        &ALIASES
-    }
 
     fn signature(&self) -> &Signature {
         &self.signature
+    }
+
+    fn coerce_types(&self, arg_types: &[DataType]) -> Result<Vec<DataType>> {
+        coerce_string_params(self.name(), 2, arg_types)
     }
 
     fn return_type(&self, _arg_types: &[DataType]) -> Result<DataType> {
@@ -110,7 +88,7 @@ impl ScalarUDFImpl for StrMatchIgnoreCaseUdf {
     }
 
     fn invoke_with_args(&self, args: ScalarFunctionArgs) -> Result<ColumnarValue> {
-        str_match_impl(&args.args, true)
+        str_match_impl(&args.args, self.case_insensitive)
     }
 }
 
@@ -126,8 +104,11 @@ fn str_match_impl(args: &[ColumnarValue], case_insensitive: bool) -> Result<Colu
 
     // Parquet pushdown replaces constant or missing columns with scalars.
     let haystack = args[0].clone().into_array(1)?;
-    let haystack = as_string_array(&haystack)?;
-    let ColumnarValue::Scalar(needle) = &args[1] else {
+    let needle = match &args[1] {
+        ColumnarValue::Scalar(needle) => scalar_str(needle),
+        ColumnarValue::Array(_) => None,
+    };
+    let Some(needle) = needle else {
         return Err(DataFusionError::SQL(
             Box::new(ParserError::ParserError(
                 "Invalid argument types[needle] to str_match function".to_string(),
@@ -135,69 +116,54 @@ fn str_match_impl(args: &[ColumnarValue], case_insensitive: bool) -> Result<Colu
             None,
         ));
     };
-    let mut needle = match needle {
-        ScalarValue::Utf8(v) => v,
-        ScalarValue::Utf8View(v) => v,
-        ScalarValue::LargeUtf8(v) => v,
-        _ => {
-            return Err(DataFusionError::SQL(
-                Box::new(ParserError::ParserError(
-                    "Invalid argument types[needle] to str_match function".to_string(),
-                )),
-                None,
-            ));
-        }
-    }
-    .as_ref()
-    .ok_or_else(|| {
-        DataFusionError::SQL(
-            Box::new(ParserError::ParserError(
-                "Invalid argument types[needle] to str_match function".to_string(),
-            )),
-            None,
-        )
-    })?
-    .to_string();
+    let mut needle = needle.to_string();
 
     // pre-compute the needle
     if case_insensitive {
         needle.make_ascii_lowercase();
     };
 
-    let mem_finder = memchr::memmem::Finder::new(needle.as_bytes());
+    let finder = memchr::memmem::Finder::new(needle.as_bytes());
+    let array = with_string_arrays!(
+        haystack.data_type(),
+        [haystack],
+        Ok(str_match_array(haystack, &finder, case_insensitive))
+    )?;
+    Ok(ColumnarValue::from(Arc::new(array) as ArrayRef))
+}
 
-    // 2. perform the computation
-    let array = haystack
+fn str_match_array<'a, S: StringArrayType<'a>>(
+    haystack: S,
+    finder: &memchr::memmem::Finder<'_>,
+    case_insensitive: bool,
+) -> BooleanArray {
+    haystack
         .iter()
         .map(|haystack| {
             haystack.map(|haystack| {
                 if case_insensitive {
-                    mem_finder
-                        .find(haystack.to_lowercase().as_bytes())
-                        .is_some()
+                    finder.find(haystack.to_lowercase().as_bytes()).is_some()
                 } else {
-                    mem_finder.find(haystack.as_bytes()).is_some()
+                    finder.find(haystack.as_bytes()).is_some()
                 }
             })
         })
-        .collect::<BooleanArray>();
-
-    // `Ok` because no error occurred during the calculation
-    // `Arc` because arrays are immutable, thread-safe, trait objects.
-    Ok(ColumnarValue::from(Arc::new(array) as ArrayRef))
+        .collect()
 }
 
 #[cfg(test)]
 mod tests {
     use std::fs::File;
 
-    use arrow::array::{Array, StringArray};
+    use arrow::array::{Array, LargeStringArray, StringArray, StringViewArray};
     use datafusion::{
         arrow::{
             array::Int64Array,
             datatypes::{Field, Schema},
             record_batch::RecordBatch,
+            util::pretty::pretty_format_batches,
         },
+        common::ScalarValue,
         datasource::MemTable,
         prelude::{ParquetReadOptions, SessionConfig, SessionContext},
     };
@@ -208,33 +174,33 @@ mod tests {
 
     #[test]
     fn test_str_match_udf_name() {
-        let udf = StrMatchUdf::new();
+        let udf = StrMatchUdf::new(false);
         assert_eq!(udf.name(), STR_MATCH_UDF_NAME);
     }
 
     #[test]
     fn test_str_match_udf_return_type_is_boolean() {
-        let udf = StrMatchUdf::new();
+        let udf = StrMatchUdf::new(false);
         let rt = udf.return_type(&[]).unwrap();
         assert_eq!(rt, DataType::Boolean);
     }
 
     #[test]
     fn test_str_match_ignore_case_udf_name() {
-        let udf = StrMatchIgnoreCaseUdf::new();
+        let udf = StrMatchUdf::new(true);
         assert_eq!(udf.name(), STR_MATCH_UDF_IGNORE_CASE_NAME);
     }
 
     #[test]
     fn test_str_match_ignore_case_return_type_is_boolean() {
-        let udf = StrMatchIgnoreCaseUdf::new();
+        let udf = StrMatchUdf::new(true);
         let rt = udf.return_type(&[]).unwrap();
         assert_eq!(rt, DataType::Boolean);
     }
 
     #[test]
     fn test_str_match_udf_aliases_include_match_field() {
-        let udf = StrMatchUdf::new();
+        let udf = StrMatchUdf::new(false);
         let aliases = udf.aliases();
         assert!(aliases.iter().any(|a| a == MATCH_FIELD_UDF_NAME));
     }
@@ -289,6 +255,48 @@ mod tests {
             let result = df.collect().await.unwrap();
             let count = result.iter().map(|batch| batch.num_rows()).sum::<usize>();
             assert!(count > 0);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_str_match_reads_every_string_type_without_a_cast() {
+        let rows = [Some("Hello world 42"), Some(""), None];
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("s", DataType::Utf8, true),
+            Field::new("v", DataType::Utf8View, true),
+            Field::new("l", DataType::LargeUtf8, true),
+        ]));
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(StringArray::from_iter(rows)),
+                Arc::new(StringViewArray::from_iter(rows)),
+                Arc::new(LargeStringArray::from_iter(rows)),
+            ],
+        )
+        .unwrap();
+        let ctx = SessionContext::new();
+        register_builtin_udfs(&ctx);
+        let table = MemTable::try_new(schema, vec![vec![batch]]).unwrap();
+        ctx.register_table("t", Arc::new(table)).unwrap();
+        for expr in [
+            "str_match({c}, 'world')",
+            "str_match({c}, arrow_cast('world', 'Utf8View'))",
+            "str_match_ignore_case({c}, 'HELLO')",
+            "match_field({c}, 'world')",
+        ] {
+            let sql = |column: &str| format!("SELECT {} AS r FROM t", expr.replace("{c}", column));
+            let expected = ctx.sql(&sql("s")).await.unwrap().collect().await.unwrap();
+            let expected = pretty_format_batches(&expected).unwrap().to_string();
+            for column in ["s", "v", "l"] {
+                let df = ctx.sql(&sql(column)).await.unwrap();
+                let plan = df.clone().into_optimized_plan().unwrap();
+                let plan = plan.display_indent().to_string();
+                assert!(!plan.contains("CAST"), "{expr} on {column}\n{plan}");
+                let actual = df.collect().await.unwrap();
+                let actual = pretty_format_batches(&actual).unwrap().to_string();
+                assert_eq!(actual, expected, "{expr} on {column}");
+            }
         }
     }
 
