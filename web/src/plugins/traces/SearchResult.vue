@@ -744,7 +744,9 @@ export default defineComponent({
         : [],
     );
     const sqlShape = computed<TracesSqlShape>(() =>
-      sqlInfo.value && hits.value.length ? resultShape(sqlKeys.value) : "spans",
+      sqlInfo.value && hits.value.length
+        ? resultShape(sqlKeys.value, sqlInfo.value.selectAll)
+        : "spans",
     );
     const sqlColumns = computed(() => {
       const hint = t("traces.sqlMode.maybeInAll", {

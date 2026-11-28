@@ -527,7 +527,9 @@
       "linkedDomains": "połączone domeny",
       "domainMappings": "mapowania domen",
       "domainRequests": "prośby o połączenie",
-      "blockedUsers": "zablokowani użytkownicy"
+      "blockedUsers": "zablokowani użytkownicy",
+      "autoresolveRuns": "uruchomienia",
+      "savedAutoResolve": "zapisane AutoResolve"
     },
     "demo": {
       "pageTitle": "Stany puste — pełny zestaw do przeglądu",
@@ -652,6 +654,23 @@
     "noOncallUnrouted": {
       "title": "Nic nie wymaga właściciela",
       "description": "Każdy alert, który został wyzwolony, dotarł do zespołu."
+    },
+    "noAutoResolveRuns": {
+      "title": "Brak uruchomień",
+      "description": "Uruchomienia rozpoczęte przez Ciebie i Twój zespół pojawią się tutaj."
+    },
+    "noAutoResolveConnections": {
+      "title": "Najpierw dodaj MCP",
+      "description": "AutoResolve działa poprzez MCP dodane przez Twoją organizację, takie jak host kodu, narzędzie wdrożeniowe lub klaster. Ta organizacja nie ma jeszcze żadnych."
+    },
+    "noUsable": {
+      "mcps": "Brak MCP, których możesz użyć",
+      "aiToolsets": "Brak zestawów narzędzi AI, których możesz użyć",
+      "askAdmin": "Poproś administratora o dostęp w IAM › Role."
+    },
+    "noSavedAutoResolve": {
+      "title": "Brak zapisanych AutoResolve",
+      "description": "Otwórz zakończone uruchomienie i wybierz Zapisz jako AutoResolve, aby ponownie wykonać jego cel lub uruchomić je, gdy alert zostanie wyzwolony."
     }
   },
   "accessBoundary": {
@@ -2075,6 +2094,7 @@
   },
   "menu": {
     "alertCalibration": "Kalibracja alertów",
+    "autoresolve": "AutoResolve",
     "autoobserve": "AutoObserve",
     "upgradeToProPlan": "Przejdź na plan PRO",
     "home": "Strona główna",
@@ -9224,6 +9244,9 @@
     "logsMessageField": "Pole wiadomości",
     "logsLevelField": "Pole poziomu",
     "logsTimeField": "Pole czasu",
+    "logsTimeFieldNoValues": "Pole czasu \"{field}\" nie zawiera prawidłowych znaczników czasu",
+    "logsLevelFieldNoValues": "Pole poziomu \"{field}\" nie zawiera wartości w wynikach",
+    "logsMessageFieldNoValues": "Pole komunikatu \"{field}\" nie zawiera wartości w wynikach",
     "htmlPanelFieldTooltip": "Pozostaw puste, aby wykryć kolumnę z wyników zapytania",
     "logsOrder": "Kolejność",
     "logsOrderNewest": "Najnowsze najpierw",
@@ -9613,6 +9636,7 @@
       "promqlFiltersAndOnly": "Filtry PromQL obsługują tylko AND. Usuń OR i grupy albo przełącz na SQL.",
       "cappedHint": "Wyświetlono pierwsze {count} wartości",
       "cappedAllHint": "„Wszystkie” obejmuje też wartości spoza listy",
+      "metricsTruncatedHint": "Niektóre metryki nie zostały zaznaczone. Wpisz nazwę metryki, aby zobaczyć wszystkie wartości.",
       "metric": "Metryka",
       "label": "Etykieta",
       "metricSelectTooltip": "Wybierz metrykę lub użyj zmiennej, np. $metricVariable, aby wybrać ją na podstawie innej wartości.",
@@ -15419,7 +15443,9 @@
     "incidentDestination": "Miejsce docelowe incydentów",
     "incidentDestinationPlaceholder": "Użyj domyślnych ustawień organizacji",
     "incidentDestinationHint": "Gdzie trafiają powiadomienia, gdy alerty tego źródła tworzą lub dołączają do incydentu. Pozostaw puste, aby użyć domyślnych ustawień organizacji — jeśli żadne nie jest ustawione, pasujące incydenty będą wyzwalane po cichu.",
+    "incidentDestinationHintOncall": "Gdzie trafiają powiadomienia, oprócz powiadomień On-Call, gdy alerty tego źródła tworzą lub dołączają do incydentu. Pozostaw puste, aby użyć domyślnych ustawień organizacji.",
     "noDestinationSet": "Nie ustawiono miejsca docelowego incydentów",
+    "oncallOnly": "Tylko On-Call",
     "setupStep1Title": "1. Utwórz webhook",
     "setupStep1Body": "W Grafanie, Alertmanagerze lub dowolnym narzędziu, które potrafi wysyłać JSON metodą POST, utwórz punkt kontaktowy / odbiorcę webhooka.",
     "setupRemainingStepsHint": "Zapisz to źródło, aby uzyskać jego adres URL i token, a następnie wklej je do konfiguracji webhooka.",
@@ -16502,6 +16528,13 @@
       "logoLightLabel": "Niestandardowe logo (tryb jasny)",
       "logoLightHelp": "Wyświetlane w trybie jasnym. PNG, JPG, GIF lub BMP, do 150 × 30 px.",
       "logoDarkLabel": "Niestandardowe logo (tryb ciemny)",
+      "logoTitle": "Własne logo",
+      "logoHelp": "Wyświetlane w nagłówku aplikacji. PNG, JPG, GIF, BMP, WEBP lub SVG, do 150 × 30 px.",
+      "logoLightTitle": "Tryb jasny",
+      "logoDarkTitle": "Tryb ciemny",
+      "logoSaved": "Zapisano",
+      "logoNotSaved": "Niezapisane",
+      "logoDimensions": "{width} × {height} px",
       "logoDarkHelp": "Wyświetlane w trybie ciemnym. PNG, JPG, GIF lub BMP, do 150 × 30 px."
     },
     "modelPricingEditor": {
@@ -18521,7 +18554,16 @@
     "panelTimeSeriesFor": "Szereg czasowy dla {stream}",
     "panelTimeSeriesForWithType": "Szereg czasowy dla {stream} ({type})",
     "logsPanelTitle": "Logi - {stream}",
-    "logsPanelDescription": "Skorelowane logi dla usługi {service}"
+    "logsPanelDescription": "Skorelowane logi dla usługi {service}",
+    "noDataInScope": "Brak danych w tym zakresie",
+    "noDataInScopeReason": "Żaden wiersz nie pasuje do tych filtrów w tym zakresie czasu.",
+    "droppedCount": "+{count} pominięty | +{count} pominiętych",
+    "droppedTitle": "Nie użyte jako filtry",
+    "droppedNoRows": "Brak wierszy z {value}",
+    "droppedNoField": "Pola nie ma w tych strumieniach",
+    "allNoDataTitle": "Żadna metryka nie ma danych w tym zakresie",
+    "allNoDataScope": "{scope}, {window}",
+    "allNoDataAction": "Pokaż metryki bez danych"
   },
   "search_scheduler_job": {
     "title": "Harmonogram zadań wyszukiwania",
@@ -20587,6 +20629,13 @@
       "sampleExpected": "Oczekiwane wyjście",
       "fromTrace": "Z trace span {id}",
       "openInPlaygroundFailed": "Nie udało się otworzyć tego spanu w Playground."
+    },
+    "largeStream": {
+      "notice": "{stream}: około {size} w tym zakresie, bez filtra agenta. Może potrwać kilka minut.",
+      "pickAgent": "Wybierz agenta",
+      "addFilter": "Dodaj filtr",
+      "runAnyway": "Uruchom mimo to",
+      "notRun": "Nie uruchomiono"
     }
   },
   "onlineEvals": {
@@ -21884,7 +21933,10 @@
       "excludeFromQuery": "Wyklucz",
       "createAlertAction": "Utwórz alert",
       "noMatchTerms": "Ten wzorzec nie ma charakterystycznego tekstu do filtrowania.",
-      "noDistinctTextTooltip": "Każdy stały fragment tekstu w tym wzorcu występuje także w innym wzorcu, więc filtr dopasowałby również ich logi.",
+      "noDistinctTextTooltip": "Tekst tego wzorca występuje również w logach innego wzorca — często ta sama wiadomość na innym poziomie logów — więc filtr nie może go samodzielnie zliczyć.",
+      "volumeUnsupported": "Wolumen nie jest dostępny dla wyszukiwań używających WITH, JOIN, UNION, aliasu tabeli lub podzapytania.",
+      "volumeFailedRetry": "Nie udało się wczytać wolumenu. Serwer może być zajęty, spróbuj ponownie.",
+      "volumeFailed": "Nie udało się wczytać wolumenu dla tego wzorca.",
       "noStreamSelected": "Nie wybrano strumienia. Wybierz strumień przed utworzeniem alertu.",
       "alertBroadMatch": "Ten wzorzec nie ma charakterystycznego stałego tekstu — zapytanie alertu będzie pasować szeroko. Rozważ dodanie ręcznych filtrów."
     },
@@ -24184,8 +24236,19 @@
       "clear": "Wyczyść"
     },
     "file": {
-      "removeFile": "Usuń plik",
-      "clearAll": "Wyczyść wszystko"
+      "removeNamed": "Usuń {name}",
+      "attachPrompt": "Przeciągnij plik, aby załączyć, lub {browse}",
+      "attachPromptMultiple": "Przeciągnij pliki, aby załączyć, lub {browse}",
+      "browseLink": "przeglądaj",
+      "supports": "Obsługiwane pliki {types}",
+      "dropFileToAttach": "Upuść plik, aby go dołączyć",
+      "dropFilesToAttach": "Upuść pliki, aby je dołączyć",
+      "typeRejected": "Akceptowane są tylko pliki: {allowed}",
+      "sizeRejected": "{size} przekracza limit {max}",
+      "countRejected": "Tylko {count} plik naraz | Tylko {count} pliki naraz",
+      "invalidJson": "Nieprawidłowy JSON: {detail}",
+      "invalidImage": "To nie jest prawidłowy plik obrazu",
+      "unavailable": "Przesyłanie plików jest niedostępne"
     },
     "date": {
       "openCalendar": "Otwórz kalendarz",
@@ -28011,8 +28074,8 @@
     "awayMark": "Oznacz nieobecność",
     "awayClear": "Wyczyść nieobecność",
     "awayClearConfirm": "Wyczyść",
-    "awayClearMessage": "Wyczyścić nieobecność {name}, {range}? Dotyczy ona każdego zespołu.",
-    "awayConsequence": "Dotyczy każdego zespołu, do którego należy {name}. Zmiany tej osoby trafiają do następnej osoby w każdej rotacji, jeśli taka istnieje.",
+    "awayClearMessage": "Wyczyścić nieobecność {name} ({range})? Ma ona zastosowanie w każdym zespole w tej organizacji.",
+    "awayConsequence": "Dotyczy każdego zespołu, do którego należy {name} w tej organizacji. Ich zmiany przechodzą do następnej osoby w każdej rotacji, jeśli taka istnieje.",
     "awayNextWeek": "Następny tydzień, pon.–niedz.",
     "awayTitle": "Oznacz nieobecność",
     "membersAddOpen": "Dodaj członków",
@@ -34638,6 +34701,464 @@
     "fixedToNow": "Kończy się teraz, nie przesuwa się",
     "gateOrder": "Początek musi być przed końcem.",
     "gateInvalid": "Nieprawidłowy zakres."
+  },
+  "autoresolve": {
+    "title": "AutoResolve",
+    "runTitle": "Uruchomienie AutoResolve",
+    "runNotFound": "Nie znaleziono tego uruchomienia",
+    "runNotFoundHint": "Mogło zostać usunięte lub link może być nieprawidłowy.",
+    "runForbidden": "Nie masz dostępu do tego uruchomienia",
+    "namesMore": "{count} więcej | {count} więcej",
+    "mcp": {
+      "count": "{count} MCP | {count} MCP",
+      "the": "MCP {names} | MCP {names}",
+      "theDescribed": "MCP {name} ({description})",
+      "described": "{name} ({description})"
+    },
+    "stage": {
+      "investigate": "Zbadaj",
+      "ask": "Zapytaj",
+      "proceed": "Kontynuuj",
+      "check": "Sprawdź",
+      "outcome": "Wynik"
+    },
+    "state": {
+      "investigating": "Badanie",
+      "waitingApproval": "Oczekiwanie na zatwierdzenie",
+      "proceeding": "Kontynuowanie",
+      "checking": "Sprawdzanie",
+      "worked": "Zadziałało",
+      "noChange": "Brak zmian",
+      "cantFix": "Nie można naprawić za pomocą tych MCP",
+      "notNeeded": "Nie jest już potrzebne",
+      "worse": "Gorzej",
+      "declined": "Odrzucone",
+      "lapsed": "Wygasłe",
+      "stepFailed": "Krok nie powiódł się",
+      "outcomeUnknown": "Wynik nieznany",
+      "failed": "Niepowodzenie",
+      "proposed": "Zaproponowano",
+      "approved": "Zatwierdzono",
+      "running": "W toku",
+      "done": "Gotowe",
+      "held": "Wstrzymane",
+      "notRun": "Nie uruchomiono",
+      "superseded": "Zastąpione"
+    },
+    "subtitle": "Wpisz, co ma zostać wykonane. Analizuje, pyta przed jakąkolwiek zmianą, kontynuuje i sprawdza.",
+    "tabs": {
+      "home": "Strona główna",
+      "runs": "Uruchomienia",
+      "saved": "Zapisane"
+    },
+    "home": {
+      "examplesTitle": "Wypróbuj jeden z tych przykładów",
+      "examples": {
+        "checkout": "Ustal, dlaczego usługa checkout zwraca błędy 5xx, i napraw to.",
+        "payment": "Które ostatnie zmiany dotyczyły usługi płatności?",
+        "ingestion": "Dlaczego opóźnienie pozyskiwania danych wzrosło w ciągu ostatniej godziny?"
+      },
+      "startFailed": "Nie udało się rozpocząć uruchomienia. Spróbuj ponownie."
+    },
+    "goalBox": {
+      "heading": "Co należy zrobić?",
+      "placeholder": "Opisz oczekiwany wynik, na przykład: ustal, dlaczego usługa nie działa, i napraw to",
+      "productData": "Dane {product}",
+      "canUse": "{mcps} i {data} | {mcps} i {data}",
+      "start": "Rozpocznij",
+      "asksFirst": "Może przeglądać bez ograniczeń. Zanim cokolwiek zmieni, pyta o zgodę.",
+      "addConnection": "Dodaj MCP",
+      "connectionsLabel": "MCP dostępne dla tego uruchomienia"
+    },
+    "connectionPicker": {
+      "chooseOne": "Wybierz co najmniej jeden MCP.",
+      "upTo": "Maksymalnie {mcps}",
+      "noneYouCanUse": "Brak MCP, których możesz użyć. Poproś administratora o dostęp w IAM › Role.",
+      "noneYet": "Ta organizacja nie ma jeszcze MCP. Najpierw dodaj go w Ustawienia › Zestawy narzędzi AI."
+    },
+    "runs": {
+      "regionNote": "Uruchomienia i zapisane AutoResolve są przypisane do regionu, w którym zostały utworzone.",
+      "recent": "Ostatnie uruchomienia",
+      "viewAll": "Zobacz wszystkie uruchomienia",
+      "search": "Szukaj celów",
+      "stateGroup": {
+        "live": "Na żywo",
+        "waiting": "Oczekuje",
+        "ended": "Zakończone"
+      },
+      "startedBy": "Rozpoczęte przez",
+      "anyone": "Ktokolwiek",
+      "me": "Ja",
+      "connection": "MCP",
+      "column": {
+        "lastRun": "Ostatnie uruchomienie",
+        "goal": "Cel",
+        "state": "Stan",
+        "startedBy": "Rozpoczęte przez",
+        "connections": "MCP",
+        "took": "Czas trwania"
+      },
+      "tookSoFar": "{time} do tej pory"
+    },
+    "orgAdmins": "Administratorzy organizacji",
+    "approvers": {
+      "roles": "rola {names} | role {names}",
+      "groups": "grupa {names} | grupy {names}",
+      "separator": "; "
+    },
+    "connection": {
+      "removeConnection": "Usuń {name}",
+      "removedChip": "{name} (usunięto)",
+      "moreRemoved": "i {count} kolejnych usunięto | i {count} kolejnych usunięto",
+      "writeCredential": "Poświadczenie dla zatwierdzonych zmian (opcjonalne)",
+      "writeCredentialHelp": "Używane tylko w krokach zatwierdzonych przez osobę. Gdy jest puste, zatwierdzone kroki używają nagłówków MCP powyżej.",
+      "writeValueSet": "Ustawiono. Wpisz nową wartość, aby ją zastąpić.",
+      "writeValueRequired": "Wprowadź wartość",
+      "addWriteHeader": "Dodaj nagłówek poświadczenia",
+      "draftWriteHeader": "Nagłówek zatwierdzonej zmiany {name}"
+    },
+    "duration": {
+      "minutesSeconds": "{minutes} min {seconds} s"
+    },
+    "run": {
+      "reconnecting": "Ponowne łączenie…",
+      "working": "W toku…",
+      "investigating": "Analizowanie",
+      "investigatingNote": "Wywołania tylko do odczytu przechodzą od razu. Uruchomienie pyta cię przed pierwszą zmianą.",
+      "investigated": "Przeanalizowano",
+      "investigatedMeta": "{count} wywołanie, {duration} | {count} wywołań, {duration}",
+      "investigatedWithEvidence": "{calls} · {cited}",
+      "steps": "Kroki",
+      "passCorrected": "Skorygowane przez {name} o {time}",
+      "passNotFixed": "Oznaczone jako niepoprawione przez {name} o {time}",
+      "passPlannedAgain": "Zaplanowano ponownie o {time}",
+      "calls": "Wywołania",
+      "approvedBy": "Zatwierdzone przez {name} o {time}",
+      "stepCount": "{count} krok | {count} kroków",
+      "stepLabel": "krok {seq}",
+      "proceedingNote": "Tylko zatwierdzone wywołania przechodzą, w kolejności, każde jednokrotnie. Każda inna zmiana wstrzymuje uruchomienie i ponownie pyta.",
+      "checking": "Sprawdzanie wyniku przez {elapsed}",
+      "checkingAgain": "Ponowne sprawdzanie wyniku przez {elapsed}",
+      "investigatingFor": "Analizowanie przez {elapsed}",
+      "proceedingFor": "Kontynuowanie przez {elapsed}",
+      "silent": "Model AI nie odpowiada od {quiet}. Ponowi próbę lub zatrzyma się o {time}.",
+      "silentOn": "Model AI nie odpowiada od {quiet}. Ponowi próbę lub zatrzyma się w {time}.",
+      "revertHint": "Zgłoszenie przywrócenia wymaga ponownego zatwierdzenia, zanim cokolwiek się zmieni.",
+      "raiseRevert": "Zgłoś przywrócenie",
+      "revertNote": "Sprawdzenie wypada gorzej. Zaproponuj zmianę, która cofa zatwierdzone kroki.",
+      "planChanged": "Plan się zmienił; przejrzyj go ponownie",
+      "approveFailed": "Nie udało się zapisać zatwierdzenia. Spróbuj ponownie.",
+      "declineFailed": "Nie udało się odrzucić żądania. Spróbuj ponownie.",
+      "replanFailed": "Nie udało się zażądać nowego planu. Spróbuj ponownie.",
+      "notice": {
+        "stepFailed": "Krok {step} nie powiódł się. Wykonano: {ran}. Nie wykonano: {notRun}.",
+        "noSteps": "brak",
+        "outcomeUnknown": "Wysłano krok, ale nie otrzymano odpowiedzi. Nie zostanie ponowiony.",
+        "failed": "Uruchomienie nie powiodło się i zostało zatrzymane.",
+        "failedWith": "Uruchomienie nie powiodło się i zostało zatrzymane. {reason}",
+        "stepFailedWith": "{reason} Wykonano: {ran}. Nie wykonano: {notRun}.",
+        "stepFailedAlone": "Krok {step} nie powiódł się.",
+        "outcomeUnknownWith": "Wysłano krok, ale nie otrzymano odpowiedzi. Nie zostanie ponowiony. {reason}",
+        "held": "Uruchomienie wstrzymane: próbowało wykonać niezatwierdzone wywołanie, więc to wywołanie zostało wstrzymane."
+      },
+      "outcome": {
+        "checkedAt": "Sprawdzono o {time}",
+        "endedAt": "Zakończono o {time}",
+        "error": "Uruchomienie zgłosiło błąd: {reason}"
+      },
+      "timeline": {
+        "title": "Oś czasu",
+        "planned": "Agent zaproponował plan",
+        "optionBand": "{title} ({band})",
+        "correctionOn": "Korekta wysłana przez {name} dla {option}: {kind}",
+        "notFixedOn": "{option} nie naprawiło tego: {note}",
+        "attemptEnded": "Zakończono: {result}"
+      },
+      "evidence": {
+        "started": "Rozpoczęte przez {name}",
+        "approved": "{name} zatwierdził {option}",
+        "approvedPlan": "{name} zatwierdził plan",
+        "stepSent": "Krok {seq} wysłany: {tool}",
+        "stepDone": "Krok {seq} zakończony: {tool}",
+        "stepDoneWith": "Krok {seq} zakończony: {detail}",
+        "stepFailed": "Krok {seq} nie powiódł się: {tool}",
+        "stepFailedWith": "Krok {seq} nie powiódł się: {detail}",
+        "span": "{from} do {to}",
+        "ended": "Uruchomienie zakończone",
+        "correction": "Korekta wysłana przez {name}: {kind}",
+        "planAgain": "Ponowne zaplanowanie na wniosek {name}",
+        "notFixedNote": "Nie naprawiono: {note}",
+        "remembered": "{time} · Zapamiętane na przyszłe uruchomienia",
+        "connectionAdded": "{name} dodał {mcp} do tego AutoResolve i poprosił o nowy plan",
+        "connectionAddedRun": "{name} dodał {mcp} do tego uruchomienia i poprosił o nowy plan",
+        "triggerOff": "Wyzwalacz alertu jest wyłączony, dopóki ktoś go ponownie nie zatwierdzi.",
+        "planningAgain": "Ponowne planowanie",
+        "markedFixed": "Oznaczone jako naprawione przez {name}"
+      },
+      "facts": {
+        "title": "To uruchomienie",
+        "startedBy": "Uruchomione przez",
+        "started": "Rozpoczęto",
+        "canUse": "Może użyć",
+        "canApprove": "Może zatwierdzić",
+        "option": "Opcja",
+        "approval": "Zatwierdzenie",
+        "check": "Sprawdzenie",
+        "outcome": "Wynik",
+        "notChosen": "Nie wybrano jeszcze",
+        "noneChosen": "Nie wybrano żadnej",
+        "notAsked": "Jeszcze nie zapytano",
+        "notAskedEnded": "Nie zapytano",
+        "correctedNotApproved": "Skorygowano, nigdy nie zatwierdzono",
+        "waitingForYou": "Czeka na Ciebie. Wygasa o {time}",
+        "waitingForYouOn": "Czeka na Ciebie. Wygasa {time}",
+        "waitingFor": "Czeka na {names}. Wygasa o {time}",
+        "waitingForOn": "Czeka na {names}. Wygasa {time}",
+        "lapsedAt": "Wygasło o {time}",
+        "lapsedOn": "Wygasło {time}",
+        "checkNotRun": "Jeszcze nie uruchomiono",
+        "checkRunning": "W toku",
+        "checkMet": "Spełnione",
+        "checkNotMet": "Niespełnione",
+        "checkDidNotRun": "Nie uruchomiono",
+        "notKnown": "Jeszcze nieznane",
+        "evidenceNote": "Każde wywołanie jest zachowywane jako dowód, wraz z argumentami i wynikiem.",
+        "notInAutoResolve": "Nie w tym AutoResolve: {mcps}"
+      }
+    },
+    "approval": {
+      "optionsLabel": "Opcje",
+      "recommended": "Zalecane",
+      "ruledOut": "Wykluczone: {list}",
+      "evidenceSummary": "{count} cytowany odczyt, {decisive} rozstrzygający | {count} cytowanych odczytów, {decisive} rozstrzygających",
+      "unverified": "{count} cytat niezweryfikowany | {count} cytatów niezweryfikowanych",
+      "viewEvidence": "Zobacz dowody",
+      "stepSummary": "{count} krok przez {mcps} | {count} kroków przez {mcps}",
+      "omitted": "{count} inna opcja została pominięta: {reason} | {count} innych opcji zostało pominiętych: {reason}",
+      "omittedNoReason": "{count} inna opcja została pominięta. | {count} innych opcji zostało pominiętych.",
+      "missingCapability": "Żaden z MCP tego przebiegu nie potrafi tego zrobić: {capability}",
+      "inFull": "{title} w całości",
+      "changes": "Zatwierdzanie zmian {mcps}.",
+      "canApprove": "Może zatwierdzić: {names}",
+      "lapsesAt": "Wygasa o {time}",
+      "lapsesOn": "Wygasa {time}",
+      "decline": "Odrzuć",
+      "askDifferent": "Poproś o inny plan",
+      "approve": "Zatwierdź i kontynuuj",
+      "noteLabel": "Co nowy plan powinien zrobić inaczej?",
+      "notePlaceholder": "Na przykład: pozostaw zmianę w pull requeście",
+      "sendNote": "Poproś o nowy plan",
+      "cannotApprove": "Nie możesz zatwierdzać zmian przez {mcps}. Może zatwierdzić: {approvers}.",
+      "connectionRemoved": "{mcps} zostało usunięte po utworzeniu tego planu, więc tej opcji nie można zatwierdzić. | {mcps} zostały usunięte po utworzeniu tego planu, więc tej opcji nie można zatwierdzić.",
+      "connectionRemovedOther": "{mcps} zostało usunięte po utworzeniu tego planu, więc tej opcji nie można zatwierdzić. Wybierz inną opcję lub poproś o inny plan. | {mcps} zostały usunięte po utworzeniu tego planu, więc tej opcji nie można zatwierdzić. Wybierz inną opcję lub poproś o inny plan.",
+      "aRemovedConnection": "MCP tej opcji",
+      "removedNote": "Utwórz plan, który nie używa {mcps}; zostało usunięte. | Utwórz plan, który nie używa {mcps}; zostały usunięte.",
+      "lapsedAt": "To żądanie wygasło o {time}.",
+      "lapsedOn": "To żądanie wygasło dnia {time}.",
+      "lapsed": "To żądanie wygasło.",
+      "lapsedBody": "Nikt nie zatwierdził go na czas, więc nic nie zostało zmienione. Cel mógł się od tego czasu zmienić; zacznij ponownie, aby uzyskać aktualny plan.",
+      "startAgain": "Zacznij ponownie",
+      "startAgainFailed": "Nie udało się ponownie uruchomić tego przebiegu. Spróbuj ponownie.",
+      "connectionsGone": "MCP użyty w tym przebiegu został usunięty. | MCP używane w tym przebiegu zostały usunięte.",
+      "chooseConnections": "Wybierz MCP",
+      "heldCall": "{tool} przez {mcp}",
+      "changedSincePlan": "Inny przebieg zmienił {mcps} od czasu utworzenia tego planu. Przed zatwierdzeniem sprawdź, czy zmiana jest nadal potrzebna. | {count} innych przebiegów zmieniło {mcps} od czasu utworzenia tego planu. Przed zatwierdzeniem sprawdź, czy zmiana jest nadal potrzebna.",
+      "viewChangedRun": "Zobacz ten przebieg | Zobacz najnowszy przebieg",
+      "heldWhilePlanning": "Podczas analizy podjęło próbę zmiany, więc to wywołanie zostało wstrzymane i nie wykonane: {tools}. | Podczas analizy podjęło próbę {count} zmian, więc te wywołania zostały wstrzymane i nie wykonane: {tools}.",
+      "declined": "To żądanie zostało odrzucone. Nic nie zostało zmienione.",
+      "correctPlan": "Popraw ten plan",
+      "partialFix": "Częściowa poprawka",
+      "partialFixLeaves": "Pozostaje niewykonane: {text}"
+    },
+    "step": {
+      "runningFor": "Działa od {elapsed}",
+      "reason": "Powód agenta",
+      "arguments": "Argumenty",
+      "preview": "Podgląd",
+      "dryRunAfter": "Przebieg próbny uruchamia się po zatwierdzeniu; jeśli się nie powiedzie, przebieg zostaje zatrzymany.",
+      "result": "Wynik",
+      "error": "Błąd",
+      "held": "Nie ma w zatwierdzonym planie",
+      "showAll": "Pokaż pełne argumenty",
+      "showFullResult": "Pokaż pełny wynik",
+      "showLess": "Pokaż mniej",
+      "refChip": "{arg} z kroku {step}",
+      "refNote": "Wypełniane przez system na podstawie wyniku kroku {steps}, a nie przez agenta. | Wypełniane przez system na podstawie wyników kroków {steps}, a nie przez agenta."
+    },
+    "savedTitle": "Zapisany AutoResolve",
+    "saved": {
+      "back": "Zapisane AutoResolve",
+      "newTitle": "Zapisz jako AutoResolve",
+      "saveAsAutoResolve": "Zapisz jako AutoResolve",
+      "runNow": "Uruchom teraz",
+      "deleteTitle": "Usunąć ten AutoResolve?",
+      "deleteMessage": "Jego wyzwalacz zostanie zatrzymany i nie będzie można go już uruchomić. Wcześniejsze uruchomienia pozostaną.",
+      "deleted": "Usunięto AutoResolve",
+      "deleteFailed": "AutoResolve nie został usunięty. Spróbuj ponownie.",
+      "runFailed": "Nie udało się uruchomić AutoResolve. Spróbuj ponownie.",
+      "saveFailed": "AutoResolve nie został zapisany. Spróbuj ponownie.",
+      "notFoundHint": "Być może został usunięty.",
+      "runNotLoaded": "Nie udało się wczytać uruchomienia do zapisania",
+      "field": {
+        "goal": "Cel",
+        "connections": "MCP",
+        "runsWhen": "Uruchamia się, gdy",
+        "trigger": "Wyzwalacz",
+        "approval": "Zatwierdzenie",
+        "savedBy": "Zapisane przez"
+      },
+      "kind": {
+        "person": "Osoba go uruchamia",
+        "alert": "Alert zostaje wyzwolony",
+        "incident": "Incydent zostaje otwarty"
+      },
+      "runsWhenAlert": "Alert zostaje wyzwolony: {alert}",
+      "runsWhenIncident": "Incydent zostaje otwarty na podstawie alertu {alert}",
+      "runsWhenAlertGone": "Alert zostaje wyzwolony, ale powiązany alert został usunięty",
+      "runsWhenIncidentGone": "Incydent zostaje otwarty, ale powiązany alert został usunięty",
+      "triggerSwitch": "Uruchamiaj na podstawie tego wyzwalacza",
+      "triggerApproved": "Zatwierdzony przez {name} o {time}",
+      "paused": "Wstrzymany do ponownego zatwierdzenia: edycja wyłączyła ten wyzwalacz. Włączenie go oznacza zatwierdzenie w Twoim imieniu.",
+      "approval": "W kanale {slack} poproszono o zatwierdzenie.",
+      "savedBy": "{name}, {time}",
+      "openSourceRun": "Otwórz uruchomienie, z którego został zapisany",
+      "regionNotice": "Ten region nie obsługuje alertów i incydentów, więc ten wyzwalacz nie uruchomi się tutaj.",
+      "connectionsRemoved": "Usunięto {mcps}. Usuń go z tego AutoResolve lub dodaj go ponownie. | Usunięto {mcps}. Usuń je z tego AutoResolve lub dodaj je ponownie.",
+      "slackUnavailable": "Zatwierdzanie przez Slack nie jest dostępne w tym wdrożeniu, więc nie można włączyć wyzwalaczy alertów i incydentów.",
+      "slackUnavailableOn": "Zatwierdzanie przez Slack nie jest dostępne w tym wdrożeniu, więc uruchomień tego wyzwalacza nie można zatwierdzać w Slacku. Wyłącz go lub zatwierdź je na ekranie.",
+      "lastRuns": "Ostatnie uruchomienia",
+      "lastRunsMore": "Wyświetlono {shown} z {total} najnowszych uruchomień.",
+      "lastRunsEmpty": "Tutaj pojawiają się uruchomienia tego AutoResolve — niezależnie od tego, czy rozpoczęła je osoba, czy jego wyzwalacz.",
+      "triggerState": {
+        "on": "Włączony",
+        "off": "Wyłączony",
+        "paused": "Wstrzymany do ponownego zatwierdzenia"
+      },
+      "form": {
+        "name": "Nazwa",
+        "goal": "Cel",
+        "connections": "MCP",
+        "connectionsHelp": "Jego uruchomienia mogą korzystać tylko z tych MCP.",
+        "connectionsPlaceholder": "Dodaj MCP",
+        "connectionsNotFilled": "To uruchomienie używało {mcps}, który został usunięty, więc pole nie jest wypełnione. | To uruchomienie używało {mcps}, które zostały usunięte, więc pole nie jest wypełnione.",
+        "runsWhen": "Uruchamia się, gdy",
+        "alert": "Alert",
+        "incidentAlert": "Alert, który otwiera incydent",
+        "alertPlaceholder": "Wybierz alert",
+        "alertGone": "Usunięty alert",
+        "alertsForbidden": "Nie masz dostępu do alertów, więc nie można ich tutaj wyświetlić.",
+        "alertsFailed": "Nie można załadować alertów. Otwórz ponownie ten formularz, aby spróbować jeszcze raz.",
+        "connectionsFailed": "Nie można załadować MCPs. Otwórz ponownie ten formularz, aby spróbować jeszcze raz.",
+        "alertsNone": "Ta organizacja nie ma jeszcze alertów. Najpierw utwórz alert w sekcji Alerty.",
+        "createTriggerHelp": "Zapisanie włącza ten wyzwalacz. Każde uruchomienie wymaga zatwierdzenia na kanale {slack} przeznaczonym do zatwierdzeń.",
+        "editPausesHelp": "Zmiana celu, MCPs lub wyzwalacza wyłącza wyzwalacz, dopóki ktoś uprawniony do zatwierdzania nie włączy go ponownie.",
+        "nameRequired": "Wpisz nazwę.",
+        "goalRequired": "Wpisz cel.",
+        "tooLong": "Użyj maksymalnie {max} znaków.",
+        "alertRequired": "Wybierz alert.",
+        "save": "Zapisz AutoResolve",
+        "saveChanges": "Zapisz zmiany"
+      },
+      "list": {
+        "search": "Szukaj zapisanych AutoResolve",
+        "column": {
+          "name": "Nazwa",
+          "runsWhen": "Uruchamia się, gdy",
+          "trigger": "Wyzwalacz",
+          "connections": "MCPs",
+          "savedBy": "Zapisane przez",
+          "updated": "Zaktualizowano"
+        }
+      },
+      "loadFailed": "Nie udało się załadować AutoResolve"
+    },
+    "andMore": "i {count} więcej | i {count} więcej",
+    "correction": {
+      "title": "Co jest nie tak z tym planem?",
+      "kindsLabel": "Co jest nie tak",
+      "kind": {
+        "wrongCause": "Błędna przyczyna",
+        "wrongFix": "Błędna poprawka",
+        "outOfScope": "Wykracza poza ten AutoResolve",
+        "notFixed": "Nie naprawiło problemu"
+      },
+      "help": {
+        "none": "Wybierz, co jest nie tak, a następnie opisz to w notatce.",
+        "wrongCause": "Błędna przyczyna: agent obwinił niewłaściwy element, więc jego poprawka celuje w niewłaściwe miejsce.",
+        "wrongFix": "Błędna poprawka: przyczyna jest prawidłowa, ale zmiana nie jest tym, czego chcesz.",
+        "outOfScope": "Wykracza poza ten AutoResolve: plan zmienia rzeczy, których ten AutoResolve nie powinien ruszać."
+      },
+      "draft": {
+        "wrongCause": "\"{option}\" celuje w niewłaściwą przyczynę.",
+        "wrongFix": "\"{option}\" to nie jest zmiana, której chcę.",
+        "outOfScope": "\"{option}\" zmienia więcej, niż ten AutoResolve powinien."
+      },
+      "noteLabel": "Notatka",
+      "noteHelp": "Agent czyta to przed ponownym planowaniem.",
+      "notePickFirst": "Najpierw wybierz, co jest nie tak",
+      "remember": "Zapamiętaj dla przyszłych uruchomień \"{name}\"",
+      "rememberHelp": "Późniejsze uruchomienia widzą tę notatkę. Możesz ją usunąć z AutoResolve.",
+      "send": "Wyślij korektę"
+    },
+    "correctionsUsed": {
+      "chip": "Użyto {count} korekty | Użyto {count} korekt",
+      "title": "Korekty użyte w tym planie",
+      "thisRun": "{name}, bieżące uruchomienie, {time}",
+      "earlierRun": "{name}, wcześniejsze uruchomienie, {time}",
+      "manage": "Zarządzaj korektami w AutoResolve"
+    },
+    "missing": {
+      "title": "Ta poprawka wymaga {mcp}, którego ten AutoResolve nie ma.",
+      "titleRun": "Ta poprawka wymaga {mcp}, którego to uruchomienie nie ma",
+      "add": "Dodaj {mcp} i zaplanuj ponownie",
+      "orPartial": "Lub zatwierdź poniższą częściową poprawkę. | Lub zatwierdź jedną z poniższych częściowych poprawek.",
+      "cannotAdd": "Tylko osoby, które mogą zatwierdzać zmiany przez {mcp}, mogą go dodać.",
+      "dialogAutoResolve": "AutoResolve",
+      "dialogConnection": "MCP do dodania",
+      "dialogTriggerOff": "Dodanie MCP wyłącza wyzwalacz alertu AutoResolve, dopóki ktoś go ponownie nie zatwierdzi.",
+      "dialogThen": "To uruchomienie zaplanuje wtedy ponownie z {mcp}. Nic się nie zmieni, dopóki ktoś nie zatwierdzi nowego planu.",
+      "dialogConfirm": "Dodaj i zaplanuj ponownie",
+      "addFailed": "Nie udało się dodać {mcp}. Spróbuj ponownie.",
+      "needs": "Ta poprawka wymaga {mcp}: {action}"
+    },
+    "verdict": {
+      "question": "Czy to naprawiło problem?",
+      "yes": "Tak",
+      "no": "Nie, nie naprawiło",
+      "noteLabel": "Co nadal nie działa poprawnie?",
+      "stillFiring": "{trigger} jest nadal wyzwolony",
+      "filledFrom": "Wypełniono na podstawie {trigger}.",
+      "planAgain": "Zaplanuj ponownie",
+      "agent": "Agent",
+      "fixed": "Naprawione",
+      "notFixed": "Nie naprawiło",
+      "byAt": "{name}, {time}",
+      "noteAt": "{note} · {time}",
+      "failed": "Twoja odpowiedź nie została zapisana. Spróbuj ponownie."
+    },
+    "corrections": {
+      "title": "Poprawki",
+      "help": "Każde nowe uruchomienie tego AutoResolve odczytuje te poprawki. Nigdy niczego nie zatwierdzają.",
+      "source": "Z {run} od {name}",
+      "runOf": "uruchomienie z {time}",
+      "sourceGone": "Z uruchomienia, które już nie istnieje, {time} od {name}",
+      "removeFailed": "Poprawka nie została usunięta. Spróbuj ponownie."
+    },
+    "incident": {
+      "title": "AutoResolve",
+      "note": "Jedno uruchomienie na incydent. Pyta, zanim cokolwiek zmieni.",
+      "loading": "Ładowanie AutoResolve…",
+      "loadFailed": "Nie udało się załadować AutoResolve dla tego incydentu.",
+      "newRun": "Nowe uruchomienie dla tego incydentu",
+      "liveRun": "To jest uruchomienie tego incydentu. Nowe uruchomienie może rozpocząć się po jego zakończeniu.",
+      "openRun": "Otwórz uruchomienie",
+      "related": "Zapisane AutoResolve dla alertów tego incydentu",
+      "suggestedFor": "Sugerowane dla incydentów z {alert}",
+      "startsOn": "Rozpoczyna się dla alertu {alert}",
+      "run": "Uruchomienie",
+      "runLocked": "{run} to bieżące uruchomienie tego incydentu. Nowe uruchomienie może rozpocząć się po jego zakończeniu.",
+      "empty": "Żadne AutoResolve nie zostało uruchomione dla tego incydentu i żadne nie jest zapisane dla jego alertów."
+    }
   },
   "autobotInvestigate": {
     "greeting": "Co powinniśmy zbadać?",

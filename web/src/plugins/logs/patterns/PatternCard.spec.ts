@@ -28,6 +28,7 @@ describe("PatternCard", () => {
     template: "User <*> logged in from IP <*>",
     description: "User login pattern",
     frequency: 1234,
+    estimated_count: 56000,
     percentage: 45.67,
     is_anomaly: false,
     variables: [
@@ -106,10 +107,23 @@ describe("PatternCard", () => {
       expect(template.text()).toBe(mockPattern.template);
     });
 
-    it("should display frequency with locale formatting", () => {
+    it("shows the window estimate until the volume arrives", () => {
       const frequency = wrapper.find('[data-test="pattern-card-0-frequency"]');
       expect(frequency.exists()).toBe(true);
-      expect(frequency.text()).toBe("1,234");
+      expect(frequency.text()).toBe("~56K");
+    });
+
+    it("sizes the share bar by the window estimate, not the sample count", () => {
+      const w = mount(PatternCard, {
+        props: { pattern: mockPattern, index: mockIndex, maxFrequency: 112000 },
+        global: {
+          plugins: [i18n],
+          provide: { store },
+          stubs: { OBadge: OBadgeStub, OTooltip: OTooltipStub, OButton: OButtonStub },
+        },
+      });
+      expect(w.html()).toContain("w-6/12");
+      w.unmount();
     });
 
     it("should display percentage with 2 decimal places", () => {
@@ -143,7 +157,10 @@ describe("PatternCard", () => {
       });
       const frequency = w.find('[data-test="pattern-card-0-frequency"]');
       expect(frequency.text()).toBe("—");
-      expect(frequency.attributes("title")).toBe(enUS.logs.patternList.noDistinctTextTooltip);
+      expect(frequency.attributes("title")).toBeUndefined();
+      expect(frequency.findComponent(OTooltipStub).props("content")).toBe(
+        enUS.logs.patternList.noDistinctTextTooltip,
+      );
       w.unmount();
     });
   });

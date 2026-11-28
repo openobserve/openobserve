@@ -1322,10 +1322,11 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     use infra::table::trial_quota_usage;
     use infra::table::{
         alert_acks, alert_calibration, alert_incidents, alert_leases, anomaly_detection,
-        compactor_manual_jobs, distinct_values, external_alerts, gen_ai_agents, incident_events,
-        incident_integrations, llm_eval, llm_prompts, llm_secrets, oncall_teams, online_eval_jobs,
-        org_ai_toolsets, org_telephony, providers, query_history, ratelimit, rca_runs,
-        rca_steering, re_pattern, re_pattern_stream_map, rum_pa, score_configs, scorers,
+        autoresolve, autoresolve_corrections, autoresolve_run_connections, autoresolve_runs,
+        autoresolve_steps, compactor_manual_jobs, distinct_values, external_alerts, gen_ai_agents,
+        incident_events, incident_integrations, llm_eval, llm_prompts, llm_secrets, oncall_teams,
+        online_eval_jobs, org_ai_toolsets, org_telephony, providers, query_history, ratelimit,
+        rca_runs, rca_steering, re_pattern, re_pattern_stream_map, rum_pa, score_configs, scorers,
         search_queue, slack_alert_messages, slo, slo_backfill_jobs, slo_budget, slos, status_pages,
         synthetics_agents, synthetics_checks, synthetics_environments, synthetics_locations,
         synthetics_probe_tokens, synthetics_variables, timed_annotations, workflows,
@@ -1385,6 +1386,23 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     alert_leases::delete_by_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/alert_leases: {e}"))?;
+    autoresolve::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/autoresolve: {e}"))?;
+    autoresolve_runs::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/autoresolve_runs: {e}"))?;
+    autoresolve_run_connections::delete_by_org(org_id)
+        .await
+        .map_err(|e| {
+            anyhow::anyhow!("step_delete_db_resources/autoresolve_run_connections: {e}")
+        })?;
+    autoresolve_steps::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/autoresolve_steps: {e}"))?;
+    autoresolve_corrections::delete_by_org(org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/autoresolve_corrections: {e}"))?;
     // downtimes.folder_id has a FK (downtimes_folder_fk) → folders.id.
     delete_org_downtimes(org_id)
         .await

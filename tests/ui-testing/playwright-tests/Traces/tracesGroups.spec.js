@@ -67,6 +67,22 @@ test.describe("Traces Groups view testcases", () => {
     await expect(pm.tracesPage.getSearchResultList()).toBeVisible({ timeout: 20000 });
   });
 
+  test("P1: Clicking a group under an OR filter brackets the filter", {
+    tag: ['@tracesGroups', '@traces', '@query', '@P1', '@all']
+  }, async () => {
+    const orFilter = "span_status = 'OK' OR span_status = 'UNSET'";
+    await pm.tracesPage.setQueryEditorValue(orFilter);
+    await pm.tracesPage.runSearch();
+    await pm.tracesPage.pickGroupBy('service_name');
+    const first = pm.tracesPage.getGroupsValues().first();
+    await expect(first).toBeVisible({ timeout: 20000 });
+    const service = (await first.textContent()).trim();
+
+    await pm.tracesPage.getGroupsRowByValue(service).click();
+
+    await pm.tracesPage.expectQueryEditorValue(`(${orFilter}) and service_name = '${service}'`);
+  });
+
   test("P2: Exclude term from the row menu stays in the Groups view", {
     tag: ['@tracesGroups', '@traces', '@P2', '@all']
   }, async () => {

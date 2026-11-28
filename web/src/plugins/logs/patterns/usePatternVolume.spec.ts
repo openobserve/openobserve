@@ -26,6 +26,7 @@ import {
   parseBucketKey,
   resolveBaseFilter,
   usePatternVolumeCache,
+  volumeIssueKey,
 } from "./usePatternVolume";
 
 const usFor = (iso: string) => Date.parse(iso) * 1000;
@@ -257,79 +258,71 @@ describe("buildPatternVolumeContext", () => {
 
 describe("fetchPatternVolume", () => {
   const A = "core event seq=<:NUM> info from <*> status 500";
-  const B = "core event seq=<:NUM> warn from <*> status 404";
-  const SHARED = "core event seq=<:NUM> info from <*>";
-  const ctx = (allTemplates?: string[]) => ({
-    orgId: "o",
-    streamName: "logs",
-    startUs: 0,
-    endUs: 1_000_000 * 3600,
-    allTemplates,
-  });
+  const ctx = { orgId: "o", streamName: "logs", startUs: 0, endUs: 1_000_000 * 3600 };
 
   beforeEach(() => {
     mockSearch.mockReset();
     mockSearch.mockResolvedValue({ data: { hits: [] } });
   });
 
-  it("counts by every distinguishing term when the long constants are shared", async () => {
-    await fetchPatternVolume({ template: A }, ctx([A, B]));
+  it("counts by the extractor's terms", async () => {
+    const terms = ["core event seq=", "info from", "status 500"];
+    await fetchPatternVolume({ template: A, match_terms: terms }, ctx);
     const sql: string = mockSearch.mock.calls[0][0].query.query.sql;
     expect(sql).toContain(
       `WHERE match_all('core event seq=') AND match_all('info from') AND match_all('status 500') GROUP BY`,
     );
   });
 
-  it("keeps the long-constants filter without a template list", async () => {
-    await fetchPatternVolume({ template: A }, ctx());
-    const sql: string = mockSearch.mock.calls[0][0].query.query.sql;
-    expect(sql).toContain(`WHERE match_all('core event seq=') GROUP BY`);
-  });
-
-  it("reports no volume, without querying, when nothing separates the pattern", async () => {
-    expect(await fetchPatternVolume({ template: SHARED }, ctx([SHARED, A]))).toBeNull();
+  it("reports no volume, without querying, when the extractor found no terms", async () => {
+    expect(await fetchPatternVolume({ template: A, match_block: "shared" }, ctx)).toBeNull();
     expect(mockSearch).not.toHaveBeenCalled();
-  });
-
-  it("carries the template list on the context", () => {
-    const c = buildPatternVolumeContext({
-      orgId: "o",
-      streamName: "logs",
-      window: { start: 1, end: 2 },
-      allTemplates: [A, B],
-    });
-    expect(c?.allTemplates).toEqual([A, B]);
   });
 });
 
-describe("usePatternVolumeCache unavailable reason", () => {
-  const A = "core event seq=<:NUM> info from <*> status 500";
-  const SHARED = "core event seq=<:NUM> info from <*>";
-  const ctx = {
-    orgId: "o",
-    streamName: "logs",
-    startUs: 0,
-    endUs: 1_000_000 * 3600,
-    allTemplates: [A, SHARED],
-  };
+describe("usePatternVolumeCache issues", () => {
+  const ctx = { orgId: "o", streamName: "logs", startUs: 0, endUs: 1_000_000 * 3600 };
+  const A = { template: "core event seq=<:NUM> info from <*>", match_terms: ["core event seq="] };
 
-  it("records why a pattern with no distinct filter has no volume", async () => {
-    const cache = usePatternVolumeCache(ref(ctx));
-    await cache.request({ template: SHARED });
-    expect(cache.get({ template: SHARED })).toEqual({
-      buckets: null,
-      total: null,
-      intervalSecs: null,
-      loading: false,
-      unavailableReason: "shared",
-    });
-  });
-
-  it("records no reason for a pattern that has a volume", async () => {
+  beforeEach(() => {
     mockSearch.mockReset();
     mockSearch.mockResolvedValue({ data: { hits: [] } });
+  });
+
+  it("records why a pattern with no terms has no volume, without querying", async () => {
+    const shared = { template: "core event <*>", match_block: "shared" };
     const cache = usePatternVolumeCache(ref(ctx));
-    await cache.request({ template: A });
-    expect(cache.get({ template: A })?.unavailableReason).toBeUndefined();
+    await cache.request(shared);
+    expect(cache.get(shared)?.unavailableReason).toBe("shared");
+    expect(volumeIssueKey(cache.get(shared))).toBe("logs.patternList.noDistinctTextTooltip");
+    expect(mockSearch).not.toHaveBeenCalled();
+  });
+
+  it("says why when the search's own filter cannot be reproduced", async () => {
+    const cache = usePatternVolumeCache(ref({ ...ctx, baseSql: 'SELECT * FROM "logs" AS l' }));
+    await cache.request(A);
+    expect(volumeIssueKey(cache.get(A))).toBe("logs.patternList.volumeUnsupported");
+  });
+
+  it.each([
+    [503, "retryable"],
+    [408, "retryable"],
+    [429, "retryable"],
+    [400, "lasting"],
+  ])("classifies a %i failure as %s", async (status, failure) => {
+    mockSearch.mockRejectedValueOnce({ response: { status } });
+    const cache = usePatternVolumeCache(ref(ctx));
+    await cache.request(A);
+    expect(cache.get(A)?.failure).toBe(failure);
+  });
+
+  it("queries again on retry and clears the failure", async () => {
+    mockSearch.mockRejectedValueOnce({ response: { status: 503 } });
+    const cache = usePatternVolumeCache(ref(ctx));
+    await cache.request(A);
+    await cache.retry(A);
+    expect(cache.get(A)?.failure).toBeUndefined();
+    expect(cache.get(A)?.total).toBe(0);
+    expect(volumeIssueKey(cache.get(A))).toBeUndefined();
   });
 });

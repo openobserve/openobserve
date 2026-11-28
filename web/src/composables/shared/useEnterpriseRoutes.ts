@@ -94,6 +94,15 @@ const zoConfigSource = (org: string | undefined): ConfigSource => ({
   fetchFull: () => (org ? queryClient.fetchQuery(configFullQuery(org)) : Promise.resolve(null)),
 });
 
+// Same `=== false` stance as workflowsRouteGuard: /config is fetched without await.
+const autoresolveRouteGuard = (to: any, from: any, next: any) => {
+  if (store.state.zoConfig?.autoresolve_enabled === false) {
+    next("/");
+    return;
+  }
+  routeGuard(to, from, next);
+};
+
 const OnCallTeams = () => import("@/views/OnCall/OnCallTeams.vue");
 const OnCallTeamDetail = () => import("@/views/OnCall/OnCallTeamDetail.vue");
 const OnCallResponses = () => import("@/views/OnCall/OnCallResponses.vue");
@@ -469,6 +478,38 @@ const useEnterpriseRoutes = () => {
           routeGuard(to, from, next);
         },
       },
+    );
+    routes.push(
+      withLicenseFeature("autoresolve", {
+        // `?tab=runs` opens the Runs tab; Home is the default.
+        path: "autoresolve",
+        name: "autoresolve",
+        component: () => import("@/views/AutoResolve/AutoResolveHome.vue"),
+        meta: { titleKey: "autoresolve.title", allowOnEmptyData: true },
+        beforeEnter: autoresolveRouteGuard,
+      }),
+      withLicenseFeature("autoresolve", {
+        path: "autoresolve/runs/:id",
+        name: "autoresolveRun",
+        component: () => import("@/views/AutoResolve/AutoResolveRunView.vue"),
+        meta: { titleKey: "autoresolve.runTitle", allowOnEmptyData: true },
+        beforeEnter: autoresolveRouteGuard,
+      }),
+      withLicenseFeature("autoresolve", {
+        // `?from_run=<run id>` prefills the form from that finished run.
+        path: "autoresolve/saved/new",
+        name: "autoresolveSavedNew",
+        component: () => import("@/views/AutoResolve/AutoResolveSavedView.vue"),
+        meta: { titleKey: "autoresolve.saved.newTitle", allowOnEmptyData: true },
+        beforeEnter: autoresolveRouteGuard,
+      }),
+      withLicenseFeature("autoresolve", {
+        path: "autoresolve/saved/:id",
+        name: "autoresolveSaved",
+        component: () => import("@/views/AutoResolve/AutoResolveSavedView.vue"),
+        meta: { titleKey: "autoresolve.savedTitle", allowOnEmptyData: true },
+        beforeEnter: autoresolveRouteGuard,
+      }),
     );
   }
 

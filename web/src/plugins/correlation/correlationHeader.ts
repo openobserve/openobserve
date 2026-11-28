@@ -10,6 +10,14 @@ export interface CandidateMenu {
   more: number;
 }
 
+/** A dimension the charts do not filter by: absent from the streams, or relaxed because it matched no rows. */
+export interface DroppedDimension {
+  id: string;
+  field: string;
+  reason: "missing" | "relaxed";
+  value?: string;
+}
+
 export interface HeaderVersionInput {
   ambiguous: boolean;
   instanceVersion: string | null;
@@ -70,6 +78,18 @@ export function correlatedByKeys(
     .map((key, index) => ({ key, index, rank: placeRank(key, groups, location) }))
     .sort((a, b) => a.rank - b.rank || a.index - b.index)
     .map((entry) => entry.key);
+}
+
+/** Dimensions the server dropped on any stream of a tab; one applied on another stream is a chip, not a drop. */
+export function droppedDimensions(streams: StreamInfo[], groups: FieldAlias[]): DroppedDimension[] {
+  const byId = new Map<string, DroppedDimension>();
+  for (const key of streams.flatMap((stream) => stream.dropped_dimensions ?? [])) {
+    const id = groupId(key, groups);
+    if (id === SERVICE_GROUP_ID || byId.has(id) || isApplied(key, streams, groups)) continue;
+    const field = groups.find((group) => group.id === key)?.fields[0] ?? key;
+    byId.set(id, { id, field, reason: "missing" });
+  }
+  return [...byId.values()];
 }
 
 /** A chip's name as the org's semantic group reads it, so every alias of a dimension reads the same; null without a group. */

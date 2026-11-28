@@ -25,10 +25,13 @@ use std::{
 };
 
 use axum::http::Method;
-use config::utils::delegation::SCOPE_SLACK_ACTION;
+use config::utils::delegation::{SCOPE_AUTORESOLVE, SCOPE_SLACK_ACTION};
 #[cfg(any(feature = "enterprise", test))]
 use config::{
-    meta::slack::{DisabledReason, ExternalIdentityLink, SlackInstallation},
+    meta::{
+        autoresolve::RunState,
+        slack::{DisabledReason, ExternalIdentityLink, SlackInstallation},
+    },
     utils::delegation::{Claims, DelegationError, Keys, SCOPE_ASSISTANT, verify},
 };
 use openobserve_core::auth::AuthExtractor;
@@ -53,6 +56,7 @@ const RESERVED_STREAM_SLOTS: &[&str] = &[
     "annotation_queues",
     "anomaly_detection",
     "cipher_keys",
+    "dashboards",
     "datasets",
     "enrichment_tables",
     "eval_jobs",
@@ -191,6 +195,40 @@ const SLACK_ACTION_SCOPE: &[ScopeRoute] = &[
     v2(&[Param, Lit("autoobserve"), Lit("decisions")], POST),
     #[cfg(feature = "enterprise")]
     v2(&[Param, Lit("autoobserve"), Lit("decisions"), Param, Lit("undo")], POST),
+    #[cfg(feature = "enterprise")]
+    v2(&[Param, Lit("autoresolve"), Lit("runs"), Param, Lit("approve")], POST),
+    #[cfg(feature = "enterprise")]
+    v2(&[Param, Lit("autoresolve"), Lit("runs"), Param, Lit("decline")], POST),
+    // Run on an incident trigger's proposal.
+    #[cfg(feature = "enterprise")]
+    v2(&[Param, Lit("autoresolve"), Lit("saved"), Param, Lit("run")], POST),
+];
+
+/// An AutoResolve turn's reads and its run's internal routes; no approve, decline or settings route.
+#[rustfmt::skip]
+const AUTORESOLVE_SCOPE: &[ScopeRoute] = &[
+    v1(&[Param, Lit("_search_stream")], POST),
+    v1(&[Param, Lit("_search_multi_stream")], POST),
+    v1(&[Param, Stream, Lit("traces"), Lit("latest_stream")], GET),
+    v1(&[Param, Lit("streams")], GET),
+    v1(&[Param, Lit("streams"), Param, Lit("schema")], GET),
+    v1(&[Param, Stream, Lit("_values")], GET),
+    v1(&[Param, Stream, Lit("_around")], GET),
+    v1(&[Param, Lit("prometheus"), Lit("api"), Lit("v1"), Lit("query")], GET_POST),
+    v1(&[Param, Lit("prometheus"), Lit("api"), Lit("v1"), Lit("query_range")], GET_POST),
+    v2(&[Param, Lit("alerts")], GET),
+    v2(&[Param, Lit("alerts"), ALERT_ID], GET),
+    v2(&[Param, Lit("alerts"), Lit("incidents")], GET),
+    v2(&[Param, Lit("alerts"), Lit("incidents"), Param], GET),
+    v1(&[Param, Lit("mcp")], GET_POST),
+    #[cfg(feature = "enterprise")]
+    v2(&[Param, Lit("autoresolve"), Lit("runs"), Param, Lit("plan")], POST),
+    #[cfg(feature = "enterprise")]
+    v2(&[Param, Lit("autoresolve"), Lit("runs"), Param, Lit("outcome")], POST),
+    #[cfg(feature = "enterprise")]
+    v2(&[Param, Lit("autoresolve"), Lit("runs"), Param, Lit("consume")], POST),
+    #[cfg(feature = "enterprise")]
+    v2(&[Param, Lit("autoresolve"), Lit("runs"), Param, Lit("steps"), Param, Lit("result")], POST),
 ];
 
 /// Set only by the validator; a request extension, so a client can never supply it.
@@ -206,6 +244,10 @@ pub struct DelegatedCaller {
 impl DelegatedCaller {
     pub fn is_slack_action(&self) -> bool {
         self.scope == SCOPE_SLACK_ACTION
+    }
+
+    pub fn is_autoresolve_run(&self) -> bool {
+        self.scope == SCOPE_AUTORESOLVE
     }
 }
 
@@ -293,6 +335,33 @@ impl LinkFacts {
     }
 }
 
+/// What the `autoresolve_runs` row named by an `autoresolve` token's `lid` says.
+#[cfg(any(feature = "enterprise", test))]
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct RunFacts {
+    org: String,
+    state: String,
+    turn_identity: String,
+}
+
+#[cfg(any(feature = "enterprise", test))]
+impl RunFacts {
+    /// Only mid-turn: a run waiting for approval or ended holds no turn that may call back.
+    fn admit(&self, claims: &Claims) -> Result<(), AuthError> {
+        let reason = if self.org != claims.org {
+            "run is in another org"
+        } else if !RunState::parse(&self.state).is_some_and(|s| s.is_live()) {
+            "run is not mid-turn"
+        } else if self.turn_identity != claims.sub {
+            "token subject is not the run identity"
+        } else {
+            return Ok(());
+        };
+        log::debug!("delegated token refused: {reason}");
+        Err(unauthorized())
+    }
+}
+
 /// Validation steps 0-5 of the delegated-token contract; `authorize` runs steps 6 and 7.
 #[cfg(feature = "enterprise")]
 pub async fn validate_delegated(
@@ -308,13 +377,20 @@ pub async fn validate_delegated(
     let claims = verified_claims(
         token,
         slack_on,
+        openobserve_core::autoresolve::autoresolve_on,
         signing_keys,
         now_secs,
         slack::disabled_reason,
     )?;
     check_route(path, path_prefix, method, &claims)?;
-    let facts = link_facts(&claims.lid, Instant::now()).await?;
-    facts.admit(&claims)?;
+    let installation_id = if claims.scope == SCOPE_AUTORESOLVE {
+        admit_run(&claims, autoresolve_run_facts).await?;
+        String::new()
+    } else {
+        let facts = link_facts(&claims.lid, Instant::now()).await?;
+        facts.admit(&claims)?;
+        facts.installation_id
+    };
     let Some(user) = openobserve_core::users::get_user(Some(&claims.org), &claims.sub).await else {
         return Err(forbidden("not a member of the org"));
     };
@@ -328,7 +404,7 @@ pub async fn validate_delegated(
         token_name: None,
         delegation: Some(DelegatedCaller {
             link_id: claims.lid,
-            installation_id: facts.installation_id,
+            installation_id,
             org: claims.org,
             jti: claims.jti,
             scope: claims.scope,
@@ -356,6 +432,11 @@ pub fn in_slack_action_scope(method: &Method, path: &str) -> bool {
     in_scope(SLACK_ACTION_SCOPE, method, path)
 }
 
+/// Whether an `autoresolve` token may call `method` on `path` (relative to `/api`).
+pub fn in_autoresolve_scope(method: &Method, path: &str) -> bool {
+    in_scope(AUTORESOLVE_SCOPE, method, path)
+}
+
 /// Validation step 6 (as the validator's own permission check), then step 7's usage touch.
 pub(crate) async fn authorize(
     result: AuthValidationResult,
@@ -372,10 +453,18 @@ pub(crate) async fn authorize(
         .await;
     if !allowed {
         log::debug!("delegated token refused: permission denied");
-        return Err(AuthError::RoleRefused("Unauthorized Access".to_string()));
+        return Err(AuthError::RoleRefused {
+            user_email: result.user_email,
+            message: "Unauthorized Access".to_string(),
+        });
     }
+    // A run token's link id is a run id, never a Slack link to keep fresh.
     #[cfg(feature = "enterprise")]
-    if let Some(caller) = &result.delegation {
+    if let Some(caller) = result
+        .delegation
+        .as_ref()
+        .filter(|c| c.scope != SCOPE_AUTORESOLVE)
+    {
         touch_if_due(&caller.link_id, config::utils::time::now_micros()).await;
     }
     Ok(result)
@@ -397,16 +486,23 @@ const fn v2(segments: &'static [Seg], methods: &'static [&'static str]) -> Scope
     }
 }
 
-/// Slack off answers before the keys are derived, so stray `o2dt.` bearers cost nothing.
+/// Slack and AutoResolve both off answer before the keys are derived, so stray `o2dt.` bearers
+/// cost nothing.
 #[cfg(any(feature = "enterprise", test))]
 fn verified_claims(
     token: &str,
     slack_on: bool,
+    autoresolve_on: impl Fn() -> bool,
     keys: impl FnOnce() -> anyhow::Result<Keys>,
     now_secs: i64,
     disabled_reason: impl Fn(&str) -> Option<DisabledReason>,
 ) -> Result<Claims, AuthError> {
-    if !slack_on {
+    // The gate reads the licence and derives keys, so a Slack token never asks for it.
+    let autoresolve_on = {
+        let open = std::cell::OnceCell::new();
+        move || *open.get_or_init(&autoresolve_on)
+    };
+    if !slack_on && !autoresolve_on() {
         return Err(unauthorized());
     }
     let keys = keys().map_err(|e| {
@@ -417,7 +513,15 @@ fn verified_claims(
         log::debug!("delegated token refused: {e}");
         unauthorized()
     })?;
-    if let Some(reason) = disabled_reason(&claims.org) {
+    // A run token involves no Slack link, so it follows the AutoResolve gate instead of Slack's.
+    if claims.scope == SCOPE_AUTORESOLVE {
+        if !autoresolve_on() {
+            log::debug!("delegated token refused: AutoResolve is off");
+            return Err(unauthorized());
+        }
+    } else if !slack_on {
+        return Err(unauthorized());
+    } else if let Some(reason) = disabled_reason(&claims.org) {
         log::debug!("delegated token refused: Slack is off ({reason:?})");
         return Err(unauthorized());
     }
@@ -454,6 +558,7 @@ fn scope_routes(scope: &str) -> Option<&'static [ScopeRoute]> {
     match scope {
         SCOPE_ASSISTANT => Some(ASSISTANT_SCOPE),
         SCOPE_SLACK_ACTION => Some(SLACK_ACTION_SCOPE),
+        SCOPE_AUTORESOLVE => Some(AUTORESOLVE_SCOPE),
         _ => None,
     }
 }
@@ -548,6 +653,36 @@ fn loaded_facts(loaded: anyhow::Result<LinkFacts>, lid: &str) -> Result<LinkFact
         log::error!("delegated token: loading link {lid} failed: {e}");
         AuthError::Unavailable("Service Unavailable".to_string())
     })
+}
+
+/// A failed lookup is 503 as for a link; a missing run is 401 like an expired token.
+#[cfg(any(feature = "enterprise", test))]
+async fn admit_run<F, Fut>(claims: &Claims, lookup: F) -> Result<(), AuthError>
+where
+    F: FnOnce(String, String) -> Fut,
+    Fut: Future<Output = anyhow::Result<Option<RunFacts>>>,
+{
+    let run = lookup(claims.org.clone(), claims.lid.clone())
+        .await
+        .map_err(|e| {
+            log::error!("delegated token: loading run {} failed: {e}", claims.lid);
+            AuthError::Unavailable("Service Unavailable".to_string())
+        })?;
+    let Some(run) = run else {
+        log::debug!("delegated token refused: unknown run");
+        return Err(unauthorized());
+    };
+    run.admit(claims)
+}
+
+#[cfg(feature = "enterprise")]
+async fn autoresolve_run_facts(org: String, run_id: String) -> anyhow::Result<Option<RunFacts>> {
+    let run = infra::table::autoresolve_runs::get(&org, &run_id).await?;
+    Ok(run.map(|r| RunFacts {
+        org: r.org,
+        state: r.state,
+        turn_identity: r.turn_identity,
+    }))
 }
 
 #[cfg(feature = "enterprise")]
@@ -648,7 +783,7 @@ mod tests {
         match result {
             Ok(_) => 200,
             Err(AuthError::Unauthorized(_)) => 401,
-            Err(AuthError::Forbidden(_) | AuthError::RoleRefused(_)) => 403,
+            Err(AuthError::Forbidden(_) | AuthError::RoleRefused { .. }) => 403,
             Err(AuthError::NotFound(_)) => 404,
             Err(AuthError::Locked { .. }) => 429,
             Err(AuthError::Unavailable(_)) => 503,
@@ -699,6 +834,27 @@ mod tests {
         status(LinkFacts::from_rows(link, installation, orgs, Instant::now()).admit(claims))
     }
 
+    async fn autoresolve_admission(
+        slack_on: bool,
+        autoresolve_on: bool,
+        claims: &Claims,
+        run: Option<RunFacts>,
+    ) -> u16 {
+        let token = token(claims);
+        let slack_disabled = |_: &str| Some(DisabledReason::Flag);
+        match verified_claims(
+            &token,
+            slack_on,
+            || autoresolve_on,
+            || Ok(keys()),
+            NOW_SECS,
+            slack_disabled,
+        ) {
+            Ok(verified) => status(admit_run(&verified, |_, _| async move { Ok(run) }).await),
+            Err(e) => status(Err::<(), _>(e)),
+        }
+    }
+
     #[test]
     fn refused_when_slack_disabled() {
         let token = token(&claims("acme"));
@@ -706,6 +862,7 @@ mod tests {
             status(verified_claims(
                 &token,
                 true,
+                || false,
                 || Ok(keys()),
                 NOW_SECS,
                 |_| Some(DisabledReason::Flag)
@@ -716,6 +873,7 @@ mod tests {
             status(verified_claims(
                 &token,
                 true,
+                || panic!("the AutoResolve gate was read for a Slack token"),
                 || Ok(keys()),
                 NOW_SECS,
                 |_| None
@@ -741,6 +899,7 @@ mod tests {
                 status(verified_claims(
                     &token,
                     true,
+                    || false,
                     || Ok(keys()),
                     NOW_SECS,
                     |_| Some(reason)
@@ -752,6 +911,7 @@ mod tests {
         let no_key = verified_claims(
             &token,
             true,
+            || false,
             || Err(anyhow::anyhow!("no master key")),
             NOW_SECS,
             |_| None,
@@ -765,6 +925,7 @@ mod tests {
         let refused = verified_claims(
             &token,
             false,
+            || false,
             || panic!("signing keys were read with Slack off"),
             NOW_SECS,
             |_| None,
@@ -793,6 +954,7 @@ mod tests {
             status(verified_claims(
                 &token,
                 true,
+                || false,
                 || Ok(keys()),
                 NOW_SECS,
                 only_other
@@ -826,6 +988,7 @@ mod tests {
                 status(verified_claims(
                     &bad,
                     true,
+                    || false,
                     || Ok(keys()),
                     NOW_SECS,
                     |_| None
@@ -846,6 +1009,7 @@ mod tests {
             status(verified_claims(
                 &token,
                 true,
+                || false,
                 || Ok(keys()),
                 NOW_SECS,
                 |_| None
@@ -861,6 +1025,7 @@ mod tests {
             status(verified_claims(
                 &token,
                 true,
+                || false,
                 || Ok(keys()),
                 NOW_SECS,
                 |_| None
@@ -881,6 +1046,10 @@ mod tests {
             (Method::POST, "/acme/oncall/responses/r1/snooze"),
             (Method::POST, "/acme/oncall/responses/r1/acknowledge"),
             (Method::POST, "/acme/oncall/responses/r1/unacknowledge"),
+            #[cfg(feature = "enterprise")]
+            (Method::POST, "/v2/acme/autoresolve/runs/r1/approve"),
+            #[cfg(feature = "enterprise")]
+            (Method::POST, "/v2/acme/autoresolve/runs/r1/decline"),
         ] {
             assert_eq!(action_route(method.clone(), path), 200, "{method} {path}");
         }
@@ -1165,6 +1334,46 @@ mod tests {
         assert!(!facts.is_fresh(loaded + LINK_CACHE_TTL));
         assert!(!touch_due(NOW, NOW + 59_999_999));
         assert!(touch_due(NOW, NOW + 60_000_000));
+    }
+
+    #[tokio::test]
+    async fn autoresolve_token_is_admitted_only_for_its_live_run() {
+        let run = |org: &str, state: &str, identity: &str| {
+            Some(RunFacts {
+                org: org.to_string(),
+                state: state.to_string(),
+                turn_identity: identity.to_string(),
+            })
+        };
+        let autoresolve = Claims {
+            scope: SCOPE_AUTORESOLVE.to_string(),
+            lid: "run_01".to_string(),
+            ..claims("acme")
+        };
+        let assistant = claims("acme");
+        let live = run("acme", "investigating", "alice@acme.io");
+        #[rustfmt::skip]
+        let rows = [
+            ("live run, Slack disabled", false, true, &autoresolve, live.clone(), 200),
+            ("run ended", false, true, &autoresolve, run("acme", "worked", "alice@acme.io"), 401),
+            ("waiting for approval", false, true, &autoresolve, run("acme", "waiting_approval", "alice@acme.io"), 401),
+            ("run of another org", false, true, &autoresolve, run("other", "investigating", "alice@acme.io"), 401),
+            ("sub is not the turn identity", false, true, &autoresolve, run("acme", "investigating", "bob@acme.io"), 401),
+            ("unknown run", false, true, &autoresolve, None, 401),
+            ("AutoResolve off", true, false, &autoresolve, live.clone(), 401),
+            ("Slack scope still needs Slack", false, true, &assistant, live.clone(), 401),
+        ];
+        for (name, slack_on, autoresolve_on, claims, run, want) in rows {
+            assert_eq!(
+                autoresolve_admission(slack_on, autoresolve_on, claims, run).await,
+                want,
+                "{name}"
+            );
+        }
+        let failed = admit_run(&autoresolve, |_, _| async {
+            Err(anyhow::anyhow!("database is down"))
+        });
+        assert_eq!(status(failed.await), 503);
     }
 
     #[cfg(not(feature = "enterprise"))]

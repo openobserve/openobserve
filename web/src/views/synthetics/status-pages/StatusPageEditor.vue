@@ -120,7 +120,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <StatusPageImageField
                       :label="t('statusPages.fields.logo')"
-                      :upload-label="t('statusPages.fields.logoUpload')"
                       :clear-label="
                         usingOrgLogoDefault
                           ? t('statusPages.fields.logoRevertToOrg')
@@ -141,11 +140,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                     <StatusPageImageField
                       :label="t('statusPages.fields.favicon')"
-                      :upload-label="t('statusPages.fields.faviconUpload')"
                       :clear-label="t('statusPages.fields.faviconRemove')"
                       :image="previewValues.favicon_img"
                       :locked="!logoUploadEnabled"
-                      square
                       data-test="status-page-favicon"
                       @select="(value) => onImageSelected('favicon_img', value)"
                       @clear="form.setFieldValue('favicon_img', '')"

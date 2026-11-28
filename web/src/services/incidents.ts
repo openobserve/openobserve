@@ -248,6 +248,10 @@ export interface RcaToolCall {
   input?: unknown;
   /** Present only with the org setting `ai_rca_thread_tool_output`. */
   output?: string | null;
+  /** AutoResolve runs: the guard held this change while planning, so it did not run. */
+  held?: boolean;
+  /** AutoResolve runs: the connection's name for a connection tool; null for any other tool. */
+  connection?: string | null;
 }
 
 /** One step the agent recorded with `record_step`. */
@@ -1130,6 +1134,7 @@ const incidents = {
       resolve_from_source: true,
       start_time: firings.window.startTime,
       end_time: Math.min(firings.window.endTime, Date.now() * 1000),
+      check_data: true,
     };
 
     const response = await serviceStreamsApi.correlate(org_identifier, request);

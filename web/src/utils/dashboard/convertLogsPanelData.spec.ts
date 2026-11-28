@@ -169,3 +169,84 @@ describe("toEpochMillis", () => {
     expect(toEpochMillis(null)).toBeNull();
   });
 });
+
+describe("unusable configured time fields", () => {
+  it("reads values before 2000 or that are not dates as no time, without reordering the rows", () => {
+    const statusRows = [
+      { status: 500, message: "a" },
+      { status: 200, message: "b" },
+      { status: 404, message: "c" },
+    ];
+    const result = convertLogsPanelData(panel({ logs_time_field: "status" }), [statusRows], store);
+    expect(result.rows.map((row) => row.time)).toEqual([null, null, null]);
+    expect(result.rows.map((row) => row.source.message)).toEqual(["a", "b", "c"]);
+    expect(result.fieldIssues).toEqual([{ role: "time", field: "status" }]);
+    expect(toEpochMillis("GET /api/search 26ms")).toBeNull();
+    expect(toEpochMillis(0)).toBeNull();
+    expect(toEpochMillis("1999-12-31T23:59:59Z")).toBeNull();
+    expect(toEpochMillis("2000-01-01T00:00:00Z")).toBe(Date.UTC(2000, 0, 1));
+  });
+
+  it("never reads free text with numbers in it as a date", () => {
+    for (const text of ["pt row 49 (newest is 59)", "error 500 at step 3", "v2.10", "row 48"]) {
+      expect(toEpochMillis(text), text).toBeNull();
+    }
+    const messages = [
+      { message: "pt row 48 (newest is 59)" },
+      { message: "pt row 49 (newest is 59)" },
+      { message: "pt row 47 (newest is 59)" },
+    ];
+    const result = convertLogsPanelData(panel({ logs_time_field: "message" }), [messages], store);
+    expect(result.rows.map((row) => row.time)).toEqual([null, null, null]);
+    expect(result.rows.map((row) => row.source)).toEqual(messages);
+    expect(result.fieldIssues).toEqual([{ role: "time", field: "message" }]);
+  });
+
+  it("keeps reading date-shaped strings, and drops times more than a year ahead", () => {
+    expect(toEpochMillis("2026-10-27T03:36:37.456Z")).toBe(Date.UTC(2026, 9, 27, 3, 36, 37, 456));
+    expect(toEpochMillis("2026-10-27T03:36:37+05:30")).toBe(Date.UTC(2026, 9, 26, 22, 6, 37));
+    expect(toEpochMillis("2026-10-27 03:36:37.5")).toBe(Date.UTC(2026, 9, 27, 3, 36, 37, 500));
+    expect(toEpochMillis("2026-10-27")).toBe(Date.UTC(2026, 9, 27));
+    expect(toEpochMillis(Date.now() + 2 * 365 * 24 * 3600 * 1000)).toBeNull();
+    expect(toEpochMillis("2049-01-01T00:00:00Z")).toBeNull();
+  });
+
+  it("reads the other date formats it read before, as UTC when they name no zone", () => {
+    const at = Date.UTC(2026, 9, 27, 3, 36, 37);
+    for (const text of [
+      "2026/10/27 03:36:37",
+      "2026.10.27 03:36:37",
+      "2026-10-27 3:36:37",
+      "10/27/2026 03:36:37",
+      "27 Oct 2026 03:36:37",
+      "Oct 27, 2026 03:36:37",
+      "Tue, 27 Oct 2026 03:36:37 GMT",
+    ]) {
+      expect(toEpochMillis(text), text).toBe(at);
+    }
+    expect(toEpochMillis("2026-10-27 09:06:37 +05:30")).toBe(at);
+    for (const text of ["login failed 2026-10-27 03:36:37", "Oct 27 2026 disk full", "2026"]) {
+      expect(toEpochMillis(text), text).toBeNull();
+    }
+  });
+
+  it("flags only configured fields with no value in any row", () => {
+    const result = convertLogsPanelData(
+      panel({ logs_message_field: "nosuchfield", logs_level_field: "level" }),
+      [rows],
+      store,
+    );
+    expect(result.fieldIssues).toEqual([{ role: "message", field: "nosuchfield" }]);
+    expect(convertLogsPanelData(panel(), [[{ code: 7 }]], store).fieldIssues).toEqual([]);
+    expect(
+      convertLogsPanelData(
+        panel({ logs_message_field: "log.msg" }),
+        [[{ log: { msg: "hi" } }]],
+        store,
+      ).fieldIssues,
+    ).toEqual([]);
+    expect(
+      convertLogsPanelData(panel({ logs_message_field: "nosuchfield" }), [[]], store).fieldIssues,
+    ).toEqual([]);
+  });
+});

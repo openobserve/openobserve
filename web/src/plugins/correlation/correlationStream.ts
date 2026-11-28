@@ -26,6 +26,8 @@ export interface StreamRowsRequest {
   signal?: AbortSignal;
   /** Resolve a partial answer with the rows that arrived; errors still reject. */
   keepPartial?: boolean;
+  /** Stream type the SQL reads; defaults to traces. */
+  streamType?: "traces" | "logs" | "metrics";
 }
 
 interface StreamResults {
@@ -71,7 +73,7 @@ export function streamTraceRows<T>(request: StreamRowsRequest): Promise<T[]> {
         type: "search",
         traceId,
         org_id: request.org,
-        pageType: "traces",
+        pageType: request.streamType ?? "traces",
         searchType: "ui",
       },
       {
