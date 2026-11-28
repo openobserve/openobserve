@@ -231,7 +231,7 @@ describe("ONavbar", () => {
       wrapper = mountNavbar({
         linksList: [
           { title: "Home", icon: "home", link: "/home", name: "home" },
-          { title: "IAM", icon: "manage-accounts", link: "/iam", name: "iam" },
+          { title: "Users & access", icon: "manage-accounts", link: "/iam", name: "iam" },
           { title: "Settings", icon: "settings", link: "/settings", name: "settings" },
           { title: "AI", icon: "auto-awesome", link: "/ai", name: "aiObservability" },
         ],
