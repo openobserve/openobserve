@@ -29,7 +29,7 @@
 
 import { describe, expect, it, afterEach, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
-import { nextTick } from "vue";
+import { nextTick, reactive } from "vue";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -77,6 +77,9 @@ import {
   anomalyCanCheckDataNow,
   anomalySensitivityModel,
   anomalyWindowShareErrors,
+  anomalySqlReadsStream,
+  buildAnomalyDefaultSql,
+  isAnomalyDefaultSql,
   lookBackWindowFloorSeconds,
 } from "./AnomalyDetectionConfig.schema";
 import enLocale from "@/locales/languages/en-US.json";
@@ -1486,6 +1489,205 @@ describe("AnomalyDetectionConfig", () => {
       expect(wrapper.find('[data-test="anomaly-detection-window-legacy-warning"]').exists()).toBe(
         false,
       );
+    });
+  });
+
+  describe("custom_sql follows the stream (o2-enterprise#3579 item 1)", () => {
+    const streamWarning = () => wrapper.find('[data-test="anomaly-custom-sql-stream-warning"]');
+    const mountReactive = async (overrides: Record<string, unknown>) => {
+      const config = reactive(buildConfig(overrides));
+      wrapper = mount(AnomalyDetectionConfig, { ...mountOptions, props: { config } });
+      await flushPromises();
+      return config;
+    };
+
+    it("recognises only the untouched default for the current interval", () => {
+      const sql = buildAnomalyDefaultSql("a", 5, "m");
+      expect(isAnomalyDefaultSql(sql, 5, "m")).toBe(true);
+      expect(isAnomalyDefaultSql(sql, 10, "m")).toBe(false);
+      expect(isAnomalyDefaultSql(sql.replace("count(*)", "max(latency)"), 5, "m")).toBe(false);
+      expect(isAnomalyDefaultSql("", 5, "m")).toBe(false);
+    });
+
+    it("matches the stream only as a whole name", () => {
+      expect(anomalySqlReadsStream('SELECT 1 FROM "app-logs"', "app-logs")).toBe(true);
+      expect(anomalySqlReadsStream("SELECT 1 FROM app_logs WHERE x=1", "app_logs")).toBe(true);
+      expect(anomalySqlReadsStream('SELECT 1 FROM "app_logs_v2"', "app_logs")).toBe(false);
+      expect(anomalySqlReadsStream('SELECT 1 FROM "app-logs-old"', "app-logs")).toBe(false);
+    });
+
+    it("regenerates the untouched default when the stream changes", async () => {
+      const config = await mountReactive({ query_mode: "custom_sql", stream_name: "a" });
+      expect(getForm(wrapper).state.values.custom_sql).toBe(buildAnomalyDefaultSql("a", 5, "m"));
+
+      config.stream_name = "b";
+      await flushPromises();
+
+      expect(getForm(wrapper).state.values.custom_sql).toBe(buildAnomalyDefaultSql("b", 5, "m"));
+      expect(streamWarning().exists()).toBe(false);
+    });
+
+    it("regenerates the default after a resolution edit too", async () => {
+      const config = await mountReactive({ query_mode: "custom_sql", stream_name: "a" });
+      getForm(wrapper).setFieldValue("histogram_interval_value", 10);
+      await flushPromises();
+
+      config.stream_name = "b";
+      await flushPromises();
+
+      expect(getForm(wrapper).state.values.custom_sql).toBe(buildAnomalyDefaultSql("b", 10, "m"));
+    });
+
+    it("regenerates a default left over from filters mode on the switch back", async () => {
+      const config = await mountReactive({ query_mode: "custom_sql", stream_name: "a" });
+      getForm(wrapper).setFieldValue("query_mode", "filters");
+      await flushPromises();
+      config.stream_name = "b";
+      await flushPromises();
+      getForm(wrapper).setFieldValue("query_mode", "custom_sql");
+      await flushPromises();
+
+      expect(getForm(wrapper).state.values.custom_sql).toBe(buildAnomalyDefaultSql("b", 5, "m"));
+    });
+
+    it("keeps an edited query and warns without blocking the save", async () => {
+      const edited = buildAnomalyDefaultSql("a", 5, "m").replace("count(*)", "max(latency)");
+      const config = await mountReactive({
+        query_mode: "custom_sql",
+        stream_name: "a",
+        custom_sql: edited,
+      });
+      expect(streamWarning().exists()).toBe(false);
+
+      config.stream_name = "b";
+      await flushPromises();
+
+      expect(getForm(wrapper).state.values.custom_sql).toBe(edited);
+      expect(streamWarning().text()).toContain("b");
+      await getForm(wrapper).handleSubmit();
+      await nextTick();
+      expect(getForm(wrapper).state.isValid).toBe(true);
+    });
+  });
+
+  describe("interval pair rules (o2-enterprise#3579 item 3, mirrors validate_interval_pair)", () => {
+    const submitted = async (
+      overrides: Record<string, unknown>,
+      extraProps: Record<string, unknown> = {},
+    ): Promise<VueWrapper> => {
+      const w = mountConfig(
+        { detection_window_value: 1, detection_window_unit: "d", ...overrides },
+        extraProps,
+      );
+      await flushPromises();
+      await getForm(w).handleSubmit();
+      await nextTick();
+      return w;
+    };
+
+    it("rejects a resolution that does not divide the 2001-01-01 origin, on its own field", async () => {
+      // 978307200 % 420 = 360
+      wrapper = await submitted({
+        histogram_interval_value: 7,
+        schedule_interval_value: 7,
+        schedule_interval_unit: "m",
+      });
+      expect(fieldError(wrapper, "histogram_interval_value")).toBe(
+        "Detection Resolution 7m does not fit the time grid that starts on 2001-01-01: it leaves 6m over. Use a value such as 1m, 5m, 10m, 15m or 1h.",
+      );
+      expect(getForm(wrapper).state.isValid).toBe(false);
+    });
+
+    it.each([
+      [30, "s"],
+      [1, "m"],
+      [5, "m"],
+      [15, "m"],
+      [1, "h"],
+      [1, "d"],
+    ])("accepts %s%s, which divides the origin", async (value, unit) => {
+      wrapper = await submitted({
+        histogram_interval_value: value,
+        histogram_interval_unit: unit,
+        schedule_interval_value: 1,
+        schedule_interval_unit: "d",
+        detection_window_value: 2,
+      });
+      expect(fieldError(wrapper, "histogram_interval_value")).toBeUndefined();
+      expect(fieldError(wrapper, "schedule_interval_value")).toBeUndefined();
+    });
+
+    it("rejects a schedule shorter than the resolution, on the schedule field", async () => {
+      wrapper = await submitted({
+        histogram_interval_value: 10,
+        schedule_interval_value: 5,
+        schedule_interval_unit: "m",
+      });
+      expect(fieldError(wrapper, "schedule_interval_value")).toBe(
+        "Check Every must not be shorter than the Detection Resolution (10m): each run would score a partial bucket.",
+      );
+      expect(fieldError(wrapper, "histogram_interval_value")).toBeUndefined();
+    });
+
+    it("rejects a schedule that is not a whole multiple and names the next one", async () => {
+      wrapper = await submitted({
+        histogram_interval_value: 10,
+        schedule_interval_value: 25,
+        schedule_interval_unit: "m",
+      });
+      expect(fieldError(wrapper, "schedule_interval_value")).toBe(
+        "Check Every must be a whole multiple of the Detection Resolution (10m), such as 30m: otherwise runs split buckets and score partial data.",
+      );
+    });
+
+    it("accepts an equal schedule and a whole multiple", async () => {
+      wrapper = await submitted({
+        histogram_interval_value: 5,
+        schedule_interval_value: 5,
+        schedule_interval_unit: "m",
+      });
+      expect(getForm(wrapper).state.isValid).toBe(true);
+      wrapper.unmount();
+      wrapper = await submitted({
+        histogram_interval_value: 5,
+        schedule_interval_value: 1,
+        schedule_interval_unit: "h",
+      });
+      expect(getForm(wrapper).state.isValid).toBe(true);
+    });
+
+    it("shows the one-minute floor, not the multiple rule, for a sub-minute schedule", async () => {
+      wrapper = await submitted({
+        histogram_interval_value: 1,
+        histogram_interval_unit: "m",
+        schedule_interval_value: 30,
+        schedule_interval_unit: "s",
+      });
+      expect(fieldError(wrapper, "schedule_interval_value")).toBe(
+        "Check Every must be at least 1m.",
+      );
+    });
+
+    it("grandfathers an untouched stored pair, as the server's update path does", async () => {
+      const stored = {
+        histogram: { raw: "7m", value: 7, unit: "m", parsed: true },
+        schedule: { raw: "10m", value: 10, unit: "m", parsed: true },
+        window: { raw: 86400, value: 1, unit: "d", parsed: true },
+      };
+      const pair = {
+        histogram_interval_value: 7,
+        schedule_interval_value: 10,
+        schedule_interval_unit: "m",
+      };
+      wrapper = await submitted(pair, { storedIntervals: stored });
+      expect(getForm(wrapper).state.isValid).toBe(true);
+      wrapper.unmount();
+
+      wrapper = await submitted(
+        { ...pair, schedule_interval_value: 14 },
+        { storedIntervals: stored },
+      );
+      expect(fieldError(wrapper, "histogram_interval_value")).toContain("7m");
     });
   });
 });

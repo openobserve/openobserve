@@ -129,6 +129,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
               </i18n-t>
             </div>
+            <div
+              v-if="sqlStreamMismatch"
+              class="text-status-warning-text pt-1 text-xs"
+              data-test="anomaly-custom-sql-stream-warning"
+            >
+              <i18n-t keypath="alerts.anomaly.streamNotInSql" tag="span">
+                <template #stream>
+                  <code>{{ raw(config.stream_name) }}</code>
+                </template>
+              </i18n-t>
+            </div>
             <div class="mt-1 text-xs" :class="'text-text-secondary'">
               <i18n-t keypath="alerts.anomaly.sqlColumnsHint" tag="span">
                 <template #timeBucket
@@ -698,7 +709,10 @@ import {
   anomalyModelQuery,
   formatAnomalySeconds,
   anomalyMissingValueColumn,
+  anomalySqlReadsStream,
+  buildAnomalyDefaultSql,
   hasTimestampAliasInSql,
+  isAnomalyDefaultSql,
   lookBackWindowFloorSeconds,
   type AnomalyDetectionConfigForm,
   type AnomalyFilterRow,
@@ -1095,13 +1109,14 @@ export default defineComponent({
       form.setFieldValue("custom_sql", sql);
     };
 
-    // Build default SQL template for a given stream name and histogram interval
-    const buildDefaultSql = (
-      streamName: string,
-      intervalValue: number | string,
-      intervalUnit: string,
-    ) =>
-      `SELECT histogram(_timestamp, '${intervalValue}${intervalUnit}') AS time_bucket, count(*) AS value\nFROM "${streamName}"\nGROUP BY time_bucket\nORDER BY time_bucket`;
+    // Non-blocking: the stream match is a text heuristic, and a valid query may name the stream in a way it misses.
+    const sqlStreamMismatch = computed(
+      () =>
+        queryMode.value === "custom_sql" &&
+        !!props.config.stream_name &&
+        !!customSql.value?.trim() &&
+        !anomalySqlReadsStream(customSql.value, props.config.stream_name),
+    );
 
     // Stream fields for filter field selector and detection function field
     const allStreamFields = ref<string[]>([]);
@@ -1217,40 +1232,33 @@ export default defineComponent({
       }
     };
 
+    // An empty or untouched default query follows the stream; an edited one is the user's and only warns.
+    const seedDefaultSql = (streamName: string) => {
+      const intervalValue = (form.state.values.histogram_interval_value as any) ?? 5;
+      const intervalUnit = (form.state.values.histogram_interval_unit as string) ?? "m";
+      const sql = (form.state.values.custom_sql as string) || "";
+      if (!sql || isAnomalyDefaultSql(sql, intervalValue, intervalUnit)) {
+        form.setFieldValue(
+          "custom_sql",
+          buildAnomalyDefaultSql(streamName, intervalValue, intervalUnit),
+        );
+      }
+    };
+
     watch(
       () => [props.config.stream_name, props.config.stream_type],
       ([streamName]) => {
         loadStreamFields();
-        // Pre-fill default SQL when switching to custom_sql mode with a selected stream
-        if (
-          form.state.values.query_mode === "custom_sql" &&
-          streamName &&
-          !form.state.values.custom_sql
-        ) {
-          form.setFieldValue(
-            "custom_sql",
-            buildDefaultSql(
-              streamName as string,
-              (form.state.values.histogram_interval_value as any) ?? 5,
-              (form.state.values.histogram_interval_unit as string) ?? "m",
-            ),
-          );
+        if (form.state.values.query_mode === "custom_sql" && streamName) {
+          seedDefaultSql(streamName as string);
         }
       },
       { immediate: true },
     );
 
-    // When switching to custom_sql mode, seed a default query if one isn't set
     watch(queryMode, (mode) => {
-      if (mode === "custom_sql" && props.config.stream_name && !form.state.values.custom_sql) {
-        form.setFieldValue(
-          "custom_sql",
-          buildDefaultSql(
-            props.config.stream_name,
-            (form.state.values.histogram_interval_value as any) ?? 5,
-            (form.state.values.histogram_interval_unit as string) ?? "m",
-          ),
-        );
+      if (mode === "custom_sql" && props.config.stream_name) {
+        seedDefaultSql(props.config.stream_name);
       }
     });
 
@@ -1306,6 +1314,7 @@ export default defineComponent({
       validate,
       hasTimestampAlias,
       missingValueColumn,
+      sqlStreamMismatch,
       hasSqlError,
       queryMode,
       customSql,
