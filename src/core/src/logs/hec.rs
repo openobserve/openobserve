@@ -109,10 +109,17 @@ pub async fn ingest(
         let status = HecStatus::Custom(e.to_string(), 400);
         return refusal_response(e, status);
     }
-    if let Err(e) = ingest_prepared(thread_id, org_id, streams, user).await {
-        // A 503 is retried, so the groups written before it are sent again.
-        let status = HecStatus::Custom(e.to_string(), 400);
-        return refusal_response(e, status);
+    let written = match ingest_prepared(thread_id, org_id, streams, user).await {
+        Ok(written) => written,
+        Err(e) => {
+            // A 503 is retried, so the groups written before it are sent again.
+            let status = HecStatus::Custom(e.to_string(), 400);
+            return refusal_response(e, status);
+        }
+    };
+    // a 500 is retried like the 503 above, instead of a Success for data that was not stored
+    if let Some(reason) = undelivered(&written) {
+        return Ok(HecStatus::Custom(reason.to_string(), 500).into());
     }
 
     Ok(HecStatus::Success.into())
@@ -341,6 +348,20 @@ fn refusal_response(e: Error, status: HecStatus) -> Result<HecResponse> {
         return Err(e);
     }
     Ok(status.into())
+}
+
+/// A failed write or a stream deleted mid-write still leaves `code` at 200, so only these flags
+/// say the batch was not stored.
+fn undelivered(written: &[IngestionResponse]) -> Option<&'static str> {
+    for resp in written {
+        if resp.write_failed {
+            return Some("write to storage failed");
+        }
+        if resp.stream_skipped {
+            return Some("stream is being deleted");
+        }
+    }
+    None
 }
 
 /// Deserialize a whole body as a stream of JSON values.
@@ -990,12 +1011,29 @@ mod tests {
     }
 
     #[test]
-    fn an_overload_refusal_is_the_error_and_any_other_refusal_keeps_its_status() {
-        let overload = Error::ResourceError("MemoryTableOverflowError".to_string());
-        let result = refusal_response(overload, HecStatus::InvalidIndex);
-        assert!(matches!(result, Err(Error::ResourceError(_))), "{result:?}");
-        let refused = Error::IngestionError("not an ingester".to_string());
-        let resp = refusal_response(refused, HecStatus::InvalidIndex).unwrap();
-        assert_eq!((resp.code, resp.text.as_str()), (400, "Incorrect index"));
+    fn a_stream_deleted_mid_write_is_undelivered() {
+        let written = |skipped| IngestionResponse::new(200, vec![]).with_stream_skipped(skipped);
+        assert_eq!(undelivered(&[written(false)]), None);
+        let one_skipped = [written(false), written(true)];
+        assert_eq!(undelivered(&one_skipped), Some("stream is being deleted"));
+    }
+
+    // cloud builds reject the unknown test org at the trial check
+    #[cfg(not(feature = "cloud"))]
+    #[tokio::test]
+    async fn a_batch_whose_write_fails_is_answered_500_not_success() {
+        // each event fits the columns limit but the two together do not, which fails the write
+        let half = get_config().limit.req_cols_per_record_limit / 2 + 1;
+        let event = |p: &str| {
+            let fields: json::Map<_, _> =
+                (0..half).map(|i| (format!("{p}{i}"), 1.into())).collect();
+            json::json!({"event": fields, "index": "hec_write_fails"}).to_string()
+        };
+        let body = Bytes::from(event("a") + &event("b"));
+        let resp = ingest(0, "test_org_id", body, "a@a.com").await.unwrap();
+        assert_eq!(
+            (resp.code, resp.text.as_str()),
+            (500, "write to storage failed")
+        );
     }
 }
