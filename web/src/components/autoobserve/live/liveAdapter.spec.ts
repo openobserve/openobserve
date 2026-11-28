@@ -17,7 +17,8 @@ import { describe, expect, it } from "vitest";
 import "@/locales";
 import { gt } from "@/types/i18n";
 import type { AutoObserveCoverage, AutoObserveSuggestion } from "@/services/autoobserve";
-import { toCoverageSource, toRequests, toSuggestionRows } from "./liveAdapter";
+import { insightOf, toCoverageSource, toRequests, toSuggestionRows } from "./liveAdapter";
+import { gapSplit } from "./liveCopy";
 import { detectorsOf } from "../aoTypes";
 import { KIND_LOOK } from "../v2/changes";
 
@@ -696,5 +697,55 @@ describe("silent_coverage: Notifies no one (demo bug 4)", () => {
       );
       expect(text).not.toMatch(/autoobserveLive|silent_coverage|undeliverable|_count|alert-7f3a/);
     }
+  });
+});
+
+describe("coverage_gap: a broad alert reads as a weak watch, not as nothing", () => {
+  const ev = { monitor_kind: "alert", monitor_id: "a1", monitor_name: "payments_errors" };
+  const cell = (state: string) => ({ state, evidence: state === "weak" ? [ev] : [], counts: {} });
+  const gapWith = (states: Record<string, string>) =>
+    suggestion({
+      evidence: {
+        service_name: "payments",
+        severity: "high",
+        cells: Object.fromEntries(Object.entries(states).map(([c, st]) => [c, cell(st)])),
+      },
+    });
+  const words = (checks: string[], type: "conjunction" | "disjunction") =>
+    new Intl.ListFormat("en-US", { type }).format(
+      checks.map((c) => String(gt(`insight.kind.classes.why.${c}`))),
+    );
+
+  it.each([
+    [
+      "none only",
+      { errors: "none", latency: "none", absence: "covered" },
+      ["errors", "latency"],
+      [],
+    ],
+    ["weak only", { errors: "weak", latency: "covered", absence: "covered" }, [], ["errors"]],
+    [
+      "mixed",
+      { errors: "weak", latency: "none", absence: "none" },
+      ["latency", "absence"],
+      ["errors"],
+    ],
+  ])("%s: reports each check once, as missing or weak", (_, states, missing, weak) => {
+    const s = gapWith(states);
+    const card = insightOf(gt, EAST, s);
+    const [row] = toSuggestionRows(gt, EAST, [s]);
+    expect(String(row.headline)).toBe(String(card.headline));
+    const nothing = String(gt("insight.kind.coverage_gap.headline", { service: "payments" }));
+    expect(String(card.headline) === nothing).toBe(weak.length === 0);
+    const why = String(card.why);
+    const missingWhy = String(
+      gt("insight.kind.coverage_gap.why", { classes: words(missing, "disjunction") }),
+    );
+    const weakWhy = String(
+      gt("insight.kind.coverage_gap.whyWeak", { classes: words(weak, "conjunction") }, 1),
+    );
+    expect(why.includes(missingWhy)).toBe(missing.length > 0);
+    expect(why.includes(weakWhy)).toBe(weak.length > 0);
+    expect(gapSplit(s.evidence.cells as never)).toEqual({ missing, weak });
   });
 });

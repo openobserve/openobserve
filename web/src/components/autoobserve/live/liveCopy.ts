@@ -21,7 +21,11 @@ import {
   permissionLabel,
   viewDenial,
 } from "@/composables/useAccessStore";
-import type { AutoObserveCellState, AutoObserveLearning } from "@/services/autoobserve";
+import type {
+  AutoObserveCell,
+  AutoObserveCellState,
+  AutoObserveLearning,
+} from "@/services/autoobserve";
 import { SYSTEM_ACTOR } from "@/utils/downtimes/quickMute";
 import type { ChartRange } from "../coverageSeries";
 import { LIVE_CHECKS, type CoverageCell, type LiveCheck } from "../aoTypes";
@@ -499,7 +503,7 @@ const COVERAGE_WORD: Record<LiveCoverageState, I18nKey> = {
 export const coverageWord = (t: TranslateFn, state: LiveCoverageState): I18nText =>
   t(COVERAGE_WORD[state]);
 
-export type LiveCellLook = "covered" | "gap" | "added" | "learning";
+export type LiveCellLook = "covered" | "weak" | "gap" | "added" | "learning";
 
 /** "Added" until a pass counts a new alert; a learning service's unwatched checks wait, not gap. */
 export const liveCellLook = (
@@ -509,11 +513,13 @@ export const liveCellLook = (
 ): LiveCellLook => {
   if (state === "covered") return "covered";
   if (added) return "added";
-  return learning ? "learning" : "gap";
+  if (learning) return "learning";
+  return state === "weak" ? "weak" : "gap";
 };
 
 export const LIVE_DOT: Record<LiveCellLook, string> = {
   covered: "bg-badge-success-soft-text",
+  weak: "bg-badge-amber-soft-text",
   gap: "bg-badge-amber-soft-text",
   added: "bg-border-strong",
   learning: "bg-status-neutral-text/60",
@@ -521,12 +527,13 @@ export const LIVE_DOT: Record<LiveCellLook, string> = {
 
 const LOOK_WORD: Record<LiveCellLook, I18nKey> = {
   covered: "autoobserveLive.coverage.stateWatched",
+  weak: "autoobserveLive.states.weak",
   gap: "autoobserveLive.coverage.stateGap",
   added: "autoobserveLive.cell.added",
   learning: "autoobserve.coverageLive.stateLearning",
 };
 
-// A check is Watched or has a Coverage gap; why it has one is the detail's job, not the chip's.
+// A broad alert is not coverage, but it is not nothing either, so the chip says Weak, not Gap.
 export const liveCellWord = (
   t: TranslateFn,
   state: AutoObserveCellState,
@@ -564,6 +571,57 @@ const CHECK_INLINE: Record<LiveCheck, I18nKey> = {
   errors: "insight.kind.classes.why.errors",
   latency: "insight.kind.classes.why.latency",
   absence: "insight.kind.classes.why.absence",
+};
+
+export interface GapSplit {
+  missing: LiveCheck[];
+  weak: LiveCheck[];
+}
+
+/** A gap's open checks: those no alert covers, and those only a broad, unscoped alert watches. */
+export const gapSplit = (cells: Partial<Record<string, AutoObserveCell>>): GapSplit => {
+  const open = LIVE_CHECKS.filter((c) => cells[c]?.state !== "covered");
+  return {
+    missing: open.filter((c) => cells[c]?.state !== "weak"),
+    weak: open.filter((c) => cells[c]?.state === "weak"),
+  };
+};
+
+/** The one headline for a coverage gap, on the card, in the drawer and in the suggestions list. */
+export const gapHeadline = (
+  t: TranslateFn,
+  service: I18nText,
+  cells: Partial<Record<string, AutoObserveCell>>,
+): I18nText =>
+  gapSplit(cells).weak.length
+    ? t("insight.kind.coverage_gap.headlineWeak", { service })
+    : t("insight.kind.coverage_gap.headline", { service });
+
+/** The weak checks first, as the headline names them, then the checks nothing watches. */
+export const gapWhy = (
+  t: TranslateFn,
+  locale: string,
+  cells: Partial<Record<string, AutoObserveCell>>,
+): I18nText => {
+  const { missing, weak } = gapSplit(cells);
+  const words = (checks: LiveCheck[], type: "conjunction" | "disjunction") =>
+    raw(new Intl.ListFormat(locale, { type }).format(checks.map((c) => t(CHECK_INLINE[c]))));
+  const monitors = new Set(
+    weak.flatMap((c) => (cells[c]?.evidence ?? []).map((ev) => ev.monitor_id)),
+  ).size;
+  const sentences = [
+    weak.length
+      ? t(
+          "insight.kind.coverage_gap.whyWeak",
+          { classes: words(weak, "conjunction") },
+          Math.max(1, monitors),
+        )
+      : "",
+    missing.length
+      ? t("insight.kind.coverage_gap.why", { classes: words(missing, "disjunction") })
+      : "",
+  ];
+  return raw(sentences.filter(Boolean).join(" "));
 };
 
 // Checks with no alert share one sentence; an alert that falls short keeps its own reason.

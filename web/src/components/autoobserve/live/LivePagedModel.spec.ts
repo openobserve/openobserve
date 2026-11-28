@@ -21,7 +21,7 @@ import {
   HOME_BASE,
   HOME_BASE_GROUPED,
   allClearText,
-  cantSeeText,
+  unwatchedText,
   homeOrder,
   homeView,
   isHomePriority,
@@ -100,16 +100,23 @@ describe("LivePagedModel", () => {
     expect(String(weekLabel(gt, 3))).toBe("3 weeks ago");
   });
 
-  it("names three gaps then says how many more, in the reader's locale", () => {
-    expect(cantSeeText(gt, "en-US", [])).toBeNull();
-    expect(String(cantSeeText(gt, "en-US", ["cart"]))).toBe(
-      "AutoObserve can't watch 1 service yet: cart.",
+  it("names three gaps then says how many more, and says weakly watched ones apart", () => {
+    const text = (missing: string[], weak: string[]) =>
+      unwatchedText(gt, "en-US", { missing, weak });
+    const nothing = String(
+      gt("autoobserve.homeLive.nothingWatches", { count: "1", names: "cart" }, 1),
     );
+    const weakly = String(
+      gt("autoobserve.homeLive.weaklyWatched", { count: "1", names: "pay" }, 1),
+    );
+    expect(text([], [])).toBeNull();
+    expect(String(text(["cart"], []))).toBe(nothing);
+    expect(String(text([], ["pay"]))).toBe(weakly);
+    expect(String(text(["cart"], ["pay"]))).toBe(`${nothing} ${weakly}`);
     expect(String(namesWithMore(gt, "en-US", ["a", "b"]))).toBe("a and b");
     const many = Array.from({ length: 1204 }, (_, i) => `s${i}`);
-    expect(String(cantSeeText(gt, "en-US", many))).toBe(
-      "AutoObserve can't watch 1,204 services yet: s0, s1, s2, and 1,201 more.",
-    );
+    expect(String(text(many, []))).toContain("1,204");
+    expect(String(text(many, []))).toContain("s0, s1, s2, and 1,201 more");
   });
 
   it("says the range it was clear for, and how many services it watched", () => {

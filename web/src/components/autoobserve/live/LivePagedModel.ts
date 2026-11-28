@@ -160,19 +160,28 @@ export const namesWithMore = (
 
 export const fmt = (locale: string, n: number): string => new Intl.NumberFormat(locale).format(n);
 
-/** What the home says it cannot watch; null while nothing is a gap. */
-export const cantSeeText = (
+/** Gap services nothing watches, then those only a broad alert watches; null with neither. */
+export const unwatchedText = (
   t: TranslateFn,
   locale: string,
-  gaps: readonly string[],
-): I18nText | null =>
-  gaps.length
-    ? t(
-        "autoobserve.homeLive.cantSee",
-        { count: raw(fmt(locale, gaps.length)), names: namesWithMore(t, locale, gaps) },
-        gaps.length,
-      )
-    : null;
+  gaps: { missing: readonly string[]; weak: readonly string[] },
+): I18nText | null => {
+  const say = (key: I18nKey, names: readonly string[]) =>
+    names.length
+      ? t(
+          key,
+          { count: raw(fmt(locale, names.length)), names: namesWithMore(t, locale, names) },
+          names.length,
+        )
+      : "";
+  const text = [
+    say("autoobserve.homeLive.nothingWatches", gaps.missing),
+    say("autoobserve.homeLive.weaklyWatched", gaps.weak),
+  ]
+    .filter(Boolean)
+    .join(" ");
+  return text ? raw(text) : null;
+};
 
 export const allClearText = (
   t: TranslateFn,
