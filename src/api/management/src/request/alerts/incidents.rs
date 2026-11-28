@@ -2489,8 +2489,8 @@ pub async fn get_incident_rca_live_stream(
 #[derive(Debug, Deserialize, IntoParams, ToSchema)]
 #[into_params(parameter_in = Query)]
 pub struct IncidentEventsQuery {
-    /// Merge alerts by type, alert ID and `first_at`, and other events by type and timestamp.
-    /// Deltas include only `seq > since`; refetch without it for deletions or a key seen twice.
+    /// A `delta: true` page holds only `seq > since`; merge alerts by ID and `first_at`, others by
+    /// type and timestamp. Other pages are whole; refetch whole for deletions or a repeat key.
     #[serde(default)]
     #[param(nullable)]
     pub since: Option<i64>,
@@ -2513,8 +2513,8 @@ pub struct IncidentEventsQuery {
         ("If-None-Match" = Option<String>, Header, description = "The `ETag` of the caller's copy; a current one answers 304"),
     ),
     responses(
-        (status = 200, description = "`{events, seq}`; the `ETag` header is `\"<seq>\"`", content_type = "application/json", body = Object),
-        (status = 304, description = "The timeline's `seq` equals `If-None-Match`; no body"),
+        (status = 200, description = "`{events, seq, delta?}`; the `ETag` header is `\"<seq>\"`", content_type = "application/json", body = Object),
+        (status = 304, description = "The timeline's `seq` equals `If-None-Match` and every event is stamped; no body"),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"})),
@@ -2539,21 +2539,13 @@ pub async fn get_incident_events(
     let if_none_match = headers
         .get(axum::http::header::IF_NONE_MATCH)
         .and_then(|v| v.to_str().ok());
-    if if_none_match.is_some() {
-        match infra::table::incident_events::seq(&org_id, &incident_id).await {
-            Ok(seq) if events_etag_matches(if_none_match, seq) => {
-                return events_not_modified(seq);
-            }
-            Ok(_) => {}
-            Err(e) => {
-                return MetaHttpResponse::internal_error(format!("Failed to get events: {e}"));
-            }
-        }
-    }
     let (events, seq) = match infra::table::incident_events::get_page(&org_id, &incident_id).await {
         Ok(page) => page,
         Err(e) => return MetaHttpResponse::internal_error(format!("Failed to get events: {e}")),
     };
+    if seq_complete(&events) && events_etag_matches(if_none_match, seq) {
+        return events_not_modified(seq);
+    }
 
     // Self-heal timelines emptied by the pre-fix read/write cycle (releases up to v0.91.x).
     // Repairing lazily on read avoids a migration that would rewrite every incident row;
@@ -2565,6 +2557,7 @@ pub async fn get_incident_events(
                 .await
             {
                 Ok((rebuilt, seq)) => {
+                    let since = query.since.filter(|_| seq_complete(&rebuilt));
                     // Flags that the timeline was rebuilt from incident/alert rows and is
                     // missing anything that lived only in the lost blob (comments,
                     // acknowledgements, RCA activity).
@@ -2579,7 +2572,7 @@ pub async fn get_incident_events(
                             &rca,
                             &incident_id,
                             &rebuilt,
-                            query.since,
+                            since,
                         )
                         .await
                     {
@@ -2590,7 +2583,7 @@ pub async fn get_incident_events(
                         }
                         rebuilt = security::rca_scope::project_timeline(rebuilt);
                     }
-                    return events_page(rebuilt, seq, query.since, true);
+                    return events_page(rebuilt, seq, since, true);
                 }
                 Err(e) => {
                     return MetaHttpResponse::internal_error(format!("Failed to get events: {e}"));
@@ -2604,6 +2597,7 @@ pub async fn get_incident_events(
         }
     }
 
+    let since = query.since.filter(|_| seq_complete(&events));
     let mut events = if project_timeline {
         security::rca_scope::project_timeline(events)
     } else {
@@ -2615,7 +2609,7 @@ pub async fn get_incident_events(
             &rca,
             &incident_id,
             &events,
-            query.since,
+            since,
         )
         .await
     {
@@ -2624,7 +2618,7 @@ pub async fn get_incident_events(
         }
         events = security::rca_scope::project_timeline(events);
     }
-    events_page(events, seq, query.since, false)
+    events_page(events, seq, since, false)
 }
 
 /// Get incident events timeline (OSS)
@@ -2644,8 +2638,8 @@ pub async fn get_incident_events(
         ("If-None-Match" = Option<String>, Header, description = "The `ETag` of the caller's copy; a current one answers 304"),
     ),
     responses(
-        (status = 200, description = "`{events, seq}`; the `ETag` header is `\"<seq>\"`", content_type = "application/json", body = Object),
-        (status = 304, description = "The timeline's `seq` equals `If-None-Match`; no body"),
+        (status = 200, description = "`{events, seq, delta?}`; the `ETag` header is `\"<seq>\"`", content_type = "application/json", body = Object),
+        (status = 304, description = "The timeline's `seq` equals `If-None-Match` and every event is stamped; no body"),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"})),
@@ -2674,6 +2668,13 @@ fn events_etag_matches(if_none_match: Option<&str>, seq: i64) -> bool {
     })
 }
 
+/// Whether every event carries a seq stamp; an older writer drops them all and keeps the row seq,
+/// so its write is invisible to a seq validator or delta.
+#[cfg(any(feature = "enterprise", test))]
+fn seq_complete(events: &[config::meta::alerts::incidents::IncidentEvent]) -> bool {
+    !events.is_empty() && events.iter().all(|event| event.seq > 0)
+}
+
 #[cfg(any(feature = "enterprise", test))]
 fn events_not_modified(seq: i64) -> Response {
     axum::http::Response::builder()
@@ -2695,6 +2696,9 @@ fn events_page(
         events.retain(|event| event.seq > since);
     }
     let mut body = serde_json::json!({ "events": events, "seq": seq });
+    if since.is_some() {
+        body["delta"] = serde_json::Value::Bool(true);
+    }
     if partial_reconstruction {
         body["partial_reconstruction"] = serde_json::Value::Bool(true);
     }
@@ -6728,20 +6732,22 @@ mod tests {
 
     #[tokio::test]
     async fn since_keeps_only_later_events_and_every_page_carries_its_etag() {
-        let all = events_page(vec![stamped(0), stamped(2), stamped(5)], 5, None, false);
+        let all = events_page(vec![stamped(1), stamped(2), stamped(5)], 5, None, false);
         assert_eq!(all.headers()[axum::http::header::ETAG], "\"5\"");
         let body = events_body(all).await;
         assert_eq!(body["seq"], 5);
         assert_eq!(body["events"].as_array().unwrap().len(), 3);
         assert!(body.get("partial_reconstruction").is_none());
+        assert!(body.get("delta").is_none());
 
         let newer = events_body(events_page(
-            vec![stamped(0), stamped(2), stamped(5)],
+            vec![stamped(1), stamped(2), stamped(5)],
             5,
             Some(2),
             false,
         ))
         .await;
+        assert_eq!(newer["delta"], true);
         let seqs: Vec<_> = newer["events"]
             .as_array()
             .unwrap()
@@ -6753,6 +6759,26 @@ mod tests {
         let rebuilt = events_body(events_page(vec![stamped(1)], 1, None, true)).await;
         assert_eq!(rebuilt["partial_reconstruction"], true);
         assert_eq!(rebuilt["seq"], 1);
+    }
+
+    #[test]
+    fn an_unstamped_event_forces_a_full_timeline_read() {
+        // An older node rewrites the row without seq stamps and leaves the row seq unchanged.
+        let mixed = vec![stamped(0), stamped(0), stamped(0)];
+        assert!(!seq_complete(&mixed));
+        assert!(!seq_complete(&[stamped(3), stamped(0)]));
+        assert!(
+            !seq_complete(&[]),
+            "an empty page must reach the reconstruction path"
+        );
+        assert!(seq_complete(&[stamped(1), stamped(3)]));
+    }
+
+    #[tokio::test]
+    async fn a_page_without_since_is_whole_even_with_unstamped_events() {
+        let body = events_body(events_page(vec![stamped(0), stamped(4)], 4, None, false)).await;
+        assert_eq!(body["events"].as_array().unwrap().len(), 2);
+        assert!(body.get("delta").is_none());
     }
     #[cfg(feature = "enterprise")]
     async fn s19_guard_fixture() -> Option<(String, String)> {
