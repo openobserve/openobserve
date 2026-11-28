@@ -15,7 +15,10 @@
 
 use std::sync::{Arc, LazyLock};
 
-use config::metrics::QUERY_AGGREGATION_CACHE_ITEMS;
+use config::{
+    memory::{MemoryConsumer, memory_budget},
+    metrics::QUERY_AGGREGATION_CACHE_ITEMS,
+};
 use datafusion::{common::Result, error::DataFusionError};
 use hashlink::lru_cache::LruCache;
 
@@ -131,11 +134,7 @@ impl StreamingAggsCache {
 
 impl Default for StreamingAggsCache {
     fn default() -> Self {
-        Self::new(
-            config::get_config()
-                .limit
-                .datafusion_streaming_aggs_cache_max_size,
-        )
+        Self::new(memory_budget().quota(MemoryConsumer::StreamingAggsCache))
     }
 }
 

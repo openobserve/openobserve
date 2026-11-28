@@ -1184,7 +1184,7 @@ mod tests {
                 panic!(
                     "migration `{newest}` is registered but no DB_SCHEMA_VERSION claims to cover \
                      it.\nYou added a migration: bump DB_SCHEMA_VERSION in \
-                     src/config/src/config.rs to {}, then add ({}, \"{newest}\") to \
+                     src/config/src/config/mod.rs to {}, then add ({}, \"{newest}\") to \
                      VERSION_COVERAGE here.\nWithout the bump `init_db` skips the upgrade on any \
                      database already stamped at the current version and the new column is never \
                      created.",
@@ -1196,7 +1196,7 @@ mod tests {
         assert!(
             config::DB_SCHEMA_VERSION >= *required,
             "DB_SCHEMA_VERSION is {} but migration `{newest}` requires at least {required}.\nBump \
-             DB_SCHEMA_VERSION in src/config/src/config.rs to {required} so `init_db` actually \
+             DB_SCHEMA_VERSION in src/config/src/config/mod.rs to {required} so `init_db` actually \
              runs the upgrade on existing databases.",
             config::DB_SCHEMA_VERSION,
         );

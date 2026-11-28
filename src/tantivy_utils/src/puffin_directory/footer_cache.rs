@@ -22,6 +22,7 @@ use std::{
 
 use byteorder::ByteOrder;
 use bytes::Bytes;
+use config::memory::{MemoryConsumer, memory_budget};
 use infra::cache::bytes_cache::BytesCache;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
@@ -30,9 +31,7 @@ use tantivy::{Directory, ReloadPolicy, directory::OwnedBytes};
 use super::{EMPTY_FILE_EXT, FOOTER_CACHE, caching_directory::CachingDirectory};
 
 pub(crate) static FOOTER_DATA_CACHE: LazyLock<BytesCache> = LazyLock::new(|| {
-    let max_size = config::get_config()
-        .search
-        .inverted_index_footer_cache_max_size;
+    let max_size = memory_budget().quota(MemoryConsumer::IndexFooterCache);
     BytesCache::new(max_size, "tantivy_footer_cache".to_string())
 });
 
@@ -249,6 +248,10 @@ pub fn build_footer_cache<D: Directory>(directory: Arc<D>) -> tantivy::Result<by
 
     let buf = cache_dir.cacher().to_bytes()?;
     Ok(buf)
+}
+
+pub fn footer_data_cache_used_bytes() -> usize {
+    FOOTER_DATA_CACHE.memory_size()
 }
 
 #[cfg(test)]

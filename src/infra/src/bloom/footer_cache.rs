@@ -33,6 +33,7 @@
 use std::sync::LazyLock;
 
 use bytes::{Bytes, BytesMut};
+use config::memory::{MemoryConsumer, memory_budget};
 
 use crate::cache::bytes_cache::BytesCache;
 
@@ -41,10 +42,10 @@ use crate::cache::bytes_cache::BytesCache;
 /// without re-issuing a head request.
 const SIZE_HEADER_LEN: usize = 8;
 
-/// Global cache. Sized via [`config::Config::search::bloom_footer_cache_max_size`]
-/// (env: `ZO_BLOOM_FOOTER_CACHE_MAX_SIZE`).
+/// Global cache. Sized via [`config::memory::MemoryConsumer::BloomFooterCache`]
+/// (env: `ZO_MEMORY_RATIO_BLOOM_FOOTER_CACHE`).
 pub static BLOOM_FOOTER_CACHE: LazyLock<BloomFooterCache> = LazyLock::new(|| {
-    let max = config::get_config().search.bloom_footer_cache_max_size;
+    let max = memory_budget().quota(MemoryConsumer::BloomFooterCache);
     BloomFooterCache::new(max)
 });
 
@@ -60,6 +61,10 @@ impl BloomFooterCache {
         Self {
             inner: BytesCache::new(max_bytes, "bloom_footer_cache".to_string()),
         }
+    }
+
+    pub fn memory_size(&self) -> usize {
+        self.inner.memory_size()
     }
 
     /// Look up the suffix and the original `.bf` total size for `path`.

@@ -50,6 +50,10 @@ pub fn get_node_metrics() -> NodeMetrics {
         );
         cpu_usage = 0.0;
     }
+    #[expect(
+        clippy::disallowed_methods,
+        reason = "reports node memory, sizes nothing"
+    )]
     let memory_total = get_memory_limit();
     let memory_usage = get_memory_usage();
     let tcp_conns = get_tcp_connections();
@@ -75,6 +79,10 @@ pub fn get_cpu_limit() -> usize {
     cgroup::get_cpu_limit()
 }
 
+#[expect(
+    clippy::disallowed_methods,
+    reason = "the one public entry to the cgroup reading"
+)]
 pub fn get_memory_limit() -> usize {
     cgroup::get_memory_limit()
 }
@@ -101,6 +109,7 @@ mod tests {
     }
 
     #[test]
+    #[expect(clippy::disallowed_methods, reason = "tests the function itself")]
     fn test_get_memory_limit_positive() {
         assert!(get_memory_limit() > 0);
     }

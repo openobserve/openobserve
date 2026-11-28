@@ -47,6 +47,7 @@ use datafusion::{
 };
 use futures::TryStreamExt;
 use hashbrown::{HashMap, HashSet, hash_map::Entry};
+pub use label_cache::label_cache_used_bytes;
 use promql_parser::parser::VectorSelector;
 
 use self::labels::load_series_labels;

@@ -44,6 +44,7 @@ use datafusion::{arrow::datatypes::Schema, error::Result, prelude::SessionContex
 use hashbrown::HashSet;
 pub use parser::parse;
 use promql_parser::label::Matchers;
+pub use series_loader::label_cache_used_bytes;
 pub use series_stream::blocks::load_metrics_block_index;
 use tokio::sync::oneshot;
 

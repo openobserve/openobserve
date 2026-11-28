@@ -8,6 +8,12 @@ await-holding-invalid-types = [
     { path = "tracing::span::EnteredSpan", reason = "use `#[tracing::instrument]` or `.instrument(span)` instead" },
 ]
 
+# Node memory is split by config::memory; size memory from a quota, not from the total.
+disallowed-methods = [
+    { path = "config::utils::sysinfo::get_memory_limit", reason = "size memory from memory_budget().quota(..)" },
+    { path = "config::utils::sysinfo::cgroup::get_memory_limit", reason = "size memory from memory_budget().quota(..)" },
+]
+
 # Ratchets for CI's -W flags: set just above today's worst offenders; tighten
 # over time by fixing code, never raise.
 too-many-lines-threshold = 1024

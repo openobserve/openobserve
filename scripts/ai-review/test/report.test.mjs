@@ -401,7 +401,7 @@ test("the sensitive path list covers each entry and leaves ordinary code alone",
   const hits = [
     ".github/workflows/x.yml", "web/.github/x", "scripts/a.sh", "deploy/a.yaml", "Dockerfile", "docker/Dockerfile.dev",
     "src/infra/migration/m1.rs", "src/migrations_v2/a.sql", "Cargo.toml", "src/config/Cargo.toml", "Cargo.lock", "package.json", "web/package-lock.json",
-    "web/yarn.lock", "pnpm-lock.yaml", "src/config/src/config.rs", "AGENTS.md", "web/CLAUDE.md", ".claude/x.md", "opencode.jsonc",
+    "web/yarn.lock", "pnpm-lock.yaml", "src/config/src/config/mod.rs", "AGENTS.md", "web/CLAUDE.md", ".claude/x.md", "opencode.jsonc",
     ".env", "web/.env.local", "src/proto/a.proto", "src/Auth.rs", "src/rbac/a.rs", "src/openfga.rs", "src/token.rs", "src/secrets.rs",
     "src/crypto.rs", "src/password.rs", "src/session.rs", "src/Permissions.vue", "src/license.rs", "src/sso.rs", "src/oauth.rs", "src/saml.rs",
     "build.rs", "src/config/build.rs", ".cargo/config.toml", "src/x/.cargo/config.toml", "rust-toolchain", "rust-toolchain.toml", ".gitattributes", "web/.gitattributes",

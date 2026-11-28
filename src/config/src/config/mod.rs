@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+pub mod memory;
+
 use std::{
     cmp::max,
     collections::BTreeMap,
@@ -36,6 +38,8 @@ use parquet::basic::Compression;
 use serde::{Deserialize, Serialize};
 use sha256::digest;
 
+pub use self::memory::Memory;
+use self::memory::check_memory_config;
 use crate::{
     meta::{
         cluster,
@@ -192,13 +196,20 @@ pub const GEO_IP_CITY_ENRICHMENT_TABLE: &str = "maxmind_city";
 pub const GEO_IP_ASN_ENRICHMENT_TABLE: &str = "maxmind_asn";
 
 pub const SIZE_IN_MB: f64 = 1024.0 * 1024.0;
+pub(crate) const MB: usize = 1024 * 1024;
+#[cfg(test)]
+pub(crate) const GB: usize = 1024 * MB;
+/// Each DataFusion pool needs at least this much to run a query or a merge.
+pub(crate) const MIN_POOL_SIZE: usize = 256 * MB;
+pub(crate) const MAX_RATIO: u32 = 100;
+pub(crate) const MAX_BUDGET_PERCENT: usize = 200;
+pub(crate) const MAX_FILE_SIZE_DEFAULT_CAP: usize = 512 * MB;
+pub(crate) const MAX_FILE_SIZE_DEFAULT_FLOOR: usize = 32 * MB;
 /// Initial HTTP/2 flow-control windows (bytes) for internal gRPC channels. Apply when
 /// `ZO_GRPC_HTTP2_ADAPTIVE_WINDOW=false` (default); adaptive resets to 64 KB and grows via BDP.
 pub const GRPC_HTTP2_STREAM_WINDOW_SIZE: u32 = 8 * 1024 * 1024; // 8 MB
 pub const GRPC_HTTP2_CONNECTION_WINDOW_SIZE: u32 = 16 * 1024 * 1024; // 16 MB
 pub const SIZE_IN_GB: f64 = 1024.0 * 1024.0 * 1024.0;
-const MAX_FILE_SIZE_DEFAULT_CAP: usize = 512 * 1024 * 1024;
-const MAX_FILE_SIZE_DEFAULT_FLOOR: usize = 32 * 1024 * 1024;
 const JOB_RUNTIME_BLOCKING_PER_CPU: usize = 8;
 const JOB_RUNTIME_BLOCKING_FLOOR: usize = 32;
 const JOB_RUNTIME_BLOCKING_CAP: usize = 256;
@@ -451,7 +462,7 @@ pub static MEM_TABLE_INDIVIDUAL_STREAMS: Lazy<HashMap<String, usize>> = Lazy::ne
             }
         })
         .collect();
-    let num_mem_tables = get_config().limit.mem_table_bucket_num;
+    let num_mem_tables = get_config().memory.memtable.bucket_num;
     for stream in streams.into_iter() {
         if map.contains_key(&stream) {
             continue;
@@ -1140,7 +1151,7 @@ pub struct Config {
     pub limit: Limit,
     pub compact: Compact,
     pub cache_latest_files: CacheLatestFiles,
-    pub memory_cache: MemoryCache,
+    pub memory: Memory,
     pub disk_cache: DiskCache,
     pub log: Log,
     pub nats: Nats,
@@ -2012,36 +2023,6 @@ pub struct Search {
     )]
     pub inverted_index_like_optimizer_enabled: bool,
     #[env_config(
-        name = "ZO_INVERTED_INDEX_RESULT_CACHE_ENABLED",
-        default = false,
-        help = "Toggle tantivy result cache."
-    )]
-    pub inverted_index_result_cache_enabled: bool,
-    #[env_config(
-        name = "ZO_INVERTED_INDEX_RESULT_CACHE_MAX_SIZE",
-        default = 0, // MB, default is 1% of total memory, clamped to [16, 256] MB
-        help = "Maximum memory size in MB for the inverted index result cache. Higher values increase memory usage but may improve query performance."
-    )]
-    pub inverted_index_result_cache_max_size: usize,
-    #[env_config(
-        name = "ZO_INVERTED_INDEX_RESULT_CACHE_MAX_ENTRY_SIZE",
-        default = 20480, // bytes, default is 20KB
-        help = "Maximum size of a single entry in the inverted index result cache. Higher values increase memory usage but may improve query performance."
-    )]
-    pub inverted_index_result_cache_max_entry_size: usize,
-    #[env_config(
-        name = "ZO_INVERTED_INDEX_FOOTER_CACHE_MAX_SIZE",
-        default = 0, // MB, default is 5% of total memory
-        help = "Maximum memory size in MB for the footer cache. Higher values allow caching more file footers but increase memory usage."
-    )]
-    pub inverted_index_footer_cache_max_size: usize,
-    #[env_config(
-        name = "ZO_BLOOM_FOOTER_CACHE_MAX_SIZE",
-        default = 0, // MB, default is 1% of total memory, clamped to [32, 256] MB
-        help = "Maximum memory size in MB for the bloom-filter footer cache. The cache holds the suffix bytes of each `.bf` (footer + tail of body) so subsequent prune calls skip the suffix-range GET. `.bf` body bytes are not cached here — they go through the regular file_data cache."
-    )]
-    pub bloom_footer_cache_max_size: usize,
-    #[env_config(
         name = "ZO_INVERTED_INDEX_TOPN_MAX_GROUP_NUM",
         default = 1000,
         help = "For top-n group by queries, a file with up to N distinct groups returns all of them, making its contribution to the merged result exact. Files with more groups keep only the limit-derived top-k and the merged top-n becomes approximate; raise to trade speed for accuracy."
@@ -2067,12 +2048,6 @@ pub struct Search {
         help = "Evaluate fused PromQL agg(range_func(...)) queries as a stream over hash-sorted metrics files, series by series"
     )]
     pub feature_metrics_streaming_agg_enabled: bool,
-    #[env_config(
-        name = "ZO_METRICS_BLOCKS_CACHE_MAX_SIZE",
-        default = 0,
-        help = "Maximum parsed metrics block metadata cache size in MB; zero uses 5% of node memory clamped to 128-4096 MB, a nonzero value below 10 disables the cache, and 10 or more sets an explicit limit."
-    )]
-    pub metrics_blocks_cache_max_size: usize,
     #[env_config(
         name = "ZO_FEATURE_DYNAMIC_PUSHDOWN_FILTER_ENABLED",
         default = true,
@@ -2164,12 +2139,6 @@ pub struct Common {
         help = "Queue backend: nats or memory. Unset resolves to memory in local mode and nats in cluster mode."
     )]
     pub queue_store: String,
-    #[env_config(
-        name = "ZO_MEMORY_QUEUE_MAX_SIZE_MB",
-        default = 64,
-        help = "Aggregate accounted memory limit in MB across all topics for the in-memory queue backend (ZO_QUEUE_STORE=memory)."
-    )]
-    pub memory_queue_max_size: usize,
     #[env_config(name = "ZO_META_STORE", default = "")]
     pub meta_store: String,
     #[env_config(name = "ZO_META_POSTGRES_DSN", default = "")]
@@ -2854,15 +2823,6 @@ pub struct Limit {
         help = "Maximum number of fields allowed in user-defined schema"
     )]
     pub user_defined_schema_max_fields: usize,
-    // MB, total data size of memtable in memory
-    #[env_config(name = "ZO_MEM_TABLE_MAX_SIZE", default = 0)]
-    pub mem_table_max_size: usize,
-    #[env_config(
-        name = "ZO_MEM_TABLE_BUCKET_NUM",
-        default = 0,
-        help = "MemTable bucket num, 0 derives it from the memtable budget: ZO_MEM_TABLE_MAX_SIZE / ZO_MAX_FILE_SIZE_IN_MEMORY / 4, between 1 and the cpu num"
-    )]
-    pub mem_table_bucket_num: usize,
     #[env_config(name = "ZO_MEM_PERSIST_INTERVAL", default = 2)] // seconds
     pub mem_persist_interval: u64,
     #[env_config(name = "ZO_WAL_WRITE_BUFFER_SIZE", default = 16384)] // 16 KB
@@ -2962,14 +2922,6 @@ pub struct Limit {
     pub metrics_max_points_per_series: usize,
     #[env_config(name = "ZO_METRICS_MAX_SERIES_RESPONSE", default = 40000)]
     pub metrics_max_series_response: usize,
-    // Memory budget in MB for the PromQL result cache index. 0 (default)
-    // means auto: 1% of total memory, clamped to [32, 256] MB.
-    #[env_config(name = "ZO_METRICS_RESULT_CACHE_MAX_SIZE", default = 0)]
-    pub metrics_result_cache_max_size: usize,
-    // Memory budget in MB for the PromQL series label cache. 0 (default)
-    // means auto: 5% of total memory, clamped to [100, 1024] MB.
-    #[env_config(name = "ZO_METRICS_LABEL_CACHE_MAX_SIZE", default = 0)]
-    pub metrics_label_cache_max_size: usize,
     #[env_config(name = "ZO_COLS_PER_RECORD_LIMIT", default = 1000)]
     pub req_cols_per_record_limit: usize,
     #[env_config(name = "ZO_NODE_HEARTBEAT_TTL", default = 30)] // seconds
@@ -3311,18 +3263,6 @@ pub struct Limit {
     pub meta_transaction_retries: usize,
     #[env_config(name = "ZO_CONSISTENT_HASH_VNODES", default = 1000)]
     pub consistent_hash_vnodes: usize,
-    #[env_config(
-        name = "ZO_DATAFUSION_FILE_STAT_CACHE_MAX_SIZE",
-        default = 0, // MB, default is 5% of total memory
-        help = "Maximum memory size in MB for the file stat cache. Higher values allow caching more file statistics but increase memory usage."
-    )]
-    pub datafusion_file_stat_cache_max_size: usize,
-    #[env_config(
-        name = "ZO_DATAFUSION_STREAMING_AGGS_CACHE_MAX_SIZE",
-        default = 0, // MB, default is 1% of total memory, clamped to [8, 128] MB
-        help = "Maximum memory size in MB for the streaming aggs cache metadata: cache file lists and partition plans per streaming query."
-    )]
-    pub datafusion_streaming_aggs_cache_max_size: usize,
     #[env_config(name = "ZO_DATAFUSION_MIN_PARTITION_NUM", default = 2)]
     pub datafusion_min_partition_num: usize,
     #[env_config(
@@ -3645,43 +3585,6 @@ pub struct CacheLatestFiles {
     pub download_from_node: bool,
     #[env_config(name = "ZO_CACHE_LATEST_FILES_DOWNLOAD_NODE_SIZE", default = 100)] // MB
     pub download_node_size: i64,
-}
-
-#[derive(Serialize, EnvConfig, Default)]
-pub struct MemoryCache {
-    #[env_config(name = "ZO_MEMORY_CACHE_ENABLED", default = false)]
-    pub enabled: bool,
-    // Memory data cache strategy, default is lru, other value is fifo, time_lru
-    #[env_config(name = "ZO_MEMORY_CACHE_STRATEGY", default = "lru")]
-    pub cache_strategy: String,
-    // Memory data cache bucket num, multiple bucket means multiple locker, default is 0
-    #[env_config(name = "ZO_MEMORY_CACHE_BUCKET_NUM", default = 0)]
-    pub bucket_num: usize,
-    // MB, default is 50% of system memory
-    #[env_config(name = "ZO_MEMORY_CACHE_MAX_SIZE", default = 0)]
-    pub max_size: usize,
-    // MB, will skip the cache when a query need cache great than this value, default is 50% of
-    // max_size
-    #[env_config(name = "ZO_MEMORY_CACHE_SKIP_SIZE", default = 0)]
-    pub skip_size: usize,
-    // MB, when cache is full will release how many data once time, default is 10% of max_size
-    #[env_config(name = "ZO_MEMORY_CACHE_RELEASE_SIZE", default = 0)]
-    pub release_size: usize,
-    #[env_config(name = "ZO_MEMORY_CACHE_GC_SIZE", default = 100)] // MB
-    pub gc_size: usize,
-    #[env_config(name = "ZO_MEMORY_CACHE_GC_INTERVAL", default = 60)] // seconds
-    pub gc_interval: u64,
-    // Days, files with data older than this will not be downloaded into the cache,
-    // queries read them directly from object storage. default 0 means no limit
-    #[env_config(name = "ZO_MEMORY_CACHE_MAX_AGE_DAYS", default = 0)]
-    pub max_age_days: i64,
-    #[env_config(name = "ZO_MEMORY_CACHE_SKIP_DISK_CHECK", default = false)]
-    pub skip_disk_check: bool,
-    // MB, default is 50% of system memory
-    #[env_config(name = "ZO_MEMORY_CACHE_DATAFUSION_MAX_SIZE", default = 0)]
-    pub datafusion_max_size: usize,
-    #[env_config(name = "ZO_MEMORY_CACHE_DATAFUSION_MEMORY_POOL", default = "")]
-    pub datafusion_memory_pool: String,
 }
 
 #[derive(Serialize, EnvConfig, Default)]
@@ -4252,6 +4155,7 @@ pub fn init() -> Config {
     if let Err(e) = check_memory_config(&mut cfg) {
         panic!("memory cache config error: {e}");
     }
+    check_wal_and_query_config(&mut cfg);
 
     // check disk cache
     if let Err(e) = check_disk_cache_config(&mut cfg) {
@@ -4306,6 +4210,10 @@ fn check_limit_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     cfg.limit.real_cpu_num = max(1, sysinfo::get_cpu_limit());
     // limit cpu num by memory, 1 core per 1GB, in case the user only set memory
     // limit on k8s and we detect the whole node's cpu cores
+    #[expect(
+        clippy::disallowed_methods,
+        reason = "caps the cpu count, sizes no memory"
+    )]
     let mem_total = sysinfo::get_memory_limit();
     let cpu_num = if mem_total == 0 {
         cfg.limit.real_cpu_num
@@ -4624,6 +4532,10 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 
     // check queue store
     check_queue_store_config(cfg)?;
+    cfg.common.memory_circuit_breaker_release_ratio = memory_circuit_breaker_release_ratio(
+        cfg.common.memory_circuit_breaker_ratio,
+        cfg.common.memory_circuit_breaker_release_ratio,
+    );
 
     check_cluster_coordinator_config(cfg)?;
     check_meta_store_config(cfg)?;
@@ -4729,20 +4641,6 @@ fn check_queue_store_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
             "ZO_QUEUE_STORE=memory is only supported in local mode (ZO_LOCAL_MODE=true); it is a process-local, non-durable queue."
         ));
     }
-    if cfg.common.memory_queue_max_size == 0 {
-        cfg.common.memory_queue_max_size = 64; // MB
-    }
-    // convert MB to bytes; the config value is bytes after this point
-    cfg.common.memory_queue_max_size = cfg
-        .common
-        .memory_queue_max_size
-        .checked_mul(1024 * 1024)
-        .ok_or_else(|| {
-            anyhow::anyhow!(
-                "ZO_MEMORY_QUEUE_MAX_SIZE_MB is too large: {} MB overflows the byte limit.",
-                cfg.common.memory_queue_max_size
-            )
-        })?;
     Ok(())
 }
 
@@ -4893,103 +4791,13 @@ fn check_path_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
-    let mem_total = sysinfo::get_memory_limit();
-    cfg.limit.mem_total = mem_total;
-    if cfg.memory_cache.max_size == 0 {
-        if cfg.common.local_mode {
-            cfg.memory_cache.max_size = mem_total / 4; // 25%
-        } else {
-            cfg.memory_cache.max_size = mem_total / 2; // 50%
-        }
-    } else {
-        cfg.memory_cache.max_size *= 1024 * 1024;
-    }
-    if cfg.memory_cache.skip_size == 0 {
-        // will skip the cache when a query need cache great than this value, default is
-        // 50% of max_size
-        cfg.memory_cache.skip_size = cfg.memory_cache.max_size / 2;
-    } else {
-        cfg.memory_cache.skip_size *= 1024 * 1024;
-    }
-    if cfg.memory_cache.release_size == 0 {
-        // when cache is full will release how many data once time, default is 10% of
-        // max_size
-        cfg.memory_cache.release_size = cfg.memory_cache.max_size / 10;
-    } else {
-        cfg.memory_cache.release_size *= 1024 * 1024;
-    }
-    if cfg.memory_cache.gc_size == 0 {
-        cfg.memory_cache.gc_size = 100 * 1024 * 1024; // 100 MB
-    } else {
-        cfg.memory_cache.gc_size *= 1024 * 1024;
-    }
-    if cfg.memory_cache.enabled && cfg.memory_cache.max_size >= mem_total {
-        return Err(anyhow::anyhow!(
-            "ZO_MEMORY_CACHE_MAX_SIZE is larger than total memory, please set a smaller value"
-        ));
-    }
-    let local_node_role: Vec<cluster::Role> = cfg
-        .common
-        .node_role
-        .clone()
-        .split(',')
-        .map(|s| s.parse().unwrap())
-        .collect();
-    if cfg.memory_cache.datafusion_max_size == 0 {
-        if local_node_role == [cluster::Role::Compactor] {
-            cfg.memory_cache.datafusion_max_size = mem_total / cfg.limit.file_merge_thread_num;
-        } else if cfg.common.local_mode {
-            cfg.memory_cache.datafusion_max_size = (mem_total - cfg.memory_cache.max_size) / 2; // 25%
-        } else {
-            cfg.memory_cache.datafusion_max_size = mem_total - cfg.memory_cache.max_size; // 50%
-        }
-    } else {
-        cfg.memory_cache.datafusion_max_size *= 1024 * 1024;
-    }
-
-    if cfg.memory_cache.bucket_num == 0 {
-        cfg.memory_cache.bucket_num = cfg.limit.cpu_num;
-    }
-    cfg.memory_cache.max_size /= cfg.memory_cache.bucket_num;
-    cfg.memory_cache.release_size /= cfg.memory_cache.bucket_num;
-    cfg.memory_cache.gc_size /= cfg.memory_cache.bucket_num;
-
-    // for memtable limit check
-    if cfg.limit.mem_table_max_size == 0 {
-        if cfg.common.local_mode {
-            cfg.limit.mem_table_max_size = mem_total / 4; // 25%
-        } else {
-            cfg.limit.mem_table_max_size = mem_total / 2; // 50%
-        }
-    } else {
-        cfg.limit.mem_table_max_size *= 1024 * 1024;
-    }
-    cfg.limit.max_file_size_in_memory = match cfg.limit.max_file_size_in_memory {
-        0 => default_max_file_size(cfg.limit.mem_table_max_size),
-        mb => mb * 1024 * 1024,
-    };
-    cfg.limit.max_file_size_on_disk = match cfg.limit.max_file_size_on_disk {
-        0 => default_max_file_size(cfg.limit.mem_table_max_size),
-        mb => mb * 1024 * 1024,
-    };
-    if cfg.limit.mem_table_bucket_num == 0 {
-        cfg.limit.mem_table_bucket_num = default_mem_table_bucket_num(
-            cfg.limit.mem_table_max_size,
-            cfg.limit.max_file_size_in_memory,
-            cfg.limit.cpu_num,
-        );
-    }
-
-    // wal
+fn check_wal_and_query_config(cfg: &mut Config) {
     if cfg.limit.wal_write_buffer_size < 4096 {
         cfg.limit.wal_write_buffer_size = 4096;
     }
     if cfg.limit.wal_write_queue_size == 0 {
         cfg.limit.wal_write_queue_size = 10000;
     }
-
-    // check query settings
     if cfg.limit.query_group_base_speed == 0 {
         cfg.limit.query_group_base_speed = SIZE_IN_GB as usize;
     } else {
@@ -5003,90 +4811,6 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
     if cfg.limit.query_default_limit == 0 {
         cfg.limit.query_default_limit = 1000;
-    }
-
-    if cfg.search.inverted_index_footer_cache_max_size == 0 {
-        cfg.search.inverted_index_footer_cache_max_size =
-            ((cfg.limit.mem_total as f64 / SIZE_IN_MB * 0.05) as usize).clamp(8, 1024)
-                * (SIZE_IN_MB as usize);
-    } else {
-        cfg.search.inverted_index_footer_cache_max_size *= SIZE_IN_MB as usize;
-    }
-    if cfg.search.bloom_footer_cache_max_size == 0 {
-        // 1% of total mem, clamped to [4, 256] MB. Bloom footers are an
-        // order of magnitude smaller than tantivy footers (footer payload
-        // ≈ 24 B per file × 3 fields + per-field header ≈ 7.5 KB per
-        // `.bf`), so the cache holds 4-32 K entries at this size.
-        cfg.search.bloom_footer_cache_max_size =
-            ((cfg.limit.mem_total as f64 / SIZE_IN_MB * 0.01) as usize).clamp(4, 256)
-                * (SIZE_IN_MB as usize);
-    } else {
-        cfg.search.bloom_footer_cache_max_size *= SIZE_IN_MB as usize;
-    }
-
-    if cfg.limit.datafusion_file_stat_cache_max_size == 0 {
-        cfg.limit.datafusion_file_stat_cache_max_size =
-            ((cfg.limit.mem_total as f64 / SIZE_IN_MB * 0.05) as usize).clamp(8, 1024)
-                * (SIZE_IN_MB as usize);
-    } else {
-        cfg.limit.datafusion_file_stat_cache_max_size *= SIZE_IN_MB as usize;
-    }
-
-    if cfg.limit.metrics_result_cache_max_size == 0 {
-        // 1% of total mem, clamped to [32, 256] MB; the promql result cache
-        // index holds roughly 200 B per entry at this size.
-        cfg.limit.metrics_result_cache_max_size =
-            ((cfg.limit.mem_total as f64 / SIZE_IN_MB * 0.01) as usize).clamp(32, 256)
-                * (SIZE_IN_MB as usize);
-    } else {
-        if cfg.limit.metrics_result_cache_max_size < 32 {
-            log::warn!("ZO_METRICS_RESULT_CACHE_MAX_SIZE raised to the 32 MB minimum");
-        }
-        cfg.limit.metrics_result_cache_max_size =
-            cfg.limit.metrics_result_cache_max_size.max(32) * (SIZE_IN_MB as usize);
-    }
-    cfg.search.inverted_index_result_cache_max_size = small_cache_max_size(
-        cfg.search.inverted_index_result_cache_max_size,
-        cfg.limit.mem_total,
-        0.01,
-        (16, 256),
-    );
-    cfg.limit.datafusion_streaming_aggs_cache_max_size = small_cache_max_size(
-        cfg.limit.datafusion_streaming_aggs_cache_max_size,
-        cfg.limit.mem_total,
-        0.01,
-        (8, 128),
-    );
-    cfg.search.metrics_blocks_cache_max_size = metrics_blocks_cache_size_mb(
-        cfg.search.metrics_blocks_cache_max_size,
-        cfg.limit.mem_total,
-    );
-    cfg.common.memory_circuit_breaker_release_ratio = memory_circuit_breaker_release_ratio(
-        cfg.common.memory_circuit_breaker_ratio,
-        cfg.common.memory_circuit_breaker_release_ratio,
-    );
-    Ok(())
-}
-
-/// Bytes for a cache configured in MB; 0 means `ratio` of `mem_total`, clamped to `clamp_mb`.
-fn small_cache_max_size(
-    configured_mb: usize,
-    mem_total: usize,
-    ratio: f64,
-    (min_mb, max_mb): (usize, usize),
-) -> usize {
-    let mb = match configured_mb {
-        0 => ((mem_total as f64 / SIZE_IN_MB * ratio) as usize).clamp(min_mb, max_mb),
-        mb => mb,
-    };
-    mb.saturating_mul(SIZE_IN_MB as usize)
-}
-
-fn metrics_blocks_cache_size_mb(configured: usize, mem_total: usize) -> usize {
-    match configured {
-        0 => (mem_total / SIZE_IN_MB as usize / 20).clamp(128, 4096),
-        1..=9 => 0,
-        size => size,
     }
 }
 
@@ -5121,22 +4845,6 @@ pub fn deverbatim(path: &Path) -> std::borrow::Cow<'_, str> {
         }
     }
     path.to_string_lossy()
-}
-
-/// A quarter of what the budget holds, so each bucket can keep two full memtables in memory.
-fn default_mem_table_bucket_num(
-    mem_table_max_size: usize,
-    max_file_size_in_memory: usize,
-    cpu_num: usize,
-) -> usize {
-    let by_memory = mem_table_max_size / max_file_size_in_memory.max(1) / 4;
-    by_memory.clamp(1, cpu_num.max(1))
-}
-
-/// A quarter of the memtable budget in whole MB, clamped to 32..512 MB.
-fn default_max_file_size(mem_table_max_size: usize) -> usize {
-    let mb = 1024 * 1024;
-    (mem_table_max_size / 4 / mb * mb).clamp(MAX_FILE_SIZE_DEFAULT_FLOOR, MAX_FILE_SIZE_DEFAULT_CAP)
 }
 
 /// Idle blocking threads pin their allocator heaps, so the cap bounds resident memory after a
@@ -5532,9 +5240,6 @@ fn check_nats_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 }
 
 fn check_inverted_index_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
-    if cfg.search.inverted_index_result_cache_max_entry_size == 0 {
-        cfg.search.inverted_index_result_cache_max_entry_size = 20480;
-    }
     if cfg.limit.inverted_index_min_token_length == 0 {
         cfg.limit.inverted_index_min_token_length = 2;
     }
@@ -5716,50 +5421,6 @@ mod tests {
         let printed = format!("{nats:?}");
         assert!(!printed.contains("NATS-PASSWORD-VALUE"), "{printed}");
         assert!(printed.contains("nats:4222"));
-    }
-
-    #[test]
-    fn metrics_blocks_cache_auto_budget_preserves_explicit_limits() {
-        let gib = 1024 * 1024 * 1024;
-        assert_eq!(metrics_blocks_cache_size_mb(0, 2 * gib), 128);
-        assert_eq!(metrics_blocks_cache_size_mb(0, 4 * gib), 204);
-        assert_eq!(metrics_blocks_cache_size_mb(0, 48 * gib), 2457);
-        assert_eq!(metrics_blocks_cache_size_mb(0, 80 * gib), 4096);
-        assert_eq!(metrics_blocks_cache_size_mb(0, 128 * gib), 4096);
-        assert_eq!(metrics_blocks_cache_size_mb(1, 48 * gib), 0);
-        assert_eq!(metrics_blocks_cache_size_mb(9, 48 * gib), 0);
-        assert_eq!(metrics_blocks_cache_size_mb(10, 48 * gib), 10);
-        assert_eq!(metrics_blocks_cache_size_mb(2048, 48 * gib), 2048);
-    }
-
-    #[test]
-    fn small_cache_max_size_defaults_to_clamped_ratio_and_keeps_explicit_mb() {
-        let (mb, gib) = (1024 * 1024, 1024 * 1024 * 1024);
-        assert_eq!(small_cache_max_size(0, gib, 0.01, (16, 256)), 16 * mb);
-        assert_eq!(small_cache_max_size(0, 4 * gib, 0.01, (16, 256)), 40 * mb);
-        assert_eq!(small_cache_max_size(0, 64 * gib, 0.01, (16, 256)), 256 * mb);
-        assert_eq!(small_cache_max_size(0, 0, 0.01, (8, 128)), 8 * mb);
-        assert_eq!(small_cache_max_size(2, 64 * gib, 0.01, (16, 256)), 2 * mb);
-        assert_eq!(small_cache_max_size(1024, gib, 0.01, (16, 256)), 1024 * mb);
-    }
-
-    #[test]
-    fn check_memory_config_sets_result_and_streaming_aggs_cache_bytes() {
-        let mut cfg = Config::default();
-        cfg.common.node_role = "all".to_string();
-        cfg.limit.cpu_num = 8;
-        cfg.search.inverted_index_result_cache_max_size = 0;
-        cfg.limit.datafusion_streaming_aggs_cache_max_size = 3;
-        check_memory_config(&mut cfg).unwrap();
-        let mem_mb = cfg.limit.mem_total / (1024 * 1024);
-        assert_eq!(
-            cfg.search.inverted_index_result_cache_max_size,
-            (mem_mb / 100).clamp(16, 256) * 1024 * 1024
-        );
-        assert_eq!(
-            cfg.limit.datafusion_streaming_aggs_cache_max_size,
-            3 * 1024 * 1024
-        );
     }
 
     use super::*;
@@ -6174,13 +5835,6 @@ mod tests {
         // Test endpoint URL validation
         cfg.sns.endpoint = "invalid-url".to_string();
         assert!(check_sns_config(&mut cfg).is_err());
-
-        cfg.memory_cache.max_size = 1024;
-        cfg.memory_cache.release_size = 1024;
-        cfg.memory_cache.bucket_num = 1;
-        check_memory_config(&mut cfg).unwrap();
-        assert_eq!(cfg.memory_cache.max_size, 1024 * 1024 * 1024);
-        assert_eq!(cfg.memory_cache.release_size, 1024 * 1024 * 1024);
 
         cfg.limit.file_push_interval = 0;
         cfg.limit.req_cols_per_record_limit = 0;
@@ -6669,11 +6323,9 @@ mod tests {
     #[test]
     fn test_check_inverted_index_config_defaults() {
         let mut cfg = Config::default();
-        cfg.search.inverted_index_result_cache_max_entry_size = 0;
         cfg.limit.inverted_index_min_token_length = 0;
         cfg.limit.inverted_index_max_token_length = 0;
         check_inverted_index_config(&mut cfg).unwrap();
-        assert_eq!(cfg.search.inverted_index_result_cache_max_entry_size, 20480);
         assert_eq!(cfg.limit.inverted_index_min_token_length, 2);
         assert_eq!(cfg.limit.inverted_index_max_token_length, 64);
     }
@@ -6742,25 +6394,6 @@ mod tests {
     }
 
     #[test]
-    fn test_default_mem_table_bucket_num() {
-        let mb = 1024 * 1024;
-        // 32 GB holds 64 memtables of 512 MB; a quarter of that, then the core count caps it
-        assert_eq!(
-            default_mem_table_bucket_num(32 * 1024 * mb, 512 * mb, 64),
-            16
-        );
-        assert_eq!(default_mem_table_bucket_num(32 * 1024 * mb, 512 * mb, 8), 8);
-        assert_eq!(default_mem_table_bucket_num(4 * 1024 * mb, 512 * mb, 28), 2);
-        assert_eq!(default_mem_table_bucket_num(2 * 1024 * mb, 512 * mb, 28), 1);
-        assert_eq!(default_mem_table_bucket_num(4 * 1024 * mb, 128 * mb, 28), 8);
-        // a budget of under four memtables still gets one bucket
-        assert_eq!(default_mem_table_bucket_num(512 * mb, 512 * mb, 28), 1);
-        assert_eq!(default_mem_table_bucket_num(0, 512 * mb, 28), 1);
-        assert_eq!(default_mem_table_bucket_num(32 * 1024 * mb, 0, 28), 28);
-        assert_eq!(default_mem_table_bucket_num(32 * 1024 * mb, 512 * mb, 0), 1);
-    }
-
-    #[test]
     fn test_default_job_runtime_blocking_worker_num() {
         assert_eq!(default_job_runtime_blocking_worker_num(0), 32);
         assert_eq!(default_job_runtime_blocking_worker_num(2), 32);
@@ -6771,47 +6404,6 @@ mod tests {
         assert_eq!(default_job_runtime_blocking_worker_num(16), 128);
         assert_eq!(default_job_runtime_blocking_worker_num(32), 256);
         assert_eq!(default_job_runtime_blocking_worker_num(64), 256);
-    }
-
-    #[test]
-    fn test_default_max_file_size() {
-        let mb = 1024 * 1024;
-        assert_eq!(default_max_file_size(64 * 1024 * mb), 512 * mb);
-        assert_eq!(default_max_file_size(2 * 1024 * mb), 512 * mb);
-        assert_eq!(default_max_file_size(1024 * mb), 256 * mb);
-        assert_eq!(default_max_file_size(512 * mb), 128 * mb);
-        assert_eq!(default_max_file_size(1000 * mb + 123), 250 * mb);
-        assert_eq!(default_max_file_size(64 * mb), 32 * mb);
-        assert_eq!(default_max_file_size(0), 32 * mb);
-    }
-
-    #[test]
-    fn test_check_memory_config_derives_mem_table_sizes() {
-        let mb = 1024 * 1024;
-        let derive = |mem_table_max_size_mb: usize, file_size_mb: usize, bucket_num: usize| {
-            let mut cfg = Config::default();
-            cfg.common.node_role = "all".to_string();
-            cfg.limit.cpu_num = 8;
-            cfg.limit.mem_table_max_size = mem_table_max_size_mb;
-            cfg.limit.max_file_size_in_memory = file_size_mb;
-            cfg.limit.max_file_size_on_disk = file_size_mb;
-            cfg.limit.mem_table_bucket_num = bucket_num;
-            check_memory_config(&mut cfg).unwrap();
-            (
-                cfg.limit.mem_table_bucket_num,
-                cfg.limit.max_file_size_in_memory,
-                cfg.limit.max_file_size_on_disk,
-            )
-        };
-        // 8 GB local mode: 2 GB budget keeps 512 MB files in one bucket
-        assert_eq!(derive(2 * 1024, 0, 0), (1, 512 * mb, 512 * mb));
-        // 4 GB local mode: 1 GB budget shrinks the files so a bucket still holds four
-        assert_eq!(derive(1024, 0, 0), (1, 256 * mb, 256 * mb));
-        assert_eq!(derive(8 * 1024, 0, 0), (4, 512 * mb, 512 * mb));
-        assert_eq!(derive(32 * 1024, 0, 0), (8, 512 * mb, 512 * mb));
-        // explicit values are kept as is
-        assert_eq!(derive(8 * 1024, 256, 3), (3, 256 * mb, 256 * mb));
-        assert_eq!(derive(1024, 512, 0), (1, 512 * mb, 512 * mb));
     }
 
     #[test]
@@ -6878,28 +6470,10 @@ mod tests {
     fn test_check_queue_store_config_memory_requires_local_mode() {
         let mut cfg = Config::default();
         cfg.common.queue_store = "memory".to_string();
-        cfg.common.memory_queue_max_size = 64;
         cfg.common.local_mode = true;
         check_queue_store_config(&mut cfg).unwrap();
         cfg.common.local_mode = false;
         assert!(check_queue_store_config(&mut cfg).is_err());
-    }
-
-    #[test]
-    fn test_check_queue_store_config_memory_size_validation() {
-        let mut cfg = Config::default();
-        cfg.common.queue_store = "memory".to_string();
-        cfg.common.local_mode = true;
-        // zero falls back to the 64 MB default, converted to bytes
-        cfg.common.memory_queue_max_size = 0;
-        assert!(check_queue_store_config(&mut cfg).is_ok());
-        assert_eq!(cfg.common.memory_queue_max_size, 64 * 1024 * 1024);
-        cfg.common.memory_queue_max_size = usize::MAX;
-        assert!(check_queue_store_config(&mut cfg).is_err());
-        // the config value is converted from MB to bytes during validation
-        cfg.common.memory_queue_max_size = 32;
-        assert!(check_queue_store_config(&mut cfg).is_ok());
-        assert_eq!(cfg.common.memory_queue_max_size, 32 * 1024 * 1024);
     }
 
     fn meta_store_cfg(local_mode: bool, meta_store: &str) -> Config {
@@ -7084,7 +6658,7 @@ mod tests {
     /// product decided away.
     #[test]
     fn test_db_monitoring_flag_reaches_the_frontend_and_is_the_only_one() {
-        let status = include_str!("../../api/management/src/request/status/mod.rs");
+        let status = include_str!("../../../api/management/src/request/status/mod.rs");
         assert!(
             status.contains("database_monitoring_enabled"),
             "the flag must be exposed on the config payload the UI reads"

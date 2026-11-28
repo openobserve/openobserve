@@ -12,7 +12,7 @@ const MAX_LISTED_COMMITS = 250;
 export function isReleaseFile(filePath) {
   if (/(^|\/)migrations?\//i.test(filePath) || /\.sql$/i.test(filePath)) return true;
   if (/(^|\/)(Cargo\.(toml|lock)|package\.json|rust-toolchain(\.toml)?)$/.test(filePath)) return true;
-  if (/^src\/config\/src\/config\.rs$/.test(filePath) || /(^|\/)\.env[^/]*$/.test(filePath)) return true;
+  if (/^src\/config\/src\/config\/mod\.rs$/.test(filePath) || /(^|\/)\.env[^/]*$/.test(filePath)) return true;
   if (/^\.github\//.test(filePath) || /^deploy\//.test(filePath)) return true;
   return /(^|\/)Dockerfile[^/]*$/.test(filePath) || /^docker\//.test(filePath);
 }

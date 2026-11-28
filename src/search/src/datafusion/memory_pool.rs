@@ -16,16 +16,21 @@
 use std::{
     fmt,
     sync::{
-        Arc,
+        Arc, LazyLock,
         atomic::{AtomicUsize, Ordering},
     },
 };
 
+use config::{memory, metrics::MEMORY_BUDGET_USED_BYTES};
 use datafusion::{
     error::DataFusionError,
     execution::memory_pool::{MemoryConsumer, MemoryLimit, MemoryPool, MemoryReservation},
     prelude::SessionContext,
 };
+
+static POOLS_RESERVED: LazyLock<prometheus::IntGauge> = LazyLock::new(|| {
+    MEMORY_BUDGET_USED_BYTES.with_label_values(&[memory::MemoryConsumer::DataFusionPool.name()])
+});
 
 /// A memory pool wrapper that tracks the peak memory usage during DataFusion execution.
 /// When dropped, it logs the peak memory usage.
@@ -70,12 +75,14 @@ impl MemoryPool for PeakMemoryPool {
 
     fn grow(&self, reservation: &MemoryReservation, additional: usize) {
         self.inner.grow(reservation, additional);
+        POOLS_RESERVED.add(additional as i64);
         let current = self.inner.reserved();
         self.update_peak(current);
     }
 
     fn shrink(&self, reservation: &MemoryReservation, size: usize) {
         self.inner.shrink(reservation, size);
+        POOLS_RESERVED.sub(size as i64);
     }
 
     fn try_grow(
@@ -85,6 +92,7 @@ impl MemoryPool for PeakMemoryPool {
     ) -> Result<(), DataFusionError> {
         let result = self.inner.try_grow(reservation, additional);
         if result.is_ok() {
+            POOLS_RESERVED.add(additional as i64);
             let current = self.inner.reserved();
             self.update_peak(current);
         }

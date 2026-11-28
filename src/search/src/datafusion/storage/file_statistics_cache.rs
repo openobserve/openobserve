@@ -21,7 +21,10 @@ use std::{
     time::Instant,
 };
 
-use config::metrics;
+use config::{
+    memory::{MemoryConsumer, memory_budget},
+    metrics,
+};
 use dashmap::{DashMap, mapref::entry::Entry};
 use datafusion::{
     common::{
@@ -147,9 +150,7 @@ impl FileStatisticsCache {
             self.release_fingerprint(&old.value.schema_fingerprint);
         }
 
-        let max_bytes = config::get_config()
-            .limit
-            .datafusion_file_stat_cache_max_size;
+        let max_bytes = memory_budget().quota(MemoryConsumer::DataFusionFileStat);
         if self.current_memory.load(Ordering::Relaxed) > max_bytes as i64 {
             self.evict(max_bytes);
         }
@@ -292,9 +293,7 @@ impl Cache<TableScopedPath, CachedFileMetadata> for FileStatisticsCache {
     }
 
     fn cache_limit(&self) -> usize {
-        config::get_config()
-            .limit
-            .datafusion_file_stat_cache_max_size
+        memory_budget().quota(MemoryConsumer::DataFusionFileStat)
     }
 
     fn update_cache_limit(&self, _limit: usize) {
