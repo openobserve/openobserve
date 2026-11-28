@@ -200,6 +200,7 @@ fn now_of(folder: Option<String>, alert: &Alert) -> AlertNow {
         folder,
         destinations: alert.destinations.clone(),
         pending_period_secs: alert.pending_period_sec,
+        keep_firing_for_secs: alert.keep_firing_for,
     }
 }
 
@@ -226,6 +227,7 @@ fn canonical(v: &Value) -> String {
 fn set(alert: &mut Alert, field: &FieldPatch) {
     match field {
         FieldPatch::PendingPeriodSecs { to, .. } => alert.pending_period_sec = *to,
+        FieldPatch::KeepFiringForSecs { to, .. } => alert.keep_firing_for = *to,
         FieldPatch::Destinations { to, .. } => alert.destinations = to.clone(),
     }
 }
@@ -275,6 +277,26 @@ mod tests {
         let now = now_of(Some("infra".into()), &alert);
         assert_eq!(now.title, "disk latency");
         assert_eq!(now.folder.as_deref(), Some("infra"));
+    }
+
+    #[test]
+    fn a_recovery_hold_patch_sets_keep_firing_for_and_is_read_back_as_its_from() {
+        let mut alert = Alert::default();
+        let before = alert.clone();
+        let hold = FieldPatch::KeepFiringForSecs { from: 0, to: 120 };
+        assert!(
+            now_of(None, &alert)
+                .drift(std::slice::from_ref(&hold))
+                .is_none()
+        );
+        set(&mut alert, &hold);
+        assert_eq!(alert.keep_firing_for, 120);
+        assert_eq!(now_of(None, &alert).keep_firing_for_secs, 120);
+        alert.keep_firing_for = before.keep_firing_for;
+        assert_eq!(
+            serde_json::to_value(&alert).unwrap(),
+            serde_json::to_value(&before).unwrap()
+        );
     }
 
     #[test]

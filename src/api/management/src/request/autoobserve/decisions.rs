@@ -1212,6 +1212,7 @@ mod tests {
                     folder: Some("ops".into()),
                     destinations: vec!["ops".into()],
                     pending_period_secs: self.of(alert_id),
+                    keep_firing_for_secs: 0,
                 }))
             }
 
