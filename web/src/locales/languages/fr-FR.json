@@ -11666,7 +11666,24 @@
       "blipsWouldNotAlert": "Ne se déclencheraient pas avec le maintien suggéré",
       "checkInterval": "Intervalle de vérification",
       "holdNow": "Maintien actuel",
-      "holdSuggested": "Maintien suggéré"
+      "holdSuggested": "Maintien suggéré",
+      "longEpisodes": "Déclenchements plus longs, non supprimés",
+      "measuredClears": "Retours à la normale mesurés",
+      "undoneClears": "Retours à la normale annulés en deux vérifications",
+      "recoveryHoldNow": "Maintien de récupération actuel",
+      "recoveryHoldSuggested": "Maintien de récupération suggéré",
+      "firingShare": "Part du temps en déclenchement",
+      "span": "Période",
+      "firingsInSpan": "Déclenchements sur la période",
+      "episodesInSpan": "Épisodes sur la période",
+      "stretchStarted": "La séquence actuelle a commencé",
+      "longestEpisode": "Épisode le plus long",
+      "stillFiring": "Toujours en déclenchement",
+      "lastResponse": "Dernière réponse",
+      "orgResponses": "Réponses enregistrées dans l'organisation",
+      "noneRecorded": "Aucune enregistrée",
+      "atLeastDuration": "Au moins {duration}",
+      "stillFiringFor": "Oui, depuis au moins {duration}"
     },
     "errorClass": {
       "streamMissing": "Flux introuvable",
@@ -11715,7 +11732,10 @@
       "checkFieldNotFound": "Vérifiez les champs utilisés par la requête : les évaluations en ont enregistré un comme introuvable.",
       "checkQuerySyntax": "Vérifiez la requête de l'alerte : le moteur de recherche l'a rejetée comme non valide. L'erreur n'indique pas quelle partie est incorrecte.",
       "reduceQueryTime": "La requête atteint sans cesse sa limite de temps. Chaque option la rend moins coûteuse, au prix d'une couverture moindre :",
-      "reduceQueryMemory": "La requête manque sans cesse de mémoire. Chaque option la rend moins coûteuse, au prix d'une couverture moindre :"
+      "reduceQueryMemory": "La requête manque sans cesse de mémoire. Chaque option la rend moins coûteuse, au prix d'une couverture moindre :",
+      "addPendingPeriod": "Définissez une période d'attente pour que la condition doive persister aussi longtemps avant que l'alerte se déclenche.",
+      "addRecoveryHold": "Définissez Maintenir le déclenchement pendant pour qu'un retour à la normale annulé par la vérification suivante ne mette pas fin au déclenchement.",
+      "reviewThreshold": "Vérifiez si le seuil repère encore une condition qui nécessite une réponse. Cette carte ne montre que des éléments factuels et ne suggère aucune valeur."
     },
     "resourceOption": {
       "window": "Fenêtre de requête plus courte",
@@ -11739,7 +11759,12 @@
       "failureMayPredateWindow": "Des échecs se produisaient déjà au début de cette fenêtre, le premier échec peut donc être antérieur.",
       "editTimingOnly": "La dernière modification est indiquée uniquement pour la chronologie ; ce n'est pas une cause confirmée.",
       "limitMayDiffer": "Ces évaluations se sont arrêtées avant la limite de temps de requête de ce nœud, une autre limite a donc pu s'appliquer ; les options restent utiles.",
-      "searchedWindow": "Recherche limitée à la période {window} ; des lignes correspondantes plus rares ne sont pas exclues."
+      "searchedWindow": "Recherche limitée à la période {window} ; des lignes correspondantes plus rares ne sont pas exclues.",
+      "attendedLowerBound": "Certaines réponses n'ont pas pu être rattachées à un groupe d'alertes ; le nombre de prises en charge est donc un minimum.",
+      "onScheduleEstimate": "Les durées sont comptées en vérifications selon la planification enregistrée de l'alerte ; une vérification manquée n'apparaît pas.",
+      "durationUpperBound": "{count} déclenchement court a été suspendu par le délai de {cooldown} de l'alerte ; la valeur suggérée suit donc ce délai et non la durée mesurée d'un déclenchement. | {count} déclenchements courts ont été suspendus par le délai de {cooldown} de l'alerte ; la valeur suggérée suit donc ce délai et non la durée mesurée d'un déclenchement.",
+      "recoveryReportedLater": "Avec le maintien, chaque retour à la normale est signalé jusqu'à {hold} plus tard.",
+      "firingTimeLowerBound": "Le temps de déclenchement additionne la durée minimale possible de chaque épisode ; la part est donc un minimum."
     },
     "qualityReason": {
       "scanTruncated": "les recherches plus larges ont expiré",
@@ -11747,7 +11772,9 @@
       "errorClassesTimedOut": "les types d'erreur n'ont pas été lus à temps",
       "errorClassesFailed": "les types d'erreur n'ont pas pu être lus",
       "evaluationTimesUnread": "les heures d'évaluation n'ont pas été lues",
-      "scheduleUnreadable": "la planification de l'alerte n'a pas pu être lue"
+      "scheduleUnreadable": "la planification de l'alerte n'a pas pu être lue",
+      "transitionsTruncated": "tous les changements d'état n'ont pas été lus",
+      "responsesTruncated": "toutes les réponses n'ont pas été lues"
     },
     "headroom": {
       "title": "Calibration des alertes",
@@ -11802,7 +11829,12 @@
       "enrichmentTimeout": "La lecture des preuves a expiré",
       "other": "Une autre raison",
       "healthySilence": "S'est exécutée correctement et ne s'est jamais déclenchée ; le silence n'est pas un problème en soi",
-      "definitionNotChecked": "Définition non vérifiée"
+      "definitionNotChecked": "Définition non vérifiée",
+      "insufficientShortEpisodes": "Trop peu de déclenchements courts pour suggérer une période d'attente",
+      "insufficientShortClearGaps": "Trop peu de retours à la normale courts pour suggérer un maintien de récupération",
+      "candidateNotAboveCurrent": "La suggestion n'est pas supérieure au réglage actuel ou ne supprime aucun déclenchement",
+      "silenceExceedsCap": "Le délai suspend chaque déclenchement au-delà de l'attente suggérée la plus longue ; aucun n'est donc considéré comme court",
+      "responseSignalUnusable": "Trop peu de réponses enregistrées dans l'organisation pour détecter une réponse manquante"
     },
     "notChecked": {
       "title": "Définition non vérifiée",
@@ -11925,7 +11957,13 @@
       "proposedActions": "Actions proposées",
       "qualityReasons": "Raison : {reasons} | Raisons : {reasons}",
       "openAlert": "Ouvrir l'alerte",
-      "advice": "Ce qu'il faut vérifier"
+      "advice": "Ce qu'il faut vérifier",
+      "declinedRequired": "{actual} sur {required} nécessaires",
+      "declinedNotRead": "Non lu ; {required} nécessaires",
+      "declinedCandidate": "Suggéré {candidate}, actuellement {current}",
+      "declinedCap": "Délai {silence}, limite {cap}",
+      "routineHeading": "Comptées, non listées",
+      "routineAlerts": "{count} alerte | {count} alertes"
     },
     "dashboard": {
       "latestRunAgo": "Dernière exécution {time}",
@@ -11992,6 +12030,11 @@
       "showingCappedUnread": "Affichage de {shown} constats : la recherche s'est arrêtée à {count} enregistrements.",
       "countsPending": "Les décomptes des alertes auxquelles vous avez accès ne sont pas encore prêts. Actualisez dans un instant.",
       "countsPendingBadge": "En attente"
+    },
+    "noisePattern": {
+      "shortBlips": "Pics brefs",
+      "recoveryHold": "Maintien de récupération",
+      "sustainedNoResponse": "Déclenchement prolongé, sans réponse"
     }
   },
   "alerts": {

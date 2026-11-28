@@ -25,7 +25,14 @@ import {
   type RuleId,
   type RunRow,
 } from "./digests";
-import { ERROR_CLASS_LABEL, isRuleId, ruleLabelKey, type NotWorkingPattern } from "./rules";
+import {
+  ERROR_CLASS_LABEL,
+  isNoisePattern,
+  isRuleId,
+  NOISE_PATTERN_LABEL,
+  ruleLabelKey,
+  type NotWorkingPattern,
+} from "./rules";
 
 /** The server's reasons (ENT dismissals.rs `DismissReason`) that today's dialog offers. */
 export type DismissReason = "expected" | "known_issue" | "not_useful" | "false_positive" | "other";
@@ -128,6 +135,15 @@ export const FINDING_PATTERN_LABEL: Record<NotWorkingPattern, I18nKey> = {
   ignored_matcher: "alertCalibration.dismiss.pattern.ignored_matcher",
   empty_scope: "alertCalibration.dismiss.pattern.empty_scope",
   source_inactive: "alertCalibration.dismiss.pattern.source_inactive",
+};
+
+/** One alert can hold a dismissal per noise pattern, so each is named by its pattern too. */
+export const findingPatternKey = (rule: string, pattern?: string | null): I18nKey | undefined => {
+  if (!pattern) return undefined;
+  if (rule === "noise") return isNoisePattern(pattern) ? NOISE_PATTERN_LABEL[pattern] : undefined;
+  return Object.hasOwn(FINDING_PATTERN_LABEL, pattern)
+    ? FINDING_PATTERN_LABEL[pattern as NotWorkingPattern]
+    : undefined;
 };
 
 export type DismissableFinding = FindingRecord & {
@@ -278,7 +294,7 @@ export function dismissalCopy(t: TranslateFn, locale: string) {
     t(isRuleId(rule) ? ruleLabelKey(rule, 2) : "alertCalibration.rules.other");
 
   const findingLabel = (rule: string, pattern?: string | null): I18nText => {
-    const key = pattern ? FINDING_PATTERN_LABEL[pattern as NotWorkingPattern] : undefined;
+    const key = findingPatternKey(rule, pattern);
     if (!key) return ruleLabel(rule);
     return t("alertCalibration.dismiss.findingWithPattern", {
       rule: ruleLabel(rule),

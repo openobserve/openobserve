@@ -67,6 +67,14 @@ export interface Coverage {
   coverage_definitions_not_checked?: number | null;
 }
 
+/** One line of a run's routine declines: how many alerts a rule's floor left out, and why. */
+export interface RoutineSkips {
+  rule_id: string;
+  pattern?: string;
+  reason: string;
+  count: number;
+}
+
 /** One rule's alerts a run left out as dismissed. */
 export interface DismissedRule {
   rule_id: string;
@@ -88,6 +96,8 @@ export interface RunRow extends Coverage {
   dismissed_count?: number | null;
   /** Each rule's alerts the run left out, stored as JSON text; absent before it was written, null for a scoped reader. */
   dismissed_rules?: string | DismissedRule[] | null;
+  /** The routine declines by rule, pattern and reason, as JSON text; written only when there are any. */
+  omitted_routine_skips?: string | unknown[] | null;
   /** Null for a scoped reader: the org's count is not one it may see. */
   alerts_in_scope: number | null;
   coverage_gap: boolean;
@@ -176,11 +186,23 @@ const isReviewFocus = (value: unknown): value is ReviewFocus =>
 export function limitationsOf(t: TranslateFn, record: DigestRecord): I18nText[] {
   return textItems(record.limitations).flatMap((code): I18nText[] => {
     if (!Object.hasOwn(LIMITATION_LABEL, code)) return [];
-    if (code !== "searched_window") return [t(LIMITATION_LABEL[code])];
-    // A window the record never stated is not guessed.
-    const secs = Number(record.evidence_notworking_searched_secs);
-    if (!(secs > 0)) return [];
-    return [t(LIMITATION_LABEL[code], { window: formatSeconds(t, secs) })];
+    const key = LIMITATION_LABEL[code];
+    // A number the record never stated is not guessed, so its sentence is left out.
+    if (code === "searched_window") {
+      const secs = Number(record.evidence_notworking_searched_secs);
+      return secs > 0 ? [t(key, { window: formatSeconds(t, secs) })] : [];
+    }
+    if (code === "duration_upper_bound") {
+      const bounded = Number(record.evidence_shortblips_bounded_episodes);
+      const silence = Number(record.evidence_shortblips_silence_secs);
+      if (!(bounded > 0 && silence > 0)) return [];
+      return [t(key, { count: bounded, cooldown: formatSeconds(t, silence) }, bounded)];
+    }
+    if (code === "recovery_reported_later") {
+      const hold = Number(record.evidence_recoveryhold_suggested_keep_firing_for_secs);
+      return hold > 0 ? [t(key, { hold: formatSeconds(t, hold) })] : [];
+    }
+    return [t(key)];
   });
 }
 
@@ -211,6 +233,18 @@ export function insightActionsOf(record: DigestRecord): InsightAction[] {
     return isReviewFocus(action.focus)
       ? [{ type: "review_alert", alert_id: action.alert_id, focus: action.focus }]
       : [];
+  });
+}
+
+/** A malformed line is dropped, so a newer writer's shape never reaches the screen. */
+export function routineSkipsOf(run: Pick<RunRow, "omitted_routine_skips">): RoutineSkips[] {
+  const value = run.omitted_routine_skips;
+  return (arrayColumn(value ?? undefined) ?? []).flatMap((item): RoutineSkips[] => {
+    if (typeof item !== "object" || item === null) return [];
+    const { rule_id, pattern, reason, count } = item as Record<string, unknown>;
+    if (typeof rule_id !== "string" || typeof reason !== "string") return [];
+    if (typeof count !== "number" || !(count > 0)) return [];
+    return [{ rule_id, reason, count, ...(typeof pattern === "string" ? { pattern } : {}) }];
   });
 }
 
@@ -254,6 +288,7 @@ export function runIdentity(record: DigestRecord): RunRow {
     skip_count: record.skip_count,
     written_skip_count: record.written_skip_count,
     omitted_routine_skip_count: record.omitted_routine_skip_count,
+    omitted_routine_skips: record.omitted_routine_skips,
     dismissed_count: record.dismissed_count,
     dismissed_rules: record.dismissed_rules,
     alerts_in_scope: record.alerts_in_scope,

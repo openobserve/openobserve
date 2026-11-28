@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm"
             shape="rounded"
             data-test="alert-calibration-finding-rule"
-            >{{ t(ruleLabelKey(finding.rule_id, schemaVersion(finding))) }}</OBadge
+            >{{ ruleBadge }}</OBadge
           >
           <OBadge
             v-if="folded"
@@ -329,7 +329,7 @@ import AlertCalibrationDismissDialog from "./AlertCalibrationDismissDialog.vue";
 import { useReopenDismissal } from "@/composables/alertCalibration/useDismissals";
 import { useDecisionRoute } from "@/composables/autoobserve/useDecisionRoute";
 import MarkIntendedReportsDialog from "@/components/autoobserve/decisions/MarkIntendedReportsDialog.vue";
-import { dismissalCopy, isDismissable, type DismissalView } from "./dismissals";
+import { dismissalCopy, findingPatternKey, isDismissable, type DismissalView } from "./dismissals";
 import { openAlertReview } from "./reviewAlert";
 import {
   applyCopy,
@@ -382,6 +382,18 @@ const openMark = () => {
   markRequested.value = true;
   markOpen.value = true;
 };
+
+/** One alert can carry a finding per noise pattern, so the badge names the pattern too. */
+const ruleBadge = computed<I18nText>(() => {
+  const rule = t(ruleLabelKey(props.finding.rule_id, schemaVersion(props.finding)));
+  const patternKey =
+    props.finding.rule_id === "noise"
+      ? findingPatternKey(props.finding.rule_id, props.finding.pattern)
+      : undefined;
+  return patternKey
+    ? t("alertCalibration.dismiss.findingWithPattern", { rule, pattern: t(patternKey) })
+    : rule;
+});
 
 /** Version-2 fields, shown only when the record carries a value this build knows. */
 const tier = computed(() => {

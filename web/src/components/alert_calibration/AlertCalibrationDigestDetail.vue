@@ -189,7 +189,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
 
       <div
-        v-if="flatSkips.length || (skips.length && (skipsCapped || omittedRoutine > 0))"
+        v-if="
+          flatSkips.length ||
+          routineRows.length ||
+          (skips.length && (skipsCapped || omittedRoutine > 0))
+        "
         class="flex flex-col gap-2"
         data-test="alert-calibration-digest-skips"
       >
@@ -222,7 +226,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="alert-calibration-digest-skip"
             >
               <OBadge variant="default-outline" size="sm" shape="rounded">{{
-                ruleLabel(skip.rule_id)
+                ruleLabel(skip.rule_id, skip.pattern)
               }}</OBadge>
               <span class="text-text-body text-xs font-medium">{{
                 skip.alert_name ?? skip.alert_id
@@ -243,6 +247,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             t("alertCalibration.detail.declinedCounted", { count: omittedRoutine }, omittedRoutine)
           }}
         </OText>
+        <OCard
+          v-if="routineRows.length"
+          variant="glass"
+          data-test="alert-calibration-digest-routine"
+        >
+          <OCardSection role="body" class="flex flex-col gap-1.5 py-2">
+            <OText variant="label" as="div">{{
+              t("alertCalibration.detail.routineHeading")
+            }}</OText>
+            <div
+              v-for="row in routineRows"
+              :key="row.key"
+              class="flex min-w-0 flex-wrap items-baseline gap-x-2"
+              data-test="alert-calibration-digest-routine-row"
+            >
+              <OBadge variant="default-outline" size="sm" shape="rounded">{{ row.rule }}</OBadge>
+              <OText variant="meta" as="span">{{ row.reason }}</OText>
+              <span class="text-text-body text-xs font-medium tabular-nums">{{ row.alerts }}</span>
+            </div>
+          </OCardSection>
+        </OCard>
       </div>
     </div>
   </OPageLayout>
@@ -289,6 +314,7 @@ import {
   isScoped,
   latestEmission,
   recordHits,
+  routineSkipsOf,
   SEARCH_SIZE,
   visibilityCopy,
   type DigestRecord,
@@ -306,6 +332,7 @@ import {
   type NotCheckedCause,
 } from "./format";
 import { isRuleId, ruleLabelKey, rulesOfVersion } from "./rules";
+import { findingPatternKey } from "./dismissals";
 
 const props = defineProps<{ windowStart: string | number; windowEnd: string | number }>();
 
@@ -341,11 +368,15 @@ const version = computed(() => run.value?.schema_version ?? 1);
 const findings = computed(() => records.data.value?.findings ?? []);
 const skips = computed(() => records.data.value?.skips ?? []);
 /** Two rules share `failure`, so one alert can carry two skips that differ only in reason. */
-const skipKey = (skip: DigestRecord) => `${skip.rule_id}:${skip.alert_id}:${skip.skip_reason}`;
+const skipKey = (skip: DigestRecord) =>
+  `${skip.rule_id}:${skip.pattern ?? ""}:${skip.alert_id}:${skip.skip_reason}`;
 const isNotChecked = (skip: DigestRecord) => skip.skip_reason === "definition_not_checked";
 const flatSkips = computed(() => skips.value.filter((skip) => !isNotChecked(skip)));
 const skipRows = computed(() =>
-  flatSkips.value.map((skip) => ({ skip, detail: skipDetailLabel(t, skip.skip_detail) })),
+  flatSkips.value.map((skip) => ({
+    skip,
+    detail: skipDetailLabel(t, skip.skip_detail, skip.skip_reason, locale.value),
+  })),
 );
 const notChecked = computed(() =>
   skips.value
@@ -398,9 +429,27 @@ const reviewQueryCta = (row: SkipGroupRow): SkipGroupCta => ({
 });
 /** Floors not met are only counted by a version-2 run; a version-1 run has no split. */
 const omittedRoutine = computed(() => run.value?.omitted_routine_skip_count ?? 0);
-/** A rule from a newer writer is named generically, never by its stored id. */
-const ruleLabel = (rule: string): I18nText =>
-  t(isRuleId(rule) ? ruleLabelKey(rule, version.value) : "alertCalibration.rules.other");
+/** A rule from a newer writer is named generically, never by its stored id; a noise pattern is named too. */
+const ruleLabel = (rule: string, pattern?: string): I18nText => {
+  const name = t(
+    isRuleId(rule) ? ruleLabelKey(rule, version.value) : "alertCalibration.rules.other",
+  );
+  const patternKey = rule === "noise" ? findingPatternKey(rule, pattern) : undefined;
+  return patternKey
+    ? t("alertCalibration.dismiss.findingWithPattern", { rule: name, pattern: t(patternKey) })
+    : name;
+};
+/** Why a category can be empty: each floor's count, which the run counts but never lists. */
+const routineRows = computed(() =>
+  run.value
+    ? routineSkipsOf(run.value).map((row) => ({
+        key: `${row.rule_id}:${row.pattern ?? ""}:${row.reason}`,
+        rule: ruleLabel(row.rule_id, row.pattern),
+        reason: skipReasonLabel(t, row.reason),
+        alerts: t("alertCalibration.detail.routineAlerts", { count: row.count }, row.count),
+      }))
+    : [],
+);
 const hitCount = computed(() => records.data.value?.hits ?? 0);
 /** Returned findings show even when their emission's count did not come back with them. */
 const hasFindings = computed(

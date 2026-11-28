@@ -11664,7 +11664,24 @@
       "blipsWouldNotAlert": "Would not fire with the suggested hold",
       "checkInterval": "Check interval",
       "holdNow": "Hold for now",
-      "holdSuggested": "Suggested hold"
+      "holdSuggested": "Suggested hold",
+      "longEpisodes": "Longer firings, not removed",
+      "measuredClears": "Measured clears",
+      "undoneClears": "Clears undone within two checks",
+      "recoveryHoldNow": "Recovery hold now",
+      "recoveryHoldSuggested": "Suggested recovery hold",
+      "firingShare": "Share of time firing",
+      "span": "Span",
+      "firingsInSpan": "Firings in span",
+      "episodesInSpan": "Episodes in span",
+      "stretchStarted": "Current stretch began",
+      "longestEpisode": "Longest episode",
+      "stillFiring": "Still firing",
+      "lastResponse": "Last response",
+      "orgResponses": "Responses recorded in the org",
+      "noneRecorded": "None recorded",
+      "atLeastDuration": "At least {duration}",
+      "stillFiringFor": "Yes, for at least {duration}"
     },
     "errorClass": {
       "streamMissing": "Stream not found",
@@ -11713,7 +11730,10 @@
       "checkFieldNotFound": "Check the fields the query uses: evaluations recorded one as not found.",
       "checkQuerySyntax": "Check the alert's query: the search engine rejected it as not valid. The error does not say which part is wrong.",
       "reduceQueryTime": "The query keeps reaching its time limit. Each option makes it cheaper and costs some coverage:",
-      "reduceQueryMemory": "The query keeps running out of memory. Each option makes it cheaper and costs some coverage:"
+      "reduceQueryMemory": "The query keeps running out of memory. Each option makes it cheaper and costs some coverage:",
+      "addPendingPeriod": "Set a pending period, so the condition must hold that long before the alert fires.",
+      "addRecoveryHold": "Set Keep firing for, so a clear that the next check undoes does not end the firing.",
+      "reviewThreshold": "Review whether the threshold still marks a condition that needs a response. This card shows evidence only and suggests no value."
     },
     "resourceOption": {
       "window": "Shorter query window",
@@ -11737,7 +11757,12 @@
       "failureMayPredateWindow": "Failures were already happening when this window began, so the first failure may be earlier.",
       "editTimingOnly": "The latest edit is shown for timing only; it is not a confirmed cause.",
       "limitMayDiffer": "These evaluations stopped before this node's query time limit, so another limit may have applied; the options still help.",
-      "searchedWindow": "Searched only the last {window}; rarer matching rows are not ruled out."
+      "searchedWindow": "Searched only the last {window}; rarer matching rows are not ruled out.",
+      "attendedLowerBound": "Some responses could not be matched to one alert group, so the attended count is a minimum.",
+      "onScheduleEstimate": "Lengths are counted in checks on the alert's saved schedule; a missed check does not show.",
+      "durationUpperBound": "{count} short firing was paused by the alert's {cooldown} cooldown, so the suggested value follows the cooldown, not a measured firing length. | {count} short firings were paused by the alert's {cooldown} cooldown, so the suggested value follows the cooldown, not a measured firing length.",
+      "recoveryReportedLater": "With the hold, every recovery is reported up to {hold} later.",
+      "firingTimeLowerBound": "Firing time adds each episode's shortest possible length, so the share is a minimum."
     },
     "qualityReason": {
       "scanTruncated": "wider searches timed out",
@@ -11745,7 +11770,9 @@
       "errorClassesTimedOut": "error types were not read in time",
       "errorClassesFailed": "error types could not be read",
       "evaluationTimesUnread": "evaluation times were not read",
-      "scheduleUnreadable": "the alert's schedule could not be read"
+      "scheduleUnreadable": "the alert's schedule could not be read",
+      "transitionsTruncated": "not every state change was read",
+      "responsesTruncated": "not every response was read"
     },
     "headroom": {
       "title": "Alert calibration",
@@ -11800,7 +11827,12 @@
       "enrichmentTimeout": "Evidence read timed out",
       "other": "Another reason",
       "healthySilence": "Ran cleanly and never fired; quiet is not a problem by itself",
-      "definitionNotChecked": "Definition not checked"
+      "definitionNotChecked": "Definition not checked",
+      "insufficientShortEpisodes": "Too few short firings to suggest a pending period",
+      "insufficientShortClearGaps": "Too few short clears to suggest a recovery hold",
+      "candidateNotAboveCurrent": "The suggestion is not above the current setting, or removes no firing",
+      "silenceExceedsCap": "The cooldown pauses every firing past the longest suggested wait, so none counts as short",
+      "responseSignalUnusable": "Too few responses recorded in the org to read a missing one"
     },
     "notChecked": {
       "title": "Definition not checked",
@@ -11923,7 +11955,13 @@
       "proposedActions": "Proposed actions",
       "qualityReasons": "Reason: {reasons} | Reasons: {reasons}",
       "openAlert": "Open alert",
-      "advice": "What to check"
+      "advice": "What to check",
+      "declinedRequired": "{actual} of the {required} needed",
+      "declinedNotRead": "Not read; {required} needed",
+      "declinedCandidate": "Suggested {candidate}, now {current}",
+      "declinedCap": "Cooldown {silence}, limit {cap}",
+      "routineHeading": "Counted, not listed",
+      "routineAlerts": "{count} alert | {count} alerts"
     },
     "dashboard": {
       "latestRunAgo": "Latest run {time}",
@@ -11990,6 +12028,11 @@
       "showingCappedUnread": "Showing {shown} findings: the search stopped at {count} records.",
       "countsPending": "Counts on the alerts you can access are not ready yet. Refresh shortly.",
       "countsPendingBadge": "Pending"
+    },
+    "noisePattern": {
+      "shortBlips": "Short blips",
+      "recoveryHold": "Recovery hold",
+      "sustainedNoResponse": "Sustained firing, no response"
     }
   },
   "alerts": {

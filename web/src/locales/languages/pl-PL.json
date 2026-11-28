@@ -11666,7 +11666,24 @@
       "blipsWouldNotAlert": "Nie wyzwoliłby się przy sugerowanym opóźnieniu",
       "checkInterval": "Interwał sprawdzania",
       "holdNow": "Obecne opóźnienie",
-      "holdSuggested": "Sugerowane opóźnienie"
+      "holdSuggested": "Sugerowane opóźnienie",
+      "longEpisodes": "Dłuższe wyzwolenia, nieusunięte",
+      "measuredClears": "Zmierzone powroty do normy",
+      "undoneClears": "Powroty do normy cofnięte w ciągu dwóch sprawdzeń",
+      "recoveryHoldNow": "Obecne opóźnienie powrotu",
+      "recoveryHoldSuggested": "Sugerowane opóźnienie powrotu",
+      "firingShare": "Udział czasu w stanie wyzwolenia",
+      "span": "Zakres",
+      "firingsInSpan": "Wyzwolenia w zakresie",
+      "episodesInSpan": "Epizody w zakresie",
+      "stretchStarted": "Bieżący odcinek rozpoczął się",
+      "longestEpisode": "Najdłuższy epizod",
+      "stillFiring": "Nadal wyzwolony",
+      "lastResponse": "Ostatnia reakcja",
+      "orgResponses": "Reakcje zapisane w organizacji",
+      "noneRecorded": "Brak zapisanych",
+      "atLeastDuration": "Co najmniej {duration}",
+      "stillFiringFor": "Tak, od co najmniej {duration}"
     },
     "errorClass": {
       "streamMissing": "Nie znaleziono strumienia",
@@ -11715,7 +11732,10 @@
       "checkFieldNotFound": "Sprawdź pola używane przez zapytanie: ewaluacje zarejestrowały, że jednego nie znaleziono.",
       "checkQuerySyntax": "Sprawdź zapytanie alertu: wyszukiwarka odrzuciła je jako nieprawidłowe. Błąd nie wskazuje, która część jest błędna.",
       "reduceQueryTime": "Zapytanie stale osiąga limit czasu. Każda opcja zmniejsza jego koszt, ale ogranicza pokrycie:",
-      "reduceQueryMemory": "Zapytaniu stale brakuje pamięci. Każda opcja zmniejsza jego koszt, ale ogranicza pokrycie:"
+      "reduceQueryMemory": "Zapytaniu stale brakuje pamięci. Każda opcja zmniejsza jego koszt, ale ogranicza pokrycie:",
+      "addPendingPeriod": "Ustaw okres oczekiwania, aby warunek musiał się utrzymywać tak długo, zanim alert zostanie wyzwolony.",
+      "addRecoveryHold": "Ustaw Utrzymuj stan alarmu przez, aby powrót do normy cofnięty przy następnym sprawdzeniu nie kończył wyzwolenia.",
+      "reviewThreshold": "Sprawdź, czy próg nadal oznacza warunek wymagający reakcji. Ta karta pokazuje tylko dowody i nie sugeruje żadnej wartości."
     },
     "resourceOption": {
       "window": "Krótsze okno zapytania",
@@ -11739,7 +11759,12 @@
       "failureMayPredateWindow": "Awarie występowały już na początku tego okna, więc pierwsza awaria może być wcześniejsza.",
       "editTimingOnly": "Najnowsza edycja jest pokazana wyłącznie dla orientacji czasowej; nie jest potwierdzoną przyczyną.",
       "limitMayDiffer": "Te ewaluacje zatrzymały się przed limitem czasu zapytania tego węzła, więc mógł obowiązywać inny limit; opcje nadal pomagają.",
-      "searchedWindow": "Przeszukano tylko ostatnie {window}; rzadsze pasujące wiersze nie są wykluczone."
+      "searchedWindow": "Przeszukano tylko ostatnie {window}; rzadsze pasujące wiersze nie są wykluczone.",
+      "attendedLowerBound": "Nie wszystkie reakcje udało się przypisać do jednej grupy alertów, więc liczba obsłużonych jest wartością minimalną.",
+      "onScheduleEstimate": "Długości są liczone w sprawdzeniach według zapisanego harmonogramu alertu; pominięte sprawdzenie nie jest widoczne.",
+      "durationUpperBound": "{count} krótkie wyzwolenie zostało wstrzymane przez czas wyciszenia {cooldown} alertu, więc sugerowana wartość wynika z wyciszenia, a nie ze zmierzonej długości wyzwolenia. | {count} krótkich wyzwoleń zostało wstrzymanych przez czas wyciszenia {cooldown} alertu, więc sugerowana wartość wynika z wyciszenia, a nie ze zmierzonej długości wyzwolenia.",
+      "recoveryReportedLater": "Przy opóźnieniu każdy powrót do normy jest zgłaszany do {hold} później.",
+      "firingTimeLowerBound": "Czas wyzwolenia sumuje najkrótszą możliwą długość każdego epizodu, więc udział jest wartością minimalną."
     },
     "qualityReason": {
       "scanTruncated": "szersze wyszukiwania przekroczyły limit czasu",
@@ -11747,7 +11772,9 @@
       "errorClassesTimedOut": "nie odczytano typów błędów na czas",
       "errorClassesFailed": "nie udało się odczytać typów błędów",
       "evaluationTimesUnread": "nie odczytano czasów ewaluacji",
-      "scheduleUnreadable": "nie udało się odczytać harmonogramu alertu"
+      "scheduleUnreadable": "nie udało się odczytać harmonogramu alertu",
+      "transitionsTruncated": "nie odczytano wszystkich zmian stanu",
+      "responsesTruncated": "nie odczytano wszystkich reakcji"
     },
     "headroom": {
       "title": "Kalibracja alertów",
@@ -11802,7 +11829,12 @@
       "enrichmentTimeout": "Przekroczono limit czasu odczytu dowodów",
       "other": "Inny powód",
       "healthySilence": "Działał bezbłędnie i nigdy nie został wyzwolony; cisza sama w sobie nie jest problemem.",
-      "definitionNotChecked": "Nie sprawdzono definicji"
+      "definitionNotChecked": "Nie sprawdzono definicji",
+      "insufficientShortEpisodes": "Za mało krótkich wyzwoleń, aby zasugerować okres oczekiwania",
+      "insufficientShortClearGaps": "Za mało krótkich powrotów do normy, aby zasugerować opóźnienie powrotu",
+      "candidateNotAboveCurrent": "Sugestia nie jest wyższa niż obecne ustawienie lub nie usuwa żadnego wyzwolenia",
+      "silenceExceedsCap": "Wyciszenie wstrzymuje każde wyzwolenie poza najdłuższym sugerowanym oczekiwaniem, więc żadne nie jest krótkie",
+      "responseSignalUnusable": "Za mało reakcji zapisanych w organizacji, aby wykryć brakującą"
     },
     "notChecked": {
       "title": "Nie sprawdzono definicji",
@@ -11925,7 +11957,13 @@
       "proposedActions": "Proponowane działania",
       "qualityReasons": "Powód: {reasons} | Powody: {reasons}",
       "openAlert": "Otwórz alert",
-      "advice": "Co sprawdzić"
+      "advice": "Co sprawdzić",
+      "declinedRequired": "{actual} z wymaganych {required}",
+      "declinedNotRead": "Nie odczytano; wymagane {required}",
+      "declinedCandidate": "Sugerowane {candidate}, obecnie {current}",
+      "declinedCap": "Wyciszenie {silence}, limit {cap}",
+      "routineHeading": "Policzone, niewymienione",
+      "routineAlerts": "{count} alert | {count} alertów"
     },
     "dashboard": {
       "latestRunAgo": "Ostatnie uruchomienie {time}",
@@ -11992,6 +12030,11 @@
       "showingCappedUnread": "Wyświetlane ustalenia: {shown} — wyszukiwanie zatrzymało się na {count} rekordach.",
       "countsPending": "Liczby dla alertów, do których masz dostęp, nie są jeszcze gotowe. Odśwież za chwilę.",
       "countsPendingBadge": "Oczekuje"
+    },
+    "noisePattern": {
+      "shortBlips": "Krótkie piki",
+      "recoveryHold": "Opóźnienie powrotu",
+      "sustainedNoResponse": "Długotrwałe wyzwolenie, brak reakcji"
     }
   },
   "alerts": {

@@ -11666,7 +11666,24 @@
       "blipsWouldNotAlert": "推奨のホールドでは発火しません",
       "checkInterval": "チェック間隔",
       "holdNow": "現在のホールド",
-      "holdSuggested": "推奨のホールド"
+      "holdSuggested": "推奨のホールド",
+      "longEpisodes": "より長い発火、除外されていません",
+      "measuredClears": "計測された解消",
+      "undoneClears": "2回のチェック以内に取り消された解消",
+      "recoveryHoldNow": "現在の復旧ホールド",
+      "recoveryHoldSuggested": "推奨の復旧ホールド",
+      "firingShare": "発火していた時間の割合",
+      "span": "期間",
+      "firingsInSpan": "期間内の発火",
+      "episodesInSpan": "期間内のエピソード",
+      "stretchStarted": "現在の継続の開始",
+      "longestEpisode": "最長のエピソード",
+      "stillFiring": "発火中",
+      "lastResponse": "最後の対応",
+      "orgResponses": "組織で記録された対応",
+      "noneRecorded": "記録なし",
+      "atLeastDuration": "少なくとも{duration}",
+      "stillFiringFor": "はい、少なくとも{duration}"
     },
     "errorClass": {
       "streamMissing": "ストリームが見つかりません",
@@ -11715,7 +11732,10 @@
       "checkFieldNotFound": "クエリが使用するフィールドを確認してください: 評価はいずれかを存在しないものとして記録しています。",
       "checkQuerySyntax": "アラートのクエリを確認してください: 検索エンジンが無効として拒否しました。エラーにはどの部分が誤っているか示されていません。",
       "reduceQueryTime": "クエリが繰り返し時間制限に達しています。各オプションは負荷を下げる代わりにカバレッジを犠牲にします:",
-      "reduceQueryMemory": "クエリが繰り返しメモリ不足になっています。各オプションは負荷を下げる代わりにカバレッジを犠牲にします:"
+      "reduceQueryMemory": "クエリが繰り返しメモリ不足になっています。各オプションは負荷を下げる代わりにカバレッジを犠牲にします:",
+      "addPendingPeriod": "保留期間を設定すると、アラートが発火する前に条件がその時間続く必要があります。",
+      "addRecoveryHold": "発火継続時間を設定すると、次のチェックで取り消される解消では発火が終了しません。",
+      "reviewThreshold": "しきい値が、対応が必要な状態を今も示しているか確認してください。このカードは根拠のみを表示し、値は提案しません。"
     },
     "resourceOption": {
       "window": "より短いクエリウィンドウ",
@@ -11739,7 +11759,12 @@
       "failureMayPredateWindow": "このウィンドウが始まった時点ですでに失敗が発生していたため、最初の失敗はさらに前の可能性があります。",
       "editTimingOnly": "最新の編集はタイミングの参考としてのみ表示されており、確認された原因ではありません。",
       "limitMayDiffer": "これらの評価はこのノードのクエリ時間制限より前に停止したため、別の制限が適用されていた可能性があります。それでもオプションは役立ちます。",
-      "searchedWindow": "直近の {window} のみを検索しました。より稀な一致行が存在しないとは言い切れません。"
+      "searchedWindow": "直近の {window} のみを検索しました。より稀な一致行が存在しないとは言い切れません。",
+      "attendedLowerBound": "一部の対応を1つのアラートグループに対応付けられなかったため、対応済みの件数は最小値です。",
+      "onScheduleEstimate": "長さはアラートの保存済みスケジュールに基づくチェック数で数えます。見逃したチェックは表示されません。",
+      "durationUpperBound": "短い発火{count}件が、アラートの{cooldown}のクールダウンで一時停止されたため、推奨値は計測した発火の長さではなくクールダウンに従います。 | 短い発火{count}件が、アラートの{cooldown}のクールダウンで一時停止されたため、推奨値は計測した発火の長さではなくクールダウンに従います。",
+      "recoveryReportedLater": "ホールドを使うと、すべての復旧の報告が最大{hold}遅れます。",
+      "firingTimeLowerBound": "発火時間は各エピソードの最短の長さを合計するため、割合は最小値です。"
     },
     "qualityReason": {
       "scanTruncated": "より広範囲の検索がタイムアウトしました",
@@ -11747,7 +11772,9 @@
       "errorClassesTimedOut": "エラータイプを時間内に読み取れませんでした",
       "errorClassesFailed": "エラータイプを読み取れませんでした",
       "evaluationTimesUnread": "評価時刻を読み取れませんでした",
-      "scheduleUnreadable": "アラートのスケジュールを読み取れませんでした"
+      "scheduleUnreadable": "アラートのスケジュールを読み取れませんでした",
+      "transitionsTruncated": "すべての状態変化を読み取れていません",
+      "responsesTruncated": "すべての対応を読み取れていません"
     },
     "headroom": {
       "title": "アラートキャリブレーション",
@@ -11802,7 +11829,12 @@
       "enrichmentTimeout": "証拠の読み取りがタイムアウトしました",
       "other": "その他の理由",
       "healthySilence": "正常に実行され、一度も発火していません。静かなこと自体は問題ではありません",
-      "definitionNotChecked": "定義が未確認"
+      "definitionNotChecked": "定義が未確認",
+      "insufficientShortEpisodes": "保留期間を提案するには短い発火が少なすぎます",
+      "insufficientShortClearGaps": "復旧ホールドを提案するには短い解消が少なすぎます",
+      "candidateNotAboveCurrent": "提案が現在の設定を上回らないか、発火を1件も除去しません",
+      "silenceExceedsCap": "クールダウンが推奨される最長の待機を超えるすべての発火を一時停止するため、短いと数えられる発火がありません",
+      "responseSignalUnusable": "組織で記録された対応が少なすぎて、欠けている対応を判断できません"
     },
     "notChecked": {
       "title": "定義が未確認",
@@ -11925,7 +11957,13 @@
       "proposedActions": "提案されたアクション",
       "qualityReasons": "理由: {reasons} | 理由: {reasons}",
       "openAlert": "アラートを開く",
-      "advice": "確認すべきこと"
+      "advice": "確認すべきこと",
+      "declinedRequired": "必要な{required}のうち{actual}",
+      "declinedNotRead": "未読み取り。{required}が必要",
+      "declinedCandidate": "推奨は{candidate}、現在は{current}",
+      "declinedCap": "クールダウン{silence}、上限{cap}",
+      "routineHeading": "集計のみ、一覧なし",
+      "routineAlerts": "{count}件のアラート | {count}件のアラート"
     },
     "dashboard": {
       "latestRunAgo": "最新の実行 {time}",
@@ -11992,6 +12030,11 @@
       "showingCappedUnread": "{shown} 件の検出結果を表示中: 検索は {count} 件のレコードで停止しました。",
       "countsPending": "アクセス可能なアラートの件数はまだ準備できていません。まもなく更新してください。",
       "countsPendingBadge": "保留中"
+    },
+    "noisePattern": {
+      "shortBlips": "短いスパイク",
+      "recoveryHold": "復旧ホールド",
+      "sustainedNoResponse": "持続的な発火、対応なし"
     }
   },
   "alerts": {

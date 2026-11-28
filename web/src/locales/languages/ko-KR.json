@@ -11666,7 +11666,24 @@
       "blipsWouldNotAlert": "제안된 유지 시간을 적용하면 발생하지 않음",
       "checkInterval": "확인 주기",
       "holdNow": "현재 유지 시간",
-      "holdSuggested": "제안된 유지 시간"
+      "holdSuggested": "제안된 유지 시간",
+      "longEpisodes": "더 긴 발생, 제외되지 않음",
+      "measuredClears": "측정된 해소",
+      "undoneClears": "확인 두 번 이내에 취소된 해소",
+      "recoveryHoldNow": "현재 복구 유지 시간",
+      "recoveryHoldSuggested": "제안된 복구 유지 시간",
+      "firingShare": "발생 상태였던 시간 비율",
+      "span": "기간",
+      "firingsInSpan": "기간 내 발생",
+      "episodesInSpan": "기간 내 에피소드",
+      "stretchStarted": "현재 구간 시작",
+      "longestEpisode": "가장 긴 에피소드",
+      "stillFiring": "여전히 발생 중",
+      "lastResponse": "마지막 대응",
+      "orgResponses": "조직에 기록된 대응",
+      "noneRecorded": "기록 없음",
+      "atLeastDuration": "최소 {duration}",
+      "stillFiringFor": "예, 최소 {duration} 동안"
     },
     "errorClass": {
       "streamMissing": "스트림을 찾을 수 없음",
@@ -11715,7 +11732,10 @@
       "checkFieldNotFound": "쿼리가 사용하는 필드를 확인하세요. 평가 시 필드 하나를 찾을 수 없는 것으로 기록되었습니다.",
       "checkQuerySyntax": "알림의 쿼리를 확인하세요. 검색 엔진이 유효하지 않다고 거부했습니다. 오류에는 어느 부분이 잘못되었는지 나와 있지 않습니다.",
       "reduceQueryTime": "쿼리가 계속 시간 제한에 도달합니다. 각 옵션은 비용을 줄이는 대신 일부 커버리지를 희생합니다:",
-      "reduceQueryMemory": "쿼리가 계속 메모리가 부족합니다. 각 옵션은 비용을 줄이는 대신 일부 커버리지를 희생합니다:"
+      "reduceQueryMemory": "쿼리가 계속 메모리가 부족합니다. 각 옵션은 비용을 줄이는 대신 일부 커버리지를 희생합니다:",
+      "addPendingPeriod": "대기 기간을 설정하면 알림이 발생하기 전에 조건이 그 시간 동안 유지되어야 합니다.",
+      "addRecoveryHold": "발생 유지 시간를 설정하면 다음 확인에서 취소되는 해소가 발생을 끝내지 않습니다.",
+      "reviewThreshold": "임계값이 여전히 대응이 필요한 조건을 나타내는지 검토하세요. 이 카드는 근거만 보여 주며 값을 제안하지 않습니다."
     },
     "resourceOption": {
       "window": "더 짧은 쿼리 기간",
@@ -11739,7 +11759,12 @@
       "failureMayPredateWindow": "이 기간이 시작될 때 이미 실패가 발생하고 있었으므로 첫 실패는 더 이전일 수 있습니다.",
       "editTimingOnly": "최근 편집은 시점 참고용으로만 표시되며 확인된 원인은 아닙니다.",
       "limitMayDiffer": "이 평가들은 이 노드의 쿼리 시간 제한 전에 중단되었으므로 다른 제한이 적용되었을 수 있습니다. 그래도 옵션은 도움이 됩니다.",
-      "searchedWindow": "최근 {window}만 검색했으므로 더 드문 일치 행이 없었다고 단정할 수 없습니다."
+      "searchedWindow": "최근 {window}만 검색했으므로 더 드문 일치 행이 없었다고 단정할 수 없습니다.",
+      "attendedLowerBound": "일부 대응을 하나의 알림 그룹에 연결할 수 없어 처리된 건수는 최솟값입니다.",
+      "onScheduleEstimate": "길이는 알림의 저장된 일정에 따른 확인 횟수로 계산하며, 놓친 확인은 표시되지 않습니다.",
+      "durationUpperBound": "짧은 발생 {count}건이 알림의 {cooldown} 쿨다운으로 일시 중지되어, 제안 값은 측정된 발생 길이가 아니라 쿨다운을 따릅니다. | 짧은 발생 {count}건이 알림의 {cooldown} 쿨다운으로 일시 중지되어, 제안 값은 측정된 발생 길이가 아니라 쿨다운을 따릅니다.",
+      "recoveryReportedLater": "유지 시간을 적용하면 모든 복구가 최대 {hold} 늦게 보고됩니다.",
+      "firingTimeLowerBound": "발생 시간은 각 에피소드의 가능한 최단 길이를 더한 것이므로 비율은 최솟값입니다."
     },
     "qualityReason": {
       "scanTruncated": "더 넓은 검색 시간 초과",
@@ -11747,7 +11772,9 @@
       "errorClassesTimedOut": "오류 유형을 제때 읽지 못함",
       "errorClassesFailed": "오류 유형을 읽을 수 없음",
       "evaluationTimesUnread": "평가 시간을 읽지 못함",
-      "scheduleUnreadable": "알림의 일정을 읽을 수 없음"
+      "scheduleUnreadable": "알림의 일정을 읽을 수 없음",
+      "transitionsTruncated": "모든 상태 변경을 읽지는 않았습니다",
+      "responsesTruncated": "모든 대응을 읽지는 않았습니다"
     },
     "headroom": {
       "title": "알림 캘리브레이션",
@@ -11802,7 +11829,12 @@
       "enrichmentTimeout": "증거 읽기 시간 초과",
       "other": "다른 이유",
       "healthySilence": "정상적으로 실행되었고 발생한 적이 없음. 조용한 것 자체는 문제가 아님",
-      "definitionNotChecked": "정의 미확인"
+      "definitionNotChecked": "정의 미확인",
+      "insufficientShortEpisodes": "대기 기간을 제안하기에는 짧은 발생이 너무 적습니다",
+      "insufficientShortClearGaps": "복구 유지 시간을 제안하기에는 짧은 해소가 너무 적습니다",
+      "candidateNotAboveCurrent": "제안 값이 현재 설정보다 높지 않거나 제거되는 발생이 없습니다",
+      "silenceExceedsCap": "쿨다운이 제안된 최장 대기 시간을 넘는 모든 발생을 일시 중지하므로 짧은 발생으로 계산되는 것이 없습니다",
+      "responseSignalUnusable": "조직에 기록된 대응이 너무 적어 누락된 대응을 판단할 수 없습니다"
     },
     "notChecked": {
       "title": "정의 미확인",
@@ -11925,7 +11957,13 @@
       "proposedActions": "제안된 작업",
       "qualityReasons": "이유: {reasons} | 이유: {reasons}",
       "openAlert": "알림 열기",
-      "advice": "확인할 사항"
+      "advice": "확인할 사항",
+      "declinedRequired": "필요한 {required} 중 {actual}",
+      "declinedNotRead": "읽지 않음; {required} 필요",
+      "declinedCandidate": "제안 {candidate}, 현재 {current}",
+      "declinedCap": "쿨다운 {silence}, 한도 {cap}",
+      "routineHeading": "집계만, 목록 없음",
+      "routineAlerts": "알림 {count}개 | 알림 {count}개"
     },
     "dashboard": {
       "latestRunAgo": "최근 실행 {time}",
@@ -11992,6 +12030,11 @@
       "showingCappedUnread": "발견 항목 {shown}개 표시 중: 검색이 {count}개 레코드에서 중단되었습니다.",
       "countsPending": "접근 가능한 알림의 개수가 아직 준비되지 않았습니다. 잠시 후 새로고침하세요.",
       "countsPendingBadge": "대기 중"
+    },
+    "noisePattern": {
+      "shortBlips": "짧은 스파이크",
+      "recoveryHold": "복구 유지 시간",
+      "sustainedNoResponse": "지속적인 발생, 대응 없음"
     }
   },
   "alerts": {
