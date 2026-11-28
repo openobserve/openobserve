@@ -852,6 +852,7 @@ mod tests {
                     dropped_dimensions: vec![],
                     filter_spellings: HashMap::new(),
                     filter_aliases: HashMap::new(),
+                    has_data: None,
                 }]),
                 ..Default::default()
             },
