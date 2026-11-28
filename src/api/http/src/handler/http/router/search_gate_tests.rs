@@ -278,7 +278,7 @@ const SEARCH_IMPORT: &str = r"\buse [^;]*\b(?:search|search_service|SearchServic
 
 /// Every production fn that calls a search entry point, as (file, fn), and how it is licence-gated.
 #[rustfmt::skip]
-const SEARCH_CALLERS: [(&str, &str, Caller); 82] = [
+const SEARCH_CALLERS: [(&str, &str, Caller); 83] = [
     ("api/management/src/request/alert_calibration/digests.rs", "search_at", Caller::Operational),
     ("api/management/src/request/alerts/history.rs", "get_alert_history", Caller::Exempt("the org's own alert and anomaly run history; its routes stay open")),
     ("api/management/src/request/alerts/history.rs", "get_all_anomaly_history", Caller::Exempt("the org's own alert and anomaly run history; its routes stay open")),
@@ -293,6 +293,7 @@ const SEARCH_CALLERS: [(&str, &str, Caller); 82] = [
     ("api/management/src/request/security/investigate.rs", "run_sql", Caller::InHandler),
     ("api/management/src/request/security/sigma.rs", "search_rows", Caller::InHandler),
     ("api/management/src/request/security/sources.rs", "search_rows", Caller::InHandler),
+    ("api/management/src/request/service_streams/has_data.rs", "exists", Caller::InHandler),
     ("api/management/src/request/synthetics/last_check.rs", "latest_result_per_check", Caller::Exempt("last check on the synthetics list; its route stays open")),
     ("api/management/src/request/workflows/mod.rs", "get_workflow_history", Caller::Exempt("the org's own workflow run history; its route stays open")),
     ("api/pipelines/src/request/pipelines/history.rs", "get_pipeline_history", Caller::Exempt("the org's own pipeline run history; its route stays open")),
