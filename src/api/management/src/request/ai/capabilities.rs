@@ -67,6 +67,7 @@ const ROUND_TRIP_REFUSED: &str = "O2 Assistant refused the credentials of this r
 const ROUND_TRIP_REJECTED: &str = "O2 Assistant rejected this request";
 const TURN_VERSIONS_CAPABILITY: &str = "turn_versions";
 const IMAGE_INPUT_CAPABILITY: &str = "image_input";
+const WRITE_APPROVALS_CAPABILITY: &str = "write_approvals";
 const SERVER_REFUSED: &str = "O2 Assistant refused this server's internal secret";
 const NOT_CONFIGURED: &str = "O2 Assistant is not configured on this server";
 // An older o2-ai lists the judge; it only scores answers and nobody talks to it.
@@ -90,6 +91,7 @@ pub struct Capabilities {
     pub model_provider: Option<String>,
     pub redaction_applied: bool,
     pub can_chat: bool,
+    /// The assistant stays read-only when o2-ai cannot raise approval cards.
     pub can_write: bool,
     pub can_share: bool,
     pub can_read_shares: bool,
@@ -150,7 +152,7 @@ impl Capabilities {
             // Nothing on this path redacts what reaches the model yet.
             redaction_applied: false,
             can_chat: permissions.chat,
-            can_write: permissions.write,
+            can_write: permissions.write && facts.write_approvals,
             can_share: permissions.share,
             can_read_shares: permissions.read_shares,
             persistence: settings.persistence,
@@ -291,6 +293,8 @@ struct AgentFacts {
     turn_versions: bool,
     /// o2-ai's health lists `image_input` in `capabilities` when its model reads images.
     image_input: bool,
+    /// o2-ai's health lists `write_approvals` when it raises approval cards for write tools.
+    write_approvals: bool,
     attachments: bool,
     context_used: bool,
     answer_locale: bool,
@@ -320,6 +324,7 @@ impl AgentFacts {
             policy_enforced: discover.policy_enforced,
             turn_versions: agent_capability(health, TURN_VERSIONS_CAPABILITY),
             image_input: agent_capability(health, IMAGE_INPUT_CAPABILITY),
+            write_approvals: agent_capability(health, WRITE_APPROVALS_CAPABILITY),
             attachments: discover.attachments,
             context_used: discover.context_used,
             answer_locale: discover.answer_locale,
@@ -1162,6 +1167,7 @@ mod tests {
             policy_enforced: false,
             turn_versions: true,
             image_input: true,
+            write_approvals: true,
             attachments: true,
             context_used: true,
             answer_locale: true,
@@ -1431,6 +1437,31 @@ mod tests {
                 expected,
                 "{response}"
             );
+        }
+    }
+
+    #[tokio::test]
+    async fn can_write_requires_permission_and_write_approvals() {
+        let (health, _) = sample_health();
+        let discover = serde_json::from_value(json!({"agents": []})).unwrap();
+        let admin = permissions(Role::Admin).await;
+        let viewer = permissions(Role::Viewer).await;
+        for (response, permissions, expected) in [
+            (r#"{"capabilities":["write_approvals"]}"#, admin, true),
+            ("{}", admin, false),
+            (r#"{"capabilities":"write_approvals"}"#, admin, false),
+            (r#"{"capabilities":["image_input"]}"#, admin, false),
+            (r#"{"capabilities":["write_approvals"]}"#, viewer, false),
+        ] {
+            let agent_health = serde_json::from_str(response).unwrap();
+            let facts = AgentFacts::new(&agent_health, &discover);
+            let caps = Capabilities::new(
+                (health.clone(), facts),
+                permissions,
+                sample_settings(),
+                Vec::new(),
+            );
+            assert_eq!(caps.can_write, expected, "{response}, {permissions:?}");
         }
     }
 
