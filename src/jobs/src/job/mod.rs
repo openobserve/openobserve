@@ -785,6 +785,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
         o2_enterprise::enterprise::oncall::sender::register_oncall_sender(|n| {
             Box::pin(openobserve_core::alerts::notifications::oncall::notify_destination(n))
         });
+        // Pipeline destinations with store refs resolve per attempt through the alert snapshot.
+        o2_enterprise::enterprise::pipeline::set_snapshot_source(|d| {
+            Box::pin(openobserve_core::alerts::destinations::destination_snapshot(d))
+        });
         if LOCAL_NODE.is_scheduler() {
             tokio::spawn(
                 openobserve_core::alerts::notifications::oncall::log_mail_destination_policies(),
@@ -1446,6 +1450,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     }
     // Every node that serves writes publishes them, not only the scheduler.
     openobserve_synthetics::service::start_publish_queue();
+    openobserve_synthetics::init_maintenance(openobserve_synthetics::StopToken::never());
     if LOCAL_NODE.is_scheduler() {
         // Ungated: synthetics is OSS, and without this an OSS build accepts a
         // check, stores it, and never runs it — the routes would be registered

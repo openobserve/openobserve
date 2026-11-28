@@ -648,7 +648,7 @@ async fn bulk_locked<C: ConnectionTrait + TransactionTrait>(
         (None, Some(filter)) => by_filter(conn, org, filter).await?,
         _ => return Err(error(StatusCode::BAD_REQUEST, "invalid bulk request")),
     };
-    let batch_id = config::ider::uuid();
+    let batch_id = config::ider::ksuid();
     let cluster = config::get_cluster_name();
     let mut next: Vec<AliasRow> = rows
         .iter()

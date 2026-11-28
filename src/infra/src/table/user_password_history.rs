@@ -46,7 +46,7 @@ pub async fn create_table() -> Result<(), errors::Error> {
 
 pub async fn add(email: &str, password_hash: &str) -> Result<(), errors::Error> {
     let record = ActiveModel {
-        id: Set(ider::uuid()),
+        id: Set(ider::ksuid()),
         email: Set(email.to_lowercase()),
         password_hash: Set(password_hash.to_string()),
         created_at: Set(chrono::Utc::now().timestamp_micros()),

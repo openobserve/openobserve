@@ -383,7 +383,7 @@ mod tests {
 
     #[test]
     fn a_put_this_node_cannot_read_drops_the_stale_cached_copy() {
-        let org = format!("stale_{}", config::ider::uuid());
+        let org = format!("stale_{}", config::ider::ksuid());
         let key = format!("{org}/d");
         DESTINATIONS.insert(
             key.clone(),
@@ -426,7 +426,7 @@ mod tests {
         std::fs::create_dir_all(&config::get_config().common.data_db_dir).unwrap();
         infra::db_init().await.unwrap();
         infra::table::migrate().await.unwrap();
-        let org = format!("r128_{}", config::ider::uuid());
+        let org = format!("r128_{}", config::ider::ksuid());
         set(Destination {
             org_id: org.clone(),
             name: "slack-dest".to_string(),

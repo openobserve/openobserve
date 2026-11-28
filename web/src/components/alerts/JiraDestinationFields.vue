@@ -14,6 +14,8 @@ import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 import { requestErrorMessage } from "@/composables/usePrebuiltDestinations";
+import { secretErrorCode } from "@/services/secrets";
+import { hasStoreRef } from "@/views/Secrets/secretRefs";
 import destinationService, {
   type JiraConnectResponse,
   type JiraFieldsResponse,
@@ -73,6 +75,12 @@ const priorityOptions = computed(() => toOptions(priorities.value));
 
 const set = (key: string, value: unknown) => form.setFieldValue(`credentials.${key}`, value);
 
+// Setup sends the token to the typed Jira URL, so a saved secret can't be used there (S11).
+const LITERAL_TOKEN_CODE = "jira_setup_needs_literal_token";
+const literalTokenError = (): I18nText =>
+  t("alerts.prebuiltDestinations.jiraSetupNeedsLiteralToken", { code: raw(LITERAL_TOKEN_CODE) });
+const tokenIsRef = computed(() => hasStoreRef([String(token.value ?? "")]));
+
 // Bumped whenever the login, project or issue type changes, so older responses are dropped.
 let generation = 0;
 const invalidateLookups = (): void => {
@@ -93,7 +101,10 @@ async function callJira<T>(action: JiraSetupAction): Promise<T | null> {
     return mine === generation ? res.data : null;
   } catch (e) {
     if (mine === generation) {
-      error.value = requestErrorMessage(e, t("alerts.prebuilt.testFailedUnknownError"));
+      error.value =
+        secretErrorCode(e) === LITERAL_TOKEN_CODE
+          ? literalTokenError()
+          : requestErrorMessage(e, t("alerts.prebuilt.testFailedUnknownError"));
     }
     return null;
   } finally {
@@ -157,6 +168,10 @@ const connect = async (): Promise<void> => {
   };
   if (!url.value || (!token.value && !usesSavedToken) || (isCloud.value && !email.value)) {
     failed(t("alerts.prebuiltDestinations.jiraConnectMissing"));
+    return;
+  }
+  if (tokenIsRef.value) {
+    error.value = literalTokenError();
     return;
   }
   const mine = generation;

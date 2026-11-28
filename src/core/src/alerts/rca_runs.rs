@@ -791,7 +791,7 @@ pub(crate) mod tests {
             2,
             None,
             ResponderRole::Owner,
-            None,
+            infra::table::oncall_responses::Provenance::default(),
         )
         .await
         .unwrap();

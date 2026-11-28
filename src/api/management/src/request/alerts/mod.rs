@@ -998,6 +998,13 @@ fn stale_policy_name(value: i16) -> &'static str {
     }
 }
 
+/// An unreadable list sends nowhere, so it needs no person check.
+fn composite_destinations(
+    definition: &infra::table::entity::alert_composites::Model,
+) -> Vec<String> {
+    serde_json::from_value(definition.destinations.clone()).unwrap_or_default()
+}
+
 fn composite_error_response(
     error: openobserve_core::alerts::composite::CompositeServiceError,
 ) -> Response {
@@ -4306,7 +4313,7 @@ pub async fn enable_alert_bulk(
 )]
 pub async fn trigger_alert(
     Path((org_id, alert_id)): Path<(String, String)>,
-    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+    Headers(user_email): Headers<UserEmail>,
 ) -> Response {
     let alert_id = match Ksuid::from_str(&alert_id) {
         Ok(id) => id,
@@ -4336,7 +4343,22 @@ pub async fn trigger_alert(
         return resp;
     }
     let client = get_orm_client_ro().await;
-    match alert::trigger_by_id(client, &org_id, alert_id).await {
+    match alert::get_by_id(client, &org_id, alert_id).await {
+        Ok((_, alert)) => {
+            if let Err(refusal) = openobserve_core::alerts::destinations::authorize_human_sends(
+                &org_id,
+                &user_email.user_id,
+                &alert.destinations,
+            )
+            .await
+            {
+                return openobserve_core::http::secret_refusal_response(&refusal);
+            }
+        }
+        Err(AlertError::AlertNotFound) => {}
+        Err(error) => return error.into(),
+    }
+    match alert::trigger_by_id(client, &org_id, alert_id, &user_email.user_id).await {
         Ok(triggered) => match triggered.warning() {
             Some(warning) => MetaHttpResponse::json(serde_json::json!({
                 "code": 200,
@@ -4346,21 +4368,27 @@ pub async fn trigger_alert(
             None => MetaHttpResponse::ok(triggered.response_message()),
         },
         Err(AlertError::AlertNotFound) => {
-            if let Some(_composite) =
+            if let Some(composite) =
                 openobserve_core::alerts::composite::get_composite(&org_id, &alert_id.to_string())
                     .await
                     .ok()
                     .flatten()
             {
                 #[cfg(feature = "enterprise")]
-                if composite_subject_unauthorized(
-                    &_composite.definition,
+                if composite_subject_unauthorized(&composite.definition, &user_email.user_id, "PUT")
+                    .await
+                {
+                    return MetaHttpResponse::forbidden("Unauthorized Access");
+                }
+                // The evaluation this schedules sends as the system, so the person is checked now.
+                if let Err(refusal) = openobserve_core::alerts::destinations::authorize_human_sends(
+                    &org_id,
                     &user_email.user_id,
-                    "PUT",
+                    &composite_destinations(&composite.definition),
                 )
                 .await
                 {
-                    return MetaHttpResponse::forbidden("Unauthorized Access");
+                    return openobserve_core::http::secret_refusal_response(&refusal);
                 }
                 return match openobserve_core::alerts::composite::trigger_composite(
                     &org_id,
@@ -4890,6 +4918,20 @@ mod tests {
         save_warnings, visible_alert,
     };
 
+    #[test]
+    fn a_composite_trigger_checks_the_destinations_it_lists() {
+        let mut definition = infra::table::entity::alert_composites::Model {
+            destinations: serde_json::json!(["slack", "pager"]),
+            ..Default::default()
+        };
+        assert_eq!(
+            super::composite_destinations(&definition),
+            ["slack", "pager"]
+        );
+        definition.destinations = serde_json::json!({"not": "a list"});
+        assert!(super::composite_destinations(&definition).is_empty());
+    }
+
     #[cfg(not(feature = "enterprise"))]
     #[tokio::test]
     async fn oss_retrain_alert_answers_403_before_parsing_the_id() {
@@ -4976,7 +5018,7 @@ mod tests {
         use infra::table::alert_incidents::{add_alert_to_incident, create, mark_security_case};
 
         crate::request::security::tests::meta_store().await;
-        let org = format!("convert_{}", config::ider::uuid());
+        let org = format!("convert_{}", config::ider::ksuid());
         let mut item = row("a1", serde_json::json!({}));
         let id = item.alert_id.to_string();
         let mut alert = Alert::default();
@@ -5696,7 +5738,7 @@ mod tests {
         use super::super::*;
 
         fn user() -> String {
-            format!("{}@example.com", config::ider::uuid())
+            format!("{}@example.com", config::ider::ksuid())
         }
 
         fn logs(org: &str, name: &str) -> TypedStream {

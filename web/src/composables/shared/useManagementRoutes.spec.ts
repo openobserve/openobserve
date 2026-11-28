@@ -573,9 +573,9 @@ describe("useManagementRoutes", () => {
       });
     });
 
-    it("should have exactly 27 children routes when enterprise is enabled", () => {
+    it("should have exactly 29 children routes when enterprise is enabled", () => {
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(27); // 8 base (incl. assistantSettings, alert_sources, llm_providers, gen_ai_agent_mapping redirects) + syntheticsLocations + modelPricing (+ editor, gaps) + slack + 14 enterprise (incl. passwordPolicy, announcements + editor, telephonySettings)
+      expect(routes[0].children).toHaveLength(29); // 8 base (incl. assistantSettings, alert_sources, llm_providers, gen_ai_agent_mapping redirects) + syntheticsLocations + modelPricing (+ editor, gaps) + slack + 16 enterprise (incl. passwordPolicy, announcements + editor, telephonySettings, secrets + store status)
     });
 
     it("should have the announcement banner list and editor routes when enterprise", () => {
@@ -677,9 +677,9 @@ describe("useManagementRoutes", () => {
       expect(routes[0].children.length).toBeGreaterThan(10);
     });
 
-    it("should have exactly 30 children routes when both enterprise and cloud are enabled", () => {
+    it("should have exactly 32 children routes when both enterprise and cloud are enabled", () => {
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(30); // 8 base (incl. assistantSettings, alert_sources, llm_providers, gen_ai_agent_mapping redirects) + syntheticsLocations + modelPricing (+ editor, gaps) + slack + 14 enterprise (incl. passwordPolicy, announcements + editor, telephonySettings) + 3 cloud
+      expect(routes[0].children).toHaveLength(32); // 8 base (incl. assistantSettings, alert_sources, llm_providers, gen_ai_agent_mapping redirects) + syntheticsLocations + modelPricing (+ editor, gaps) + slack + 16 enterprise (incl. passwordPolicy, announcements + editor, telephonySettings, secrets + store status) + 3 cloud
     });
 
     it("should have all enterprise routes when both are enabled", () => {

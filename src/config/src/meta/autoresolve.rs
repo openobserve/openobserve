@@ -483,6 +483,10 @@ pub enum ConsumeResponse {
         step_id: String,
         arguments: Value,
         headers: HashMap<String, String>,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        allowed_hosts: Vec<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        follow_redirects: Option<bool>,
     },
     Refuse {
         message: String,
@@ -499,6 +503,8 @@ impl std::fmt::Debug for ConsumeResponse {
                 step_id,
                 arguments,
                 headers,
+                allowed_hosts,
+                follow_redirects,
             } => {
                 let mut names: Vec<&String> = headers.keys().collect();
                 names.sort();
@@ -506,6 +512,8 @@ impl std::fmt::Debug for ConsumeResponse {
                     .field("step_id", step_id)
                     .field("arguments", arguments)
                     .field("header_names", &names)
+                    .field("allowed_hosts", allowed_hosts)
+                    .field("follow_redirects", follow_redirects)
                     .finish()
             }
             Self::Refuse { message } => f.debug_struct("Refuse").field("message", message).finish(),
@@ -1074,6 +1082,7 @@ mod tests {
 
         let wire = [
             json!({"decision":"run","step_id":"s1","arguments":{"sha":"abc"},"headers":{"Authorization":"W"}}),
+            json!({"decision":"run","step_id":"s1","arguments":{"sha":"abc"},"headers":{"Authorization":"W"},"allowed_hosts":["https://github.example:443"],"follow_redirects":false}),
             json!({"decision":"refuse","message":"Run step 1 first."}),
             json!({"decision":"hold","message":"Waiting for review."}),
         ];
@@ -1084,6 +1093,22 @@ mod tests {
         let result = json!({"ok":true,"unknown":false,"result":{"n":1},"error":null});
         let parsed: StepResultInput = serde_json::from_value(result.clone()).unwrap();
         assert_eq!(serde_json::to_value(parsed).unwrap(), result);
+    }
+
+    #[test]
+    fn consume_response_debug_hides_header_values_and_shows_pins() {
+        let response = ConsumeResponse::Run {
+            step_id: "s1".into(),
+            arguments: json!({}),
+            headers: HashMap::from([("Authorization".into(), "write-secret".into())]),
+            allowed_hosts: vec!["https://github.example:443".into()],
+            follow_redirects: Some(false),
+        };
+        let debug = format!("{response:?}");
+        assert!(debug.contains("Authorization"));
+        assert!(!debug.contains("write-secret"));
+        assert!(debug.contains("https://github.example:443"));
+        assert!(debug.contains("follow_redirects: Some(false)"));
     }
 
     #[test]

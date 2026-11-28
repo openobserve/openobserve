@@ -923,7 +923,7 @@ mod tests {
 
     fn denied_user() -> Headers<UserEmail> {
         Headers(UserEmail {
-            user_id: format!("{}@example.com", config::ider::uuid()),
+            user_id: format!("{}@example.com", config::ider::ksuid()),
         })
     }
 
@@ -979,14 +979,14 @@ mod tests {
     #[tokio::test]
     async fn rebinding_a_judge_needs_read_on_the_new_provider_but_keeping_it_does_not() {
         infra::table::scorers::create_table().await.unwrap();
-        let org_id = format!("rebind_{}", config::ider::uuid());
+        let org_id = format!("rebind_{}", config::ider::ksuid());
         let body: ScorerRequestBody = serde_json::from_value(
             serde_json::json!({"name": "judge", "scorer": judge("provider-a")}),
         )
         .unwrap();
         let mut existing: infra::table::scorers::Scorer = body.into();
-        existing.id = config::ider::uuid();
-        existing.entity_id = config::ider::uuid();
+        existing.id = config::ider::ksuid();
+        existing.entity_id = config::ider::ksuid();
         existing.org_id = org_id.clone();
         existing.version = 1;
         existing.is_active = true;

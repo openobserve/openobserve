@@ -21,6 +21,7 @@ vi.mock("vue-i18n", () => ({
 }));
 
 import AgentSetupDrawer from "./AgentSetupDrawer.vue";
+import store from "@/test/unit/helpers/store";
 
 // ── Stubs ───────────────────────────────────────────────────────────────────
 // ODrawer is stubbed open-regardless so the composer is always in the DOM; the
@@ -66,7 +67,7 @@ const BASE_PROPS = {
 function mountDrawer(props: Record<string, unknown> = {}) {
   return mount(AgentSetupDrawer, {
     props: { ...BASE_PROPS, ...props },
-    global: { stubs: STUBS },
+    global: { stubs: STUBS, plugins: [store] },
   }) as VueWrapper;
 }
 

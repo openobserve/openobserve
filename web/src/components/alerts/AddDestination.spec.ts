@@ -787,6 +787,7 @@ describe("AddDestination - prebuilt (single form, no nested <form>)", () => {
         slack_team_name: "Acme",
         slack_channel_id: "B000",
       },
+      [],
     );
     expect(wrapper.emitted("get:destinations")).toBeTruthy();
     expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
@@ -844,6 +845,7 @@ describe("AddDestination - prebuilt (single form, no nested <form>)", () => {
         slack_team_name: "Acme",
         slack_channel_id: "B000",
       },
+      [],
     );
     expect(hoisted.mockCreatePrebuilt).not.toHaveBeenCalled();
   });
@@ -1212,6 +1214,7 @@ describe("AddDestination - Slack setup flow", () => {
         setup_method: "manifest",
         slack_app_name: "Operations Alerts",
       },
+      [],
     );
     const serializedCall = JSON.stringify(hoisted.mockCreatePrebuilt.mock.calls[0]);
     expect(serializedCall.split(VALID_SLACK)).toHaveLength(2);
@@ -1303,6 +1306,7 @@ describe("AddDestination - Slack setup flow", () => {
       false,
       undefined,
       { setup_method: "webhook" },
+      [],
     );
   });
 
@@ -1390,6 +1394,7 @@ describe("AddDestination - Slack setup flow", () => {
       false,
       "prebuilt_slack",
       { setup_method: "webhook" },
+      [],
     );
   });
 
@@ -1457,6 +1462,7 @@ describe("AddDestination - Slack setup flow", () => {
         setup_method: "manifest",
         slack_app_name: "Operations Alerts",
       },
+      [],
     );
   });
 
@@ -1497,6 +1503,7 @@ describe("AddDestination - Slack setup flow", () => {
       false,
       "prebuilt_slack",
       { setup_method: "webhook" },
+      [],
     );
   });
 
@@ -1534,6 +1541,7 @@ describe("AddDestination - Slack setup flow", () => {
       false,
       "prebuilt_slack",
       { setup_method: "webhook" },
+      [],
     );
   });
 

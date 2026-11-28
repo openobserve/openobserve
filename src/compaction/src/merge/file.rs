@@ -548,7 +548,7 @@ mod tests {
     }
 
     async fn memory_storage_account() -> String {
-        let id = ider::uuid();
+        let id = ider::ksuid();
         storage::add_account(&id, Box::new(InMemory::new())).await;
         format!("{id}:default")
     }

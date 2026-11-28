@@ -282,7 +282,7 @@ pub async fn delete_by_org(org_id: &str) -> Result<(), errors::Error> {
 ///
 /// `WHERE down_notified_at = 0` makes the transition a compare-and-swap: exactly
 /// one node flips 0 → now and gets `rows_affected == 1`; the rest see 0 and stay
-/// quiet. Same primitive as `synthetics_jobs::lease_batch` and
+/// quiet. Same primitive as `synthetics_jobs::lease_batch_for_org` and
 /// `synthetics_checks::try_claim_slot`.
 ///
 /// Deliberately NOT cached — `LOCATIONS_CACHE` serves definition reads, and a

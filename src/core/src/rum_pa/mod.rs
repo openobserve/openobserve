@@ -688,7 +688,7 @@ pub fn validate_app(app: Option<&str>) -> Result<String, RumPaError> {
     }
 }
 
-/// The 27-character KSUID `config::ider::uuid()` mints.
+/// The 27-character KSUID `config::ider::ksuid()` mints.
 pub fn is_id(id: &str) -> bool {
     id.len() == ID_LENGTH && id.bytes().all(|b| b.is_ascii_alphanumeric())
 }
@@ -1438,7 +1438,7 @@ mod tests {
     #[test]
     fn ids_are_27_letters_or_digits() {
         assert!(validate_id(ID_A).is_ok());
-        assert!(validate_id(&config::ider::uuid()).is_ok());
+        assert!(validate_id(&config::ider::ksuid()).is_ok());
         assert!(validate_id(&ID_A[..26]).is_err());
         assert!(validate_id(&format!("{ID_A}x")).is_err());
         assert!(validate_id(&format!("{}-", &ID_A[..26])).is_err());

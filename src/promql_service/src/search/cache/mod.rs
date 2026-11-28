@@ -748,7 +748,7 @@ mod tests {
             let start = 1_700_000_000_000_000;
             let step = second_micros(15);
             Some(Self {
-                query: format!("isolation_{}", config::ider::uuid()),
+                query: format!("isolation_{}", config::ider::ksuid()),
                 start,
                 end: start + 4 * step,
                 step,

@@ -1131,7 +1131,7 @@ pub async fn delete_stream_data_by_time_range(
 
     // Create a job in the compact manual jobs table
     let job = infra::table::compactor_manual_jobs::CompactorManualJob {
-        id: config::ider::uuid(),
+        id: config::ider::ksuid(),
         key,
         status: infra::table::compactor_manual_jobs::Status::Pending,
         created_at: Utc::now().timestamp_micros(),

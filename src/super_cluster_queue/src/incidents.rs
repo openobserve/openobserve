@@ -263,7 +263,7 @@ mod tests {
         ];
         let mut landed = Vec::new();
         for (moved_here, recovered, rekeyed) in cases {
-            let org = format!("separated_{}", config::ider::uuid());
+            let org = format!("separated_{}", config::ider::ksuid());
             let pair = |opener: &str| alert_pair_verdicts::Model {
                 org_id: org.clone(),
                 alert_a: "moved".to_string(),

@@ -112,7 +112,7 @@ async fn latest_result_per_check(
     };
 
     let resp = search_service::cache::search(
-        &config::ider::uuid(),
+        &config::ider::ksuid(),
         org_id,
         StreamType::Logs,
         None,

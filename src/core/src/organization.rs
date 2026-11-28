@@ -652,7 +652,7 @@ pub async fn create_org(
         ));
     }
 
-    org.identifier = ider::uuid();
+    org.identifier = ider::ksuid();
     #[cfg(not(feature = "cloud"))]
     let org_type = CUSTOM.to_owned();
     #[cfg(feature = "cloud")]

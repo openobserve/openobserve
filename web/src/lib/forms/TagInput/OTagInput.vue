@@ -18,7 +18,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div data-test="tag-input-container" class="h-full w-full" v-bind="wrapperAttrs">
     <div
       data-test="tag-input-wrapper"
-      class="group border-card-glass-border rounded-default bg-card-glass-bg focus-within:border-theme-accent relative flex h-full min-h-14 w-full max-w-full cursor-text flex-col overflow-hidden border px-1.25 py-0 transition-colors duration-300"
+      class="group border-card-glass-border rounded-default bg-card-glass-bg focus-within:border-theme-accent relative flex h-full min-h-14 w-full max-w-full flex-col overflow-hidden border px-1.25 py-0 transition-colors duration-300"
+      :class="disabled ? 'cursor-not-allowed opacity-60' : 'cursor-text'"
     >
       <label
         v-if="label"
@@ -44,9 +45,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :class="isHighlighted(tag) ? 'ring-theme-accent ring-1' : ''"
         >
           {{ tag }}
-          <template #trailing>
+          <template v-if="!disabled" #trailing>
             <button
               type="button"
+              :data-test="`tag-remove-${index}`"
               :aria-label="t('common.removeTag', { tag })"
               class="inline-flex cursor-pointer items-center justify-center hover:opacity-70"
               @click="removeTag(index)"
@@ -61,6 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ref="inputRef"
           v-model="inputValue"
           type="text"
+          :disabled="disabled"
           :placeholder="
             modelValue.length > 0 ? '' : (placeholder ?? t('common.typeAndPressEnterOrComma'))
           "
@@ -100,6 +103,7 @@ interface Props {
   label?: I18nText;
   /** Case-insensitive substring — tags containing it get a highlight ring (search-match affordance). */
   highlightQuery?: string;
+  disabled?: boolean;
 }
 
 // No `placeholder` default: `t()` in `withDefaults` would freeze the locale at
@@ -158,6 +162,7 @@ const handleInput = () => {
 };
 
 const removeTag = (index: number) => {
+  if (props.disabled) return;
   const newTags = props.modelValue.filter((_, i) => i !== index);
   emit("update:modelValue", newTags);
 };

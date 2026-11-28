@@ -335,7 +335,7 @@ async fn create_event_once<C: ConnectionTrait + TransactionTrait>(
     }
     let now = now_ms();
     let row = NamedEventRow {
-        id: config::ider::uuid(),
+        id: config::ider::ksuid(),
         org_id: scope.org.to_string(),
         app: scope.app.to_string(),
         name: draft.name.clone(),
@@ -432,7 +432,7 @@ async fn create_funnel_once<C: ConnectionTrait + TransactionTrait>(
     }
     let now = now_ms();
     let row = FunnelRow {
-        id: config::ider::uuid(),
+        id: config::ider::ksuid(),
         org_id: scope.org.to_string(),
         app: scope.app.to_string(),
         name: draft.name.clone(),
@@ -1674,13 +1674,13 @@ mod tests {
     }
 
     async fn tombstones_keep_deleted_rows_away(db: &'static DatabaseConnection) {
-        let org = format!("rumpa_{}", config::ider::uuid());
-        let early = stored_event(&org, &config::ider::uuid(), "early delete");
+        let org = format!("rumpa_{}", config::ider::ksuid());
+        let early = stored_event(&org, &config::ider::ksuid(), "early delete");
         unreplicate(db, &early, 1).await.unwrap();
         replicate(db, &early).await.unwrap();
         assert!(stored(db, &early).await.is_none(), "delete before put");
 
-        let redelivered = stored_event(&org, &config::ider::uuid(), "redelivered");
+        let redelivered = stored_event(&org, &config::ider::ksuid(), "redelivered");
         replicate(db, &redelivered).await.unwrap();
         unreplicate(db, &redelivered, 1).await.unwrap();
         replicate(db, &redelivered).await.unwrap();
@@ -1713,7 +1713,7 @@ mod tests {
     async fn two_puts_racing_on_an_absent_row_keep_the_newer(db: &'static DatabaseConnection) {
         let pg = db.get_database_backend() == DbBackend::Postgres;
         for round in 0..10 {
-            let org = format!("rumpa_{}", config::ider::uuid());
+            let org = format!("rumpa_{}", config::ider::ksuid());
             let anchor = create(
                 db,
                 Scope {
@@ -1723,7 +1723,7 @@ mod tests {
                 "anchor",
             )
             .await;
-            let v1 = stored_event(&org, &config::ider::uuid(), "raced");
+            let v1 = stored_event(&org, &config::ider::ksuid(), "raced");
             let v2 = NamedEventRow {
                 version: 2,
                 updated_at: 2,
@@ -1763,7 +1763,7 @@ mod tests {
         let pg = db.get_database_backend() == DbBackend::Postgres;
         for at_insert in [false, true] {
             for round in 0..10 {
-                let org = format!("rumpa_{}", config::ider::uuid());
+                let org = format!("rumpa_{}", config::ider::ksuid());
                 let anchor = create(
                     db,
                     Scope {
@@ -1773,7 +1773,7 @@ mod tests {
                     "anchor",
                 )
                 .await;
-                let row = stored_event(&org, &config::ider::uuid(), "doomed");
+                let row = stored_event(&org, &config::ider::ksuid(), "doomed");
                 let gate = match (pg, at_insert) {
                     (false, _) => None,
                     (true, false) => Some(hold_row(db, &org, &anchor.id).await),
@@ -1879,7 +1879,7 @@ mod tests {
     async fn p2_r7_two_first_settings_puts_racing_admit_one_and_conflict_the_other(
         db: &'static DatabaseConnection,
     ) {
-        let org = format!("rumpa_{}", config::ider::uuid());
+        let org = format!("rumpa_{}", config::ider::ksuid());
         let racer = |org: String, user: &'static str, env: &'static str| {
             tokio::spawn(async move {
                 let scope = Scope {
@@ -1917,7 +1917,7 @@ mod tests {
     }
 
     async fn concurrent_creates_at_49_admit_exactly_one(db: &'static DatabaseConnection) {
-        let org = format!("rumpa_{}", config::ider::uuid());
+        let org = format!("rumpa_{}", config::ider::ksuid());
         let scope = Scope {
             org: &org,
             app: APP,
@@ -1965,7 +1965,7 @@ mod tests {
     async fn a_racing_delete_and_funnel_save_never_leave_a_dangling_reference(
         db: &'static DatabaseConnection,
     ) {
-        let org = format!("rumpa_{}", config::ider::uuid());
+        let org = format!("rumpa_{}", config::ider::ksuid());
         for round in 0..20 {
             let scope = Scope {
                 org: &org,
@@ -2086,7 +2086,7 @@ mod tests {
             eprintln!("skipped: row lock order exists only on Postgres");
             return;
         }
-        let org = format!("rumpa_{}", config::ider::uuid());
+        let org = format!("rumpa_{}", config::ider::ksuid());
         let (low, edit) = a_clashing_edit(db, &org, ids).await;
         let local = db.begin().await.unwrap();
         rum_pa::get_for_update::<NamedEvents, _>(&local, &org, APP, &low.id)
@@ -2156,7 +2156,7 @@ mod tests {
         ids: Option<[&str; 2]>,
     ) {
         for round in 0..20 {
-            let org = format!("rumpa_{}", config::ider::uuid());
+            let org = format!("rumpa_{}", config::ider::ksuid());
             let (low, edit) = a_clashing_edit(db, &org, ids).await;
             let incoming = edit.clone();
             let applier = tokio::spawn(async move { replicate(db, &incoming).await });

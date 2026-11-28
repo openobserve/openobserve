@@ -242,6 +242,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :org="agentSetup?.org"
       :o2-url="agentSetup?.o2_url"
       :script-url="agentSetup?.script_url"
+      :agents="detail?.agents"
+      :min-runner-version="agentSetup?.min_runner_version"
+      :lease-deadline-us="agentSetup?.lease_deadline_us"
     />
   </OPageLayout>
 </template>

@@ -1385,7 +1385,7 @@ mod tests {
 
         #[tokio::test]
         async fn detection_apply_needs_the_security_permission_the_editor_save_needs() {
-            let org = format!("aec_{}", config::ider::uuid());
+            let org = format!("aec_{}", config::ider::ksuid());
             let (alert_id, user) = stored_alert(&org).await;
             mark(&org, &alert_id, true).await;
             grant(&user, &[]);
@@ -1422,7 +1422,7 @@ mod tests {
 
         #[tokio::test]
         async fn detection_undo_needs_the_security_permission_the_editor_save_needs() {
-            let org = format!("aec_{}", config::ider::uuid());
+            let org = format!("aec_{}", config::ider::ksuid());
             let (alert_id, user) = stored_alert(&org).await;
             grant(&user, &[]);
             let (deps, alerts) = (deps(), Pending::default());

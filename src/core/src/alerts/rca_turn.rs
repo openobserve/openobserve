@@ -51,9 +51,12 @@ use config::{
     utils::time::now_micros,
 };
 use futures::StreamExt;
-use infra::table::{
-    ai_chat_sessions, ai_chat_turns,
-    rca_runs::{self as runs_table, Model as RunRow, RunSummaryPatch, RunUpdate},
+use infra::{
+    secret_store::toolset::AgentPrincipal,
+    table::{
+        ai_chat_sessions, ai_chat_turns,
+        rca_runs::{self as runs_table, Model as RunRow, RunSummaryPatch, RunUpdate},
+    },
 };
 use o2_enterprise::enterprise::{
     ai::{
@@ -386,7 +389,10 @@ async fn start_turn(
         }
     }
     let prompt = prompt.render();
-    let (mcps, skills) = load_agent_tools(&run.org_id).await;
+    let principal = AgentPrincipal::Automation {
+        run_id: run.run_id.clone(),
+    };
+    let (mcps, skills) = load_agent_tools(&run.org_id, &principal).await;
 
     let session_id = match run.session_id.clone() {
         Some(session_id) => session_id,
@@ -519,6 +525,7 @@ async fn start_turn(
     let spec = TurnSpec {
         identity,
         request,
+        toolset_principal: Some(principal),
         auth_header,
         forward_headers: Some(forward_headers),
         client,

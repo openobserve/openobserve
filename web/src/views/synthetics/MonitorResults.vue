@@ -87,6 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="refresh"
       />
     </template>
+    <CheckRunnerNotice v-if="locationIds.length" :location-ids="locationIds" />
     <div class="min-h-0 flex-1 overflow-hidden">
       <MonitorRuns
         :key="checkIdentity"
@@ -185,6 +186,7 @@ import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import MonitorRuns from "@/views/synthetics/MonitorRuns.vue";
+import CheckRunnerNotice from "@/components/synthetic-monitoring/CheckRunnerNotice.vue";
 import RunDetail from "@/views/synthetics/RunDetail.vue";
 import { getConsumableRelativeTime } from "@/utils/date";
 import { getFoldersListByType } from "@/utils/commons";
@@ -211,6 +213,8 @@ const checkType = ref("browser");
 /** The check's configured retry count. 0 means nothing can ever be observed as
  *  flaky, so the flakiness tiles have no answer to give rather than a zero. */
 const retries = ref(0);
+/** The check's location ids; the old-runner banner reads the agents of its private ones. */
+const locationIds = ref<string[]>([]);
 // True once fetchCheck() resolves — the drawer can auto-open from a run/exec
 // query param before that happens, so RunDetail must not trust checkType's
 // "browser" default until it's confirmed.
@@ -586,6 +590,7 @@ async function fetchCheck() {
       });
       // The flaky tiles are only answerable when the check is allowed to retry.
       retries.value = Number(res.data.retries ?? res.data.settings?.retries ?? 0) || 0;
+      locationIds.value = Array.isArray(res.data.locations) ? res.data.locations.map(String) : [];
       await resolveEnvironmentNames((res.data.environments ?? []) as string[], request);
     }
   } catch (err: any) {

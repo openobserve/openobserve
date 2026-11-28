@@ -107,7 +107,7 @@ pub async fn insert_with<C: ConnectionTrait>(
     share: &NewShare<'_>,
     now: i64,
 ) -> Result<Model, errors::Error> {
-    let id = config::ider::uuid();
+    let id = config::ider::ksuid();
     let record = ActiveModel {
         id: Set(id.clone()),
         org_id: Set(share.org_id.to_string()),

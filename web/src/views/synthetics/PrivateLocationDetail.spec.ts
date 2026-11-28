@@ -144,6 +144,8 @@ const baseStubs = {
       "org",
       "o2Url",
       "scriptUrl",
+      "minRunnerVersion",
+      "leaseDeadlineUs",
     ],
   },
 };
@@ -323,6 +325,22 @@ describe("PrivateLocationDetail", () => {
   });
 
   describe("setup drawer", () => {
+    it("forwards the enforced runner version and lease deadline to setup", async () => {
+      const leaseDeadlineUs = Date.UTC(2026, 11, 3, 12) * 1000;
+      mockServiceGetAgentSetup.mockResolvedValue({
+        data: { min_runner_version: "2.0.0", lease_deadline_us: leaseDeadlineUs },
+      });
+      wrapper = mountPage();
+      await flushPromises();
+      await wrapper
+        .get('[data-test="synthetics-private-location-detail-setup-btn"]')
+        .trigger("click");
+      await flushPromises();
+      const setup = wrapper.findComponent(baseStubs.AgentSetupDrawer);
+      expect(setup.props("minRunnerVersion")).toBe("2.0.0");
+      expect(setup.props("leaseDeadlineUs")).toBe(leaseDeadlineUs);
+    });
+
     it("should open setup drawer and fetch agent setup when copy setup button is clicked", async () => {
       wrapper = mountPage();
       await flushPromises();

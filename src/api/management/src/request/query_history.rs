@@ -565,7 +565,7 @@ mod tests {
     }
 
     fn user() -> String {
-        format!("{}@example.com", config::ider::uuid())
+        format!("{}@example.com", config::ider::ksuid())
     }
 
     fn headers(user: &str) -> Headers<UserEmail> {
@@ -709,7 +709,7 @@ mod tests {
         use sea_orm::ConnectionTrait;
         setup().await;
         let a = user();
-        let id = config::ider::uuid();
+        let id = config::ider::ksuid();
         infra::db::get_orm_client_rw()
             .await
             .execute_unprepared(&format!(

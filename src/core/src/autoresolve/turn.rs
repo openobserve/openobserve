@@ -45,7 +45,7 @@ use o2_enterprise::enterprise::{
         client::{AUTORESOLVE_AGENT_TYPE, QueryRequest, SESSION_ID_HEADER, get_agent_client},
         toolsets::{
             McpEntry,
-            push::{autoresolve_entries, normalize_tool_name},
+            push::{autoresolve_entries, autoresolve_toolsets, normalize_tool_name},
         },
     },
     autoresolve::token::mint,
@@ -211,14 +211,12 @@ pub(crate) async fn spawn_check_turn(
     spawn_turn(run, Phase::Check, None, steps, false).await
 }
 
-/// The MCP tools of the run's chosen connections that still exist;
-/// [AutoResolveError::NoConnections] when none does. Only the chosen ones are read and decrypted.
-pub(crate) async fn load_tools(
-    org: &str,
-    ids: &[String],
-) -> Result<Vec<McpEntry>, AutoResolveError> {
+/// Run-start validation must not resolve credentials or audit a run that may never be stored.
+pub(crate) async fn check_tools(org: &str, ids: &[String]) -> Result<(), AutoResolveError> {
     let listed = org_ai_toolsets::list_described(org, MCP_KIND).await?;
-    load_listed(org, &listed, ids).await
+    let chosen = load_chosen(org, &listed, ids).await?;
+    let names: Vec<String> = listed.iter().map(|(_, name, _)| name.clone()).collect();
+    chosen_of(&names, chosen).map(|_| ())
 }
 
 /// The org's MCP connections the run does not have, each with its key, sorted by key, at most
@@ -424,9 +422,20 @@ fn not_connected_context(
 
 async fn load_listed(
     org: &str,
+    run_id: &str,
     listed: &[Listed],
     ids: &[String],
 ) -> Result<Vec<McpEntry>, AutoResolveError> {
+    let chosen = load_chosen(org, listed, ids).await?;
+    let names: Vec<String> = listed.iter().map(|(_, name, _)| name.clone()).collect();
+    tools_of(org, run_id, &names, chosen).await
+}
+
+async fn load_chosen(
+    org: &str,
+    listed: &[Listed],
+    ids: &[String],
+) -> Result<Vec<OrgToolset>, AutoResolveError> {
     let mut chosen = Vec::with_capacity(ids.len());
     for id in ids
         .iter()
@@ -436,8 +445,7 @@ async fn load_listed(
             chosen.push(toolset);
         }
     }
-    let names: Vec<String> = listed.iter().map(|(_, name, _)| name.clone()).collect();
-    tools_of(org, &names, chosen)
+    Ok(chosen)
 }
 
 /// The run's tools and the context extras, read once per turn; a planning turn also records
@@ -448,7 +456,7 @@ async fn turn_inputs(
 ) -> Result<(Vec<McpEntry>, TurnExtras), AutoResolveError> {
     let run_ids = run_connection_ids(run)?;
     let listed = org_ai_toolsets::list_described(&run.org, MCP_KIND).await?;
-    let mcps = load_listed(&run.org, &listed, &run_ids).await?;
+    let mcps = load_listed(&run.org, &run.id, &listed, &run_ids).await?;
     let permitted = planner_listable(run).await;
     let this_run = autoresolve_corrections::for_run(&run.org, &run.id).await?;
     let active = match &run.autoresolve_id {
@@ -611,16 +619,29 @@ async fn admit(run: &RunRow, phase: Phase, trace_id: &str) -> Result<AdmittedTur
     }
 }
 
-fn tools_of(
+async fn tools_of(
     org: &str,
+    run_id: &str,
     mcp_names: &[String],
     chosen: Vec<OrgToolset>,
 ) -> Result<Vec<McpEntry>, AutoResolveError> {
-    let mcps = autoresolve_entries(org, mcp_names, chosen);
+    let chosen = chosen_of(mcp_names, chosen)?;
+    let mcps = autoresolve_entries(org, run_id, mcp_names, chosen).await;
     if mcps.is_empty() {
         return Err(AutoResolveError::NoConnections);
     }
     Ok(mcps)
+}
+
+fn chosen_of(
+    mcp_names: &[String],
+    chosen: Vec<OrgToolset>,
+) -> Result<Vec<OrgToolset>, AutoResolveError> {
+    let chosen = autoresolve_toolsets(mcp_names, chosen);
+    if chosen.is_empty() {
+        return Err(AutoResolveError::NoConnections);
+    }
+    Ok(chosen)
 }
 
 fn turn_context(
@@ -1194,7 +1215,7 @@ mod tests {
                 .filter(|t| ids.contains(&t.id))
                 .cloned()
                 .collect();
-            let got = tools_of(ORG, &names, chosen);
+            let got = chosen_of(&names, chosen);
             let names = got
                 .as_ref()
                 .ok()

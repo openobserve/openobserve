@@ -1204,7 +1204,7 @@ mod tests {
                 eprintln!("skipped: needs a postgres at ZO_META_POSTGRES_DSN");
                 return None;
             };
-            let schema = format!("s{}", config::ider::uuid().to_lowercase());
+            let schema = format!("s{}", config::ider::ksuid().to_lowercase());
             let admin = sqlx::PgPool::connect(&url).await.unwrap();
             sqlx::query(&format!("CREATE SCHEMA {schema}"))
                 .execute(&admin)

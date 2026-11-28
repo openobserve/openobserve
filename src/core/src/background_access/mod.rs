@@ -1811,7 +1811,7 @@ mod tests {
     #[tokio::test]
     async fn a_failed_or_empty_load_is_left_to_the_action() {
         crate::authz::fake_checker();
-        let user = format!("{}@example.com", config::ider::uuid());
+        let user = format!("{}@example.com", config::ider::ksuid());
         let failed = async { Err(anyhow::anyhow!("replica unavailable")) };
         assert!(guard_loaded("o1", &user, failed).await.is_ok());
         let failed = async { Err(anyhow::anyhow!("replica unavailable")) };
@@ -1868,7 +1868,7 @@ mod tests {
     #[tokio::test]
     async fn a_rename_or_layout_edit_looks_up_no_report_and_checks_nothing() {
         crate::authz::fake_checker();
-        let user = format!("{}@example.com", config::ider::uuid());
+        let user = format!("{}@example.com", config::ider::ksuid());
         let stored = two_tabs("secret", "secret");
         let mut edited = stored.clone();
         edited["title"] = json!("renamed");
@@ -1888,7 +1888,7 @@ mod tests {
     #[tokio::test]
     async fn a_changed_query_counts_only_in_a_tab_some_report_renders() {
         crate::authz::fake_checker();
-        let user = format!("{}@example.com", config::ider::uuid());
+        let user = format!("{}@example.com", config::ider::ksuid());
         let stored = two_tabs("first", "second");
 
         let hidden_edit = two_tabs("first", "secret");
@@ -1916,7 +1916,7 @@ mod tests {
         use config::meta::dashboards::reports::ReportDashboard;
 
         crate::authz::fake_checker();
-        let user = format!("{}@example.com", config::ider::uuid());
+        let user = format!("{}@example.com", config::ider::ksuid());
         let report = Report {
             dashboards: vec![ReportDashboard {
                 dashboard: "d1".to_string(),
@@ -2065,7 +2065,7 @@ mod tests {
 
     #[cfg(all(feature = "enterprise", feature = "test-utils"))]
     fn editor() -> String {
-        let user = format!("{}@example.com", config::ider::uuid());
+        let user = format!("{}@example.com", config::ider::ksuid());
         let checker = crate::authz::fake_checker();
         for name in ["safe", "first", "second", "third"] {
             checker.grant_read(
@@ -2242,7 +2242,7 @@ mod tests {
 
     #[cfg(all(feature = "enterprise", feature = "test-utils"))]
     fn metrics_editor() -> String {
-        let user = format!("{}@example.com", config::ider::uuid());
+        let user = format!("{}@example.com", config::ider::ksuid());
         let checker = crate::authz::fake_checker();
         for name in ["up", "safe_metric"] {
             checker.grant_read(

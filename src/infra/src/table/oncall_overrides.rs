@@ -68,7 +68,7 @@ pub async fn create(
 ) -> Result<ScheduleOverride, errors::Error> {
     let client = get_orm_client_rw().await;
     let record = ScheduleOverride {
-        id: ider::uuid(),
+        id: ider::ksuid(),
         org_id: org_id.to_string(),
         team_id: team_id.to_string(),
         rotation_id,

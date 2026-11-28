@@ -97,6 +97,7 @@ vi.mock("@/utils/synthetics/buildPayload", () => ({
 import CreateProtocolCheck from "./CreateProtocolCheck.vue";
 import destinationService from "@/services/alert_destination";
 import { getFoldersListByType } from "@/utils/commons";
+import { queryClient } from "@/composables/query/queryClient";
 
 // ── Stubs ────────────────────────────────────────────────────────────────
 const baseStubs = {
@@ -347,6 +348,50 @@ describe("CreateProtocolCheck", () => {
 
       expect(mockServiceCreate).toHaveBeenCalledTimes(1);
       expect(configure.props("check").template).toBeNull();
+    });
+
+    it("logs a failed save without the request body the user typed", async () => {
+      mockToast.mockReturnValue(() => {});
+      const log = vi.spyOn(console, "error").mockImplementation(() => {});
+      mockServiceCreate.mockRejectedValue({
+        config: { data: '{"password":"hunter2"}' },
+        response: { status: 500, data: { code: "boom" } },
+      });
+      wrapper = mountPage("http");
+      await flushPromises();
+      await wrapper.find('[data-test="synthetics-create-save-btn"]').trigger("click");
+      await flushPromises();
+      const saveLog = log.mock.calls.find((c) => c[0] === "[synthetics] save failed");
+      expect(saveLog?.[1]).toEqual({ status: 500, code: "boom" });
+      expect(JSON.stringify(log.mock.calls)).not.toContain("hunter2");
+      log.mockRestore();
+    });
+
+    it.each([
+      ["saved", () => Promise.resolve({ data: { id: "proto-check-1" } })],
+      ["refused", () => Promise.reject({ response: { status: 400, data: { code: "x" } } })],
+    ])("keeps no submitted credential in the mutation cache once %s", async (_label, reply) => {
+      mockToast.mockReturnValue(() => {});
+      const log = vi.spyOn(console, "error").mockImplementation(() => {});
+      mockServiceCreate.mockImplementation(reply as any);
+      wrapper = mountPage("http");
+      await flushPromises();
+      const configure = wrapper.findComponent({ name: "CheckConfigure" });
+      await configure.vm.$emit("update:check", {
+        ...configure.props("check"),
+        password: "pr0be-s3cret",
+      });
+      await flushPromises();
+      await wrapper.find('[data-test="synthetics-create-save-btn"]').trigger("click");
+      await flushPromises();
+      expect(JSON.stringify(mockServiceCreate.mock.calls)).toContain("pr0be-s3cret");
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      const cached = queryClient
+        .getMutationCache()
+        .getAll()
+        .map((m) => m.state);
+      expect(JSON.stringify(cached)).not.toContain("pr0be-s3cret");
+      log.mockRestore();
     });
 
     // B1: the picker shows the server's template refusal through validationErrors.template.

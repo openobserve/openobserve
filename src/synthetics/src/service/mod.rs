@@ -99,6 +99,7 @@ pub mod composition;
 pub mod composition_lock;
 pub mod crypto;
 pub mod locations;
+pub mod respell;
 pub mod runs;
 pub mod tokens;
 pub mod variables;

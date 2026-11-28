@@ -26,6 +26,8 @@ use std::{
 
 use reqwest::dns::{Addrs, Name, Resolve, Resolving};
 
+const DEFAULT_REDIRECT_MODE: RedirectMode = RedirectMode::Validated { max_hops: 5 };
+
 /// Cloud metadata and credential endpoints (IMDS, ECS task role, EKS Pod Identity, Alibaba).
 const METADATA_IPS: [IpAddr; 6] = [
     IpAddr::V4(Ipv4Addr::new(169, 254, 169, 254)),
@@ -49,6 +51,19 @@ static NO_ALLOWLIST: SsrfAllowlist = SsrfAllowlist {
 };
 static PROXY_HOSTS: LazyLock<Vec<String>> =
     LazyLock::new(|| proxy_hosts_from(|name| std::env::var(name).ok()));
+
+/// `Deny` returns a 3xx unfollowed, so a secret-bearing request never reaches the Location host.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RedirectMode {
+    Deny,
+    Validated { max_hops: u8 },
+}
+
+impl RedirectMode {
+    pub fn secret_bearing_policy(self) -> reqwest::redirect::Policy {
+        redirect_policy(self, &ALLOWLIST)
+    }
+}
 
 pub struct SsrfGuard;
 
@@ -310,9 +325,13 @@ impl Scope {
     }
 
     /// Destinations never follow: each hop is a host the audit trail does not record.
-    fn redirect_policy(self, allowlist: &'static SsrfAllowlist) -> reqwest::redirect::Policy {
+    fn redirect_policy(
+        self,
+        allowlist: &'static SsrfAllowlist,
+        mode: RedirectMode,
+    ) -> reqwest::redirect::Policy {
         match self {
-            Scope::Strict => revalidated_redirects(allowlist),
+            Scope::Strict => redirect_policy(mode, allowlist),
             Scope::Destination => reqwest::redirect::Policy::none(),
         }
     }
@@ -483,6 +502,93 @@ impl Resolve for SsrfDnsResolver {
     }
 }
 
+#[derive(Clone)]
+pub struct SecretBackendNetwork {
+    private: Arc<[Cidr]>,
+    cluster: Arc<[Cidr]>,
+}
+
+impl SecretBackendNetwork {
+    pub fn from_cidrs(private: &str, cluster: &str) -> Option<Self> {
+        let parse = |spec: &str| {
+            split_list(spec)
+                .map(Cidr::parse)
+                .collect::<Option<Vec<_>>>()
+                .map(Arc::from)
+        };
+        Some(Self {
+            private: parse(private)?,
+            cluster: parse(cluster)?,
+        })
+    }
+
+    fn allows_address(&self, ip: IpAddr) -> bool {
+        let embedded = unwrap_embedded_ipv4(&ip);
+        if is_always_blocked_ip(&ip)
+            || self
+                .cluster
+                .iter()
+                .any(|net| net.contains(&ip) || net.contains(&embedded))
+        {
+            return false;
+        }
+        let private = match embedded {
+            IpAddr::V4(ip) => ip.is_private(),
+            IpAddr::V6(ip) => ip.is_unique_local(),
+        };
+        if private {
+            return self.private.iter().any(|net| net.contains(&embedded));
+        }
+        if let IpAddr::V6(v6) = embedded {
+            // Permit native global unicast only. Locally translated IPv6 and Teredo hide the
+            // destination.
+            let [first, second, ..] = v6.segments();
+            if first & 0xe000 != 0x2000 || (first, second) == (0x2001, 0) {
+                return false;
+            }
+        }
+        !SsrfGuard::is_private_ip_inner(&ip, false)
+    }
+
+    fn checked_addrs(&self, addrs: Vec<SocketAddr>) -> Result<Vec<SocketAddr>, SsrfRefusal> {
+        if addrs.is_empty() || addrs.iter().any(|addr| !self.allows_address(addr.ip())) {
+            return Err(SsrfRefusal("backend address refused".to_owned()));
+        }
+        Ok(addrs)
+    }
+
+    pub async fn resolve_host(
+        &self,
+        host: &str,
+    ) -> Result<Vec<SocketAddr>, Box<dyn std::error::Error + Send + Sync>> {
+        if is_always_blocked_host(host.trim_end_matches('.')) {
+            return Err(SsrfRefusal("backend address refused".to_owned()).into());
+        }
+        let host = host.trim_start_matches('[').trim_end_matches(']');
+        let addrs = if let Ok(ip) = host.parse::<IpAddr>() {
+            vec![SocketAddr::new(ip, 0)]
+        } else {
+            // An endpoint origin is absolute; a DNS search suffix could select another service.
+            let absolute = format!("{}.", host.trim_end_matches('.'));
+            tokio::net::lookup_host((absolute.as_str(), 0))
+                .await
+                .map_err(|_| std::io::Error::from(std::io::ErrorKind::HostUnreachable))?
+                .collect()
+        };
+        Ok(self.checked_addrs(addrs)?)
+    }
+}
+
+impl Resolve for SecretBackendNetwork {
+    fn resolve(&self, name: Name) -> Resolving {
+        let network = self.clone();
+        Box::pin(async move {
+            let addrs = network.resolve_host(name.as_str()).await?;
+            Ok(Box::new(addrs.into_iter()) as Addrs)
+        })
+    }
+}
+
 /// Build a reqwest client that is hardened against SSRF on redirect chains
 /// and on DNS resolution. Use this anywhere the URL is derived from user input
 /// and the response is read back; it ignores the operator allowlist.
@@ -493,7 +599,7 @@ impl Resolve for SsrfDnsResolver {
 ///
 /// Honors `ZO_SSRF_ALLOW_LOOPBACK` consistently across both layers.
 pub fn build_safe_client(builder: reqwest::ClientBuilder) -> reqwest::Result<reqwest::Client> {
-    build_scoped_client(builder, Scope::Strict, &ALLOWLIST)
+    build_scoped_client(builder, Scope::Strict, &ALLOWLIST, DEFAULT_REDIRECT_MODE)
 }
 
 /// [`build_safe_client`] for send-only destinations: admits the operator allowlist and never
@@ -501,7 +607,20 @@ pub fn build_safe_client(builder: reqwest::ClientBuilder) -> reqwest::Result<req
 pub fn build_safe_destination_client(
     builder: reqwest::ClientBuilder,
 ) -> reqwest::Result<reqwest::Client> {
-    build_scoped_client(builder, Scope::Destination, &ALLOWLIST)
+    build_scoped_client(
+        builder,
+        Scope::Destination,
+        &ALLOWLIST,
+        DEFAULT_REDIRECT_MODE,
+    )
+}
+
+/// Destination allowlist rules also apply when the request carries a secret.
+pub fn build_secret_bearing_client(
+    builder: reqwest::ClientBuilder,
+    mode: RedirectMode,
+) -> reqwest::Result<reqwest::Client> {
+    build_scoped_client(builder, Scope::Destination, &ALLOWLIST, mode)
 }
 
 /// [`build_safe_client`] that never follows redirects, for requests whose body carries
@@ -605,13 +724,14 @@ fn build_scoped_client(
     builder: reqwest::ClientBuilder,
     scope: Scope,
     configured: &'static SsrfAllowlist,
+    mode: RedirectMode,
 ) -> reqwest::Result<reqwest::Client> {
     let allowlist = scope.allowlist(configured);
     let resolver = SsrfDnsResolver {
         allowlist,
         proxy_hosts: &PROXY_HOSTS,
     };
-    build_guarded_client(builder, resolver, scope.redirect_policy(allowlist))
+    build_guarded_client(builder, resolver, scope.redirect_policy(allowlist, mode))
 }
 
 fn build_guarded_client(
@@ -625,23 +745,29 @@ fn build_guarded_client(
         .build()
 }
 
-/// Follows at most 5 hops, refusing any target `allowlist`'s policy would refuse.
-fn revalidated_redirects(allowlist: &'static SsrfAllowlist) -> reqwest::redirect::Policy {
-    reqwest::redirect::Policy::custom(move |attempt| {
-        if attempt.previous().len() >= 5 {
-            return attempt.error("too many redirects");
-        }
-        let cfg = crate::get_config();
-        match SsrfGuard::validate_url_inner(
-            attempt.url().as_str(),
-            cfg.common.ssrf_allow_loopback,
-            cfg.common.skip_ssrf_checks,
-            allowlist,
-        ) {
-            Ok(()) => attempt.follow(),
-            Err(e) => attempt.error(SsrfRefusal(e)),
-        }
-    })
+fn redirect_policy(
+    mode: RedirectMode,
+    allowlist: &'static SsrfAllowlist,
+) -> reqwest::redirect::Policy {
+    match mode {
+        RedirectMode::Deny => reqwest::redirect::Policy::custom(|attempt| attempt.stop()),
+        RedirectMode::Validated { max_hops } => reqwest::redirect::Policy::custom(move |attempt| {
+            // `previous()` holds the original URL too, so `max_hops - 1` redirects are followed.
+            if attempt.previous().len() >= usize::from(max_hops) {
+                return attempt.error("too many redirects");
+            }
+            let cfg = crate::get_config();
+            match SsrfGuard::validate_url_inner(
+                attempt.url().as_str(),
+                cfg.common.ssrf_allow_loopback,
+                cfg.common.skip_ssrf_checks,
+                allowlist,
+            ) {
+                Ok(()) => attempt.follow(),
+                Err(e) => attempt.error(SsrfRefusal(e)),
+            }
+        }),
+    }
 }
 
 /// Strict policy refuses `url` at `peer` while the destination policy admits it.
@@ -758,6 +884,11 @@ fn prefix_eq(a: u128, b: u128, prefix: u8, bits: u32) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use std::{
+        sync::atomic::{AtomicUsize, Ordering},
+        time::Duration,
+    };
+
     #[test]
     fn always_blocked_hosts_match_what_every_probe_refuses() {
         for blocked in [
@@ -816,6 +947,48 @@ mod tests {
 
     fn none() -> SsrfAllowlist {
         SsrfAllowlist::default()
+    }
+
+    #[test]
+    fn backend_network_filters_the_whole_dns_answer_and_excludes_cluster_routes() {
+        let network =
+            SecretBackendNetwork::from_cidrs("10.0.0.0/8,fd12::/16", "10.96.0.0/12").unwrap();
+        let socket = |ip: &str| SocketAddr::new(ip.parse().unwrap(), 443);
+        for denied in [
+            "10.96.2.1",
+            "::ffff:10.96.2.1",
+            "64:ff9b::a60:201",
+            "2002:a60:201::",
+            "172.16.0.1",
+            "fd20::1",
+            "127.0.0.1",
+            "fd00:ec2::254",
+            "169.254.169.254",
+            "64:ff9b::a9fe:a9fe",
+            "2002:7f00:1::",
+            "64:ff9b:1::1",
+            "2001:0::1",
+        ] {
+            assert!(
+                network
+                    .checked_addrs(vec![socket("8.8.8.8"), socket(denied)])
+                    .is_err()
+            );
+        }
+        let allowed = [
+            "8.8.8.8",
+            "2606:4700::1111",
+            "10.12.0.5",
+            "fd12::5",
+            "::ffff:10.12.0.5",
+            "64:ff9b::a0c:5",
+            "2002:a0c:5::",
+        ]
+        .map(socket)
+        .to_vec();
+        assert_eq!(network.checked_addrs(allowed.clone()).unwrap(), allowed);
+        assert!(network.checked_addrs(Vec::new()).is_err());
+        assert!(SecretBackendNetwork::from_cidrs("10.0.0.0/8", "malformed").is_none());
     }
 
     #[tokio::test]
@@ -1151,6 +1324,96 @@ mod tests {
         assert!(res.is_ok(), "{res:?}");
     }
 
+    async fn response_server(response: String) -> (SocketAddr, Arc<AtomicUsize>) {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let connections = Arc::new(AtomicUsize::new(0));
+        let accepted = Arc::clone(&connections);
+        tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            accepted.fetch_add(1, Ordering::Relaxed);
+            let mut buf = [0; 4096];
+            assert!(socket.read(&mut buf).await.unwrap() > 0);
+            socket.write_all(response.as_bytes()).await.unwrap();
+        });
+        (addr, connections)
+    }
+
+    fn redirect_to(url: &str) -> String {
+        format!("HTTP/1.1 302 Found\r\nLocation: {url}\r\nContent-Length: 0\r\n\r\n")
+    }
+
+    #[tokio::test]
+    async fn test_secret_bearing_client_stops_before_redirect_target() {
+        let (target, connections) =
+            response_server("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n".into()).await;
+        let (origin, _) = response_server(redirect_to(&format!("http://{target}/"))).await;
+        let builder = reqwest::Client::builder()
+            .no_proxy()
+            .timeout(Duration::from_secs(5));
+        let client = build_secret_bearing_client(builder, RedirectMode::Deny).unwrap();
+        let response = client
+            .get(format!("http://{origin}/"))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(response.status(), reqwest::StatusCode::FOUND);
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        assert_eq!(connections.load(Ordering::Relaxed), 0);
+    }
+
+    async fn redirect_chain(redirects: usize) -> String {
+        let (mut addr, _) =
+            response_server("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n".into()).await;
+        for _ in 0..redirects {
+            let target = format!("http://redirect.test:{}/", addr.port());
+            (addr, _) = response_server(redirect_to(&target)).await;
+        }
+        format!("http://{addr}/")
+    }
+
+    #[tokio::test]
+    async fn test_validated_redirect_limit_and_unfollowed_destinations() {
+        let builder = || {
+            reqwest::Client::builder()
+                .no_proxy()
+                .timeout(Duration::from_secs(5))
+                .resolve("redirect.test", SocketAddr::from((Ipv4Addr::LOCALHOST, 0)))
+        };
+        let destination = build_safe_destination_client(builder()).unwrap();
+        let response = destination
+            .get(redirect_chain(4).await)
+            .send()
+            .await
+            .unwrap();
+        assert!(response.status().is_redirection());
+
+        let resolver = SsrfDnsResolver {
+            allowlist: &NO_ALLOWLIST,
+            proxy_hosts: &PROXY_HOSTS,
+        };
+        let client = build_guarded_client(
+            builder(),
+            resolver,
+            redirect_policy(DEFAULT_REDIRECT_MODE, &NO_ALLOWLIST),
+        )
+        .unwrap();
+        let response = client.get(redirect_chain(4).await).send().await.unwrap();
+        assert_eq!(response.status(), reqwest::StatusCode::OK);
+
+        for redirects in [5, 6] {
+            let err = client
+                .get(redirect_chain(redirects).await)
+                .send()
+                .await
+                .unwrap_err();
+            assert!(err.is_redirect(), "{err:?}");
+            assert!(error_chain(&err).contains("too many redirects"), "{err:?}");
+        }
+    }
+
     #[tokio::test]
     async fn test_safe_client_refuses_redirect_to_metadata() {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -1245,7 +1508,8 @@ mod tests {
         let allow: &'static SsrfAllowlist =
             Box::leak(Box::new(SsrfAllowlist::parse("127.0.0.1/32", "")));
         let builder = reqwest::Client::builder().timeout(std::time::Duration::from_secs(5));
-        let client = build_scoped_client(builder, Scope::Destination, allow).unwrap();
+        let client =
+            build_scoped_client(builder, Scope::Destination, allow, DEFAULT_REDIRECT_MODE).unwrap();
         let url = format!("http://127.0.0.1:{port}/");
         let resp = client.get(&url).send().await.unwrap();
         assert_eq!(resp.status(), reqwest::StatusCode::FOUND);
@@ -1282,7 +1546,8 @@ mod tests {
             Box::leak(Box::new(SsrfAllowlist::parse("127.0.0.1/32,::1/128", "")));
         let url = format!("http://localhost:{port}/");
         let builder = || reqwest::Client::builder().timeout(std::time::Duration::from_secs(5));
-        let strict = build_scoped_client(builder(), Scope::Strict, allow).unwrap();
+        let strict =
+            build_scoped_client(builder(), Scope::Strict, allow, DEFAULT_REDIRECT_MODE).unwrap();
         let err = strict
             .get(&url)
             .send()
@@ -1291,7 +1556,9 @@ mod tests {
         assert!(error_chain(&err).contains("not allowed"), "{err:?}");
         let refusal = find_ssrf_refusal(&err).expect("the refusal is in the error chain");
         assert!(refusal.to_string().contains("not allowed"), "{refusal}");
-        let destination = build_scoped_client(builder(), Scope::Destination, allow).unwrap();
+        let destination =
+            build_scoped_client(builder(), Scope::Destination, allow, DEFAULT_REDIRECT_MODE)
+                .unwrap();
         let res = destination.get(&url).send().await;
         assert!(res.is_ok(), "{:?}", res.map_err(|e| error_chain(&e)));
     }
@@ -1319,7 +1586,12 @@ mod tests {
                 allowlist: &NO_ALLOWLIST,
                 proxy_hosts,
             };
-            build_guarded_client(builder, resolver, revalidated_redirects(&NO_ALLOWLIST)).unwrap()
+            build_guarded_client(
+                builder,
+                resolver,
+                redirect_policy(DEFAULT_REDIRECT_MODE, &NO_ALLOWLIST),
+            )
+            .unwrap()
         };
         let target = "http://hooks.example.com/";
         let proxied = client(Box::leak(Box::new(proxy_hosts_from(|name| {
@@ -1388,7 +1660,13 @@ mod tests {
         let builder = || reqwest::Client::builder().timeout(std::time::Duration::from_secs(5));
         let by_cidr: &'static SsrfAllowlist =
             Box::leak(Box::new(SsrfAllowlist::parse("127.0.0.1/32", "")));
-        let client = build_scoped_client(builder(), Scope::Destination, by_cidr).unwrap();
+        let client = build_scoped_client(
+            builder(),
+            Scope::Destination,
+            by_cidr,
+            DEFAULT_REDIRECT_MODE,
+        )
+        .unwrap();
         let resp = client
             .get(format!("http://127.0.0.1:{port}/"))
             .send()
@@ -1408,7 +1686,13 @@ mod tests {
 
         let by_host: &'static SsrfAllowlist =
             Box::leak(Box::new(SsrfAllowlist::parse("", "localhost")));
-        let client = build_scoped_client(builder(), Scope::Destination, by_host).unwrap();
+        let client = build_scoped_client(
+            builder(),
+            Scope::Destination,
+            by_host,
+            DEFAULT_REDIRECT_MODE,
+        )
+        .unwrap();
         let resp = client
             .get(format!("http://localhost:{port}/"))
             .send()

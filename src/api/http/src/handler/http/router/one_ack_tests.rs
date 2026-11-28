@@ -245,7 +245,10 @@ async fn impacted_page(origin: &Response, kind: SubjectType, team_id: &str) -> R
         AlertPriority::P1.to_i32(),
         Some("impacted"),
         ResponderRole::Impacted,
-        Some(&origin.id),
+        infra::table::oncall_responses::Provenance {
+            origin_response_id: Some(&origin.id),
+            ..Default::default()
+        },
     )
     .await
     .unwrap()
@@ -526,7 +529,10 @@ async fn incident_with_owner_and_impacted_pages(name: &str) -> IncidentFixture {
         AlertPriority::P1.to_i32(),
         Some(name),
         ResponderRole::Impacted,
-        Some(&owner.id),
+        infra::table::oncall_responses::Provenance {
+            origin_response_id: Some(&owner.id),
+            ..Default::default()
+        },
     )
     .await
     .unwrap();
@@ -1095,7 +1101,7 @@ async fn a_press_on_an_older_open_page_stops_it() {
                 AlertPriority::P1.to_i32(),
                 Some("r32"),
                 ResponderRole::Owner,
-                None,
+                infra::table::oncall_responses::Provenance::default(),
             )
             .await
             .unwrap()
@@ -1127,7 +1133,7 @@ async fn a_press_on_an_older_open_page_stops_it() {
                 AlertPriority::P1.to_i32(),
                 Some("r32"),
                 ResponderRole::Owner,
-                None,
+                infra::table::oncall_responses::Provenance::default(),
             )
             .await
             .unwrap()
@@ -1163,7 +1169,7 @@ async fn a_leftover_page_stays_stopped_on_unack_and_take_over() {
                 AlertPriority::P1.to_i32(),
                 Some("d34"),
                 ResponderRole::Owner,
-                None,
+                infra::table::oncall_responses::Provenance::default(),
             )
             .await
             .unwrap()
@@ -1218,7 +1224,7 @@ async fn a_leftover_pages_team_is_a_responder() {
                 AlertPriority::P1.to_i32(),
                 Some("d35"),
                 ResponderRole::Owner,
-                None,
+                infra::table::oncall_responses::Provenance::default(),
             )
             .await
             .unwrap()

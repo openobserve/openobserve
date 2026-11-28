@@ -25,11 +25,13 @@ export interface ToolsetCreateRequest {
   name: string;
   kind: ToolsetKind;
   description?: string;
+  automation_allowed?: boolean;
   data?: Record<string, any>;
 }
 
 export interface ToolsetUpdateRequest {
   description?: string;
+  automation_allowed?: boolean;
   data?: Record<string, any>;
 }
 

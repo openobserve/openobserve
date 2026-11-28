@@ -190,11 +190,18 @@ pub async fn add(mut entry: OrgToolset) -> Result<(), errors::Error> {
 
 /// Fetch a toolset by its KSUID `id`. Returns the record with plaintext `data`.
 pub async fn get(org: &str, id: &str) -> Result<Option<OrgToolset>, errors::Error> {
-    let client = get_orm_client_ro().await;
+    get_with(get_orm_client_ro().await, org, id).await
+}
+
+pub async fn get_with<C: ConnectionTrait>(
+    conn: &C,
+    org: &str,
+    id: &str,
+) -> Result<Option<OrgToolset>, errors::Error> {
     let row = Entity::find()
         .filter(Column::Org.eq(org))
         .filter(Column::Id.eq(id))
-        .one(client)
+        .one(conn)
         .await
         .map_err(|e| errors::DbError::SeaORMError(e.to_string()))?;
 

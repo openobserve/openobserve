@@ -23,7 +23,7 @@ use infra::{
     secrets::{self, SecretMaterial, SecretOwnerKind},
     table::{
         cipher,
-        entity::llm_secrets,
+        entity::credential_values,
         workflow_http_triggers::{
             self as triggers, ApplyOutcome, AuthMode, CredentialKind, CredentialState,
             ReplicatedCredential, ReplicatedTrigger, TriggerSnapshot,
@@ -119,12 +119,12 @@ fn token_snapshot() -> TriggerSnapshot {
     snap
 }
 
-async fn secret_row(trigger_id: &str) -> llm_secrets::Model {
+async fn secret_row(trigger_id: &str) -> credential_values::Model {
     let db = get_orm_client_rw().await;
     let stored = triggers::list_credentials(db, trigger_id).await.unwrap();
     let secret_ref = stored[0].secret_ref.clone().expect("a local secret");
-    llm_secrets::Entity::find()
-        .filter(llm_secrets::Column::SecretRef.eq(&secret_ref))
+    credential_values::Entity::find()
+        .filter(credential_values::Column::SecretRef.eq(&secret_ref))
         .one(db)
         .await
         .unwrap()
@@ -163,8 +163,8 @@ fn a_signing_secret_is_encrypted_locally_on_first_sight() {
             .await
             .unwrap();
         assert_eq!(revoked, ApplyOutcome::Applied);
-        let left = llm_secrets::Entity::find()
-            .filter(llm_secrets::Column::OwnerId.eq("cred-1"))
+        let left = credential_values::Entity::find()
+            .filter(credential_values::Column::OwnerId.eq("cred-1"))
             .count(db)
             .await
             .unwrap();

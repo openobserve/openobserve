@@ -1635,7 +1635,7 @@ pub(super) mod tests {
     }
 
     pub(in super::super) fn link(ranges: serde_json::Value) -> PublicDashboard {
-        let id = config::ider::uuid();
+        let id = config::ider::ksuid();
         PublicDashboard {
             org_id: format!("org-{id}"),
             folder_id: "f".into(),

@@ -90,6 +90,8 @@ pub enum TemplateError {
     InUseForKind { kind: String, by: String },
     #[error("Template is in use by {0}")]
     DeleteWithBinding(String),
+    #[error("ref_not_allowed_in_field: template text cannot hold a secret or variable reference")]
+    RefNotAllowedInField,
 }
 
 pub async fn get(org_id: &str, name: &str) -> Result<Template, TemplateError> {

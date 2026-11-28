@@ -421,7 +421,7 @@ pub fn hook_test_input(trigger_id: &str, data: Vec<serde_json::Value>) -> serde_
             event_type: EVENT_TYPE,
             trigger_source: TRIGGER_SOURCE,
             trigger_id: trigger_id.to_string(),
-            run_id: config::ider::uuid(),
+            run_id: config::ider::ksuid(),
             received_at: now_micros(),
             query: serde_json::Map::new(),
             headers: serde_json::Map::new(),
@@ -1114,7 +1114,7 @@ mod tests {
     };
 
     use infra::table::{
-        entity::llm_secrets,
+        entity::credential_values,
         workflow_http_trigger_requests::{self as ledger, NewHookRequest},
     };
     use sea_orm::{ConnectOptions, Database, DatabaseConnection, PaginatorTrait};
@@ -1238,16 +1238,16 @@ mod tests {
     }
 
     async fn secrets_of(db: &DatabaseConnection, owner_id: &str) -> u64 {
-        llm_secrets::Entity::find()
-            .filter(llm_secrets::Column::OwnerKind.eq("workflow_trigger"))
-            .filter(llm_secrets::Column::OwnerId.eq(owner_id))
+        credential_values::Entity::find()
+            .filter(credential_values::Column::OwnerKind.eq("workflow_trigger"))
+            .filter(credential_values::Column::OwnerId.eq(owner_id))
             .count(db)
             .await
             .unwrap()
     }
 
     async fn all_secrets(db: &DatabaseConnection) -> u64 {
-        llm_secrets::Entity::find().count(db).await.unwrap()
+        credential_values::Entity::find().count(db).await.unwrap()
     }
 
     async fn ledger_row(db: &DatabaseConnection, trigger_id: &str, run_id: &str, at: i64) {

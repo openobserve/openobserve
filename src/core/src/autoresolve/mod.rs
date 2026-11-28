@@ -56,7 +56,10 @@ use infra::{
     },
 };
 use o2_enterprise::enterprise::{
-    ai::toolsets::{AutoResolveConnection, ToolsetKind, autoresolve_connection},
+    ai::toolsets::{
+        AutoResolveConnection, AutoResolveWrite, ToolsetKind, autoresolve_connection,
+        autoresolve_write_headers,
+    },
     common::config::get_config as get_o2_config,
 };
 use sea_orm::{ConnectionTrait, TransactionTrait};
@@ -152,6 +155,19 @@ pub(crate) trait ConnectionSource: Send + Sync {
         name_or_id: &str,
     ) -> anyhow::Result<Option<AutoResolveConnection>>;
 
+    async fn write_headers(
+        &self,
+        _org: &str,
+        _run_id: &str,
+        connection: &AutoResolveConnection,
+    ) -> anyhow::Result<AutoResolveWrite> {
+        Ok(AutoResolveWrite {
+            headers: connection.write_headers.clone(),
+            allowed_hosts: Vec::new(),
+            follow_redirects: None,
+        })
+    }
+
     /// The toolset with this id of any kind, as its name and whether it is an MCP connection.
     async fn toolset(&self, org: &str, id: &str) -> anyhow::Result<Option<(String, bool)>> {
         let found = self.get(org, id).await?.filter(|c| c.id == id);
@@ -170,6 +186,15 @@ impl ConnectionSource for LiveConnections {
         name_or_id: &str,
     ) -> anyhow::Result<Option<AutoResolveConnection>> {
         autoresolve_connection(org, name_or_id).await
+    }
+
+    async fn write_headers(
+        &self,
+        org: &str,
+        run_id: &str,
+        connection: &AutoResolveConnection,
+    ) -> anyhow::Result<AutoResolveWrite> {
+        Ok(autoresolve_write_headers(org, &connection.id, run_id, &connection.fingerprint).await?)
     }
 
     async fn toolset(&self, org: &str, id: &str) -> anyhow::Result<Option<(String, bool)>> {
@@ -203,6 +228,18 @@ impl ConnectionSource for Listable<'_> {
     ) -> anyhow::Result<Option<AutoResolveConnection>> {
         let found = self.source.get(org, name_or_id).await?;
         Ok(found.filter(|c| self.permits(org, &c.id)))
+    }
+
+    async fn write_headers(
+        &self,
+        org: &str,
+        run_id: &str,
+        connection: &AutoResolveConnection,
+    ) -> anyhow::Result<AutoResolveWrite> {
+        if !self.permits(org, &connection.id) {
+            anyhow::bail!("connection is not permitted");
+        }
+        self.source.write_headers(org, run_id, connection).await
     }
 
     async fn toolset(&self, org: &str, id: &str) -> anyhow::Result<Option<(String, bool)>> {
@@ -279,11 +316,11 @@ pub async fn start_run_for(
         return Err(AutoResolveError::NotEnabled);
     }
     let ids: Vec<String> = connections.iter().map(|c| c.id.clone()).collect();
-    match turn::load_tools(org, &ids).await {
+    match turn::check_tools(org, &ids).await {
         Err(AutoResolveError::NoConnections) if autoresolve_id.is_some() => {
             return Err(AutoResolveError::ConnectionsGone);
         }
-        loaded => loaded?,
+        checked => checked?,
     };
     let new = launch_row(
         org,

@@ -2467,7 +2467,7 @@ mod tests {
                 data: std::sync::Arc::new(vec![]),
             },
         );
-        let caller = format!("{}@example.com", config::ider::uuid());
+        let caller = format!("{}@example.com", config::ider::ksuid());
         let vrl = r#"row = get_enrichment_table_record!("qf_table", {"k": .k})"#;
         let encoded = base64::encode_url(vrl);
         for query_fn in [encoded.as_str(), vrl] {
@@ -2538,7 +2538,7 @@ mod tests {
                     .await
                     .insert(format!("{ORG}/logs/qf2_logs"), SchemaCache::new(schema));
             }
-            let email = format!("{}@example.com", config::ider::uuid());
+            let email = format!("{}@example.com", config::ider::ksuid());
             common::infra::config::ORG_USERS.insert(
                 format!("{}/{email}", config::DEFAULT_ORG),
                 infra::table::org_users::OrgUserRecord {

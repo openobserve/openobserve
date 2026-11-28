@@ -17,17 +17,28 @@ import type {
   BrowserCheck,
   BrowserCheckFrequency,
   BrowserCheckSchedule,
+  BrowserStep,
   HttpCheckConfig,
   ProtocolCheck,
   ProtocolCheckType,
   SshCheckConfig,
   TcpCheckConfig,
   TlsCheckConfig,
+  WireStep,
+  WriteOnlyMeta,
 } from "@/types/synthetics";
 import { convertDateToTimestamp } from "@/utils/timezone";
 import { mapWireSteps } from "./mapRecordedStep";
 import { buildV2Steps } from "./buildV2Steps";
 import { startFromScheduleFields } from "./scheduleStart";
+import {
+  cookieHasSecret,
+  isSetMarker,
+  readSlot,
+  slotKey,
+  writeSlot,
+  writeStepValue,
+} from "./writeOnly";
 import { useLocalTimezone } from "../storage";
 
 // ── Outbound: BrowserCheck → API payload ─────────────────────────────────────
@@ -108,6 +119,8 @@ export function buildCreateBrowserTestPayload(check: BrowserCheck): Record<strin
     cooldownMins,
     alertIfFails,
     tz_offset: _tz_offset,
+    writeOnly: _writeOnly,
+    replacedSlots: _replacedSlots,
     ...rest
   } = check;
 
@@ -135,7 +148,7 @@ export function buildCreateBrowserTestPayload(check: BrowserCheck): Record<strin
 
     variables: (variables ?? []).map(({ id: _id, name, value, secure, example }) => ({
       name,
-      value,
+      value: writeSlot(check, slotKey.variable(name), value),
       secure: secure ?? false,
       example: example ?? "",
     })),
@@ -147,7 +160,9 @@ export function buildCreateBrowserTestPayload(check: BrowserCheck): Record<strin
       // and `steps_version` is now one of them. Steps are built field by field
       // rather than spread, for the same reason. A journey that cannot be built
       // throws here — the save gate is what stops it getting this far.
-      steps: buildV2Steps(journey),
+      steps: buildV2Steps(journey).map((wire, i) =>
+        journey[i]?.valueSet ? { ...wire, value: writeStepValue(journey[i]) } : wire,
+      ),
       browser_devices: browserDevices ?? [{ browser: "chromium", device: "desktop" }],
       // Defaults apply on create only; on edit the stored values win.
       timeout_ms: extras?.timeout_ms ?? 30000,
@@ -161,21 +176,39 @@ export function buildCreateBrowserTestPayload(check: BrowserCheck): Record<strin
         trace: capture?.trace ?? "on-fail",
         video: extras?.video ?? "off",
       },
-      ...(secrets?.length && { secrets: secrets.map(({ id: _id, ...s }) => s) }),
-      ...(headers?.length && { headers: headers.map(({ id: _id, ...h }) => h) }),
+      ...(secrets?.length && {
+        secrets: secrets.map(({ id: _id, ...s }) => ({
+          ...s,
+          value: writeSlot(check, slotKey.browserSecret(s.name), s.value),
+        })),
+      }),
+      ...(headers?.length && {
+        headers: headers.map(({ id: _id, ...h }) => ({
+          ...h,
+          value: writeSlot(check, slotKey.header(h.key ?? (h as { name?: string }).name), h.value),
+        })),
+      }),
     },
 
     // Cookies ride at the top level (like auth/variables) so the backend
     // encrypts their values at rest and injects them via _AUTH_COOKIES.
     ...(cookies?.length && {
-      cookies: cookies.map(({ name, value, domain }) => ({ name, value, domain })),
+      cookies: cookies.map(({ name, value, domain, path, secure }) => ({
+        name,
+        value: writeSlot(check, slotKey.cookie(name, domain), value),
+        domain,
+        ...(path !== undefined && { path }),
+        ...((secure !== undefined || cookieHasSecret(value)) && {
+          secure: cookieHasSecret(value) || !!secure,
+        }),
+      })),
     }),
 
     ...(auth && {
       auth: {
         type: auth.type,
         username: auth.username,
-        password: auth.password,
+        password: writeSlot(check, slotKey.authPassword(), auth.password),
       },
     }),
   };
@@ -198,7 +231,13 @@ function buildProtocolConfig(check: ProtocolCheck): Record<string, unknown> {
         method: c.method,
         timeout_ms: c.timeout_ms,
         follow_redirects: c.follow_redirects,
-        headers: c.headers.filter((h) => h.name.trim()).map(({ name, value }) => ({ name, value })),
+        headers: c.headers
+          .filter((h) => h.name.trim())
+          .map(({ name, value, secure }) => ({
+            name,
+            value: writeSlot(check, slotKey.header(name), value),
+            ...(secure !== undefined && { secure }),
+          })),
         ...(c.body.trim() && { body: c.body }),
         assertions: c.assertions
           .filter((a) => a.field)
@@ -232,7 +271,7 @@ function buildProtocolConfig(check: ProtocolCheck): Record<string, unknown> {
       return {
         port: c.port,
         username: c.username,
-        auth: { type: c.authType, secret: c.secret },
+        auth: { type: c.authType, secret: writeSlot(check, slotKey.sshSecret(), c.secret) },
         timeout_ms: c.timeout_ms,
       };
     }
@@ -265,7 +304,7 @@ export function buildCreateProtocolCheckPayload(check: ProtocolCheck): Record<st
 
     variables: (check.variables ?? []).map(({ name, value, secure, example }) => ({
       name,
-      value,
+      value: writeSlot(check, slotKey.variable(name), value),
       secure: secure ?? false,
       example: example ?? "",
     })),
@@ -280,7 +319,7 @@ export function buildCreateProtocolCheckPayload(check: ProtocolCheck): Record<st
         auth: {
           type: check.auth.type,
           username: check.auth.username,
-          password: check.auth.password,
+          password: writeSlot(check, slotKey.authPassword(), check.auth.password),
         },
       }),
   };
@@ -391,9 +430,11 @@ export function mapResponseToBrowserCheck(data: Record<string, unknown>): Browse
     cookies: apiCookies,
     ...rest
   } = data as any;
+  const writeOnly: Record<string, WriteOnlyMeta> = {};
 
   return {
     ...rest,
+    writeOnly,
     start: start ?? undefined,
     url: target,
     folder: folder_id,
@@ -429,12 +470,12 @@ export function mapResponseToBrowserCheck(data: Record<string, unknown>): Browse
     // buildWireFromStep rebuilds from the UI fields, so keeping it would shadow
     // the correct reconstruction — which is how a reloaded `select` came to
     // replay as "select nothing". See MapWireStepOptions.
-    journey: mapWireSteps(config?.steps ?? []),
+    journey: readStepValues(config?.steps ?? []),
 
     ...(variables?.length && {
       variables: (variables as any[]).map((v) => ({
         name: v.name,
-        value: v.value,
+        value: readSlot(v.value, slotKey.variable(v.name ?? ""), writeOnly),
         secure: v.secure ?? false,
         example: v.example ?? "",
       })),
@@ -443,20 +484,46 @@ export function mapResponseToBrowserCheck(data: Record<string, unknown>): Browse
       auth: {
         type: (apiAuth as any).type,
         username: (apiAuth as any).username,
-        password: (apiAuth as any).password,
+        password: readSlot((apiAuth as any).password, slotKey.authPassword(), writeOnly),
       },
     }),
-    ...(config?.secrets && { secrets: config.secrets }),
-    ...(config?.headers && { headers: config.headers }),
+    ...(config?.secrets && {
+      secrets: (config.secrets as any[]).map((sec) => ({
+        ...sec,
+        value: readSlot(sec.value, slotKey.browserSecret(sec.name ?? ""), writeOnly),
+      })),
+    }),
+    ...(config?.headers && {
+      headers: (config.headers as any[]).map((h) => ({
+        ...h,
+        value: readSlot(h.value, slotKey.header(h.key ?? h.name ?? ""), writeOnly),
+      })),
+    }),
     // Cookies are top-level on the wire (encrypted at rest server-side).
     ...(apiCookies?.length && {
       cookies: (apiCookies as any[]).map((c) => ({
         name: c.name,
-        value: c.value,
+        value: readSlot(c.value, slotKey.cookie(c.name ?? "", c.domain ?? ""), writeOnly),
         domain: c.domain,
+        ...(typeof c.path === "string" && { path: c.path }),
+        ...(typeof c.secure === "boolean" && { secure: c.secure }),
       })),
     }),
   } as BrowserCheck;
+}
+
+/**
+ * A step whose value the server holds keeps its stored id, because a keep is matched by
+ * step id; the set marker becomes `valueSet` and an empty value, so the editor never holds it.
+ */
+function readStepValues(stored: WireStep[]): BrowserStep[] {
+  return mapWireSteps(stored).map((step, i) => {
+    const wire = stored[i] as WireStep & { id?: unknown; value?: unknown };
+    if (!isSetMarker(wire.value)) return step;
+    const id = typeof wire.id === "string" && wire.id ? wire.id : step.id;
+    const { updated_at, updated_by } = wire.value;
+    return { ...step, id, value: "", valueSet: { updated_at, updated_by } };
+  });
 }
 
 // ── Inbound: API response → ProtocolCheck (http/tcp/tls/ssh edits) ───────────
@@ -466,6 +533,7 @@ export function mapResponseToProtocolCheck(data: Record<string, unknown>): Proto
   const type = (data as any).type as ProtocolCheckType;
   const cfg = ((data as any).config ?? {}) as Record<string, any>;
   const check: ProtocolCheck = { ...base, checkType: type };
+  const writeOnly = (check.writeOnly ??= {});
 
   switch (type) {
     case "http":
@@ -473,7 +541,8 @@ export function mapResponseToProtocolCheck(data: Record<string, unknown>): Proto
         method: cfg.method ?? "GET",
         headers: (cfg.headers ?? []).map((h: any) => ({
           name: h.name ?? "",
-          value: h.value ?? "",
+          value: readSlot(h.value, slotKey.header(h.name ?? ""), writeOnly),
+          ...(typeof h.secure === "boolean" && { secure: h.secure }),
         })),
         body: cfg.body ?? "",
         follow_redirects: cfg.follow_redirects ?? true,
@@ -506,7 +575,7 @@ export function mapResponseToProtocolCheck(data: Record<string, unknown>): Proto
         port: cfg.port ?? 22,
         username: cfg.username ?? "",
         authType: cfg.auth?.type === "private_key" ? "private_key" : "password",
-        secret: cfg.auth?.secret ?? "",
+        secret: readSlot(cfg.auth?.secret, slotKey.sshSecret(), writeOnly),
         timeout_ms: cfg.timeout_ms ?? 10000,
       };
       break;

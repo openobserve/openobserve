@@ -2,6 +2,7 @@
 
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
+import { defineComponent, nextTick, ref } from "vue";
 import OInput from "./OInput.vue";
 
 describe("OInput", () => {
@@ -191,6 +192,57 @@ describe("OInput — password reveal", () => {
     const wrapper = mount(OInput, { props: { type: "password", modelValue: "x" } });
     expect(wrapper.find("[aria-pressed]").exists()).toBe(false);
   });
+
+  it("keeps password values out of DOM attributes while editing and revealing", async () => {
+    const wrapper = mountPassword();
+    const field = () => wrapper.get<HTMLInputElement>('[data-test="secret-field"]');
+    expect(field().element.value).toBe("hunter2");
+    expect(field().attributes("value")).toBeUndefined();
+
+    await field().setValue("replacement");
+    await wrapper.setProps({ modelValue: "replacement" });
+    expect(wrapper.emitted("update:modelValue")?.[0]).toEqual(["replacement"]);
+    expect(field().attributes("value")).toBeUndefined();
+
+    await wrapper.get('[data-test="secret-reveal"]').trigger("click");
+    expect(field().attributes("type")).toBe("text");
+    expect(field().element.value).toBe("replacement");
+    expect(field().attributes("value")).toBeUndefined();
+    wrapper.unmount();
+  });
+
+  it("preserves the password caret when v-model echoes an edit", async () => {
+    const wrapper = mount(
+      defineComponent({
+        components: { OInput },
+        setup: () => ({ value: ref("hunter2") }),
+        template: '<OInput v-model="value" type="password" revealable />',
+      }),
+      { attachTo: document.body },
+    );
+    const input = wrapper.get<HTMLInputElement>("input").element;
+    input.focus();
+    input.setSelectionRange(2, 2);
+    input.setRangeText("X", 2, 2, "end");
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    expect(input.selectionStart).toBe(3);
+
+    await nextTick();
+    expect(input.value).toBe("huXnter2");
+    expect(input.selectionStart).toBe(3);
+    expect(input.hasAttribute("value")).toBe(false);
+    wrapper.unmount();
+  });
+
+  it.each(["text", "email", "number"] as const)(
+    "preserves the value attribute for %s inputs",
+    (type) => {
+      const wrapper = mount(OInput, { props: { type, modelValue: "42" } });
+      expect(wrapper.get<HTMLInputElement>("input").element.value).toBe("42");
+      expect(wrapper.get("input").attributes("value")).toBe("42");
+      wrapper.unmount();
+    },
+  );
 
   it("offers no toggle on a field that is not masked to begin with", () => {
     const wrapper = mount(OInput, {

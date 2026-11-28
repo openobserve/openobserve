@@ -876,7 +876,7 @@ pub async fn test_workflow(
     } = options;
     validate_workflow(&workflow, is_draft).await?;
     let executable = ExecutablePipeline::new_from_workflow(&workflow).await?;
-    let run_id = config::ider::uuid();
+    let run_id = config::ider::ksuid();
     let start_time = chrono::Utc::now().timestamp_micros();
     let res = executable
         .process_workflow(
@@ -1102,7 +1102,7 @@ pub async fn retry_run(
         .process_workflow(org_id, inputs, from_node, Default::default())
         .await;
     // the retry is its own run; the failed run's id stays as source_id for provenance
-    let retry_run_id = config::ider::uuid();
+    let retry_run_id = config::ider::ksuid();
     record_workflow_run(
         org_id,
         wid,
@@ -1166,7 +1166,7 @@ pub async fn send_member_workflow_trigger(
     ]))?;
 
     let data = serde_json::to_string(data)?;
-    let run_id = config::ider::uuid();
+    let run_id = config::ider::ksuid();
 
     let entry = WorkflowRunData {
         id: 0,
@@ -1589,7 +1589,7 @@ mod tests {
     #[test]
     fn a_retry_run_gets_its_own_run_id_and_keeps_the_original_as_source() {
         let original_run_id = "original-run-1";
-        let retry_run_id = config::ider::uuid();
+        let retry_run_id = config::ider::ksuid();
         assert_ne!(
             retry_run_id, original_run_id,
             "a retry must not reuse the failed run's id as its own run_id"

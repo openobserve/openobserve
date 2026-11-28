@@ -39,7 +39,7 @@ fn calculate_load_score(stats: &NodeMetrics) -> f64 {
 }
 
 pub fn select_best_node(nodes: &[Node]) -> Option<&Node> {
-    let trace_id = config::ider::uuid();
+    let trace_id = config::ider::ksuid();
     for node in nodes.iter() {
         log::debug!(
             "[ROUTER trace_id: {}] node: {}, score: {:.5}, cpu_usage: {:.2}, mem_usage: {:.2}, conns: {}",

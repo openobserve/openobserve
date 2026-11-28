@@ -22,7 +22,10 @@
 //! substitute last, which is the only thing stopping a pod named
 //! `{alert_name}` from being expanded by a later pass.
 
-use config::{meta::alerts::notification_kind::NotificationKind, utils::json::Value};
+use config::{
+    meta::{alerts::notification_kind::NotificationKind, secret_store::grammar},
+    utils::json::Value,
+};
 
 use super::context::NotificationContext;
 
@@ -41,6 +44,15 @@ pub fn apply_template_body(
 ) -> String {
     let shipped = config::prebuilt_loader::is_shipped_prebuilt_body(&template.name, &template.body);
     render_custom(&template.body, ctx, is_email, shipped)
+}
+
+pub(super) fn apply_template_body_without_routing_key(
+    template: &config::meta::destinations::Template,
+    ctx: &NotificationContext,
+) -> String {
+    let shipped = config::prebuilt_loader::is_shipped_prebuilt_body(&template.name, &template.body);
+    let body = template.body.replace("{routing_key}", "");
+    render_custom(&body, ctx, false, shipped)
 }
 
 fn render_custom(
@@ -65,7 +77,11 @@ fn render_custom(
         |field| {
             ctx.row_columns.iter().any(|(key, _)| key == field)
                 || ctx.context_attributes.iter().any(|(key, _)| key == field)
-                || ctx.metadata.iter().any(|(key, _)| key == field)
+                || ctx.metadata.iter().any(|(key, value)| {
+                    key == field
+                        && (!config::get_config().common.secret_store_refs_enabled
+                            || !grammar::has_secret_ref(value))
+                })
                 || field.strip_prefix("group.").is_some_and(|name| {
                     ctx.group_labels
                         .as_ref()
@@ -352,7 +368,10 @@ pub(crate) fn apply_custom_template_plain(
     // Substitute endpoint metadata variables (e.g., credential_assignmentGroup,
     // credential_priority)
     for (key, value) in ctx.metadata.iter() {
-        resp = resp.replace(&format!("{{{}}}", key), value);
+        if !config::get_config().common.secret_store_refs_enabled || !grammar::has_secret_ref(value)
+        {
+            resp = resp.replace(&format!("{{{}}}", key), value);
+        }
     }
 
     // ── Group variables, LAST (M-4) ─────────────────────────────────────────

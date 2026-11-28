@@ -21,7 +21,7 @@
 
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use chrono::Utc;
-use config::ider;
+use config::{ider, meta::secret_store::SecretValue};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, QueryFilter, Set,
     TransactionTrait,
@@ -29,8 +29,8 @@ use sea_orm::{
 use serde::{Deserialize, Serialize};
 
 use crate::table::{
-    entity::llm_secrets::{ActiveModel, Column, Entity, Model},
-    llm_secrets::{self as table, SecretRecord},
+    credential_values::{self as table, SecretRecord, SlotClass},
+    entity::credential_values::{ActiveModel, Column, Entity, Model},
 };
 
 pub const MAX_GRACE_MS: i64 = 24 * 60 * 60 * 1_000;
@@ -45,6 +45,12 @@ pub enum SecretOwnerKind {
     Scorer,
     PromptWebhook,
     WorkflowTrigger,
+    /// A named store value; sealed with associated data only.
+    OrgSecret,
+    OrgSecretPointer,
+    /// An owned probe token row; sealed with associated data only.
+    ProbeToken,
+    SecretBackend,
 }
 
 impl SecretOwnerKind {
@@ -54,6 +60,10 @@ impl SecretOwnerKind {
             Self::Scorer => "scorer",
             Self::PromptWebhook => "prompt_webhook",
             Self::WorkflowTrigger => "workflow_trigger",
+            Self::OrgSecret => table::OWNER_KIND_ORG_SECRET,
+            Self::OrgSecretPointer => table::OWNER_KIND_ORG_SECRET_POINTER,
+            Self::ProbeToken => table::OWNER_KIND_PROBE_TOKEN,
+            Self::SecretBackend => table::OWNER_KIND_SECRET_BACKEND,
         }
     }
 }
@@ -230,6 +240,10 @@ fn metadata(model: &Model) -> Result<SecretMetadata, SecretError> {
             "scorer" => SecretOwnerKind::Scorer,
             "prompt_webhook" => SecretOwnerKind::PromptWebhook,
             "workflow_trigger" => SecretOwnerKind::WorkflowTrigger,
+            table::OWNER_KIND_ORG_SECRET => SecretOwnerKind::OrgSecret,
+            table::OWNER_KIND_ORG_SECRET_POINTER => SecretOwnerKind::OrgSecretPointer,
+            table::OWNER_KIND_PROBE_TOKEN => SecretOwnerKind::ProbeToken,
+            table::OWNER_KIND_SECRET_BACKEND => SecretOwnerKind::SecretBackend,
             other => {
                 return Err(SecretError::Malformed(format!(
                     "unknown secret owner kind '{other}'"
@@ -315,13 +329,13 @@ pub async fn prepare_create(
         purpose: purpose.as_str().to_string(),
         key_id,
         state: CURRENT.to_string(),
-        value: material.encode()?,
+        value: material.encode()?.into(),
         last_verified_at: None,
         grace_expires_at: None,
         created_at: now,
         updated_at: now,
     };
-    let active = table::encrypted_active_model(&record)
+    let active = table::encrypted_active_model(&record, &SlotClass::Legacy)
         .await
         .map_err(map_infra)?;
     let written = WrittenSecret {
@@ -445,13 +459,13 @@ pub async fn replace_current(
         purpose: current.purpose.clone(),
         key_id: current.key_id.clone(),
         state: CURRENT.to_string(),
-        value: material.encode()?,
+        value: material.encode()?.into(),
         last_verified_at: None,
         grace_expires_at: None,
         created_at: current.created_at,
         updated_at: now_ms(),
     };
-    let active = table::encrypted_active_model(&record)
+    let active = table::encrypted_active_model(&record, &SlotClass::Legacy)
         .await
         .map_err(map_infra)?;
     table::update(db, active).await?;
@@ -514,13 +528,13 @@ pub async fn rotate_signing(
                 .unwrap_or_else(generate_key_id),
         ),
         state: CANDIDATE.to_string(),
-        value: material.encode()?,
+        value: material.encode()?.into(),
         last_verified_at: None,
         grace_expires_at: None,
         created_at: now,
         updated_at: now,
     };
-    let active = table::encrypted_active_model(&record)
+    let active = table::encrypted_active_model(&record, &SlotClass::Legacy)
         .await
         .map_err(map_infra)?;
     table::insert(db, active).await.map_err(|error| {
@@ -687,15 +701,59 @@ pub async fn resolve_record(
     owner_id: &str,
     state: &str,
 ) -> Result<(SecretMetadata, SecretMaterial), SecretError> {
-    let model = table::find_state(table::client().await, org_id, secret_ref, state)
+    let (safe, value) = resolve_value_in(
+        table::client().await,
+        org_id,
+        secret_ref,
+        owner_kind,
+        owner_id,
+        state,
+        &SlotClass::Legacy,
+    )
+    .await?;
+    Ok((safe, SecretMaterial::decode(&value)?))
+}
+
+/// The stored owner kind and id must equal the caller's before anything is decrypted, so a
+/// row of another kind (a P1-E pointer included) fails without being opened.
+pub async fn resolve_value_in<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    secret_ref: &str,
+    owner_kind: SecretOwnerKind,
+    owner_id: &str,
+    state: &str,
+    slot: &SlotClass<'_>,
+) -> Result<(SecretMetadata, SecretValue), SecretError> {
+    let model = table::find_state(conn, org_id, secret_ref, state)
         .await?
         .ok_or(SecretError::NotFound)?;
     if model.owner_kind != owner_kind.as_str() || model.owner_id != owner_id {
         return Err(SecretError::OwnerMismatch);
     }
     let safe = metadata(&model)?;
-    let record = table::decrypt_model(model).await.map_err(map_infra)?;
-    Ok((safe, SecretMaterial::decode(&record.value)?))
+    let record = table::decrypt_model_in(conn, model, slot)
+        .await
+        .map_err(|error| map_infra(error.into()))?;
+    Ok((safe, record.value))
+}
+
+#[cfg(test)]
+pub(crate) async fn sealed_value_test_store() -> bool {
+    use crate::table::cipher;
+
+    static READY: tokio::sync::OnceCell<()> = tokio::sync::OnceCell::const_new();
+    if !crate::table::testing::meta_store().await {
+        return false;
+    }
+    READY
+        .get_or_init(|| async {
+            if cipher::master_key().is_err() {
+                cipher::boot(None).await.expect("cipher");
+            }
+        })
+        .await;
+    true
 }
 
 #[cfg(test)]
@@ -716,18 +774,12 @@ mod tests {
     }
 
     #[test]
-    fn workflow_trigger_owner_kind_round_trips() {
-        let kind = SecretOwnerKind::WorkflowTrigger;
-        assert_eq!(kind.as_str(), "workflow_trigger");
-        assert_eq!(
-            serde_json::to_string(&kind).unwrap(),
-            "\"workflow_trigger\""
-        );
-        let row = Model {
+    fn owner_kinds_round_trip() {
+        let mut row = Model {
             id: "value-1".to_string(),
             secret_ref: "secret-1".to_string(),
             org_id: "acme".to_string(),
-            owner_kind: kind.as_str().to_string(),
+            owner_kind: String::new(),
             owner_id: "cred-1".to_string(),
             purpose: SecretPurpose::Signing.as_str().to_string(),
             key_id: Some("key-1".to_string()),
@@ -738,9 +790,22 @@ mod tests {
             created_at: 1,
             updated_at: 1,
         };
-        let safe = metadata(&row).expect("the owner kind parses back");
-        assert_eq!(safe.owner_kind, kind);
-        assert_eq!(safe.owner_id, "cred-1");
+        for (kind, stored) in [
+            (SecretOwnerKind::WorkflowTrigger, "workflow_trigger"),
+            (SecretOwnerKind::OrgSecretPointer, "org_secret_pointer"),
+            (SecretOwnerKind::SecretBackend, "secret_backend"),
+        ] {
+            assert_eq!(kind.as_str(), stored);
+            assert_eq!(serde_json::to_value(kind).unwrap().as_str(), Some(stored));
+            row.owner_kind = stored.to_string();
+            let safe = metadata(&row).expect("the owner kind parses back");
+            assert_eq!(safe.owner_kind, kind);
+            assert_eq!(safe.owner_id, "cred-1");
+        }
+        assert_eq!(
+            table::NamedValueClass::OrgSecretPointer.owner_kind(),
+            SecretOwnerKind::OrgSecretPointer.as_str()
+        );
     }
 
     #[test]
@@ -749,5 +814,179 @@ mod tests {
             panic!("signing material must be a token")
         };
         assert!(!value.is_empty());
+    }
+
+    mod sealed_rows {
+        use config::meta::secret_store::SecretKind;
+
+        use super::*;
+        use crate::table::{
+            credential_values::{NamedValueAd, NamedValueClass},
+            testing::unique,
+        };
+
+        fn row(org: &str, kind: &str, owner_id: &str, secret_ref: &str) -> SecretRecord {
+            SecretRecord {
+                id: ider::generate(),
+                secret_ref: secret_ref.to_string(),
+                org_id: org.to_string(),
+                owner_kind: kind.to_string(),
+                owner_id: owner_id.to_string(),
+                purpose: SecretPurpose::Auth.as_str().to_string(),
+                key_id: None,
+                state: CURRENT.to_string(),
+                value: "hunter2".to_string().into(),
+                last_verified_at: None,
+                grace_expires_at: None,
+                created_at: 1,
+                updated_at: 1,
+            }
+        }
+
+        fn ad<'a>(org: &'a str, owner_id: &'a str, secret_ref: &'a str) -> NamedValueAd<'a> {
+            NamedValueAd {
+                org_id: org,
+                class: NamedValueClass::OrgSecret,
+                value_row_id: owner_id,
+                secret_ref,
+                secret_id: "sec-1",
+                kind: SecretKind::Secret,
+                env_id: "_org",
+                env_incarnation: "",
+                value_rev: "r1",
+            }
+        }
+
+        async fn store(record: &SecretRecord, slot: &SlotClass<'_>) {
+            let active = table::encrypted_active_model(record, slot).await.unwrap();
+            table::insert(table::client().await, active).await.unwrap();
+        }
+
+        #[tokio::test]
+        async fn a_named_value_resolves_only_through_its_own_slot() {
+            if !sealed_value_test_store().await {
+                return;
+            }
+            let org = unique("ad_org");
+            let (owner, sref) = (ider::generate(), ider::generate());
+            let slot = SlotClass::NamedValue(ad(&org, &owner, &sref));
+            store(
+                &row(&org, table::OWNER_KIND_ORG_SECRET, &owner, &sref),
+                &slot,
+            )
+            .await;
+            let conn = table::client().await;
+            let kind = SecretOwnerKind::OrgSecret;
+
+            let (meta, value) = resolve_value_in(conn, &org, &sref, kind, &owner, CURRENT, &slot)
+                .await
+                .unwrap();
+            assert_eq!(value.as_str(), "hunter2");
+            assert_eq!(meta.owner_kind, kind);
+
+            let other_secret = SlotClass::NamedValue(NamedValueAd {
+                secret_id: "sec-2",
+                ..ad(&org, &owner, &sref)
+            });
+            assert!(matches!(
+                resolve_value_in(conn, &org, &sref, kind, &owner, CURRENT, &other_secret).await,
+                Err(SecretError::Encryption(_))
+            ));
+            assert!(matches!(
+                resolve_record(&org, &sref, kind, &owner, CURRENT).await,
+                Err(SecretError::Encryption(_))
+            ));
+            assert!(matches!(
+                resolve_value_in(
+                    conn,
+                    &org,
+                    &sref,
+                    SecretOwnerKind::Task,
+                    &owner,
+                    CURRENT,
+                    &SlotClass::Legacy
+                )
+                .await,
+                Err(SecretError::OwnerMismatch)
+            ));
+            table::delete_by_org(&org).await.unwrap();
+        }
+
+        #[tokio::test]
+        async fn a_pointer_or_unsealed_row_never_resolves_as_a_named_value() {
+            if !sealed_value_test_store().await {
+                return;
+            }
+            let org = unique("ad_ptr");
+            let conn = table::client().await;
+            let kind = SecretOwnerKind::OrgSecret;
+
+            let (owner, sref) = (ider::generate(), ider::generate());
+            let pointer_slot = SlotClass::NamedValue(NamedValueAd {
+                class: NamedValueClass::OrgSecretPointer,
+                ..ad(&org, &owner, &sref)
+            });
+            store(
+                &row(&org, table::OWNER_KIND_ORG_SECRET_POINTER, &owner, &sref),
+                &pointer_slot,
+            )
+            .await;
+            let slot = SlotClass::NamedValue(ad(&org, &owner, &sref));
+            assert!(matches!(
+                resolve_value_in(conn, &org, &sref, kind, &owner, CURRENT, &slot).await,
+                Err(SecretError::OwnerMismatch)
+            ));
+
+            let (owner, sref) = (ider::generate(), ider::generate());
+            let mut unsealed = table::encrypted_active_model(
+                &row(&org, "task", &owner, &sref),
+                &SlotClass::Legacy,
+            )
+            .await
+            .unwrap();
+            unsealed.owner_kind = Set(table::OWNER_KIND_ORG_SECRET.to_string());
+            table::insert(conn, unsealed).await.unwrap();
+            let slot = SlotClass::NamedValue(ad(&org, &owner, &sref));
+            assert!(matches!(
+                resolve_value_in(conn, &org, &sref, kind, &owner, CURRENT, &slot).await,
+                Err(SecretError::Encryption(_))
+            ));
+            table::delete_by_org(&org).await.unwrap();
+        }
+
+        #[tokio::test]
+        async fn legacy_rows_still_resolve_and_refuse_a_bound_kind_on_write() {
+            if !sealed_value_test_store().await {
+                return;
+            }
+            let org = unique("ad_legacy");
+            let (owner, sref) = (ider::generate(), ider::generate());
+            let mut task = row(&org, "task", &owner, &sref);
+            task.value = SecretMaterial::Token {
+                value: "tok".to_string(),
+            }
+            .encode()
+            .unwrap()
+            .into();
+            store(&task, &SlotClass::Legacy).await;
+            let (_, material) = resolve_record(&org, &sref, SecretOwnerKind::Task, &owner, CURRENT)
+                .await
+                .unwrap();
+            assert_eq!(
+                material,
+                SecretMaterial::Token {
+                    value: "tok".to_string()
+                }
+            );
+            assert!(
+                table::encrypted_active_model(
+                    &row(&org, table::OWNER_KIND_PROBE_TOKEN, &owner, &sref),
+                    &SlotClass::Legacy,
+                )
+                .await
+                .is_err()
+            );
+            table::delete_by_org(&org).await.unwrap();
+        }
     }
 }

@@ -31,9 +31,28 @@ use super::{
 
 /// Sends one on-call message to one destination through the shared path.
 pub async fn notify_destination(n: OnCallNotification) -> Result<SentTemplate, OnCallSendError> {
+    // A test page is a human send: its sender needs use on every bound secret at send time too.
+    if let Some(user) = &n.requested_by
+        && let Err(refusal) = crate::alerts::destinations::authorize_human_sends(
+            &n.org_id,
+            user,
+            std::slice::from_ref(&n.destination),
+        )
+        .await
+    {
+        return Err(OnCallSendError::Permanent(format!(
+            "secret_error:{}",
+            refusal.code.as_str()
+        )));
+    }
     let mut ctx = on_call_context(&n);
     let explicit = super::org_default::load_override(&n.org_id, n.template.as_deref()).await;
-    let result = notify(&n.org_id, &n.destination, &explicit, None, &mut ctx).await;
+    let send = notify(&n.org_id, &n.destination, &explicit, None, &mut ctx);
+    // The check above read the refs once; a rebind before the send is caught on the resolved set.
+    let result = match n.requested_by.clone() {
+        Some(user) => super::send::as_human_sender(user, send).await,
+        None => send.await,
+    };
     send_result(result.map(|outcome| SentTemplate {
         destination: n.destination.clone(),
         template_name: outcome.template_name,

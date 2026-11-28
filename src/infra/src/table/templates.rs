@@ -109,7 +109,7 @@ pub async fn put_with<C: ConnectionTrait>(db: &C, template: Template) -> Result<
             active.update(db).await?.try_into_model()?
         }
         None => {
-            active.id = Set(template.id.map_or_else(ider::uuid, |id| id.to_string()));
+            active.id = Set(template.id.map_or_else(ider::ksuid, |id| id.to_string()));
             active.insert(db).await?.try_into_model()?
         }
     };
@@ -1224,7 +1224,7 @@ mod tests {
         kind: &str,
     ) {
         ActiveModel {
-            id: Set(ider::uuid()),
+            id: Set(ider::ksuid()),
             org: Set(org.to_string()),
             name: Set(name.to_string()),
             is_default: Set(is_default),
@@ -1248,7 +1248,7 @@ mod tests {
     ) {
         db.execute_unprepared(&format!(
             "INSERT INTO {table} (id, org, name, template) VALUES ('{}', '{org}', '{name}', '{template}')",
-            ider::uuid()
+            ider::ksuid()
         ))
         .await
         .unwrap();
@@ -1495,7 +1495,7 @@ mod tests {
     async fn insert_destination(db: &DatabaseConnection, name: &str, template_id: &str) {
         db.execute_unprepared(&format!(
             "INSERT INTO destinations (id, org, name, template_id) VALUES ('{}', 'acme', '{name}', '{template_id}')",
-            ider::uuid()
+            ider::ksuid()
         ))
         .await
         .unwrap();
@@ -1682,7 +1682,7 @@ mod tests {
     async fn a_user_row_named_prebuilt_default_survives_both_migrations_with_its_tuples_queued() {
         let db = retire_db().await;
         ActiveModel {
-            id: Set(ider::uuid()),
+            id: Set(ider::ksuid()),
             org: Set(DEFAULT_ORG.to_string()),
             name: Set(DEFAULT_TEMPLATE_NAME.to_string()),
             is_default: Set(true),

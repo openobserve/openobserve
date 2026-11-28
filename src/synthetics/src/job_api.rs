@@ -13,12 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Synthetics job API — called by probe agents via `o2syn_` token auth.
-//!
-//! Routes (all `bypass: true` in RBAC — authenticated via `o2syn_` token):
-//!   POST /api/synthetics/jobs/resolve
-//!   POST /api/synthetics/jobs/lease
-//!   POST /api/synthetics/jobs/ack
+//! Probe credentials span one org. Dispatcher credentials authorize one job attempt.
 
 // Step billing. `ack` COMPUTES the usage events and RETURNS them on
 // [`AckResponse`]; it never sends them — this crate has no edge to
@@ -480,25 +475,70 @@ pub(crate) mod billing {
     }
 }
 
-use std::collections::{HashMap, HashSet};
+/// Test-only tally of the expensive steps a call takes, keyed by org, so tests can bound cost.
+#[cfg(test)]
+pub(crate) mod cost {
+    use std::{
+        collections::HashMap,
+        sync::{LazyLock, Mutex},
+    };
 
+    static HITS: LazyLock<Mutex<HashMap<(String, &'static str), usize>>> =
+        LazyLock::new(Default::default);
+
+    pub(crate) fn hit(org: &str, step: &'static str) {
+        *HITS
+            .lock()
+            .unwrap()
+            .entry((org.to_owned(), step))
+            .or_default() += 1;
+    }
+
+    pub(crate) fn take(org: &str, step: &'static str) -> usize {
+        HITS.lock()
+            .unwrap()
+            .remove(&(org.to_owned(), step))
+            .unwrap_or_default()
+    }
+}
+
+use std::{
+    collections::{HashMap, HashSet},
+    fmt,
+    time::Duration,
+};
+
+use anyhow::Context;
 use config::meta::{
+    secret_store::{
+        ConsumerType, SecretErrorCode,
+        grammar::{PinPattern, has_secret_ref},
+    },
     self_reporting::usage::UsageData,
     synthetics::{
         MAX_VARIABLES, Synthetic, SyntheticAuth, SyntheticType, SyntheticVariable,
         validate_http_url_quietly, with_default_scheme,
     },
-    synthetics_variables::substitute_placeholders,
+    synthetics_variables::{placeholder_names, substitute_placeholders},
 };
 use infra::{
     db::{get_orm_client_ro, get_orm_client_rw},
+    secret_store::{lease_notice::runner_lease_notice, resolver},
     table::{
-        org_ingestion_tokens, synthetics_checks, synthetics_jobs, synthetics_locations,
+        entity::{synthetics_agents as agent_entity, synthetics_jobs as job_entity},
+        org_ingestion_tokens, org_secrets, secret_dependencies, secret_refs, synthetics_agents,
+        synthetics_checks, synthetics_environments,
+        synthetics_jobs::{self, CompletionProof, LeaseIssuer, complete_attempt},
+        synthetics_locations,
+        synthetics_probe_tokens::{self, token_sha256},
         synthetics_runs,
+        synthetics_variables::{self as variable_table, SyntheticsVariableRecord},
     },
 };
+use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
+use zeroize::Zeroizing;
 
 use crate::{RESULTS_STREAM, STEP_RESULTS_STREAM};
 
@@ -507,6 +547,123 @@ use crate::{RESULTS_STREAM, STEP_RESULTS_STREAM};
 #[derive(Debug, Deserialize)]
 pub struct ResolveRequest {
     pub job_id: String,
+    #[serde(default)]
+    pub lease_token: Option<PresentedLease>,
+}
+
+#[derive(Clone, Deserialize)]
+#[serde(transparent)]
+pub struct PresentedLease(String);
+
+impl PresentedLease {
+    pub fn new(token: String) -> Self {
+        Self(token)
+    }
+
+    pub fn sha256(&self) -> String {
+        token_sha256(self.expose())
+    }
+
+    pub fn expose(&self) -> &str {
+        &self.0
+    }
+}
+
+impl fmt::Debug for PresentedLease {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("PresentedLease(..)")
+    }
+}
+
+pub struct LeasePrincipal {
+    pub org: String,
+    pub job_id: String,
+    pub attempt: i32,
+    pub lease_sha256: String,
+}
+
+impl fmt::Debug for LeasePrincipal {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("LeasePrincipal")
+            .field("org", &self.org)
+            .field("job_id", &self.job_id)
+            .field("attempt", &self.attempt)
+            .finish_non_exhaustive()
+    }
+}
+
+/// A probe's o2syn_ token belongs to the path org. A dispatcher lease grants one job attempt.
+#[derive(Debug)]
+pub enum JobCaller {
+    /// `token_id` names the o2syn_ token the probe authenticated with; None only in-process.
+    Probe {
+        org: String,
+        token_id: Option<String>,
+    },
+    Lease(LeasePrincipal),
+}
+
+impl JobCaller {
+    pub fn org(&self) -> &str {
+        match self {
+            Self::Probe { org, .. } => org,
+            Self::Lease(principal) => &principal.org,
+        }
+    }
+
+    fn check_job_id(&self, job_id: &str) -> Result<(), AttemptError> {
+        if let Self::Lease(principal) = self
+            && principal.job_id != job_id
+        {
+            return Err(AttemptError::OtherJob);
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AttemptError {
+    NotFound,
+    WrongOrg,
+    OtherJob,
+    Superseded,
+    LeaseRequired,
+    KeyOutsideAttempt,
+    Unavailable,
+    CaptureOff,
+    ProbeUpgradeRequired,
+    BadRequest(String),
+}
+
+impl fmt::Display for AttemptError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            Self::NotFound => "job not found",
+            Self::WrongOrg => "forbidden: job does not belong to this org",
+            Self::OtherJob => "lease is for another job",
+            Self::Superseded => "lease_superseded",
+            Self::LeaseRequired => "forbidden: lease_required",
+            Self::KeyOutsideAttempt => "forbidden: artifact key is outside this attempt",
+            Self::Unavailable => "job lookup failed",
+            Self::CaptureOff => "capture_off_for_secret_bearing",
+            Self::ProbeUpgradeRequired => SecretErrorCode::ProbeUpgradeRequired.as_str(),
+            Self::BadRequest(message) => message,
+        })
+    }
+}
+
+impl std::error::Error for AttemptError {}
+
+pub(crate) struct BoundAttempt {
+    pub row: job_entity::Model,
+    pub attempt: i32,
+    pub lease_sha256: Option<String>,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Tokenless {
+    Allow,
+    RefuseLeased,
 }
 
 /// Viewport dimensions delivered to the probe so it doesn't need hardcoded device tables.
@@ -525,6 +682,13 @@ pub struct BrowserDeviceEntry {
     pub engine: String,
     pub device: String,
     pub viewport: Viewport,
+}
+
+#[derive(Deserialize)]
+struct StoredBrowserDevice {
+    execution_id: String,
+    engine: String,
+    device: String,
 }
 
 #[derive(Debug, Serialize, utoipa::ToSchema)]
@@ -562,6 +726,45 @@ pub struct ResolveResponse {
     /// payload instead. None when the org has no enabled ingest token.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ingest: Option<IngestInfo>,
+    /// Https origins a credential-bearing request or navigation may reach; set only for a check
+    /// that carries store refs, whose `follow_redirects` is then forced off.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub allowed_hosts: Vec<String>,
+    /// Set when this response hands a write-only value to an agent; never on the wire.
+    #[serde(skip)]
+    pub agent_audit: Option<AgentResolveAudit>,
+}
+
+/// The `secret.agent_resolve` audit record: ids and slot keys, never a value or lease material.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct AgentResolveAudit {
+    pub agent_id: String,
+    pub location_id: String,
+    pub check_id: String,
+    pub check_name: String,
+    pub job_id: String,
+    pub attempt: i32,
+    pub secret_ids: Vec<String>,
+    pub inline_slots: Vec<String>,
+    /// Names of the shared `kind=secret` variables delivered with the attempt.
+    pub secret_variables: Vec<String>,
+}
+
+impl AgentResolveAudit {
+    pub fn target(&self) -> String {
+        format!(
+            "secret.agent_resolve agent={} location={} check={} ({}) job={} attempt={} secrets=[{}] inline_slots=[{}] secret_variables=[{}]",
+            self.agent_id,
+            self.location_id,
+            self.check_name,
+            self.check_id,
+            self.job_id,
+            self.attempt,
+            self.secret_ids.join(","),
+            self.inline_slots.join(","),
+            self.secret_variables.join(","),
+        )
+    }
 }
 
 /// Ingest destination for probe result records.
@@ -589,14 +792,9 @@ pub struct IngestInfo {
 #[derive(Debug, Deserialize)]
 pub struct AckRequest {
     pub job_id: String,
-    /// The acking probe's agent id — the same value it sent as `claimed_by` on
-    /// lease. The server completes the job only if the row is still leased to it.
-    ///
-    /// `Option` on purpose, and it must stay optional until both probes are
-    /// deployed: a probe built before this field existed acks without it, and
-    /// rejecting those acks would throw away every result in the meantime. An ack
-    /// without it falls back to the status guard alone — exactly the behaviour
-    /// before this change, so an old probe is no worse off than it was.
+    #[serde(default)]
+    pub lease_token: Option<PresentedLease>,
+    /// Older probes omit their agent id, so only check ownership when it is present.
     #[serde(default)]
     pub claimed_by: Option<String>,
     /// Check result status from the probe: "up" | "warning" | "down" | "error"
@@ -676,45 +874,11 @@ pub struct AckBatchRequest {
     pub acks: Vec<AckRequest>,
 }
 
-fn artifact_key(
-    org_id: &str,
-    synthetics_id: &str,
-    run_id: &str,
-    job_id: &str,
-    execution_id: Option<&str>,
-    attempt: u32,
-    name: &str,
-) -> String {
-    let now = chrono::Utc::now();
-    // run_id groups all artifacts of one scheduled slot under one prefix so
-    // per-run listing/cleanup is a prefix op.
-    // Leaf: execution_id for browser checks (one per engine+device combo),
-    // job_id for protocol checks (single execution per job).
-    let id = execution_id.unwrap_or(job_id);
-    // Every attempt of one execution writes the same file names, so a retried
-    // run would silently overwrite the earlier attempt's screenshots. Attempt 0
-    // keeps the historical key so nothing already stored moves.
-    let name = if attempt == 0 {
-        name.to_string()
-    } else {
-        format!("attempt-{attempt}-{name}")
-    };
-    format!(
-        "synthetics/{}/{}/{}/{}/{}/{}/{}/{}",
-        org_id,
-        synthetics_id,
-        now.format("%Y"),
-        now.format("%m"),
-        now.format("%d"),
-        run_id,
-        id,
-        name,
-    )
-}
-
 #[derive(Debug, Deserialize)]
 pub struct ArtifactUrlsRequest {
     pub job_id: String,
+    #[serde(default)]
+    pub lease_token: Option<PresentedLease>,
     /// execution_id for the specific engine+device execution — used as the S3 key namespace.
     /// Required for browser checks; omitted for protocol checks (falls back to job_id).
     pub execution_id: Option<String>,
@@ -755,42 +919,141 @@ pub struct ArtifactUrlsResponse {
     pub evidence: Option<ArtifactUploadRef>,
 }
 
+/// The job's scheduled date keeps every artifact under one prefix across midnight.
+pub(crate) fn artifact_prefix(
+    org_id: &str,
+    synthetics_id: &str,
+    scheduled_ts_us: i64,
+    run_id: &str,
+    leaf: &str,
+    dispatch_attempt: i32,
+) -> String {
+    let date = chrono::DateTime::from_timestamp_micros(scheduled_ts_us)
+        .unwrap_or_else(chrono::Utc::now)
+        .format("%Y/%m/%d");
+    let prefix = format!("synthetics/{org_id}/{synthetics_id}/{date}/{run_id}/{leaf}/");
+    if dispatch_attempt > 0 {
+        format!("{prefix}d{dispatch_attempt}/")
+    } else {
+        prefix
+    }
+}
+
+fn artifact_key(prefix: &str, retry: u32, name: &str) -> String {
+    if retry == 0 {
+        format!("{prefix}{name}")
+    } else {
+        format!("{prefix}attempt-{retry}-{name}")
+    }
+}
+
+fn upload_ttl(
+    deadline: Option<i64>,
+    now_us: i64,
+    signing_time_us: i64,
+) -> Result<Duration, AttemptError> {
+    let max = Duration::from_secs(30 * 60);
+    let Some(deadline) = deadline else {
+        return Ok(max);
+    };
+    let remaining = deadline.saturating_sub(now_us);
+    // The storage signers encode lifetimes in whole seconds.
+    if remaining < 1_000_000 {
+        return Err(AttemptError::Superseded);
+    }
+    let budget = remaining.saturating_sub(signing_time_us).max(1_000_000);
+    Ok(max.min(Duration::from_secs(budget as u64 / 1_000_000)))
+}
+
+async fn presign_upload(key: &str, deadline: Option<i64>) -> anyhow::Result<reqwest::Url> {
+    let mut signing_time_us = 0;
+    for _ in 0..2 {
+        let start = config::utils::time::now_micros();
+        let ttl = upload_ttl(deadline, start, signing_time_us)?;
+        let url = infra::storage::presign_url(key, reqwest::Method::PUT, ttl).await?;
+        let finish = config::utils::time::now_micros();
+        // The signer can fetch credentials before starting the TTL. Its return time bounds
+        // issuance.
+        if ttl <= upload_ttl(deadline, finish, 0)? {
+            return Ok(url);
+        }
+        signing_time_us = finish.saturating_sub(start);
+    }
+    anyhow::bail!("could not sign an upload URL within its lease")
+}
+
+fn stored_devices(row: &job_entity::Model) -> Result<Vec<StoredBrowserDevice>, AttemptError> {
+    match row.browser_devices.as_deref() {
+        None | Some("") => Ok(Vec::new()),
+        Some(json) => serde_json::from_str(json).map_err(|e| {
+            log::error!("[synthetics] browser devices job_id={}: {e}", row.id);
+            AttemptError::Unavailable
+        }),
+    }
+}
+
+fn artifact_leaf(
+    row: &job_entity::Model,
+    execution_id: Option<&str>,
+) -> Result<String, AttemptError> {
+    let devices = stored_devices(row)?;
+    if devices.is_empty() && execution_id.is_none_or(|id| id == row.id) {
+        return Ok(row.id.clone());
+    }
+    if let Some(id) = execution_id
+        && devices.iter().any(|device| device.execution_id == id)
+    {
+        return Ok(id.to_owned());
+    }
+    Err(AttemptError::BadRequest(
+        "invalid execution_id for job".into(),
+    ))
+}
+
 pub async fn artifact_urls(
     req: ArtifactUrlsRequest,
-    token_org: &str,
+    caller: &JobCaller,
 ) -> anyhow::Result<ArtifactUrlsResponse> {
-    let conn = get_orm_client_ro().await;
-
-    let check = synthetics_jobs::get_by_id(conn, &req.job_id)
-        .await
-        .map_err(|e| anyhow::anyhow!(e.to_string()))?
-        .ok_or_else(|| anyhow::anyhow!("job not found: {}", req.job_id))?;
-
-    // Tenant boundary — same as resolve/ack.
-    if check.org_id != token_org {
-        anyhow::bail!(
-            "forbidden: job {:?} does not belong to this org",
-            req.job_id
-        );
+    let conn = get_orm_client_rw().await;
+    let bound = bind_attempt(
+        conn,
+        caller,
+        req.lease_token.as_ref(),
+        &req.job_id,
+        config::utils::time::now_micros(),
+        Tokenless::RefuseLeased,
+    )
+    .await?;
+    let check = &bound.row;
+    // F08: an attempt that was handed values stays capture-off even if the check loses them.
+    if stamped_delivery_marker(check).is_some()
+        || secret_bearing_in(conn, &check.org_id, &check.synthetics_id).await?
+    {
+        return Err(AttemptError::CaptureOff.into());
     }
-
+    let leaf = artifact_leaf(check, req.execution_id.as_deref())?;
+    let prefix = artifact_prefix(
+        &check.org_id,
+        &check.synthetics_id,
+        check.scheduled_ts,
+        &check.run_id,
+        &leaf,
+        bound.attempt,
+    );
     let is_local = config::is_local_disk_storage();
-    let expires = std::time::Duration::from_secs(30 * 60);
-
-    let exec_id = req.execution_id.as_deref();
+    let lease_deadline = if bound.lease_sha256.is_some() {
+        Some(check.lease_expires_at.ok_or(AttemptError::Superseded)?)
+    } else {
+        None
+    };
 
     let mut screenshots = Vec::with_capacity(req.screenshots.len());
     for step_id in &req.screenshots {
         let name = format!("screenshot-{step_id}.png");
-        let key = artifact_key(
-            &check.org_id,
-            &check.synthetics_id,
-            &check.run_id,
-            &req.job_id,
-            exec_id,
-            req.attempt,
-            &name,
-        );
+        if name.contains(['/', '\\']) || name.contains("..") {
+            return Err(AttemptError::BadRequest("invalid screenshot step_id".into()).into());
+        }
+        let key = artifact_key(&prefix, req.attempt, &name);
         if is_local {
             screenshots.push(ArtifactUploadRef {
                 step_id: Some(step_id.clone()),
@@ -803,9 +1066,9 @@ pub async fn artifact_urls(
                 key,
             });
         } else {
-            let url = infra::storage::presign_url(&key, reqwest::Method::PUT, expires)
+            let url = presign_upload(&key, lease_deadline)
                 .await
-                .map_err(|e| anyhow::anyhow!("presign screenshot: {e}"))?;
+                .context("presign screenshot")?;
             screenshots.push(ArtifactUploadRef {
                 step_id: Some(step_id.clone()),
                 upload_url: Some(url.to_string()),
@@ -816,15 +1079,7 @@ pub async fn artifact_urls(
     }
 
     let trace = if req.trace {
-        let key = artifact_key(
-            &check.org_id,
-            &check.synthetics_id,
-            &check.run_id,
-            &req.job_id,
-            exec_id,
-            req.attempt,
-            "trace.zip",
-        );
+        let key = artifact_key(&prefix, req.attempt, "trace.zip");
         // TODO: trace viewing requires design discussion for the end user UI (embedded viewer vs
         // external)
         if is_local {
@@ -839,9 +1094,9 @@ pub async fn artifact_urls(
                 key,
             })
         } else {
-            let url = infra::storage::presign_url(&key, reqwest::Method::PUT, expires)
+            let url = presign_upload(&key, lease_deadline)
                 .await
-                .map_err(|e| anyhow::anyhow!("presign trace: {e}"))?;
+                .context("presign trace")?;
             Some(ArtifactUploadRef {
                 step_id: None,
                 upload_url: Some(url.to_string()),
@@ -856,15 +1111,7 @@ pub async fn artifact_urls(
     // Same shape as the trace above: NDJSON rather than a zip, and named so the
     // key is self-describing in object storage.
     let evidence = if req.evidence {
-        let key = artifact_key(
-            &check.org_id,
-            &check.synthetics_id,
-            &check.run_id,
-            &req.job_id,
-            exec_id,
-            req.attempt,
-            "evidence.ndjson",
-        );
+        let key = artifact_key(&prefix, req.attempt, "evidence.ndjson");
         if is_local {
             Some(ArtifactUploadRef {
                 step_id: None,
@@ -877,9 +1124,9 @@ pub async fn artifact_urls(
                 key,
             })
         } else {
-            let url = infra::storage::presign_url(&key, reqwest::Method::PUT, expires)
+            let url = presign_upload(&key, lease_deadline)
                 .await
-                .map_err(|e| anyhow::anyhow!("presign evidence: {e}"))?;
+                .context("presign evidence")?;
             Some(ArtifactUploadRef {
                 step_id: None,
                 upload_url: Some(url.to_string()),
@@ -901,6 +1148,586 @@ pub async fn artifact_urls(
         trace,
         evidence,
     })
+}
+
+pub async fn authorize_upload(
+    caller: &JobCaller,
+    presented: Option<&PresentedLease>,
+    key: &str,
+) -> Result<(), AttemptError> {
+    let conn = get_orm_client_rw().await;
+    authorize_upload_in(
+        conn,
+        caller,
+        presented,
+        key,
+        config::utils::time::now_micros(),
+    )
+    .await
+}
+
+pub(crate) async fn authorize_upload_in<C: ConnectionTrait>(
+    conn: &C,
+    caller: &JobCaller,
+    presented: Option<&PresentedLease>,
+    key: &str,
+    now_us: i64,
+) -> Result<(), AttemptError> {
+    use job_entity::Column;
+
+    let invalid_key = || AttemptError::BadRequest("invalid artifact key".into());
+    let parts: Vec<_> = key.split('/').collect();
+    let ["synthetics", org, sid, _, _, _, run, leaf, first, ..] = parts.as_slice() else {
+        return Err(invalid_key());
+    };
+    if *org != caller.org()
+        || first.is_empty()
+        || key.contains("..")
+        || key.contains("//")
+        || key.contains('\\')
+    {
+        return Err(invalid_key());
+    }
+
+    let rows = job_entity::Entity::find()
+        .filter(Column::OrgId.eq(*org))
+        .filter(Column::SyntheticsId.eq(*sid))
+        .filter(Column::RunId.eq(*run))
+        .all(conn)
+        .await
+        .map_err(|e| {
+            log::error!("[synthetics] artifact job lookup run_id={run}: {e}");
+            AttemptError::Unavailable
+        })?;
+    for row in rows {
+        if row.id != *leaf
+            && !stored_devices(&row)?
+                .iter()
+                .any(|device| device.execution_id == *leaf)
+        {
+            continue;
+        }
+        let bound = bind_attempt(
+            conn,
+            caller,
+            presented,
+            &row.id,
+            now_us,
+            Tokenless::RefuseLeased,
+        )
+        .await?;
+        if stamped_delivery_marker(&bound.row).is_some()
+            || secret_bearing_in(conn, org, sid).await?
+        {
+            return Err(AttemptError::CaptureOff);
+        }
+        if bound.lease_sha256.is_some() {
+            let prefix =
+                artifact_prefix(org, sid, bound.row.scheduled_ts, run, leaf, bound.attempt);
+            if !key
+                .strip_prefix(&prefix)
+                .is_some_and(|name| !name.is_empty() && name != "." && !name.contains('/'))
+            {
+                return Err(AttemptError::KeyOutsideAttempt);
+            }
+        }
+        return Ok(());
+    }
+    Err(AttemptError::NotFound)
+}
+
+/// True when the check or a child it embeds holds a write-only value; such runs keep no artifacts.
+pub async fn secret_bearing(org_id: &str, synthetics_id: &str) -> Result<bool, AttemptError> {
+    secret_bearing_in(get_orm_client_rw().await, org_id, synthetics_id).await
+}
+
+pub(crate) async fn secret_bearing_in<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    synthetics_id: &str,
+) -> Result<bool, AttemptError> {
+    let Some(check) = cached_check(conn, org_id, synthetics_id).await? else {
+        return Ok(false);
+    };
+    if crate::service::carries_write_only(&check) || needs_lease(&check, false) {
+        return Ok(true);
+    }
+    for child_id in child_ids(&check) {
+        if cached_check(conn, org_id, &child_id)
+            .await?
+            .is_some_and(|child| {
+                crate::service::carries_write_only(&child) || needs_lease(&child, false)
+            })
+        {
+            return Ok(true);
+        }
+    }
+    async {
+        let refs = secret_refs::list_for_consumer_in(
+            conn,
+            org_id,
+            ConsumerType::SyntheticsCheck.as_str(),
+            synthetics_id,
+        )
+        .await?;
+        if !refs.is_empty() {
+            return Ok(true);
+        }
+        has_store_secret_dependency(conn, org_id, synthetics_id).await
+    }
+    .await
+    .map_err(|e| {
+        log::error!("[synthetics] secret binding lookup {org_id}/{synthetics_id}: {e}");
+        AttemptError::Unavailable
+    })
+}
+
+pub fn needs_lease(snapshot: &Synthetic, has_store_secret_dependency: bool) -> bool {
+    has_store_secret_dependency
+        || serde_json::to_string(snapshot).map_or(true, |snapshot| {
+            snapshot.contains("{{secrets.") || has_secret_ref(&snapshot)
+        })
+}
+
+async fn has_store_secret_dependency<C: ConnectionTrait>(
+    conn: &C,
+    org: &str,
+    id: &str,
+) -> Result<bool, infra::errors::Error> {
+    #[cfg(test)]
+    cost::hit(org, "store_dependency_read");
+    let deps = secret_dependencies::list_for_consumer_in(
+        conn,
+        org,
+        ConsumerType::SyntheticsCheck.as_str(),
+        id,
+    )
+    .await?;
+    let ids: Vec<_> = deps
+        .iter()
+        .filter_map(|dep| dep.dep_key.strip_prefix("vars:"))
+        .collect();
+    if ids.is_empty() {
+        return Ok(false);
+    }
+    Ok(org_secrets::Entity::find()
+        .filter(org_secrets::Column::OrgId.eq(org))
+        .filter(org_secrets::Column::Id.is_in(ids))
+        .filter(org_secrets::Column::Kind.eq("secret"))
+        .one(conn)
+        .await?
+        .is_some())
+}
+
+async fn cached_check<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    id: &str,
+) -> Result<Option<Synthetic>, AttemptError> {
+    synthetics_checks::get_cached(conn, org_id, id)
+        .await
+        .map_err(|e| {
+            log::error!("[synthetics] check lookup {org_id}/{id}: {e}");
+            AttemptError::Unavailable
+        })
+}
+
+fn child_ids(check: &Synthetic) -> std::collections::BTreeSet<String> {
+    if check.check_type != SyntheticType::Browser {
+        return Default::default();
+    }
+    check
+        .config
+        .get("steps")
+        .and_then(|s| s.as_array())
+        .map(|steps| {
+            config::meta::synthetics_composition::subtest_refs(steps)
+                .into_iter()
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// Scrubs the job's write-only values, inline and resolved store values alike, from the probe's
+/// error and status reason before they are stored or sent on. Another org's job is left alone.
+pub async fn redact_ack_error(req: &mut AckRequest, org_id: &str) {
+    let conn = get_orm_client_rw().await;
+    for (field, is_reason) in [(&mut req.error, false), (&mut req.status_reason, true)] {
+        let Some(text) = field.as_deref().filter(|t| !t.is_empty()) else {
+            continue;
+        };
+        let redacted = match ack_error_redaction(conn, &req.job_id, org_id, text).await {
+            Ok(None) => continue,
+            Ok(Some(redacted)) => redacted,
+            // Fail closed: text that may hold a value is withheld rather than passed on.
+            Err(e) => {
+                log::error!(
+                    "[synthetics] ack error redaction job_id={}: {e}",
+                    req.job_id
+                );
+                REDACTED.to_owned()
+            }
+        };
+        // A withheld reason is dropped: classification then falls back to `attempts`.
+        *field = (!(is_reason && redacted.contains(REDACTED))).then_some(redacted);
+    }
+    if !error_source_is_clean(conn, req, org_id).await {
+        req.error_source.clear();
+    }
+}
+
+/// `error_source` is a short code; anything else, or a code that holds a job value, is dropped.
+async fn error_source_is_clean(
+    conn: &sea_orm::DatabaseConnection,
+    req: &AckRequest,
+    org_id: &str,
+) -> bool {
+    let source = req.error_source.as_str();
+    // Reserved codes go through the scrub too: a credential can equal one.
+    if source.is_empty() {
+        return true;
+    }
+    let code_shaped = source.len() <= MAX_ERROR_SOURCE_LEN
+        && source.starts_with(|c: char| c.is_ascii_lowercase())
+        && source
+            .chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_');
+    if !code_shaped {
+        return false;
+    }
+    match ack_error_redaction(conn, &req.job_id, org_id, source).await {
+        Ok(None) => true,
+        Ok(Some(redacted)) => redacted == source,
+        Err(_) => false,
+    }
+}
+
+/// None when the job's check and children hold no write-only value to scrub.
+async fn ack_error_redaction(
+    conn: &sea_orm::DatabaseConnection,
+    job_id: &str,
+    org_id: &str,
+    error: &str,
+) -> anyhow::Result<Option<String>> {
+    let Some(job) = job_entity::Entity::find_by_id(job_id)
+        .filter(job_entity::Column::OrgId.eq(org_id))
+        .one(conn)
+        .await?
+    else {
+        return Ok(None);
+    };
+    let secrets = match (
+        stamped_delivery_marker(&job),
+        attempt_secrets(conn, &job).await,
+    ) {
+        (None, secrets) => match secrets? {
+            Some(secrets) => secrets,
+            None => return Ok(None),
+        },
+        (Some(marker), Ok(Some(secrets))) if secrets.fingerprint == marker => secrets,
+        // T02: values changed or unreadable since delivery cannot be matched, so all text goes.
+        (Some(_), _) => return Ok(Some(REDACTED.to_owned())),
+    };
+    let mut text = crate::service::redact_run_text(error, &secrets.values);
+    if let Some(redactor) = &secrets.redactor {
+        text = redactor.redact(&text);
+    }
+    Ok(Some(text))
+}
+
+/// The marker a resolve stamps when it hands out values: their fingerprint, or `unverifiable`
+/// when the check now on record no longer holds every value that was sent.
+pub(crate) async fn delivery_marker(
+    conn: &sea_orm::DatabaseConnection,
+    job: &job_entity::Model,
+    mut delivered: Delivered,
+) -> Option<String> {
+    let bearing = delivered.bearing();
+    // Every value sent must be on record: a save that drops a ref or placeholder mid-resolve
+    // would otherwise leave a fingerprint that omits it.
+    let mut sent = Zeroizing::new(std::mem::take(&mut *delivered.inline));
+    sent.extend(delivered.legacy.iter().cloned());
+    if let Some(store) = &delivered.store {
+        sent.extend(store.slots.iter().cloned());
+    }
+    match attempt_secrets_with(conn, job, Some(delivered)).await {
+        Ok(Some(secrets)) if sent.iter().all(|v| secrets.values.contains(v)) => {
+            Some(secrets.fingerprint)
+        }
+        Ok(None) if !bearing => None,
+        Ok(_) => Some(UNVERIFIABLE_DELIVERY.to_owned()),
+        Err(e) => {
+            log::warn!("[synthetics] delivery fingerprint job_id={}: {e}", job.id);
+            Some(UNVERIFIABLE_DELIVERY.to_owned())
+        }
+    }
+}
+
+fn stamped_delivery_marker(job: &job_entity::Model) -> Option<String> {
+    serde_json::from_str::<serde_json::Value>(&job.metadata)
+        .ok()?
+        .get(DELIVERY_MARKER_KEY)?
+        .as_str()
+        .map(str::to_owned)
+}
+
+/// The last step before a resolve answers: the attempt must still be live under the presented
+/// lease. A marker that differs from one an earlier resolve stamped becomes `unverifiable`.
+async fn seal_delivery(
+    conn: &sea_orm::DatabaseConnection,
+    bound: &BoundAttempt,
+    marker: Option<&str>,
+    clock: impl Fn() -> i64,
+) -> anyhow::Result<()> {
+    if marker.is_none() && bound.lease_sha256.is_none() {
+        return Ok(());
+    }
+    let expiry = stamp_live_attempt(conn, bound, marker, &clock).await?;
+    // The CAS can wait on a row lock past expiry, so the lease is checked again once it is done.
+    if expiry.is_some_and(|expiry| expiry <= clock()) {
+        return Err(AttemptError::Superseded.into());
+    }
+    Ok(())
+}
+
+/// The lease expiry the attempt was live under when the marker landed.
+async fn stamp_live_attempt(
+    conn: &sea_orm::DatabaseConnection,
+    bound: &BoundAttempt,
+    marker: Option<&str>,
+    clock: &impl Fn() -> i64,
+) -> anyhow::Result<Option<i64>> {
+    use job_entity::Column;
+    for _ in 0..SEAL_ATTEMPTS {
+        let now_us = clock();
+        let row = job_entity::Entity::find_by_id(&bound.row.id)
+            .filter(Column::OrgId.eq(&bound.row.org_id))
+            .one(conn)
+            .await?
+            .ok_or(AttemptError::Superseded)?;
+        if !attempt_still_live(&row, bound, now_us) {
+            return Err(AttemptError::Superseded.into());
+        }
+        let expiry = bound.lease_sha256.as_ref().and(row.lease_expires_at);
+        let Some(marker) = marker else {
+            return Ok(expiry);
+        };
+        let mut update = job_entity::Entity::update_many()
+            .col_expr(
+                Column::Metadata,
+                sea_orm::sea_query::Expr::value(merged_marker_metadata(&row.metadata, marker)),
+            )
+            .filter(Column::Id.eq(&row.id))
+            .filter(Column::OrgId.eq(&row.org_id))
+            .filter(Column::DispatchAttempts.eq(bound.attempt))
+            .filter(Column::Metadata.eq(&row.metadata));
+        if let Some(hash) = &bound.lease_sha256 {
+            update = update
+                .filter(Column::Status.eq(1))
+                .filter(Column::LeaseTokenSha256.eq(hash))
+                .filter(Column::LeaseExpiresAt.gt(now_us));
+        }
+        if update.exec(conn).await?.rows_affected == 1 {
+            return Ok(expiry);
+        }
+    }
+    Err(AttemptError::Superseded.into())
+}
+
+fn attempt_still_live(row: &job_entity::Model, bound: &BoundAttempt, now_us: i64) -> bool {
+    if row.dispatch_attempts != bound.attempt {
+        return false;
+    }
+    let Some(hash) = &bound.lease_sha256 else {
+        return true;
+    };
+    row.status == 1
+        && row.lease_expires_at.is_some_and(|expiry| expiry > now_us)
+        && row
+            .lease_token_sha256
+            .as_deref()
+            .is_some_and(|s| config::utils::str::constant_time_eq(s.as_bytes(), hash.as_bytes()))
+}
+
+fn merged_marker_metadata(metadata: &str, marker: &str) -> String {
+    let mut metadata: serde_json::Value =
+        serde_json::from_str(metadata).unwrap_or_else(|_| serde_json::json!({}));
+    if !metadata.is_object() {
+        metadata = serde_json::json!({});
+    }
+    let merged = match metadata
+        .get(DELIVERY_MARKER_KEY)
+        .and_then(serde_json::Value::as_str)
+    {
+        Some(prior) if prior != marker => UNVERIFIABLE_DELIVERY,
+        _ => marker,
+    };
+    metadata[DELIVERY_MARKER_KEY] = merged.into();
+    metadata.to_string()
+}
+
+/// Every value the attempt can hand the runner: inline write-only values, shared `kind=secret`
+/// variables and substituted store slots. None when there is none.
+async fn attempt_secrets(
+    conn: &sea_orm::DatabaseConnection,
+    job: &job_entity::Model,
+) -> anyhow::Result<Option<AttemptSecrets>> {
+    attempt_secrets_with(conn, job, None).await
+}
+
+/// [`attempt_secrets`] over the values a resolve just delivered, when it has them.
+async fn attempt_secrets_with(
+    conn: &sea_orm::DatabaseConnection,
+    job: &job_entity::Model,
+    delivered: Option<Delivered>,
+) -> anyhow::Result<Option<AttemptSecrets>> {
+    let Some(check) = cached_check(conn, &job.org_id, &job.synthetics_id).await? else {
+        return Ok(None);
+    };
+    let mut checks = vec![check];
+    for child_id in child_ids(&checks[0]) {
+        if let Some(child) = cached_check(conn, &job.org_id, &child_id).await? {
+            checks.push(child);
+        }
+    }
+    let mut store_bound = false;
+    for check in &checks {
+        store_bound |= !secret_refs::list_for_consumer_in(
+            conn,
+            &job.org_id,
+            ConsumerType::SyntheticsCheck.as_str(),
+            &check.id,
+        )
+        .await?
+        .is_empty();
+    }
+    let shared_secrets = crate::service::shared_secret_names(conn, &job.org_id).await?;
+    let mut dek = None;
+    let mut legacy_named = false;
+    if !shared_secrets.is_empty() {
+        let key = crate::service::synthetics_dek(&job.org_id).await?;
+        for check in &checks {
+            // Placeholders in split config values are only visible once rehydrated.
+            let mut open = check.clone();
+            if crate::service::has_encrypted_config(&mut open) {
+                crate::service::rehydrate_config_secrets(&mut open, &key)?;
+            }
+            let named =
+                placeholder_names(&crate::service::variables::check_placeholder_text(&open));
+            legacy_named |= shared_secrets.iter().any(|name| named.contains(name));
+        }
+        dek = Some(key);
+    }
+    checks.retain(crate::service::carries_write_only);
+    if checks.is_empty() && !store_bound && !legacy_named {
+        return Ok(None);
+    }
+    let dek = match dek {
+        Some(dek) => dek,
+        None => crate::service::synthetics_dek(&job.org_id).await?,
+    };
+    let mut values = Zeroizing::new(
+        checks
+            .iter()
+            .flat_map(|check| crate::service::stored_write_only_values(check, &dek))
+            .collect::<Vec<_>>(),
+    );
+    let mut redactor = None;
+    if store_bound || legacy_named {
+        let mut delivered = match delivered {
+            Some(delivered) => delivered,
+            None => fresh_delivery(conn, job, store_bound).await?,
+        };
+        values.extend(delivered.legacy.drain(..));
+        if store_bound && let Some(mut store) = delivered.store {
+            values.extend(store.slots.drain(..));
+            redactor = Some(store.redactor);
+        }
+    }
+    let fingerprint = delivery_fingerprint(&dek, &values);
+    Ok(Some(AttemptSecrets {
+        values,
+        redactor,
+        fingerprint,
+    }))
+}
+
+/// The legacy and store values a resolve of `job` would deliver now.
+async fn fresh_delivery(
+    conn: &sea_orm::DatabaseConnection,
+    job: &job_entity::Model,
+    store_bound: bool,
+) -> anyhow::Result<Delivered> {
+    let prepared =
+        prepare_delivery(conn, &job.org_id, &job.synthetics_id, job.env.as_deref()).await?;
+    let legacy = legacy_values(&prepared.legacy_secrets, &prepared.env_inject);
+    let mut store = None;
+    if store_bound
+        && let Some((snapshot, resolved)) = store_resolution(
+            conn,
+            job,
+            &prepared.synthetic,
+            prepared.dek.as_deref(),
+            &prepared.env_inject,
+            prepared.shared_rows.as_deref(),
+        )
+        .await?
+        .map_err(|code| anyhow::anyhow!("store values unavailable for redaction: {code}"))?
+    {
+        let mut slots = Zeroizing::new(Vec::with_capacity(snapshot.slot_pointers.len()));
+        for field in &snapshot.slot_pointers {
+            let text = snapshot
+                .stored
+                .pointer(field)
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or_default();
+            let value = resolved
+                .substitute_slot(field, text)
+                .map_err(|code| anyhow::anyhow!("store slot unavailable: {code}"))?;
+            slots.push(value.as_str().to_owned());
+        }
+        store = Some(StoreValues {
+            slots,
+            redactor: resolved.redactor,
+        });
+    }
+    Ok(Delivered {
+        inline: Zeroizing::default(),
+        legacy,
+        store,
+    })
+}
+
+fn legacy_values(names: &[String], env_inject: &HashMap<String, String>) -> Zeroizing<Vec<String>> {
+    Zeroizing::new(
+        names
+            .iter()
+            .filter_map(|name| env_inject.get(name).cloned())
+            .collect(),
+    )
+}
+
+/// Keyed with the org DEK, so the stamped digest cannot be checked against guessed values.
+fn delivery_fingerprint(dek: &[u8], values: &[String]) -> String {
+    let mut sorted: Vec<&str> = values
+        .iter()
+        .map(String::as_str)
+        .filter(|v| !v.is_empty())
+        .collect();
+    sorted.sort_unstable();
+    sorted.dedup();
+    let key = Zeroizing::new(config::utils::base64::encode_raw(dek));
+    // Sized up front: a reallocation would leave a copy of the plaintext behind.
+    let size = key.len() + sorted.iter().map(|v| v.len() + 22).sum::<usize>();
+    let mut input = Zeroizing::new(String::with_capacity(size));
+    input.push_str(&key);
+    for value in sorted {
+        input.push('\n');
+        input.push_str(&value.len().to_string());
+        input.push(':');
+        input.push_str(value);
+    }
+    token_sha256(&input)
 }
 
 // ── Artifact download: presigned URLs for the UI ─────────────────────────────
@@ -1058,6 +1885,13 @@ pub struct AckResponse {
     pub template: Option<String>,
 }
 
+/// An ack's answer; `applied` is false when the completion matched no row (stale or duplicate).
+#[derive(Debug)]
+pub struct AckOutcome {
+    pub response: AckResponse,
+    pub applied: bool,
+}
+
 /// The notification a completed run should send, resolved against the check's
 /// `alert_if_fails` / `cooldown_mins` settings and its persisted alert state.
 #[derive(Debug, Clone, Copy, Default, Serialize, PartialEq, Eq, utoipa::ToSchema)]
@@ -1088,6 +1922,16 @@ pub const REASON_CONFIG_VARIABLE_UNDEFINED: &str = "config_variable_undefined";
 /// A shared secret row the check references exists but holds no value; retrying cannot fix it.
 pub const REASON_CONFIG_SECRET_UNSET: &str = "config_secret_unset";
 pub const REASON_CONFIG_VARIABLE_LIMIT: &str = "config_variable_limit";
+/// A write-only value would reach an origin it was not typed for (design §6 S03).
+pub const REASON_SLOT_ORIGIN_CHANGED: &str = "secret_error:slot_origin_changed";
+/// Job `metadata` key holding the delivery fingerprint; stripped before the runner sees it.
+const DELIVERY_MARKER_KEY: &str = "_secret_delivery";
+pub(crate) const UNVERIFIABLE_DELIVERY: &str = "unverifiable";
+/// A concurrent resolve of the same attempt can move the metadata between read and write.
+const SEAL_ATTEMPTS: usize = 3;
+const MAX_ERROR_SOURCE_LEN: usize = 32;
+const REDACTED: &str = "[REDACTED]";
+const TOKENLESS_STAMP_INTERVAL_US: i64 = 3_600_000_000;
 
 /// Expansion could not produce a runnable journey; `guard_failure` means a guard of ours failed.
 #[derive(Debug, Clone)]
@@ -1112,112 +1956,254 @@ struct ComposedJourney {
     children: HashMap<String, config::meta::synthetics_composition::ChildJourney>,
 }
 
+struct AttemptSecrets {
+    values: Zeroizing<Vec<String>>,
+    redactor: Option<infra::secret_store::redact::Redactor>,
+    fingerprint: String,
+}
+
+/// The values one resolve handed out; its delivery marker is computed from them.
+pub(crate) struct Delivered {
+    /// Inline write-only values as sent; empty when rebuilt for an ACK.
+    pub(crate) inline: Zeroizing<Vec<String>>,
+    pub(crate) legacy: Zeroizing<Vec<String>>,
+    pub(crate) store: Option<StoreValues>,
+}
+
+impl Delivered {
+    fn bearing(&self) -> bool {
+        !self.inline.is_empty() || !self.legacy.is_empty() || self.store.is_some()
+    }
+}
+
+pub(crate) struct StoreValues {
+    slots: Zeroizing<Vec<String>>,
+    redactor: infra::secret_store::redact::Redactor,
+}
+
+#[cfg(test)]
+impl StoreValues {
+    pub(crate) fn for_tests(slots: Vec<String>) -> Self {
+        let redactor =
+            infra::secret_store::redact::Redactor::for_attempt(slots.iter().map(String::as_str));
+        Self {
+            slots: Zeroizing::new(slots),
+            redactor,
+        }
+    }
+}
+
+/// What [`deliver_store_refs`] did to the check.
+struct StoreDelivery {
+    allowed_hosts: Vec<String>,
+    secret_ids: Vec<String>,
+    values: Option<StoreValues>,
+}
+
+struct Prepared {
+    synthetic: Synthetic,
+    env_inject: HashMap<String, String>,
+    dek: Option<Vec<u8>>,
+    composed: Option<ComposedJourney>,
+    has_shared_variables: bool,
+    /// One uncached read for a check with store refs: values and dependency digests both use it.
+    shared_rows: Option<Vec<SyntheticsVariableRecord>>,
+    /// Shared `kind=secret` variables in `env_inject`; they get the write-only delivery rules.
+    legacy_secrets: Vec<String>,
+    write_only_live: bool,
+}
+
+#[derive(Clone, Copy)]
+enum SnapshotPurpose {
+    Save,
+    Resolve { write_only_live: bool },
+}
+
 // ── Service functions (called by OSS handlers) ────────────────────────────────
 
-/// Returns full synthetic config for a pending check so the probe knows what to execute.
-///
-/// Credentials stored AES-encrypted at rest are decrypted here with the org DEK
-/// and returned as plain `env_inject` key-value pairs. This is safe because:
-///   - The job API is only reachable over TLS (required for all O2 deployments).
-///   - The `o2syn_` probe token is scoped to this org only.
-///
-/// `check.auth` is redacted in the response — the probe reads credentials from
-/// `env_inject` only so the encrypted blob never leaves the backend.
-pub async fn resolve(req: ResolveRequest, token_org: &str) -> anyhow::Result<ResolveResponse> {
-    let conn = get_orm_client_rw().await;
-
-    let check = synthetics_jobs::get_by_id(conn, &req.job_id)
+pub(crate) async fn bind_attempt<C: ConnectionTrait>(
+    conn: &C,
+    caller: &JobCaller,
+    presented: Option<&PresentedLease>,
+    job_id: &str,
+    now_us: i64,
+    tokenless: Tokenless,
+) -> Result<BoundAttempt, AttemptError> {
+    caller.check_job_id(job_id)?;
+    // Another org's job reads as absent, so a probe cannot tell it from a missing one.
+    let row = job_entity::Entity::find_by_id(job_id)
+        .filter(job_entity::Column::OrgId.eq(caller.org()))
+        .one(conn)
         .await
-        .map_err(|e| anyhow::anyhow!(e.to_string()))?
-        .ok_or_else(|| anyhow::anyhow!("job not found: {}", req.job_id))?;
-
-    // Tenant boundary: the caller's token org must own the job. `job_id` is a
-    // KSUID that leaks into result streams and logs, so without this a valid
-    // token from another org could resolve this job's decrypted secrets.
-    if check.org_id != token_org {
-        anyhow::bail!(
-            "forbidden: job {:?} does not belong to this org",
-            req.job_id
-        );
+        .map_err(|e| {
+            log::error!("[synthetics] lease lookup job_id={job_id}: {e}");
+            AttemptError::Unavailable
+        })?
+        .ok_or(AttemptError::NotFound)?;
+    if row.org_id != caller.org() {
+        return Err(AttemptError::WrongOrg);
     }
 
-    // Definition only (config/secrets/type) — served from the definition cache.
-    let mut synthetic = synthetics_checks::get_cached(conn, &check.org_id, &check.synthetics_id)
-        .await
-        .map_err(|e| anyhow::anyhow!(e.to_string()))?
-        .ok_or_else(|| anyhow::anyhow!("check not found: {}", check.synthetics_id))?;
-
-    // Decrypt credentials and variables; build env_inject for the probe.
-    let has_encrypted_config = crate::service::has_encrypted_config(&mut synthetic);
-    let env_id = check.env.clone();
-    let has_shared_variables = crate::service::org_has_shared_variables(&check.org_id).await;
-    let mut env_inject = HashMap::new();
-    let dek = if needs_dek(&synthetic, has_encrypted_config, has_shared_variables) {
-        Some(crate::service::synthetics_dek(&check.org_id).await?)
-    } else {
-        None
+    let lease_sha256 = match caller {
+        JobCaller::Lease(principal) => Some(principal.lease_sha256.clone()),
+        JobCaller::Probe { .. } => presented.map(PresentedLease::sha256),
     };
-
-    // Before the shared tier: a `{{NAME}}` in a header only exists once its slot is restored.
-    if has_encrypted_config && let Some(dek) = dek.as_deref() {
-        crate::service::rehydrate_config_secrets(&mut synthetic, dek)?;
+    let bound = BoundAttempt {
+        attempt: row.dispatch_attempts,
+        row,
+        lease_sha256,
+    };
+    if let JobCaller::Lease(principal) = caller
+        && principal.attempt != bound.attempt
+    {
+        return Err(AttemptError::Superseded);
     }
-    // Before the shared tier too: a child's `{{NAME}}` is invisible until its steps are spliced in.
-    let composed = expand_for_resolve(conn, &mut synthetic).await?;
-
-    if let Some(dek) = dek.as_deref() {
-        if let Some(ref auth) = synthetic.auth {
-            env_inject.extend(build_env_map(auth, dek)?);
+    let stored = bound.row.lease_token_sha256.as_deref();
+    if let Some(hash) = &bound.lease_sha256 {
+        if bound.row.status != 1
+            || bound
+                .row
+                .lease_expires_at
+                .is_none_or(|expiry| expiry <= now_us)
+            || !stored.is_some_and(|s| {
+                config::utils::str::constant_time_eq(s.as_bytes(), hash.as_bytes())
+            })
+        {
+            return Err(AttemptError::Superseded);
         }
+    } else if stored.is_some() && tokenless == Tokenless::RefuseLeased {
+        return Err(AttemptError::LeaseRequired);
+    }
+    Ok(bound)
+}
 
-        let shared = if has_shared_variables {
-            crate::service::resolve_shared_variables(
-                &check.org_id,
-                env_id.as_deref(),
-                &synthetic,
-                dek,
-            )
-            .await?
-        } else {
-            Vec::new()
-        };
-        env_inject.extend(merge_variable_tiers(
-            shared,
-            &synthetic.variables,
-            dek,
-            &check.synthetics_id,
-        )?);
+/// Authorization must precede decryption because the probe receives plaintext credentials in
+/// `env_inject` over TLS.
+pub async fn resolve(req: ResolveRequest, caller: &JobCaller) -> anyhow::Result<ResolveResponse> {
+    resolve_at(req, caller, config::utils::time::now_micros()).await
+}
 
-        // Decrypt top-level cookies and serialize as _AUTH_COOKIES JSON for the probe.
-        // Probe calls context.addCookies(JSON.parse(envVars._AUTH_COOKIES)) regardless of auth
-        // type.
-        if !synthetic.cookies.is_empty() {
-            let decrypted: Vec<serde_json::Value> = synthetic
-                .cookies
-                .iter()
-                .map(|c| {
-                    let value = if c.value.is_empty() {
-                        Ok(String::new())
-                    } else {
-                        crate::service::decrypt_secret(dek, &c.value)
-                    }?;
-                    Ok(serde_json::json!({
-                        "name":     c.name,
-                        "value":    value,
-                        "domain":   c.domain,
-                        "path":     c.path,
-                        "httpOnly": c.http_only,
-                        "secure":   c.secure,
-                    }))
-                })
-                .collect::<anyhow::Result<_>>()?;
-            env_inject.insert(
-                "_AUTH_COOKIES".into(),
-                serde_json::to_string(&decrypted)
-                    .map_err(|e| anyhow::anyhow!("cookies serialize failed: {e}"))?,
-            );
+pub(crate) async fn resolve_at(
+    req: ResolveRequest,
+    caller: &JobCaller,
+    now: i64,
+) -> anyhow::Result<ResolveResponse> {
+    let conn = get_orm_client_rw().await;
+    let started = std::time::Instant::now();
+
+    let bound = bind_attempt(
+        conn,
+        caller,
+        req.lease_token.as_ref(),
+        &req.job_id,
+        now,
+        Tokenless::Allow,
+    )
+    .await
+    .map_err(anyhow::Error::new)?;
+    let check = synthetics_jobs::get_by_id(conn, &bound.row.id)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?
+        .ok_or(AttemptError::NotFound)?;
+
+    let Prepared {
+        mut synthetic,
+        mut env_inject,
+        dek,
+        composed,
+        has_shared_variables,
+        shared_rows,
+        legacy_secrets,
+        write_only_live,
+    } = prepare_delivery(
+        conn,
+        &check.org_id,
+        &check.synthetics_id,
+        check.env.as_deref(),
+    )
+    .await?;
+    // Before the store splice rewrites env_inject: the marker holds the values as delivered.
+    let legacy_delivered = legacy_values(&legacy_secrets, &env_inject);
+    let inline_delivered = Zeroizing::new(
+        dek.as_deref()
+            .map(|dek| crate::service::stored_write_only_values(&synthetic, dek))
+            .unwrap_or_default(),
+    );
+
+    let auth_ref = ["_AUTH_PASSWORD", "_AUTH_TOKEN", "_AUTH_COOKIES"]
+        .into_iter()
+        .any(|key| {
+            env_inject
+                .get(key)
+                .is_some_and(|value| has_secret_ref(value))
+        });
+    // After the splice, so a child's inline write-only value counts as well.
+    let inline_slots = crate::service::write_only_slot_keys(&synthetic);
+    // A shared `kind=secret` variable is delivered under the inline write-only rules.
+    let inline_credentials =
+        write_only_live && (!inline_slots.is_empty() || !legacy_secrets.is_empty());
+    let mut lease_required = auth_ref
+        || needs_lease(&synthetic, false)
+        || has_store_secret_dependency(conn, &check.org_id, &check.synthetics_id).await?;
+    // P1-11: once the banner period is over, an inline write-only value needs a leased runner too.
+    if !lease_required && inline_credentials && bound.lease_sha256.is_none() {
+        lease_required = banner_period_over(conn, now).await?;
+    }
+    if lease_required && bound.lease_sha256.is_none() {
+        return Err(AttemptError::ProbeUpgradeRequired.into());
+    }
+    let agent = attempt_agent(&bound.row).await?;
+    if let Some(agent) = &agent
+        && (lease_required || inline_credentials)
+    {
+        require_rotated_agent_token(conn, agent, caller).await?;
+        if bound.lease_sha256.is_none() {
+            record_tokenless_resolve(conn, &agent.id, now).await;
         }
     }
+    // After the lease check, and before capture or target edits leave the signed save form.
+    let StoreDelivery {
+        allowed_hosts,
+        secret_ids,
+        values: store_values,
+    } = deliver_store_refs(
+        conn,
+        &bound.row,
+        &mut synthetic,
+        dek.as_deref(),
+        &mut env_inject,
+        shared_rows.as_deref(),
+    )
+    .await?;
+    let delivered = Delivered {
+        inline: inline_delivered,
+        legacy: legacy_delivered,
+        store: store_values,
+    };
+    let delivery_marker = delivery_marker(conn, &bound.row, delivered).await;
+    let allowed_hosts = if allowed_hosts.is_empty() && inline_credentials && write_only_live {
+        inline_allowed_hosts(&mut synthetic, &env_inject)
+    } else {
+        allowed_hosts
+    };
+    refuse_url_placeholders_after_banner(conn, &synthetic, has_shared_variables, now).await?;
+    // After the splice, so a child's write-only step value also turns capture off (D277).
+    if lease_required || inline_credentials {
+        crate::service::force_capture_off(&mut synthetic);
+    }
+    let agent_audit = agent
+        .filter(|_| lease_required || inline_credentials)
+        .map(|agent| AgentResolveAudit {
+            agent_id: agent.id,
+            location_id: agent.location_id,
+            check_id: synthetic.id.clone(),
+            check_name: synthetic.name.clone(),
+            job_id: bound.row.id.clone(),
+            attempt: bound.attempt,
+            secret_ids,
+            inline_slots,
+            secret_variables: legacy_secrets,
+        });
 
     inject_journey_secrets(&synthetic, &mut env_inject);
     synthetic.target = resolved_target(
@@ -1241,12 +2227,6 @@ pub async fn resolve(req: ResolveRequest, token_org: &str) -> anyhow::Result<Res
     // Deserialise browser_devices from the job row, then enrich each entry with
     // the viewport dimensions from env config so the probe doesn't need a local
     // device table.
-    #[derive(Deserialize)]
-    struct StoredBrowserDevice {
-        execution_id: String,
-        engine: String,
-        device: String,
-    }
     let raw_devices: Vec<StoredBrowserDevice> = check
         .browser_devices
         .as_deref()
@@ -1276,6 +2256,9 @@ pub async fn resolve(req: ResolveRequest, token_org: &str) -> anyhow::Result<Res
 
     let mut metadata: serde_json::Value =
         serde_json::from_str(&check.metadata).unwrap_or(serde_json::json!({}));
+    if let Some(fields) = metadata.as_object_mut() {
+        fields.remove(DELIVERY_MARKER_KEY);
+    }
     if let Some(env_id) = check.env.as_deref() {
         metadata["environment"] =
             serde_json::json!(environment_display_name(&check.org_id, env_id).await);
@@ -1309,6 +2292,11 @@ pub async fn resolve(req: ResolveRequest, token_org: &str) -> anyhow::Result<Res
             token: t.token,
         });
 
+    let clock = || {
+        let elapsed = i64::try_from(started.elapsed().as_micros()).unwrap_or(i64::MAX);
+        now.saturating_add(elapsed)
+    };
+    seal_delivery(conn, &bound, delivery_marker.as_deref(), clock).await?;
     Ok(ResolveResponse {
         job_id: req.job_id,
         run_id: check.run_id,
@@ -1323,7 +2311,607 @@ pub async fn resolve(req: ResolveRequest, token_org: &str) -> anyhow::Result<Res
         valid_until: check.valid_until,
         ssrf_policy,
         ingest,
+        allowed_hosts,
+        agent_audit,
     })
+}
+
+/// The check as the runner gets it before store refs: decrypted, rehydrated, children spliced in,
+/// with `env_inject` built. Resolve and ack-time redaction share it.
+async fn prepare_delivery(
+    conn: &sea_orm::DatabaseConnection,
+    org_id: &str,
+    synthetics_id: &str,
+    env_id: Option<&str>,
+) -> anyhow::Result<Prepared> {
+    #[cfg(test)]
+    cost::hit(org_id, "prepare_delivery");
+    // Definition only (config/secrets/type) — served from the definition cache.
+    let mut synthetic = synthetics_checks::get_cached(conn, org_id, synthetics_id)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?
+        .ok_or_else(|| anyhow::anyhow!("check not found: {}", synthetics_id))?;
+
+    // Decrypt credentials and variables; build env_inject for the probe.
+    let has_encrypted_config = crate::service::has_encrypted_config(&mut synthetic);
+    let mut shared_rows = fresh_rows_for_store_refs(conn, org_id, &synthetic, None).await?;
+    let has_shared_variables = match &shared_rows {
+        Some(rows) => !rows.is_empty(),
+        None => crate::service::org_has_shared_variables(org_id).await,
+    };
+    let mut env_inject = HashMap::new();
+    let write_only = crate::service::carries_write_only(&synthetic);
+    let dek = if write_only || needs_dek(&synthetic, has_encrypted_config, has_shared_variables) {
+        Some(crate::service::synthetics_dek(org_id).await?)
+    } else {
+        None
+    };
+    // Shared secret variables also become write-only, even without a local credential slot.
+    let write_only_live = if write_only || has_shared_variables || !child_ids(&synthetic).is_empty()
+    {
+        crate::service::write_only_live_in(
+            conn,
+            crate::service::store_latched(),
+            crate::service::durably_latched(),
+        )
+        .await?
+    } else {
+        false
+    };
+    if write_only
+        && write_only_live
+        && let Some(dek) = dek.as_deref()
+    {
+        require_slot_origins(org_id, &synthetic, dek).await?;
+    }
+
+    // Before the shared tier: a `{{NAME}}` in a header only exists once its slot is restored.
+    if has_encrypted_config && let Some(dek) = dek.as_deref() {
+        crate::service::rehydrate_config_secrets(&mut synthetic, dek)?;
+    }
+    // Before the shared tier too: a child's `{{NAME}}` is invisible until its steps are spliced in.
+    let composed = expand_snapshot(conn, &mut synthetic, dek.as_deref(), write_only_live).await?;
+    shared_rows = fresh_rows_for_store_refs(conn, org_id, &synthetic, shared_rows).await?;
+    let mut legacy_secrets = Vec::new();
+    if let Some(dek) = dek.as_deref() {
+        if let Some(ref auth) = synthetic.auth {
+            env_inject.extend(build_env_map(auth, dek)?);
+        }
+
+        let shared = match &shared_rows {
+            Some(rows) => {
+                crate::service::resolve_shared_variables_from(
+                    org_id,
+                    env_id,
+                    &synthetic,
+                    dek,
+                    rows.clone(),
+                )
+                .await?
+            }
+            None if has_shared_variables => {
+                crate::service::resolve_shared_variables(org_id, env_id, &synthetic, dek).await?
+            }
+            None => Vec::new(),
+        };
+        env_inject.extend(merge_variable_tiers(
+            shared,
+            &synthetic.variables,
+            dek,
+            synthetics_id,
+        )?);
+        if has_shared_variables {
+            legacy_secrets =
+                delivered_legacy_secrets(conn, &synthetic, env_id, shared_rows.as_deref()).await?;
+        }
+
+        // Decrypt top-level cookies and serialize as _AUTH_COOKIES JSON for the probe.
+        // Probe calls context.addCookies(JSON.parse(envVars._AUTH_COOKIES)) regardless of auth
+        // type.
+        if !synthetic.cookies.is_empty() {
+            let decrypted: Vec<serde_json::Value> = synthetic
+                .cookies
+                .iter()
+                .map(|c| {
+                    let value = if c.value.is_empty() {
+                        Ok(String::new())
+                    } else {
+                        crate::service::decrypt_secret(dek, &c.value)
+                    }?;
+                    Ok(serde_json::json!({
+                        "name":     c.name,
+                        "value":    value,
+                        "domain":   c.domain,
+                        "path":     c.path,
+                        "httpOnly": c.http_only,
+                        "secure":   c.secure,
+                    }))
+                })
+                .collect::<anyhow::Result<_>>()?;
+            env_inject.insert(
+                "_AUTH_COOKIES".into(),
+                serde_json::to_string(&decrypted)
+                    .map_err(|e| anyhow::anyhow!("cookies serialize failed: {e}"))?,
+            );
+        }
+    }
+
+    Ok(Prepared {
+        synthetic,
+        env_inject,
+        dek,
+        composed,
+        has_shared_variables,
+        shared_rows,
+        legacy_secrets,
+        write_only_live,
+    })
+}
+
+/// Shared `kind=secret` variables the job delivers: named by the check, in scope for the job's
+/// environment and not shadowed by a check variable.
+async fn delivered_legacy_secrets(
+    conn: &sea_orm::DatabaseConnection,
+    synthetic: &Synthetic,
+    env_id: Option<&str>,
+    rows: Option<&[SyntheticsVariableRecord]>,
+) -> anyhow::Result<Vec<String>> {
+    let listed;
+    let rows = match rows {
+        Some(rows) => rows,
+        None => {
+            listed = variable_table::list_cached(conn, &synthetic.org_id)
+                .await
+                .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+            listed.as_slice()
+        }
+    };
+    let global = synthetics_environments::global_environment_id(&synthetic.org_id);
+    let named = placeholder_names(&crate::service::variables::check_placeholder_text(
+        synthetic,
+    ));
+    let mut names: Vec<String> = rows
+        .iter()
+        .filter(|row| row.kind == "secret" && named.contains(&row.name))
+        .filter(|row| row.env == global || env_id == Some(row.env.as_str()))
+        .filter(|row| !synthetic.variables.iter().any(|v| v.name == row.name))
+        .map(|row| row.name.clone())
+        .collect();
+    names.sort_unstable();
+    names.dedup();
+    Ok(names)
+}
+
+/// The org's shared variables read past the cache when the check carries a store ref; `read`
+/// is kept when already taken.
+async fn fresh_rows_for_store_refs(
+    conn: &sea_orm::DatabaseConnection,
+    org_id: &str,
+    synthetic: &Synthetic,
+    read: Option<Vec<SyntheticsVariableRecord>>,
+) -> anyhow::Result<Option<Vec<SyntheticsVariableRecord>>> {
+    if read.is_some() {
+        return Ok(read);
+    }
+    let text = serde_json::to_string(synthetic)?;
+    if !has_secret_ref(&text) {
+        return Ok(None);
+    }
+    #[cfg(test)]
+    cost::hit(org_id, "org_variables_read");
+    Ok(Some(
+        variable_table::list(conn, org_id)
+            .await
+            .map_err(|e| anyhow::anyhow!(e.to_string()))?,
+    ))
+}
+
+/// Swaps every bound `{{secrets.X}}` for its value through the resolver's checks 0-7, so the
+/// runner never sees ref text; refusals carry only the code. Returns the runner's `allowed_hosts`.
+async fn deliver_store_refs(
+    conn: &sea_orm::DatabaseConnection,
+    job: &job_entity::Model,
+    synthetic: &mut Synthetic,
+    dek: Option<&[u8]>,
+    env_inject: &mut HashMap<String, String>,
+    shared_rows: Option<&[SyntheticsVariableRecord]>,
+) -> anyhow::Result<StoreDelivery> {
+    let check_id = synthetic.id.clone();
+    let refused = |code: SecretErrorCode| {
+        anyhow::Error::new(ConfigError {
+            status_reason: secret_error_reason(code),
+            message: format!("check '{check_id}': {code}"),
+            guard_failure: false,
+        })
+    };
+    let resolution = store_resolution(conn, job, synthetic, dek, env_inject, shared_rows)
+        .await?
+        .map_err(refused)?;
+    let mut allowed = Vec::new();
+    let mut secret_ids = Vec::new();
+    let mut values = None;
+    if let Some((snapshot, resolved)) = resolution {
+        let target = with_default_scheme(&substitute_placeholders(&synthetic.target, env_inject));
+        let bound = resolved.bound_policies();
+        secret_ids = bound.iter().map(|row| row.id.clone()).collect();
+        let pins = carried_pins(bound).map_err(refused)?;
+        allowed = allowed_hosts(&pins, &target).map_err(refused)?;
+        if synthetic.check_type == SyntheticType::Http
+            && let Some(config) = synthetic.config.as_object_mut()
+        {
+            config.insert("follow_redirects".into(), false.into());
+        }
+        let mut slots = Zeroizing::new(Vec::with_capacity(snapshot.slot_pointers.len()));
+        for field in &snapshot.slot_pointers {
+            let text = snapshot
+                .stored
+                .pointer(field)
+                .and_then(serde_json::Value::as_str)
+                .ok_or_else(|| refused(SecretErrorCode::SecretUnbound))?;
+            let value = resolved.substitute_slot(field, text).map_err(refused)?;
+            place_slot_value(synthetic, env_inject, field, &value).map_err(refused)?;
+            slots.push(value.as_str().to_owned());
+        }
+        values = Some(StoreValues {
+            slots,
+            redactor: resolved.redactor,
+        });
+    }
+    // Ref text that reached no slot above must never travel to the runner as a literal.
+    let leftover = env_inject.values().any(|v| has_secret_ref(v))
+        || has_secret_ref(&synthetic.target)
+        || has_secret_ref(&synthetic.config.to_string());
+    if leftover {
+        return Err(refused(SecretErrorCode::SecretUnbound));
+    }
+    Ok(StoreDelivery {
+        allowed_hosts: allowed,
+        secret_ids,
+        values,
+    })
+}
+
+/// Runs the resolver over the signed save form; the outer error is infrastructure, the inner one
+/// a store refusal. None when the check carries no store ref.
+async fn store_resolution(
+    conn: &sea_orm::DatabaseConnection,
+    job: &job_entity::Model,
+    synthetic: &Synthetic,
+    dek: Option<&[u8]>,
+    env_inject: &HashMap<String, String>,
+    shared_rows: Option<&[SyntheticsVariableRecord]>,
+) -> anyhow::Result<Result<Option<(resolver::Snapshot, resolver::Resolved)>, SecretErrorCode>> {
+    #[cfg(test)]
+    cost::hit(&synthetic.org_id, "store_resolution");
+    let form = save_form(synthetic, dek)?;
+    let global = synthetics_environments::global_environment_id(&synthetic.org_id);
+    let org_scoped = job.env.as_deref().is_none_or(|env| env == global);
+    let attempt = resolver::SyntheticsJob {
+        env_incarnation: if org_scoped {
+            None
+        } else {
+            job.env_incarnation.clone()
+        },
+        leased_by_agent: job.lease_issuer.as_deref() == Some(LeaseIssuer::Agent.as_str()),
+    };
+    let snapshot = match crate::service::checks::resolver_snapshot(
+        conn,
+        &form,
+        job.env.as_deref(),
+        attempt,
+        env_inject,
+        shared_rows,
+    )
+    .await
+    {
+        Ok(Some(snapshot)) => snapshot,
+        Ok(None) => return Ok(Ok(None)),
+        Err(code) => return Ok(Err(code)),
+    };
+    Ok(resolver::resolve(conn, &snapshot)
+        .await
+        .map(|resolved| Some((snapshot, resolved))))
+}
+
+/// Host lists of the bound secrets with `pin_mode = hosts`; `any` and `legacy` add no constraint.
+fn carried_pins(rows: &[org_secrets::Model]) -> Result<Vec<Vec<PinPattern>>, SecretErrorCode> {
+    rows.iter()
+        .filter(|row| row.kind == "secret" && row.pin_mode == org_secrets::PinMode::Hosts)
+        .map(|row| {
+            row.allowed_hosts
+                .lines()
+                .map(PinPattern::parse)
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(|_| SecretErrorCode::PinMismatch)
+        })
+        .collect()
+}
+
+/// The intersection of the carried host lists as https origins, else the target's origin; never
+/// empty, since an empty list would read as "no limit" (R8-02, R9-16, R13-02).
+pub(crate) fn allowed_hosts(
+    pins: &[Vec<PinPattern>],
+    target: &str,
+) -> Result<Vec<String>, SecretErrorCode> {
+    if pins.is_empty() {
+        let url = reqwest::Url::parse(target).map_err(|_| SecretErrorCode::InsecureTransport)?;
+        let (Some(host), Some(port)) = (url.host_str(), url.port_or_known_default()) else {
+            return Err(SecretErrorCode::InsecureTransport);
+        };
+        if url.scheme() != "https" {
+            return Err(SecretErrorCode::InsecureTransport);
+        }
+        return Ok(vec![format!("https://{host}:{port}")]);
+    }
+    let inside_all = |candidate: &PinPattern| {
+        pins.iter()
+            .all(|list| list.iter().any(|pin| pin.covers(candidate)))
+    };
+    let common: Vec<&PinPattern> = pins.iter().flatten().filter(|p| inside_all(p)).collect();
+    let mut origins: Vec<String> = common
+        .iter()
+        .filter(|p| !common.iter().any(|q| q != *p && q.covers(p)))
+        .map(ToString::to_string)
+        .collect();
+    origins.sort();
+    origins.dedup();
+    if origins.is_empty() {
+        return Err(SecretErrorCode::PinMismatch);
+    }
+    Ok(origins)
+}
+
+/// The expanded snapshot as the save signed it: inline credentials in plaintext.
+fn save_form(synthetic: &Synthetic, dek: Option<&[u8]>) -> anyhow::Result<Synthetic> {
+    let mut form = synthetic.clone();
+    let Some(dek) = dek else {
+        return Ok(form);
+    };
+    let open = |value: &mut String| -> anyhow::Result<()> {
+        if !value.is_empty() {
+            *value = crate::service::decrypt_secret(dek, value)?;
+        }
+        Ok(())
+    };
+    match &mut form.auth {
+        Some(SyntheticAuth::Basic { password, .. }) => open(password)?,
+        Some(SyntheticAuth::Bearer { token }) => open(token)?,
+        _ => {}
+    }
+    for var in &mut form.variables {
+        if var.value.starts_with("AESenc:") {
+            open(&mut var.value)?;
+        }
+    }
+    for cookie in &mut form.cookies {
+        open(&mut cookie.value)?;
+    }
+    Ok(form)
+}
+
+/// Writes a substituted slot where the runner reads it; a ref cookie is forced `Secure`.
+fn place_slot_value(
+    synthetic: &mut Synthetic,
+    env_inject: &mut HashMap<String, String>,
+    field: &str,
+    value: &str,
+) -> Result<(), SecretErrorCode> {
+    let unbound = SecretErrorCode::SecretUnbound;
+    let path: Vec<_> = field.split('/').skip(1).collect();
+    match path.as_slice() {
+        ["auth", "password"] => {
+            env_inject.insert("_AUTH_PASSWORD".into(), value.to_owned());
+        }
+        ["auth", "token"] => {
+            env_inject.insert("_AUTH_TOKEN".into(), value.to_owned());
+        }
+        ["cookies", index, "value"] => {
+            let index: usize = index.parse().map_err(|_| unbound)?;
+            let raw = env_inject.get("_AUTH_COOKIES").ok_or(unbound)?;
+            let mut cookies: Vec<serde_json::Value> =
+                serde_json::from_str(raw).map_err(|_| unbound)?;
+            let cookie = cookies.get_mut(index).ok_or(unbound)?;
+            cookie["value"] = value.into();
+            cookie["secure"] = true.into();
+            let raw = serde_json::to_string(&cookies).map_err(|_| unbound)?;
+            env_inject.insert("_AUTH_COOKIES".into(), raw);
+        }
+        ["config", ..] => {
+            let slot = synthetic
+                .config
+                .pointer_mut(&field["/config".len()..])
+                .ok_or(unbound)?;
+            if !slot.is_string() {
+                return Err(unbound);
+            }
+            *slot = value.into();
+        }
+        _ => return Err(SecretErrorCode::RefNotAllowedInField),
+    }
+    Ok(())
+}
+
+/// Run results record a store refusal as `secret_error:{code}`; one leaked string per code.
+fn secret_error_reason(code: SecretErrorCode) -> &'static str {
+    static REASONS: std::sync::LazyLock<std::sync::Mutex<HashMap<SecretErrorCode, &'static str>>> =
+        std::sync::LazyLock::new(Default::default);
+    let mut reasons = REASONS
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    reasons
+        .entry(code)
+        .or_insert_with(|| Box::leak(format!("secret_error:{}", code.as_str()).into_boxed_str()))
+}
+
+fn secret_config_error(code: SecretErrorCode, message: String) -> anyhow::Error {
+    anyhow::Error::new(ConfigError {
+        status_reason: secret_error_reason(code),
+        message,
+        guard_failure: false,
+    })
+}
+
+/// The agent behind an attempt: an agent lease, or a tokenless claim by a registered agent.
+async fn attempt_agent(
+    job: &job_entity::Model,
+) -> anyhow::Result<Option<synthetics_agents::SyntheticsAgentRecord>> {
+    if job.lease_issuer.as_deref() == Some(LeaseIssuer::Dispatcher.as_str()) {
+        return Ok(None);
+    }
+    let Some(agent_id) = job.claimed_by.as_deref() else {
+        return Ok(None);
+    };
+    let agent = synthetics_agents::get_cached(agent_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("agent lookup failed: {e}"))?;
+    Ok(agent.filter(|agent| agent.org_id == job.org_id))
+}
+
+/// The old-runner banner period ends 7 days after the `(tokenless_recorder, _meta)` marker; it
+/// has not started while the marker is missing.
+async fn banner_period_over<C: ConnectionTrait>(conn: &C, now: i64) -> anyhow::Result<bool> {
+    Ok(runner_lease_notice(conn)
+        .await?
+        .is_some_and(|notice| notice.deadline_us <= now))
+}
+
+/// Once write-only values are live, an agent registered with a token minted before the cutover
+/// marker gets no write-only value (D296); nor does a probe presenting such a token for it.
+async fn require_rotated_agent_token<C: ConnectionTrait>(
+    conn: &C,
+    agent: &synthetics_agents::SyntheticsAgentRecord,
+    caller: &JobCaller,
+) -> anyhow::Result<()> {
+    if !crate::service::write_only_live_in(
+        conn,
+        crate::service::store_latched(),
+        crate::service::durably_latched(),
+    )
+    .await?
+    {
+        return Ok(());
+    }
+    let cutover_at = synthetics_probe_tokens::agent_token_cutover_at().await?;
+    let mut tokens = vec![agent.token_id.as_deref()];
+    if let JobCaller::Probe {
+        token_id: Some(id), ..
+    } = caller
+        && agent.token_id.as_deref() != Some(id.as_str())
+    {
+        tokens.push(Some(id.as_str()));
+    }
+    for token in tokens {
+        let created_at = match token {
+            Some(id) => synthetics_probe_tokens::created_at_by_id(&agent.org_id, id).await?,
+            None => None,
+        };
+        if token_rotation_required(created_at, cutover_at) {
+            return Err(secret_config_error(
+                SecretErrorCode::AgentTokenRotationRequired,
+                "This agent's token must be rotated".to_owned(),
+            ));
+        }
+    }
+    Ok(())
+}
+
+/// T07: an inline write-only value may reach only the origins of the expanded check's
+/// requests, all inside the slot origins checked at prepare; redirects stay off.
+fn inline_allowed_hosts(
+    synthetic: &mut Synthetic,
+    env_inject: &HashMap<String, String>,
+) -> Vec<String> {
+    let mut urls = vec![synthetic.target.clone()];
+    match synthetic.check_type {
+        SyntheticType::Http => {}
+        SyntheticType::Browser => urls.extend(
+            synthetic
+                .config
+                .get("steps")
+                .and_then(serde_json::Value::as_array)
+                .into_iter()
+                .flatten()
+                .filter(|step| step["action"] == "navigate")
+                .filter_map(|step| step["url"].as_str().map(str::to_owned)),
+        ),
+        _ => return Vec::new(),
+    }
+    let mut origins = Vec::new();
+    for url in urls {
+        let resolved = with_default_scheme(&substitute_placeholders(&url, env_inject));
+        origins.push(config::meta::synthetics::effective_origin(&resolved));
+    }
+    origins.sort();
+    origins.dedup();
+    if synthetic.check_type == SyntheticType::Http
+        && let Some(config) = synthetic.config.as_object_mut()
+    {
+        config.insert("follow_redirects".into(), false.into());
+    }
+    origins
+}
+
+pub(crate) fn token_rotation_required(
+    token_created_at: Option<i64>,
+    cutover_at: Option<i64>,
+) -> bool {
+    // No recorded or surviving token row cannot prove a token minted after the cutover.
+    match token_created_at {
+        Some(created_at) => synthetics_probe_tokens::is_pre_cutover(created_at, cutover_at),
+        None => cutover_at.is_some(),
+    }
+}
+
+/// Stamps the agent for the old-runner banner, at most hourly; a failure loses one banner entry.
+async fn record_tokenless_resolve<C: ConnectionTrait>(conn: &C, agent_id: &str, now: i64) {
+    use agent_entity::Column;
+    let stale = Column::LastTokenlessCredentialResolveAt
+        .is_null()
+        .or(Column::LastTokenlessCredentialResolveAt.lt(now - TOKENLESS_STAMP_INTERVAL_US));
+    let stamped = agent_entity::Entity::update_many()
+        .col_expr(
+            Column::LastTokenlessCredentialResolveAt,
+            sea_orm::sea_query::Expr::value(now),
+        )
+        .filter(Column::Id.eq(agent_id))
+        .filter(stale)
+        .exec(conn)
+        .await;
+    if let Err(e) = stamped {
+        log::warn!("[synthetics] tokenless resolve stamp agent_id={agent_id}: {e}");
+    }
+}
+
+/// After the banner period, resolve refuses what save refuses: a write-only `{{NAME}}` in a URL.
+async fn refuse_url_placeholders_after_banner(
+    conn: &sea_orm::DatabaseConnection,
+    synthetic: &Synthetic,
+    has_shared_variables: bool,
+    now: i64,
+) -> anyhow::Result<()> {
+    let shared = if has_shared_variables {
+        crate::service::shared_secret_names(conn, &synthetic.org_id).await?
+    } else {
+        Vec::new()
+    };
+    let Err(code) = crate::service::refuse_write_only_url_placeholders(synthetic, &shared) else {
+        return Ok(());
+    };
+    if !banner_period_over(conn, now).await? {
+        return Ok(());
+    }
+    Err(secret_config_error(
+        code,
+        format!("check '{}': {code}", synthetic.id),
+    ))
+}
+
+pub(crate) async fn expand_snapshot_for_save<C: ConnectionTrait>(
+    conn: &C,
+    synthetic: &mut Synthetic,
+) -> anyhow::Result<()> {
+    expand_snapshot_with(conn, synthetic, None, SnapshotPurpose::Save).await?;
+    Ok(())
 }
 
 fn needs_dek(
@@ -1562,10 +3150,128 @@ fn within_replication_grace(parent_updated_at: i64) -> bool {
     config::utils::time::now_micros().saturating_sub(parent_updated_at) < grace_us
 }
 
-/// Splices every referenced child's stored steps into the parent's config, or says why it cannot.
-async fn expand_for_resolve<C: sea_orm::ConnectionTrait>(
+/// Refuses the run before any host is contacted when a write-only slot's origins moved.
+async fn require_slot_origins(org_id: &str, check: &Synthetic, dek: &[u8]) -> anyhow::Result<()> {
+    let origins = crate::service::stored_check_origins(org_id, check, dek).await?;
+    crate::service::slot_origins_allowed_at_resolve(
+        check,
+        dek,
+        &origins,
+        crate::origins_backfill::origins_backfill_done(),
+    )
+    .await
+    .map_err(|code| {
+        anyhow::Error::new(ConfigError {
+            status_reason: REASON_SLOT_ORIGIN_CHANGED,
+            message: format!(
+                "check '{}': {code}; a write-only value must be typed again for its new host",
+                check.id
+            ),
+            guard_failure: false,
+        })
+    })
+}
+
+async fn require_stored_child_slot_origins<C: ConnectionTrait>(
+    conn: &C,
+    parent: &Synthetic,
+    child: &Synthetic,
+    dek: &[u8],
+) -> Result<(), SecretErrorCode> {
+    let mut view = parent.clone();
+    view.environments.clone_from(&child.environments);
+    let origins = crate::service::stored_check_origins(&parent.org_id, &view, dek)
+        .await
+        .map_err(|_| SecretErrorCode::SlotOriginChanged)?;
+    crate::service::slot_origins_allowed_at_resolve(
+        child,
+        dek,
+        &origins,
+        crate::origins_backfill::origins_backfill_done_in(conn),
+    )
+    .await
+}
+
+/// S03: an embedded child's write-only values go only to hosts they were typed for, judged by the
+/// expanded parent's requests under the parent's variables, per child environment.
+pub(crate) async fn require_child_slot_origins(
+    parent: &Synthetic,
+    child: &Synthetic,
+    dek: &[u8],
+) -> Result<(), SecretErrorCode> {
+    let mut view = parent.clone();
+    view.environments.clone_from(&child.environments);
+    let vars = crate::service::load_origin_vars(&parent.org_id, &view, dek)
+        .await
+        .map_err(|_| SecretErrorCode::SlotOriginChanged)?;
+    let origins = crate::service::check_origins(&view, &vars);
+    crate::service::slot_origins_allowed(child, dek, &origins)
+}
+
+/// S03 at parent save: refuses an embedding whose journey would carry a child's write-only value
+/// to a host the value was not typed for.
+pub(crate) async fn refuse_child_host_change<C: ConnectionTrait>(
+    conn: &C,
+    body: &Synthetic,
+) -> anyhow::Result<()> {
+    let mut children = Vec::new();
+    for child_id in child_ids(body) {
+        if let Some(child) = synthetics_checks::get(conn, &body.org_id, &child_id).await?
+            && child.check_type == SyntheticType::Browser
+            && crate::service::carries_write_only(&child)
+        {
+            children.push(child);
+        }
+    }
+    if children.is_empty() {
+        return Ok(());
+    }
+    let dek = crate::service::synthetics_dek(&body.org_id).await?;
+    let write_only_live = crate::service::write_only_live_in(
+        conn,
+        crate::service::store_latched(),
+        crate::service::durably_latched(),
+    )
+    .await?;
+    if !write_only_live {
+        return Ok(());
+    }
+    let mut expanded = body.clone();
+    expand_snapshot_for_save(conn, &mut expanded).await?;
+    for child in &children {
+        require_child_slot_origins(&expanded, child, &dek)
+            .await
+            .map_err(|_| {
+                crate::service::SlotRefusal::new(
+                    SecretErrorCode::SlotValueRequiredOnHostChange,
+                    "subtests",
+                )
+            })?;
+    }
+    Ok(())
+}
+
+/// Splices every referenced child's stored steps, rehydrated, into the parent's config.
+async fn expand_snapshot<C: sea_orm::ConnectionTrait>(
     conn: &C,
     synthetic: &mut config::meta::synthetics::Synthetic,
+    parent_dek: Option<&[u8]>,
+    write_only_live: bool,
+) -> anyhow::Result<Option<ComposedJourney>> {
+    expand_snapshot_with(
+        conn,
+        synthetic,
+        parent_dek,
+        SnapshotPurpose::Resolve { write_only_live },
+    )
+    .await
+}
+
+async fn expand_snapshot_with<C: ConnectionTrait>(
+    conn: &C,
+    synthetic: &mut Synthetic,
+    parent_dek: Option<&[u8]>,
+    purpose: SnapshotPurpose,
 ) -> anyhow::Result<Option<ComposedJourney>> {
     use config::meta::{
         synthetics::{BrowserConfig, is_composition_action},
@@ -1590,12 +3296,33 @@ async fn expand_for_resolve<C: sea_orm::ConnectionTrait>(
     }
     let refs = subtest_refs(&steps);
     let mut children = HashMap::new();
+    let mut write_only_children = Vec::new();
+    let mut org_dek = parent_dek.map(<[u8]>::to_vec);
     for child_id in refs.iter().collect::<std::collections::HashSet<_>>() {
-        if let Some(child) = synthetics_checks::get_cached(conn, &synthetic.org_id, child_id)
-            .await
-            .map_err(|e| anyhow::anyhow!(e.to_string()))?
+        let child = match purpose {
+            SnapshotPurpose::Save => {
+                synthetics_checks::get(conn, &synthetic.org_id, child_id).await
+            }
+            SnapshotPurpose::Resolve { .. } => {
+                synthetics_checks::get_cached(conn, &synthetic.org_id, child_id).await
+            }
+        }?;
+        if let Some(mut child) = child
             && child.check_type == SyntheticType::Browser
         {
+            // Split step values live in `config_secrets`; without this they splice in blank (D231).
+            if crate::service::has_encrypted_config(&mut child) {
+                if org_dek.is_none() {
+                    org_dek = Some(crate::service::synthetics_dek(&synthetic.org_id).await?);
+                }
+                let dek = org_dek.as_deref().unwrap_or_default();
+                if let SnapshotPurpose::Resolve { .. } = purpose
+                    && crate::service::carries_write_only(&child)
+                {
+                    write_only_children.push(child.clone());
+                }
+                crate::service::rehydrate_config_secrets(&mut child, dek)?;
+            }
             // Not `unwrap_or_default`: a 0-step child would silently drop the reference.
             let cfg: BrowserConfig = serde_json::from_value(child.config).map_err(|e| {
                 config::metrics::SYNTHETICS_COMPOSITION_GUARD_FAILURES_TOTAL.inc();
@@ -1632,6 +3359,26 @@ async fn expand_for_resolve<C: sea_orm::ConnectionTrait>(
             anyhow::Error::new(e)
         })?;
     synthetic.config["steps"] = serde_json::Value::Array(expanded);
+    if let SnapshotPurpose::Resolve {
+        write_only_live: true,
+    } = purpose
+    {
+        let dek = org_dek.as_deref().unwrap_or_default();
+        for child in &write_only_children {
+            require_stored_child_slot_origins(conn, synthetic, child, dek)
+                .await
+                .map_err(|code| {
+                    anyhow::Error::new(ConfigError {
+                        status_reason: REASON_SLOT_ORIGIN_CHANGED,
+                        message: format!(
+                            "check '{}': {code}; embedded '{}' must have its write-only value typed again for this journey's hosts",
+                            synthetic.id, child.id
+                        ),
+                        guard_failure: false,
+                    })
+                })?;
+        }
+    }
     Ok(Some(ComposedJourney {
         parent_steps: steps,
         children,
@@ -1992,21 +3739,26 @@ pub(crate) async fn publish_check_status(done: &synthetics_runs::RunFinalized) {
 /// Marks the job complete, increments the run counter, and returns context for
 /// notifications. Returns `run_complete = true` when all jobs in the run have
 /// acked.
-pub async fn ack(req: AckRequest, token_org: &str) -> anyhow::Result<AckResponse> {
+pub async fn ack(req: AckRequest, caller: &JobCaller) -> anyhow::Result<AckResponse> {
+    ack_attempt(req, caller)
+        .await
+        .map(|outcome| outcome.response)
+}
+
+/// Like [`ack`], and says whether the completion changed a row: settlement publishes only then.
+pub async fn ack_attempt(req: AckRequest, caller: &JobCaller) -> anyhow::Result<AckOutcome> {
+    caller.check_job_id(&req.job_id)?;
     let conn = get_orm_client_rw().await;
 
     // Fetch the leased row first for context (location, check_id, org_id).
     let check = synthetics_jobs::get_by_id(conn, &req.job_id)
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?
-        .ok_or_else(|| anyhow::anyhow!("job not found: {}", req.job_id))?;
+        .ok_or(AttemptError::NotFound)?;
 
     // Tenant boundary — same as resolve.
-    if check.org_id != token_org {
-        anyhow::bail!(
-            "forbidden: job {:?} does not belong to this org",
-            req.job_id
-        );
+    if check.org_id != caller.org() {
+        return Err(AttemptError::WrongOrg.into());
     }
 
     // Convert probe status string to SyntheticStatus DB integer.
@@ -2035,16 +3787,24 @@ pub async fn ack(req: AckRequest, token_org: &str) -> anyhow::Result<AckResponse
         .to_string()
     });
 
-    // Mark job complete. `None` means the ack did not apply: the job was no longer
-    // Claimed (a duplicate ack), or it is claimed by a different agent now (a late
-    // ack from a holder the reaper already evicted).
-    let acked = synthetics_jobs::ack_complete(
+    let presented_hash;
+    let proof = match caller {
+        JobCaller::Lease(principal) => CompletionProof::Lease(&principal.lease_sha256),
+        JobCaller::Probe { .. } => {
+            presented_hash = req.lease_token.as_ref().map(PresentedLease::sha256);
+            presented_hash
+                .as_deref()
+                .map_or(CompletionProof::Tokenless, CompletionProof::Lease)
+        }
+    };
+    let acked = complete_attempt(
         conn,
         &req.job_id,
         job_status,
         result_json.as_deref(),
         now_us,
         req.claimed_by.as_deref(),
+        proof,
     )
     .await
     .map_err(|e| anyhow::anyhow!(e.to_string()))?;
@@ -2061,7 +3821,10 @@ pub async fn ack(req: AckRequest, token_org: &str) -> anyhow::Result<AckResponse
             claimed_by = req.claimed_by.as_deref().unwrap_or("<not sent>"),
             "[synthetics] stale_lease: ack dropped, job is no longer claimed by this agent"
         );
-        return Ok(stale_lease_response(req.job_id, req.trigger_type, check));
+        return Ok(AckOutcome {
+            response: stale_lease_response(req.job_id, req.trigger_type, check),
+            applied: false,
+        });
     }
 
     // A failure waits for one confirm job from the same location before it counts. The confirm
@@ -2224,33 +3987,36 @@ pub async fn ack(req: AckRequest, token_org: &str) -> anyhow::Result<AckResponse
         Vec::new()
     };
 
-    Ok(AckResponse {
-        run_complete,
-        run_status,
-        job_count,
-        org_id: check.org_id,
-        job_id: req.job_id,
-        run_id: check.run_id,
-        synthetics_id: check.synthetics_id,
-        synthetics_name: synthetic.name,
-        synthetic_type,
-        target: synthetic.target,
-        destinations: synthetic.destinations,
-        location: check.location,
-        pool: check.pool,
-        trigger_type: req.trigger_type,
-        alert,
-        // Echoed straight back so the notification can name the condition.
-        status_reason: merged.map_or(req.status_reason.clone(), |m| m.1.map(str::to_owned)),
-        consecutive_failures,
-        failing_locations,
-        passing_locations,
-        usage_events,
-        failing_environments,
-        suppressed_by,
-        coverage,
-        gap_notice,
-        template: synthetic.template.clone(),
+    Ok(AckOutcome {
+        response: AckResponse {
+            run_complete,
+            run_status,
+            job_count,
+            org_id: check.org_id,
+            job_id: req.job_id,
+            run_id: check.run_id,
+            synthetics_id: check.synthetics_id,
+            synthetics_name: synthetic.name,
+            synthetic_type,
+            target: synthetic.target,
+            destinations: synthetic.destinations,
+            location: check.location,
+            pool: check.pool,
+            trigger_type: req.trigger_type,
+            alert,
+            // Echoed straight back so the notification can name the condition.
+            status_reason: merged.map_or(req.status_reason.clone(), |m| m.1.map(str::to_owned)),
+            consecutive_failures,
+            failing_locations,
+            passing_locations,
+            usage_events,
+            failing_environments,
+            suppressed_by,
+            coverage,
+            gap_notice,
+            template: synthetic.template.clone(),
+        },
+        applied: true,
     })
 }
 
@@ -2542,10 +4308,526 @@ async fn resolve_alert<C: sea_orm::ConnectionTrait>(
 
 #[cfg(test)]
 mod tests {
+    mod attempt_binding {
+        use infra::table::entity::synthetics_jobs::{ActiveModel, Entity};
+        use sea_orm::{
+            ActiveModelTrait, ConnectOptions, ConnectionTrait, Database, DatabaseConnection,
+            Schema, Set,
+        };
+
+        use super::*;
+
+        const NOW: i64 = 200;
+        const BROWSER_DEVICES: &str =
+            r#"[{"execution_id":"E","engine":"chromium","device":"desktop"}]"#;
+
+        #[test]
+        fn attempt_authorization_never_reads_a_replica() {
+            let source = include_str!("job_api.rs");
+            for signature in [
+                "\npub async fn artifact_urls(",
+                "\npub async fn resolve(",
+                "\npub(crate) async fn bind_attempt<",
+                "\npub async fn authorize_upload(",
+            ] {
+                let (_, function) = source.split_once(signature).expect(signature);
+                let (body, _) = function.split_once("\n}").expect(signature);
+                assert!(!body.contains("get_orm_client_ro"), "{signature}");
+            }
+        }
+
+        async fn jobs_db() -> DatabaseConnection {
+            let mut options = ConnectOptions::new("sqlite::memory:");
+            options.max_connections(1);
+            let db = Database::connect(options).await.unwrap();
+            let backend = db.get_database_backend();
+            let schema = Schema::new(backend);
+            for table in [
+                schema.create_table_from_entity(Entity),
+                schema.create_table_from_entity(infra::table::entity::synthetics_checks::Entity),
+                schema.create_table_from_entity(infra::table::entity::secret_refs::Entity),
+                schema.create_table_from_entity(infra::table::entity::secret_dependencies::Entity),
+            ] {
+                db.execute(backend.build(&table)).await.unwrap();
+            }
+            db
+        }
+
+        async fn insert_job(db: &DatabaseConnection, hash: Option<String>) -> ActiveModel {
+            ActiveModel {
+                id: Set("job".into()),
+                synthetics_id: Set("check".into()),
+                synthetics_name: Set("check".into()),
+                org_id: Set("org".into()),
+                location: Set("test".into()),
+                pool: Set("pool".into()),
+                scheduled_ts: Set(NOW - 1),
+                valid_until: Set(NOW + 100),
+                status: Set(1),
+                lease_expires_at: Set(Some(NOW + 1)),
+                dispatch_attempts: Set(2),
+                run_id: Set("run".into()),
+                steps_configured: Set(1),
+                metadata: Set("{}".into()),
+                lease_token_sha256: Set(hash),
+                ..Default::default()
+            }
+            .insert(db)
+            .await
+            .unwrap()
+            .into()
+        }
+
+        fn principal(token: &PresentedLease) -> LeasePrincipal {
+            LeasePrincipal {
+                org: "org".into(),
+                job_id: "job".into(),
+                attempt: 2,
+                lease_sha256: token.sha256(),
+            }
+        }
+
+        #[test]
+        fn upload_expiration_accounts_for_time_spent_signing() {
+            let end = Some(5_000_000);
+            let first = upload_ttl(end, 0, 0).unwrap();
+            assert_eq!(first, Duration::from_secs(5));
+            assert!(first > upload_ttl(end, 2_000_000, 0).unwrap());
+            let retry = upload_ttl(end, 2_000_000, 2_000_000).unwrap();
+            assert_eq!(retry, upload_ttl(end, 4_000_000, 0).unwrap());
+            assert_eq!(upload_ttl(end, 4_000_001, 0), Err(AttemptError::Superseded));
+            assert_eq!(upload_ttl(end, 5_000_000, 0), Err(AttemptError::Superseded));
+            for deadline in [None, Some(3_600_000_000)] {
+                assert_eq!(
+                    upload_ttl(deadline, 0, 0).unwrap(),
+                    Duration::from_secs(1_800)
+                );
+            }
+        }
+
+        #[test]
+        fn artifacts_share_the_jobs_scheduled_date_across_midnight() {
+            let scheduled = 1_704_067_199_999_999;
+            let key = |name| {
+                let prefix = artifact_prefix("org", "check", scheduled, "run", "job", 0);
+                artifact_key(&prefix, 0, name)
+            };
+            let prefix = "synthetics/org/check/2023/12/31/run/job/";
+            assert_eq!(key("before.png"), format!("{prefix}before.png"));
+            assert_eq!(key("after.png"), format!("{prefix}after.png"));
+        }
+
+        #[tokio::test]
+        async fn artifact_leaves_belong_to_the_job_and_retries_keep_their_names() {
+            let db = jobs_db().await;
+            let mut job = insert_job(&db, None).await;
+            job.browser_devices = Set(Some(BROWSER_DEVICES.into()));
+            let mut row = job.update(&db).await.unwrap();
+            let leaf = artifact_leaf(&row, Some("E")).unwrap();
+            let prefix = artifact_prefix(
+                &row.org_id,
+                &row.synthetics_id,
+                row.scheduled_ts,
+                &row.run_id,
+                &leaf,
+                row.dispatch_attempts,
+            );
+            assert_eq!(prefix, "synthetics/org/check/1970/01/01/run/E/d2/");
+            assert_eq!(
+                artifact_key(&prefix, 3, "trace.zip"),
+                format!("{prefix}attempt-3-trace.zip")
+            );
+            for execution in [None, Some("J")] {
+                assert!(matches!(
+                    artifact_leaf(&row, execution),
+                    Err(AttemptError::BadRequest(_))
+                ));
+            }
+            for devices in [None, Some("[]".to_owned())] {
+                row.browser_devices = devices;
+                assert_eq!(artifact_leaf(&row, None).unwrap(), "job");
+                assert_eq!(artifact_leaf(&row, Some("job")).unwrap(), "job");
+                assert!(matches!(
+                    artifact_leaf(&row, Some("E")),
+                    Err(AttemptError::BadRequest(_))
+                ));
+            }
+        }
+
+        #[tokio::test]
+        async fn completion_matches_only_the_live_dispatcher_attempt_once() {
+            let db = jobs_db().await;
+            let previous = token_sha256("previous");
+            let current = token_sha256("current");
+            let mut job = insert_job(&db, Some(current.clone())).await;
+            job.claimed_by = Set(Some("dispatcher-node".into()));
+            job.lease_issuer = Set(Some("dispatcher".into()));
+            job.update(&db).await.unwrap();
+
+            let complete =
+                |now, owner, proof| complete_attempt(&db, "job", 3, Some("{}"), now, owner, proof);
+            let owner = Some("dispatcher-node");
+            for (now, claimed_by, proof) in [
+                (NOW, owner, CompletionProof::Lease(&previous)),
+                (NOW, owner, CompletionProof::Tokenless),
+                (NOW + 1, owner, CompletionProof::Lease(&current)),
+                (NOW, Some("other-node"), CompletionProof::Lease(&current)),
+            ] {
+                assert_eq!(complete(now, claimed_by, proof).await.unwrap(), None);
+            }
+            assert_eq!(
+                complete(NOW, owner, CompletionProof::Lease(&current))
+                    .await
+                    .unwrap()
+                    .as_deref(),
+                Some("run")
+            );
+            assert_eq!(
+                complete(NOW, owner, CompletionProof::Lease(&current))
+                    .await
+                    .unwrap(),
+                None
+            );
+            let row = Entity::find_by_id("job").one(&db).await.unwrap().unwrap();
+            assert_eq!(row.status, 3);
+            assert_eq!(row.result.as_deref(), Some("{}"));
+            assert_eq!(row.completed_at, Some(NOW));
+            assert_eq!(row.lease_token_sha256, Some(current));
+        }
+
+        #[tokio::test]
+        async fn tokenless_completion_accepts_a_legacy_claim() {
+            let db = jobs_db().await;
+            insert_job(&db, None).await;
+            let run = complete_attempt(&db, "job", 4, None, NOW, None, CompletionProof::Tokenless)
+                .await
+                .unwrap();
+            assert_eq!(run.as_deref(), Some("run"));
+        }
+
+        /// F08: removing a check's credential mid-lease does not reopen uploads for an attempt
+        /// that was handed values.
+        #[tokio::test]
+        async fn a_credentialed_attempt_stays_capture_off_after_an_edit() {
+            let db = jobs_db().await;
+            let token = PresentedLease::new("current".into());
+            let mut job = insert_job(&db, Some(token.sha256())).await;
+            job.metadata = Set(serde_json::json!({ DELIVERY_MARKER_KEY: "f" }).to_string());
+            job.update(&db).await.unwrap();
+            let lease = JobCaller::Lease(principal(&token));
+            let key = "synthetics/org/check/1970/01/01/run/job/file";
+            assert_eq!(
+                authorize_upload_in(&db, &lease, None, key, NOW).await,
+                Err(AttemptError::CaptureOff)
+            );
+        }
+
+        fn superseded(result: anyhow::Result<()>) -> bool {
+            result
+                .unwrap_err()
+                .downcast_ref::<AttemptError>()
+                .is_some_and(|e| *e == AttemptError::Superseded)
+        }
+
+        async fn marker_of(db: &DatabaseConnection) -> Option<String> {
+            let row = Entity::find_by_id("job").one(db).await.unwrap().unwrap();
+            stamped_delivery_marker(&row)
+        }
+
+        /// N04: a lease that expired or moved on while the resolve worked releases nothing.
+        #[tokio::test]
+        async fn a_resolve_seals_only_an_attempt_still_live_under_its_lease() {
+            let db = jobs_db().await;
+            let token = PresentedLease::new("current".into());
+            let mut job = insert_job(&db, Some(token.sha256())).await;
+            let lease = JobCaller::Lease(principal(&token));
+            let bound = bind_attempt(&db, &lease, None, "job", NOW, Tokenless::Allow)
+                .await
+                .unwrap();
+            assert!(superseded(
+                seal_delivery(&db, &bound, Some("f"), || NOW + 1).await
+            ));
+            assert!(superseded(
+                seal_delivery(&db, &bound, None, || NOW + 1).await
+            ));
+            assert_eq!(marker_of(&db).await, None);
+
+            seal_delivery(&db, &bound, Some("f"), || NOW).await.unwrap();
+            assert_eq!(marker_of(&db).await.as_deref(), Some("f"));
+
+            job.dispatch_attempts = Set(3);
+            job.update(&db).await.unwrap();
+            assert!(superseded(
+                seal_delivery(&db, &bound, Some("f"), || NOW).await
+            ));
+            assert!(superseded(seal_delivery(&db, &bound, None, || NOW).await));
+        }
+
+        /// N04: a lease that expires while the marker write waits releases nothing.
+        #[tokio::test]
+        async fn a_lease_that_expires_during_the_seal_releases_nothing() {
+            use std::sync::atomic::{AtomicI64, Ordering};
+
+            let db = jobs_db().await;
+            let token = PresentedLease::new("current".into());
+            insert_job(&db, Some(token.sha256())).await;
+            let lease = JobCaller::Lease(principal(&token));
+            let bound = bind_attempt(&db, &lease, None, "job", NOW, Tokenless::Allow)
+                .await
+                .unwrap();
+            for marker in [Some("f"), None] {
+                let ticks = AtomicI64::new(NOW);
+                let clock = || ticks.fetch_add(1, Ordering::Relaxed);
+                assert!(superseded(seal_delivery(&db, &bound, marker, clock).await));
+            }
+        }
+
+        /// T02: a second resolve of one attempt that sent other values cannot narrow the marker.
+        #[tokio::test]
+        async fn a_second_resolve_with_other_values_marks_the_attempt_unverifiable() {
+            let db = jobs_db().await;
+            let token = PresentedLease::new("current".into());
+            insert_job(&db, Some(token.sha256())).await;
+            let lease = JobCaller::Lease(principal(&token));
+            let bound = bind_attempt(&db, &lease, None, "job", NOW, Tokenless::Allow)
+                .await
+                .unwrap();
+            for (marker, stamped) in [("a", "a"), ("a", "a"), ("b", UNVERIFIABLE_DELIVERY)] {
+                seal_delivery(&db, &bound, Some(marker), || NOW)
+                    .await
+                    .unwrap();
+                assert_eq!(marker_of(&db).await.as_deref(), Some(stamped));
+            }
+            seal_delivery(&db, &bound, Some("a"), || NOW).await.unwrap();
+            assert_eq!(marker_of(&db).await.as_deref(), Some(UNVERIFIABLE_DELIVERY));
+        }
+
+        #[tokio::test]
+        async fn leased_upload_matches_only_its_execution_attempt_and_filename() {
+            let db = jobs_db().await;
+            let token = PresentedLease::new("current".into());
+            let mut job = insert_job(&db, Some(token.sha256())).await;
+            job.browser_devices = Set(Some(BROWSER_DEVICES.into()));
+            job.update(&db).await.unwrap();
+            let lease = JobCaller::Lease(principal(&token));
+            let probe = JobCaller::Probe {
+                org: "org".into(),
+                token_id: None,
+            };
+            let key = "synthetics/org/check/1970/01/01/run/E/d2/file";
+            for (caller, presented) in [(&lease, None), (&probe, Some(&token))] {
+                assert_eq!(
+                    authorize_upload_in(&db, caller, presented, key, NOW).await,
+                    Ok(())
+                );
+            }
+            for wrong in [
+                key.replace("/d2/", "/d1/"),
+                key.replace("/d2/", "/"),
+                key.replace("/01/01/", "/01/02/"),
+                key.trim_end_matches("file").to_owned(),
+                key.replace("file", "nested/file"),
+            ] {
+                assert_eq!(
+                    authorize_upload_in(&db, &lease, None, &wrong, NOW).await,
+                    Err(AttemptError::KeyOutsideAttempt)
+                );
+            }
+            for missing in [
+                key.replace("/E/", "/J/"),
+                key.replace("/run/", "/elsewhere/"),
+            ] {
+                assert_eq!(
+                    authorize_upload_in(&db, &lease, None, &missing, NOW).await,
+                    Err(AttemptError::NotFound)
+                );
+            }
+            for malformed in [
+                key.replace("file", "../file"),
+                key.replace("file", "a//file"),
+                key.replace("file", "a\\file"),
+                key.replace("/org/", "/other/"),
+            ] {
+                assert!(matches!(
+                    authorize_upload_in(&db, &probe, Some(&token), &malformed, NOW).await,
+                    Err(AttemptError::BadRequest(_))
+                ));
+            }
+        }
+
+        #[tokio::test]
+        async fn tokenless_upload_requires_a_legacy_claim_even_after_completion() {
+            let db = jobs_db().await;
+            let mut job = insert_job(&db, Some(token_sha256("current"))).await;
+            let probe = JobCaller::Probe {
+                org: "org".into(),
+                token_id: None,
+            };
+            let key = "synthetics/org/check/1970/01/01/run/job/file";
+            let upload = || authorize_upload_in(&db, &probe, None, key, NOW);
+            assert_eq!(upload().await, Err(AttemptError::LeaseRequired));
+            job.status = Set(3);
+            let mut job: ActiveModel = job.update(&db).await.unwrap().into();
+            assert_eq!(upload().await, Err(AttemptError::LeaseRequired));
+            job.lease_token_sha256 = Set(None);
+            job.update(&db).await.unwrap();
+            assert_eq!(upload().await, Ok(()));
+        }
+
+        #[tokio::test]
+        async fn a_secret_bearing_check_takes_no_artifact_uploads() {
+            let db = crate::service::composition::tests::db_with_synthetics_defaults().await;
+            let backend = db.get_database_backend();
+            let table = Schema::new(backend).create_table_from_entity(Entity);
+            db.execute(backend.build(&table)).await.unwrap();
+            let mut job = insert_job(&db, None).await;
+            job.org_id = Set("org-wo".into());
+            job.synthetics_id = Set("check-wo".into());
+            job.update(&db).await.unwrap();
+            let check = Synthetic {
+                id: "check-wo".into(),
+                check_type: SyntheticType::Http,
+                auth: Some(SyntheticAuth::Bearer {
+                    token: "AESenc:stored".into(),
+                }),
+                ..Default::default()
+            };
+            synthetics_checks::insert_row(&db, "org-wo", "check-wo", &check)
+                .await
+                .unwrap();
+            let probe = JobCaller::Probe {
+                org: "org-wo".into(),
+                token_id: None,
+            };
+            let key = "synthetics/org-wo/check-wo/1970/01/01/run/job/file";
+            assert_eq!(
+                authorize_upload_in(&db, &probe, None, key, NOW).await,
+                Err(AttemptError::CaptureOff)
+            );
+        }
+
+        #[test]
+        fn debug_redacts_lease_credentials() {
+            let token = PresentedLease::new("private-lease-token".into());
+            assert_eq!(format!("{token:?}"), "PresentedLease(..)");
+            let debug = format!("{:?}", principal(&token));
+            assert!(!debug.contains(token.expose()));
+            assert!(!debug.contains(&token.sha256()));
+        }
+
+        #[tokio::test]
+        async fn dispatcher_is_bound_to_one_live_attempt() {
+            let db = jobs_db().await;
+            let token = PresentedLease::new("dispatcher-token".into());
+            let mut row = insert_job(&db, Some(token.sha256())).await;
+            let caller = JobCaller::Lease(principal(&token));
+            let bind = |job, now| bind_attempt(&db, &caller, None, job, now, Tokenless::Allow);
+            let bound = bind("job", NOW).await.unwrap();
+            assert_eq!(bound.row.id, "job");
+            assert_eq!(bound.attempt, 2);
+            assert_eq!(bound.lease_sha256, Some(token.sha256()));
+            assert_eq!(
+                bind("missing", NOW).await.err(),
+                Some(AttemptError::OtherJob)
+            );
+            assert_eq!(
+                bind("job", NOW + 1).await.err(),
+                Some(AttemptError::Superseded)
+            );
+
+            row.dispatch_attempts = Set(3);
+            row.lease_token_sha256 = Set(Some(PresentedLease::new("new-token".into()).sha256()));
+            row.update(&db).await.unwrap();
+            assert_eq!(bind("job", NOW).await.err(), Some(AttemptError::Superseded));
+        }
+
+        #[tokio::test]
+        async fn probe_proof_and_tokenless_policy_follow_the_stored_lease() {
+            let db = jobs_db().await;
+            let token = PresentedLease::new("agent-token".into());
+            let mut row = insert_job(&db, Some(token.sha256())).await;
+            let probe = JobCaller::Probe {
+                org: "org".into(),
+                token_id: None,
+            };
+            let bind = |proof, policy| bind_attempt(&db, &probe, proof, "job", NOW, policy);
+            let valid = bind(Some(&token), Tokenless::RefuseLeased).await.unwrap();
+            assert_eq!(valid.attempt, 2);
+            assert_eq!(valid.lease_sha256, Some(token.sha256()));
+            let wrong = PresentedLease::new("wrong-token".into());
+            assert_eq!(
+                bind(Some(&wrong), Tokenless::Allow).await.err(),
+                Some(AttemptError::Superseded)
+            );
+            let tokenless = bind(None, Tokenless::Allow).await.unwrap();
+            assert_eq!(tokenless.attempt, 2);
+            assert_eq!(tokenless.lease_sha256, None);
+            assert_eq!(
+                bind(None, Tokenless::RefuseLeased).await.err(),
+                Some(AttemptError::LeaseRequired)
+            );
+
+            row.lease_token_sha256 = Set(None);
+            row.update(&db).await.unwrap();
+            assert_eq!(
+                bind(None, Tokenless::RefuseLeased)
+                    .await
+                    .unwrap()
+                    .lease_sha256,
+                None
+            );
+        }
+
+        #[tokio::test]
+        async fn probe_must_own_an_existing_job() {
+            let db = jobs_db().await;
+            insert_job(&db, None).await;
+            let caller = JobCaller::Probe {
+                org: "other".into(),
+                token_id: None,
+            };
+            let bind = |job| bind_attempt(&db, &caller, None, job, NOW, Tokenless::Allow);
+            assert_eq!(bind("job").await.err(), Some(AttemptError::NotFound));
+            assert_eq!(bind("missing").await.err(), Some(AttemptError::NotFound));
+        }
+    }
+
     use config::meta::synthetics::{SyntheticCookie, SyntheticVariable};
 
     use super::*;
     use crate::service::encrypt_secret;
+
+    #[test]
+    fn an_expanded_store_reference_or_secret_dependency_needs_a_lease() {
+        use config::meta::synthetics_composition::ChildJourney;
+        use serde_json::json;
+
+        let mut snapshot = Synthetic {
+            check_type: SyntheticType::Browser,
+            config: json!({"steps": [
+                {"id": "login", "action": "subtest", "subtest": {"id": "child"}}
+            ]}),
+            ..Default::default()
+        };
+        assert!(!needs_lease(&snapshot, false));
+        assert!(needs_lease(&snapshot, true));
+        let child = ChildJourney {
+            id: "child".into(),
+            name: "login".into(),
+            steps: vec![json!({"id": "fill", "action": "fill", "value": "{{secrets.TOKEN}}"})],
+        };
+        let expanded = expand_journey(
+            snapshot.config["steps"].as_array().unwrap(),
+            &HashMap::from([(child.id.clone(), child)]),
+            0,
+            false,
+        )
+        .unwrap();
+        snapshot.config["steps"] = json!(expanded);
+        assert!(needs_lease(&snapshot, false));
+        snapshot.config["steps"][0]["value"] = json!("{{vars.PLAIN}} {{LEGACY}}");
+        assert!(!needs_lease(&snapshot, false));
+    }
 
     /// The minimum an ack has ever had to carry. Everything else on
     /// `AckRequest` is `#[serde(default)]`, which is what makes rollback safe.
@@ -3110,7 +5392,7 @@ mod tests {
             assert_eq!(billed(&events), Some(1.0));
         }
 
-        /// Exactly-once: `ack_complete` returned `None`, so no usage events.
+        /// A stale completion cannot charge a second time for the same job.
         #[test]
         fn t14_a_duplicate_ack_emits_nothing() {
             let resp = stale_lease_response(
@@ -4124,7 +6406,7 @@ mod tests {
         async fn a_plain_journey_resolves_unchanged() {
             let mut synthetic = browser_synthetic(json!(parent(&[], 2)));
             let before = synthetic.config.clone();
-            expand_for_resolve(&empty_db().await, &mut synthetic)
+            expand_snapshot(&empty_db().await, &mut synthetic, None, false)
                 .await
                 .unwrap();
             assert_eq!(synthetic.config, before);
@@ -4146,12 +6428,99 @@ mod tests {
         async fn a_reference_naming_no_child_reaches_the_boundary_check() {
             let mut synthetic =
                 browser_synthetic(json!([nav("s0"), { "id": "r0", "action": "subtest" }]));
-            let err = expand_for_resolve(&empty_db().await, &mut synthetic)
+            let err = expand_snapshot(&empty_db().await, &mut synthetic, None, false)
                 .await
                 .unwrap_err();
             let err = err.downcast_ref::<ConfigError>().expect("a ConfigError");
             assert_eq!(err.status_reason, REASON_CONFIG_REFERENCE_INVALID);
             assert!(err.message.contains("names no check"), "{}", err.message);
+        }
+
+        async fn db_with_split_child(org: &str, child_id: &str) -> sea_orm::DatabaseConnection {
+            let db = crate::service::composition::tests::db_with_synthetics_defaults().await;
+            let child = config::meta::synthetics::Synthetic {
+                id: child_id.into(),
+                org_id: org.into(),
+                check_type: SyntheticType::Browser,
+                config: json!({ "steps": [
+                    nav("c0"),
+                    { "id": "c1", "action": "fill", "locator": "#password", "value": null },
+                ] }),
+                config_secrets: [(
+                    "/steps/1/value".to_string(),
+                    crate::service::encrypt_literal(&super::dek(), "hunter2").unwrap(),
+                )]
+                .into(),
+                ..Default::default()
+            };
+            synthetics_checks::insert_row(&db, org, child_id, &child)
+                .await
+                .unwrap();
+            db
+        }
+
+        fn embedding(org: &str, child_id: &str) -> config::meta::synthetics::Synthetic {
+            let mut parent = browser_synthetic(json!(parent(&[child_id], 1)));
+            parent.org_id = org.into();
+            parent.config["secrets"] = json!([]);
+            parent
+        }
+
+        #[tokio::test]
+        async fn a_split_child_value_is_spliced_in_and_turns_capture_off() {
+            let db = db_with_split_child("org-d231", "child-d231").await;
+            let mut synthetic = embedding("org-d231", "child-d231");
+            assert!(!crate::service::carries_write_only(&synthetic));
+            expand_snapshot(&db, &mut synthetic, Some(&super::dek()), false)
+                .await
+                .unwrap();
+            let steps = synthetic.config["steps"].as_array().unwrap();
+            assert!(steps.iter().any(|s| s["value"] == "hunter2"), "{steps:?}");
+            assert!(crate::service::carries_write_only(&synthetic));
+            crate::service::force_capture_off(&mut synthetic);
+            assert_eq!(synthetic.config["capture"]["trace"], "off");
+        }
+
+        #[tokio::test]
+        async fn a_child_slot_without_origins_fails_closed_after_the_backfill() {
+            let db = db_with_split_child("org-origins", "child-origins").await;
+            let mut synthetic = embedding("org-origins", "child-origins");
+            let err = expand_snapshot(&db, &mut synthetic, Some(&super::dek()), true)
+                .await
+                .unwrap_err();
+            let err = err.downcast_ref::<ConfigError>().expect("a ConfigError");
+            assert_eq!(err.status_reason, REASON_SLOT_ORIGIN_CHANGED);
+            assert!(!err.message.contains("hunter2"));
+        }
+
+        #[tokio::test]
+        async fn artifacts_and_ack_text_follow_a_child_write_only_value() {
+            let db = db_with_split_child("org-art", "child-art").await;
+            let parent = embedding("org-art", "child-art");
+            synthetics_checks::insert_row(&db, "org-art", "parent-art", &parent)
+                .await
+                .unwrap();
+            let mut plain = browser_synthetic(json!([nav("p0")]));
+            plain.config["secrets"] = json!([]);
+            synthetics_checks::insert_row(&db, "org-art", "plain-art", &plain)
+                .await
+                .unwrap();
+            assert_eq!(
+                secret_bearing_in(&db, "org-art", "child-art").await,
+                Ok(true)
+            );
+            assert_eq!(
+                secret_bearing_in(&db, "org-art", "parent-art").await,
+                Ok(true)
+            );
+            assert_eq!(
+                secret_bearing_in(&db, "org-art", "plain-art").await,
+                Ok(false)
+            );
+            assert_eq!(
+                secret_bearing_in(&db, "org-art", "missing").await,
+                Ok(false)
+            );
         }
     }
 }

@@ -233,7 +233,7 @@ pub async fn admit_signed_in_turn(
     let session_id = session_id.as_str();
     let turn_id = match turn_id {
         Some(id) => normalize_uuid(id).ok_or(AdmitError::InvalidSession("Invalid turn id"))?,
-        None => config::ider::uuid(),
+        None => config::ider::ksuid(),
     };
     let owner = resolve_owner(user_email).await?;
     // Another user's or a deleted chat is refused before anything is created or locked.
@@ -549,8 +549,8 @@ mod tests {
             "adm_{}",
             infra::table::rca_runs::new_run_id().to_lowercase()
         );
-        let session_id = config::ider::uuid();
-        let turn_id = config::ider::uuid();
+        let session_id = config::ider::ksuid();
+        let turn_id = config::ider::ksuid();
         let turn = NewTurn {
             org_id: &org_id,
             session_id: &session_id,
@@ -579,7 +579,7 @@ mod tests {
             "adm_{}",
             infra::table::rca_runs::new_run_id().to_lowercase()
         );
-        let session_id = config::ider::uuid();
+        let session_id = config::ider::ksuid();
         let turn = |turn_id: &'static str, agent, handoff_from, agent_chosen| NewTurn {
             org_id: "",
             session_id: "",

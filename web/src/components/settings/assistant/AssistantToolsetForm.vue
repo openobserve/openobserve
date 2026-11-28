@@ -123,7 +123,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('aiToolset.timeoutSeconds')"
           data-test="ai-toolset-mcp-timeout"
         />
-        <AssistantToolsetSecretRows :form="form" :rows="headers" />
+        <AssistantToolsetSecretRows
+          :form="form"
+          :rows="headers"
+          :picker-shown="pickerShown"
+          :consumer-id="editId ?? ''"
+        />
         <div
           v-if="writeHeadersOn"
           class="flex flex-col gap-2"
@@ -139,11 +144,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <AssistantToolsetSecretRows
             :form="form"
             :rows="writeHeaders"
+            :picker-shown="pickerShown"
+            :consumer-id="editId ?? ''"
             field="writeHeaders"
             :legend="t('autoresolve.connection.writeCredential')"
             :add-label="t('autoresolve.connection.addWriteHeader')"
             test-id="ai-toolset-write-header"
           />
+        </div>
+        <div
+          v-if="pickerShown"
+          class="border-border-default rounded-default flex flex-col gap-1 border p-3"
+          data-test="ai-toolset-automation"
+        >
+          <OFormSwitch
+            name="automation_allowed"
+            :label="t('aiToolset.secrets.automationLabel')"
+            :disabled="automationMissing.length > 0"
+            data-test="ai-toolset-automation-switch"
+          />
+          <span
+            v-if="automationMissing.length"
+            class="text-text-secondary text-xs"
+            data-test="ai-toolset-automation-locked"
+          >
+            {{
+              t("aiToolset.secrets.automationNeedsManage", { names: automationMissing.join(", ") })
+            }}
+          </span>
+          <span v-else class="text-text-secondary text-xs">
+            {{ t("aiToolset.secrets.automationAudit", { event: raw("secret.export") }) }}
+          </span>
         </div>
       </template>
 
@@ -217,11 +248,14 @@ import { setServerFieldErrors, useOForm } from "@/lib/forms/Form/useOForm";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
+import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
 import {
   createToolsetMutation,
   toolsetQuery,
   updateToolsetMutation,
 } from "@/services/assistant_settings.queries";
+import { secretPickerQuery } from "@/services/secrets.queries";
+import { useSecretPickerShown } from "@/views/Secrets/useSecretConsumer";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 
 import {
@@ -238,6 +272,7 @@ import {
 } from "./AssistantToolsetForm.schema";
 import AssistantToolsetSecretRows from "./AssistantToolsetSecretRows.vue";
 import { agentNameOf, type ToolsetRow } from "./assistantToolsets";
+import { missingManage } from "./assistantToolsetSecrets";
 import { useAssistantSettingsPage } from "./useAssistantSettingsPage";
 
 const REENTER_COPY: Record<ReenterReason | "refused", I18nKey> = {
@@ -269,6 +304,13 @@ const isEdit = props.mode === "edit" || !!props.editId;
 
 const record = useQuery(
   computed(() => ({ ...toolsetQuery(org, props.editId ?? ""), enabled: !!props.editId })),
+);
+const pickerShown = useSecretPickerShown();
+const usableSecrets = useQuery(
+  computed(() => ({
+    ...secretPickerQuery(org, "ai_toolset", props.editId ?? ""),
+    enabled: pickerShown.value && !!org,
+  })),
 );
 const create = useMutation(() => createToolsetMutation(org));
 const update = useMutation(() => updateToolsetMutation(org));
@@ -306,6 +348,27 @@ const typedName = form.useStore((s) => s.values.name);
 const submitted = form.useStore((s) => s.submissionAttempts > 0);
 const dirty = form.useStore((s) => s.isDirty);
 
+const automationMissing = computed(() => {
+  if (!pickerShown.value || kind.value !== "mcp") return [];
+  const saved = record.data.value as
+    | { data?: { headers?: Record<string, unknown>; write_header_refs?: Record<string, unknown> } }
+    | undefined;
+  const headerValues = [
+    ...headers.value.map((row) => {
+      const value =
+        row.state === "unchanged" ? saved?.data?.headers?.[row.stored ?? row.key] : row.value;
+      return typeof value === "string" ? value : undefined;
+    }),
+    ...writeHeaders.value.map((row) => {
+      const value =
+        row.state === "unchanged"
+          ? saved?.data?.write_header_refs?.[row.stored ?? row.key]
+          : row.value;
+      return typeof value === "string" ? value : undefined;
+    }),
+  ];
+  return missingManage(headerValues, usableSecrets.data.value ?? []);
+});
 const agentName = computed(() => (typedName.value ? agentNameOf(typedName.value) : ""));
 const store = useStore();
 // AutoResolve runs an approved change through the MCP with this credential (enterprise, feature on).
@@ -388,14 +451,23 @@ async function save(values: ToolsetFormValues) {
     return;
   }
   const data = toolsetDataOf(values, props.mergeSecrets, writeHeadersOn.value);
+  const automation = pickerShown.value
+    ? { automation_allowed: values.automation_allowed === true }
+    : {};
   try {
     if (props.editId) {
-      const body = { description: values.description, data };
+      const body = { description: values.description, data, ...automation };
       await update.mutateAsync({ id: props.editId, body });
       toast({ variant: "success", message: t("assistant.toolsets.form.updated") });
     } else {
       const description = values.description || undefined;
-      await create.mutateAsync({ name: values.name, kind: values.kind, description, data });
+      await create.mutateAsync({
+        name: values.name,
+        kind: values.kind,
+        description,
+        data,
+        ...automation,
+      });
       toast({ variant: "success", message: t("assistant.toolsets.form.added") });
     }
     form.reset(values);

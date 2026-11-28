@@ -301,12 +301,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           tabindex="0"
                         />
                       </div>
-                      <div class="w-5/12">
+                      <div class="flex w-5/12 flex-nowrap items-start gap-1">
                         <OFormInput
+                          class="min-w-0 flex-1"
                           :data-test="`add-destination-header-${header['key']}-value-input`"
                           :name="`headers[${index}].value`"
                           :placeholder="t('alert_destinations.api_header_value')"
                           tabindex="0"
+                        />
+                        <SecretPicker
+                          v-if="secretPickerShown"
+                          consumer-type="pipeline_destination"
+                          :consumer-id="destination?.name ?? ''"
+                          :data-test="`pipeline-destination-header-${index}-secret-picker`"
+                          @pick="(item: SecretPickerItem) => pickSecretIntoHeader(index, item)"
                         />
                       </div>
                       <div class="headers-btns w-1/6">
@@ -384,6 +392,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
+      <div
+        v-if="step !== 1 && (secretConsumer.toBind.value.length || secretConsumer.refusal.value)"
+        class="flex flex-col gap-3"
+        :class="fill ? 'shrink-0 px-4' : 'mt-4'"
+      >
+        <SecretBindBox
+          v-if="secretConsumer.toBind.value.length"
+          v-model:pins="secretConsumer.pins.value"
+          v-model:allow="secretConsumer.allow.value"
+          :items="secretConsumer.toBind.value"
+        />
+        <SecretSaveRefusal
+          v-if="secretConsumer.refusal.value"
+          :refusal="secretConsumer.refusal.value"
+        />
+      </div>
       <OSaveBar
         v-if="step === 1"
         mode="create"
@@ -424,7 +448,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts" setup>
 import { saveDestinationMutation } from "@/services/alert_destination.queries";
 import { useOrgId } from "@/composables/query/useOrgId";
-import { useMutation } from "@tanstack/vue-query";
+import { useMutation, useQuery } from "@tanstack/vue-query";
+import config from "@/aws-exports";
+import SecretPicker from "@/views/Secrets/SecretPicker.vue";
+import SecretBindBox from "@/views/Secrets/SecretBindBox.vue";
+import SecretSaveRefusal from "@/views/Secrets/SecretSaveRefusal.vue";
+import { refusalFrom, useSecretConsumer } from "@/views/Secrets/useSecretConsumer";
+import type { SecretPickerItem } from "@/services/secrets";
+import { secretStoreStatusQuery } from "@/services/secrets.queries";
 import { ref, computed, watch } from "vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
@@ -689,6 +720,27 @@ const openobserveStream = form.useStore((s: any) => s.values.stream);
 // template v-for + the exposed test surface. Reading via form.useStore tracks
 // every add/remove/edit (a bare `form.state.values` read would NOT re-render).
 const apiHeaders = form.useStore((s: any) => (s.values.headers ?? []) as HeaderRow[]);
+
+// The picker only appears once every node can bind refs, so a bind it offers can succeed.
+const secretStatus = useQuery(() =>
+  Object.assign(secretStoreStatusQuery(orgIdForWrites.value), {
+    enabled: !!orgIdForWrites.value && config.isEnterprise == "true",
+  }),
+);
+const secretPickerShown = computed(() => secretStatus.data.value?.store_ready === true);
+const secretConsumer = useSecretConsumer(
+  orgIdForWrites,
+  computed(() => "pipeline_destination" as const),
+  computed(() => [formUrl.value, ...apiHeaders.value.map((h) => h.value)]),
+  formUrl,
+);
+const pickSecretIntoHeader = (index: number, item: SecretPickerItem) => {
+  form.setFieldValue(
+    `headers[${index}].value` as never,
+    secretConsumer.insert(apiHeaders.value[index]?.value, item) as never,
+  );
+  secretConsumer.refusal.value = null;
+};
 
 // ── Cross-field side effect: defaulting on a REAL destination_type change ──────
 // Sets method/output_format/esbulk_index/url_endpoint + resets headers. Guard
@@ -1091,7 +1143,7 @@ const connectionNotes = computed<{ title: I18nText; steps: I18nText[]; example: 
 // `value` is optional so existing tests that invoke createDestination() directly
 // keep working — they fall back to the form's live state (still the one source
 // of truth, never a mirror).
-const createDestination = (value?: DestinationForm) => {
+const createDestination = async (value?: DestinationForm) => {
   // Read every field from the form (single source of truth): the @submit payload
   // if present, else the form's live state for direct test calls.
   const v = (value ?? form.state.values) as DestinationForm;
@@ -1106,6 +1158,8 @@ const createDestination = (value?: DestinationForm) => {
     });
     return;
   }
+  secretConsumer.refusal.value = null;
+  const secretBinds = await secretConsumer.binds();
   const dismiss = toast({
     variant: "loading",
     message: t("toastMessages.NodeForm.pleaseWait"),
@@ -1173,6 +1227,7 @@ const createDestination = (value?: DestinationForm) => {
   if (Object.keys(metadata).length > 0) {
     payload.metadata = metadata;
   }
+  if (secretBinds.length) payload.secret_binds = secretBinds;
 
   // Check if we're in edit mode. Return the promise so OForm awaits the save
   // (its isSubmitting drives the Save button spinner).
@@ -1186,6 +1241,11 @@ const createDestination = (value?: DestinationForm) => {
       })
       .catch((err: any) => {
         dismiss();
+        const refusal = refusalFrom(err);
+        if (refusal) {
+          secretConsumer.refusal.value = refusal;
+          return;
+        }
         if (err.response?.status == 403) {
           return;
         }
@@ -1204,6 +1264,11 @@ const createDestination = (value?: DestinationForm) => {
       })
       .catch((err: any) => {
         dismiss();
+        const refusal = refusalFrom(err);
+        if (refusal) {
+          secretConsumer.refusal.value = refusal;
+          return;
+        }
         if (err.response?.status == 403) {
           return;
         }

@@ -166,7 +166,7 @@ pub(crate) async fn consume_with(
     txn.commit().await?;
 
     match decision {
-        Decision::Answer(answer) => Ok(answer),
+        Decision::Answer(answer) => deliver_answer(seams, &run, &steps, &lookups, answer).await,
         Decision::Failed { step_id, message } => {
             after_transition(org, run_id, RunState::StepFailed).await;
             seams.turns.cancel(&run).await;
@@ -344,8 +344,64 @@ async fn run_next(
     Ok(Decision::Answer(ConsumeResponse::Run {
         step_id: next.id.clone(),
         arguments: resolved,
-        headers: conn.write_headers.clone(),
+        headers: HashMap::new(),
+        allowed_hosts: Vec::new(),
+        follow_redirects: None,
     }))
+}
+
+async fn deliver_answer(
+    seams: &Seams<'_>,
+    run: &RunRow,
+    steps: &[StepRow],
+    lookups: &Lookups,
+    answer: ConsumeResponse,
+) -> Result<ConsumeResponse, AutoResolveError> {
+    let ConsumeResponse::Run {
+        step_id, arguments, ..
+    } = answer
+    else {
+        return Ok(answer);
+    };
+    let connection = steps
+        .iter()
+        .find(|step| step.id == step_id)
+        .and_then(|step| lookups.by_id.get(&step.connection_id))
+        .and_then(Option::as_ref)
+        .ok_or_else(|| anyhow::anyhow!("consumed step has no connection"))?;
+    match seams
+        .connections
+        .write_headers(&run.org, &run.id, connection)
+        .await
+    {
+        Ok(delivery) => Ok(ConsumeResponse::Run {
+            step_id,
+            arguments,
+            headers: delivery.headers,
+            allowed_hosts: delivery.allowed_hosts,
+            follow_redirects: delivery.follow_redirects,
+        }),
+        Err(_) => {
+            let message = format!(
+                "A secret for {} is not available.",
+                named_mcp(&connection.name)
+            );
+            record_result_with(
+                seams,
+                &run.org,
+                &run.id,
+                &step_id,
+                StepResultInput {
+                    ok: false,
+                    unknown: false,
+                    result: None,
+                    error: Some(message.clone()),
+                },
+            )
+            .await?;
+            Ok(refuse(&message))
+        }
+    }
 }
 
 /// Fails `step` before it is sent, and the run with it; the steps after it never run.
@@ -667,6 +723,7 @@ fn refuse(message: &str) -> ConsumeResponse {
 #[cfg(test)]
 mod tests {
     use infra::table::entity::autoresolve_steps::Entity as Steps;
+    use o2_enterprise::enterprise::ai::toolsets::AutoResolveWrite;
     use sea_orm::{DatabaseConnection, EntityTrait};
     use serde_json::json;
 
@@ -693,6 +750,39 @@ mod tests {
             key: &str,
         ) -> anyhow::Result<Option<AutoResolveConnection>> {
             Ok(self.0.clone().filter(|c| c.id == key || c.name == key))
+        }
+    }
+
+    struct WriteDelivery<'a> {
+        db: &'a DatabaseConnection,
+        source: &'a dyn ConnectionSource,
+        delivery: Option<AutoResolveWrite>,
+    }
+
+    #[async_trait::async_trait]
+    impl ConnectionSource for WriteDelivery<'_> {
+        async fn get(&self, org: &str, key: &str) -> anyhow::Result<Option<AutoResolveConnection>> {
+            self.source.get(org, key).await
+        }
+
+        async fn write_headers(
+            &self,
+            org: &str,
+            run_id: &str,
+            connection: &AutoResolveConnection,
+        ) -> anyhow::Result<AutoResolveWrite> {
+            assert_eq!((org, run_id), (ORG, RUN));
+            assert_eq!(
+                (connection.id.as_str(), connection.fingerprint.as_str()),
+                ("c1", FP)
+            );
+            let steps = autoresolve_steps::list_for_run_with(self.db, org, run_id).await?;
+            let step = steps.iter().find(|step| step.id == "s1").unwrap();
+            assert_eq!(step.state, StepState::Running.as_str());
+            assert!(step.consumed_at_us.is_some());
+            self.delivery
+                .clone()
+                .ok_or_else(|| anyhow::anyhow!("private resolver details"))
         }
     }
 
@@ -921,6 +1011,8 @@ mod tests {
             step_id: step_id.into(),
             arguments,
             headers: HashMap::from([("Authorization".into(), "W".into())]),
+            allowed_hosts: Vec::new(),
+            follow_redirects: None,
         }
     }
 
@@ -1044,6 +1136,64 @@ mod tests {
             assert_eq!(run.error.as_deref(), run_error, "{case}");
             assert_eq!((run.revision, run.turn_deadline_us), (1, None), "{case}");
             assert_eq!(h.cancels(), cancels, "{case}");
+        }
+    }
+
+    #[tokio::test]
+    async fn write_headers_resolve_after_commit_and_refusal_finishes_the_consumed_step() {
+        for resolved in [true, false] {
+            let h = Harness::new(head_then_tag(), github(FP)).await;
+            let delivered = AutoResolveWrite {
+                headers: HashMap::from([("Authorization".into(), "resolved-write".into())]),
+                allowed_hosts: vec!["https://github.example:443".into()],
+                follow_redirects: Some(false),
+            };
+            let source = WriteDelivery {
+                db: &h.db,
+                source: &h.connections,
+                delivery: resolved.then(|| delivered.clone()),
+            };
+            let seams = Seams {
+                connections: &source,
+                ..h.seams()
+            };
+            let answer = tokio::time::timeout(
+                std::time::Duration::from_secs(2),
+                consume_with(&seams, ORG, RUN, call("get_head", json!({"repo": "x"}))),
+            )
+            .await
+            .expect("header delivery must not hold the consume transaction")
+            .unwrap();
+            if resolved {
+                assert_eq!(
+                    answer,
+                    ConsumeResponse::Run {
+                        step_id: "s1".into(),
+                        arguments: json!({"repo": "x"}),
+                        headers: delivered.headers,
+                        allowed_hosts: delivered.allowed_hosts,
+                        follow_redirects: delivered.follow_redirects,
+                    }
+                );
+                assert_eq!(h.run().await.state, RunState::Proceeding.as_str());
+            } else {
+                let name = &h.connections.0.as_ref().unwrap().name;
+                let message = format!("A secret for the {name} MCP is not available.");
+                assert_eq!(answer, refuse(&message));
+                assert_eq!(
+                    h.states(1).await,
+                    vec![state("failed", Some(&message)), state("not_run", None)]
+                );
+                let run = h.run().await;
+                assert_eq!(run.state, RunState::StepFailed.as_str());
+                assert!(run.ended_at_us.is_some());
+                assert_eq!(h.cancels(), 1);
+                let steps = h.steps().await;
+                let failed = steps.iter().find(|step| step.id == "s1").unwrap();
+                assert!(failed.consumed_at_us.is_some());
+                assert!(failed.finished_at_us.is_some());
+                assert_eq!(failed.result, None);
+            }
         }
     }
 

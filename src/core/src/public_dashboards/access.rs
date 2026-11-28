@@ -76,7 +76,7 @@ mod tests {
 
     #[test]
     fn requests_are_counted_per_link_and_a_failed_flush_keeps_them() {
-        let id = config::ider::uuid();
+        let id = config::ider::ksuid();
         record(&id, 10);
         record(&id, 30);
         record(&id, 20);

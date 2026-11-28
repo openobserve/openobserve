@@ -17,9 +17,9 @@ use axum::{
     Json,
     extract::{Path, Query},
     http::StatusCode,
-    response::Response,
+    response::{IntoResponse, Response},
 };
-use config::meta::destinations::TemplateKind;
+use config::meta::{destinations::TemplateKind, secret_store::SecretErrorCode};
 use db::user::is_root_user;
 use openobserve_api_common::extractors::Headers;
 #[cfg(feature = "enterprise")]
@@ -30,7 +30,7 @@ use openobserve_core::{
         templates,
     },
     auth::UserEmail,
-    http::template_error_response,
+    http::template_error_response as generic_template_error_response,
 };
 
 use crate::{
@@ -559,11 +559,27 @@ pub async fn preview_template(
     }
 }
 
+/// A store-ref refusal answers with its code, so the form can name the field it belongs to.
+fn template_error_response(e: db::alerts::templates::TemplateError) -> Response {
+    match e {
+        db::alerts::templates::TemplateError::RefNotAllowedInField => (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({
+                "code": SecretErrorCode::RefNotAllowedInField,
+                "message": e.to_string(),
+            })),
+        )
+            .into_response(),
+        e => generic_template_error_response(e),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use axum::http::StatusCode;
     use db::alerts::templates::TemplateError;
-    use openobserve_core::http::template_error_response;
+
+    use super::template_error_response;
 
     fn status(err: TemplateError) -> StatusCode {
         template_error_response(err).status()
@@ -677,6 +693,17 @@ mod tests {
             status(TemplateError::InvalidKind("bogus".to_string())),
             StatusCode::BAD_REQUEST
         );
+    }
+
+    #[tokio::test]
+    async fn a_template_ref_refusal_is_a_400_carrying_its_code() {
+        let response = template_error_response(TemplateError::RefNotAllowedInField);
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let body: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(body["code"], "ref_not_allowed_in_field");
     }
 
     #[test]

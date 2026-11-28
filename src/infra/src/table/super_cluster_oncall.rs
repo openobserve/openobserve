@@ -15,7 +15,7 @@
 
 //! Id-preserving writes for replicated on-call rows.
 //!
-//! The ordinary `oncall_*` modules mint a fresh `ider::uuid()` on every insert,
+//! The ordinary `oncall_*` modules mint a fresh `ider::ksuid()` on every insert,
 //! which is right for the region where a thing is created and wrong everywhere
 //! else: an escalation trigger's `module_key` IS the response id, and teams are
 //! referenced by id from schedules, policies and ownership rules. A replica
@@ -499,6 +499,7 @@ async fn put_response_in<C: ConnectionTrait>(
         // replication.
         runbook_url: None,
         exhausted_at: response.exhausted_at,
+        requested_by: response.requested_by.clone(),
         updated_at: response.updated_at,
     };
     match oncall_responses::Entity::find_by_id(&response.id)
@@ -571,7 +572,7 @@ async fn put_event_in<C: ConnectionTrait>(
         return Ok(());
     }
     oncall_response_events::ActiveModel {
-        id: Set(config::ider::uuid()),
+        id: Set(config::ider::ksuid()),
         response_id: Set(response_id.to_string()),
         kind: Set(event.kind.to_i32()),
         at: Set(event.at),
@@ -715,6 +716,7 @@ mod tests {
             priority: 1,
             responder_role: ResponderRole::Owner,
             exhausted_at: None,
+            requested_by: None,
             origin_response_id: None,
             state: ResponseState::Triggered,
             opened_at: 10,

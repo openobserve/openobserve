@@ -189,7 +189,7 @@ mod tests {
     /// Each round's files form one chain; files without statistics are an error, not a guess.
     #[tokio::test(flavor = "multi_thread")]
     async fn test_read_chains() {
-        let id = ider::uuid();
+        let id = ider::ksuid();
         infra::storage::add_account(&id, Box::new(InMemory::new())).await;
         let account = format!("{id}:default");
         let mut rounds = Vec::new();

@@ -60,7 +60,7 @@ pub async fn insert_with<C: ConnectionTrait>(
     mark: &NewMark<'_>,
     now: i64,
 ) -> Result<String, errors::Error> {
-    let id = config::ider::uuid();
+    let id = config::ider::ksuid();
     let record = ActiveModel {
         id: Set(id.clone()),
         org_id: Set(fit(mark.org_id, 256)),

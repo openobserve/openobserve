@@ -176,7 +176,7 @@ async fn store_code_in<C: ConnectionTrait>(
     let user_email = user_email.to_lowercase();
     let Some(expected) = expected_sent_at else {
         let model = ActiveModel {
-            id: Set(ider::uuid()),
+            id: Set(ider::ksuid()),
             user_email: Set(user_email),
             target: Set(target.to_string()),
             code_hash: Set(Some(code_hash.to_string())),

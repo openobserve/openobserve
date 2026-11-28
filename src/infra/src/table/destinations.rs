@@ -17,8 +17,8 @@ use std::str::FromStr;
 
 use config::{ider, meta::destinations, utils::json};
 use sea_orm::{
-    ActiveModelTrait, ActiveValue::NotSet, ColumnTrait, DatabaseConnection, EntityTrait,
-    ModelTrait, QueryFilter, QueryOrder, QuerySelect, Set, TryIntoModel,
+    ActiveModelTrait, ActiveValue::NotSet, ColumnTrait, ConnectionTrait, DatabaseConnection,
+    EntityTrait, ModelTrait, QueryFilter, QueryOrder, QuerySelect, Set, TryIntoModel,
 };
 
 use crate::{
@@ -61,23 +61,30 @@ impl Model {
 pub async fn put(
     destination: destinations::Destination,
 ) -> Result<destinations::Destination, Error> {
+    put_in(get_orm_client_rw().await, destination).await
+}
+
+pub async fn put_in<C: ConnectionTrait>(
+    conn: &C,
+    destination: destinations::Destination,
+) -> Result<destinations::Destination, Error> {
     // Template is now optional - only look it up if one is specified
     let template_id = if let destinations::Module::Alert {
         template: Some(template_name),
         ..
     } = &destination.module
     {
-        super::templates::get(&destination.org_id, template_name)
+        super::templates::get_with(conn, &destination.org_id, template_name)
             .await?
             .and_then(|temp| temp.id.map(|id| id.to_string()))
     } else {
         None
     };
 
-    let client = get_orm_client_rw().await;
+    let stored_type = stored_type(&destination.module)?;
 
     let (model, template): (Model, Option<String>) =
-        match get_model_and_template(client, &destination.org_id, &destination.name).await? {
+        match get_model_and_template(conn, &destination.org_id, &destination.name).await? {
             Some((model, ..)) => {
                 let mut active: ActiveModel = model.into();
                 active.name = Set(destination.name);
@@ -85,27 +92,27 @@ pub async fn put(
                 let new_template = match destination.module {
                     destinations::Module::Alert {
                         template: new_template,
-                        destination_type,
+                        ..
                     } => {
                         // Template is optional - only set template_id if a template is specified
                         active.template_id = Set(template_id);
                         active.module = Set("alert".to_string());
-                        active.r#type = Set(json::to_value(destination_type)?);
+                        active.r#type = Set(stored_type);
                         new_template
                     }
-                    destinations::Module::Pipeline { endpoint } => {
+                    destinations::Module::Pipeline { .. } => {
                         active.template_id = Set(None);
                         active.module = Set("pipeline".to_string());
-                        active.r#type = Set(json::to_value(endpoint)?);
+                        active.r#type = Set(stored_type);
                         None
                     }
                 };
-                (active.update(client).await?.try_into_model()?, new_template)
+                (active.update(conn).await?.try_into_model()?, new_template)
             }
             None => {
                 let (active, new_template) = {
                     let mut active = ActiveModel {
-                        id: Set(destination.id.map_or_else(ider::uuid, |id| id.to_string())),
+                        id: Set(destination.id.map_or_else(ider::ksuid, |id| id.to_string())),
                         org: Set(destination.org_id),
                         name: Set(destination.name),
                         template_id: Set(None),
@@ -115,24 +122,24 @@ pub async fn put(
                     let new_template = match destination.module {
                         destinations::Module::Alert {
                             template: new_template,
-                            destination_type,
+                            ..
                         } => {
                             // Template is optional - only set template_id if a template is
                             // specified
                             active.module = Set("alert".to_string());
                             active.template_id = Set(template_id);
-                            active.r#type = Set(json::to_value(destination_type)?);
+                            active.r#type = Set(stored_type);
                             new_template
                         }
-                        destinations::Module::Pipeline { endpoint } => {
+                        destinations::Module::Pipeline { .. } => {
                             active.module = Set("pipeline".to_string());
-                            active.r#type = Set(json::to_value(endpoint)?);
+                            active.r#type = Set(stored_type);
                             None
                         }
                     };
                     (active, new_template)
                 };
-                (active.insert(client).await?.try_into_model()?, new_template)
+                (active.insert(conn).await?.try_into_model()?, new_template)
             }
         };
     model.try_into(template)
@@ -142,9 +149,33 @@ pub async fn get(org_id: &str, name: &str) -> Result<Option<destinations::Destin
     get_on(get_orm_client_ro().await, org_id, name).await
 }
 
+pub async fn get_on<C: ConnectionTrait>(
+    db: &C,
+    org_id: &str,
+    name: &str,
+) -> Result<Option<destinations::Destination>, Error> {
+    // An old node reads a newer release's type as not found, as the list path does.
+    Ok(get_model_and_template(db, org_id, name)
+        .await?
+        .and_then(|row| decode_models(vec![row]).pop()))
+}
+
 /// Whether a row exists under this name, decodable by this binary or not.
 pub async fn exists_row(org_id: &str, name: &str) -> Result<bool, Error> {
     exists_row_on(get_orm_client_ro().await, org_id, name).await
+}
+
+pub async fn exists_row_on<C: ConnectionTrait>(
+    db: &C,
+    org_id: &str,
+    name: &str,
+) -> Result<bool, Error> {
+    Ok(Entity::find()
+        .filter(Column::Org.eq(org_id))
+        .filter(Column::Name.eq(name))
+        .one(db)
+        .await?
+        .is_some())
 }
 
 pub async fn list(
@@ -173,6 +204,56 @@ pub async fn delete(org_id: &str, name: &str) -> Result<(), Error> {
     Ok(())
 }
 
+/// Deletes all destinations of the org and returns their names.
+pub async fn delete_by_org(org_id: &str) -> Result<Vec<String>, Error> {
+    let client = get_orm_client_rw().await;
+    let delete = Entity::delete_many().filter(Column::Org.eq(org_id));
+    Ok(super::delete_returning(client, delete, &[Column::Name]).await?)
+}
+
+/// Names of the org's destinations.
+pub async fn list_names_by_org(org_id: &str) -> Result<Vec<String>, Error> {
+    let client = get_orm_client_ro().await;
+    let names = Entity::find()
+        .select_only()
+        .column(Column::Name)
+        .filter(Column::Org.eq(org_id))
+        .into_tuple::<String>()
+        .all(client)
+        .await?;
+    Ok(names)
+}
+
+fn stored_type(module: &destinations::Module) -> Result<json::Value, Error> {
+    let mut stored;
+    let (endpoint, fields) = match module {
+        destinations::Module::Alert {
+            destination_type, ..
+        } => {
+            stored = json::to_value(destination_type)?;
+            match destination_type {
+                destinations::DestinationType::Http(endpoint) => (endpoint, &mut stored),
+                destinations::DestinationType::SlackApp(target) => match &target.previous_webhook {
+                    Some(endpoint) => (endpoint, &mut stored["previous_webhook"]),
+                    None => return Ok(stored),
+                },
+                destinations::DestinationType::Sns(_) | destinations::DestinationType::Email(_) => {
+                    return Ok(stored);
+                }
+            }
+        }
+        destinations::Module::Pipeline { endpoint } => {
+            stored = json::to_value(endpoint)?;
+            (endpoint, &mut stored)
+        }
+    };
+    // An older reader must reject the whole destination even when only a header carries a ref.
+    if endpoint.uses_store_refs() {
+        fields["url"] = json::json!({"t": endpoint.url});
+    }
+    Ok(stored)
+}
+
 /// Skips rows this binary cannot decode, so a newer destination type never fails the whole list.
 fn decode_models(rows: Vec<(Model, Option<String>)>) -> Vec<destinations::Destination> {
     rows.into_iter()
@@ -190,28 +271,8 @@ fn decode_models(rows: Vec<(Model, Option<String>)>) -> Vec<destinations::Destin
         .collect()
 }
 
-async fn get_on(
-    db: &DatabaseConnection,
-    org_id: &str,
-    name: &str,
-) -> Result<Option<destinations::Destination>, Error> {
-    // An old node reads a newer release's type as not found, as the list path does.
-    Ok(get_model_and_template(db, org_id, name)
-        .await?
-        .and_then(|row| decode_models(vec![row]).pop()))
-}
-
-async fn exists_row_on(db: &DatabaseConnection, org_id: &str, name: &str) -> Result<bool, Error> {
-    Ok(Entity::find()
-        .filter(Column::Org.eq(org_id))
-        .filter(Column::Name.eq(name))
-        .one(db)
-        .await?
-        .is_some())
-}
-
-async fn get_model_and_template(
-    db: &DatabaseConnection,
+async fn get_model_and_template<C: ConnectionTrait>(
+    db: &C,
     org_id: &str,
     name: &str,
 ) -> Result<Option<(Model, Option<String>)>, sea_orm::DbErr> {
@@ -246,32 +307,173 @@ async fn list_models(
         .collect())
 }
 
-/// Deletes all destinations of the org and returns their names.
-pub async fn delete_by_org(org_id: &str) -> Result<Vec<String>, Error> {
-    let client = get_orm_client_rw().await;
-    let delete = Entity::delete_many().filter(Column::Org.eq(org_id));
-    Ok(super::delete_returning(client, delete, &[Column::Name]).await?)
-}
-
-/// Names of the org's destinations.
-pub async fn list_names_by_org(org_id: &str) -> Result<Vec<String>, Error> {
-    let client = get_orm_client_ro().await;
-    let names = Entity::find()
-        .select_only()
-        .column(Column::Name)
-        .filter(Column::Org.eq(org_id))
-        .into_tuple::<String>()
-        .all(client)
-        .await?;
-    Ok(names)
-}
-
 #[cfg(test)]
 mod tests {
-    use sea_orm::{ConnectionTrait, Database, Schema};
+    use sea_orm::{ConnectionTrait, Database, Schema, TransactionTrait};
     use svix_ksuid::KsuidLike as _;
 
     use super::*;
+
+    #[derive(Default, serde::Deserialize, serde::Serialize)]
+    #[serde(default)]
+    struct FrozenEndpoint {
+        url: String,
+        #[serde(default)]
+        method: destinations::HTTPType,
+        #[serde(default)]
+        skip_tls_verify: bool,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        headers: Option<hashbrown::HashMap<String, String>>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        output_format: Option<destinations::HTTPOutputFormat>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        destination_type: Option<String>,
+        #[serde(default)]
+        metadata: hashbrown::HashMap<String, String>,
+    }
+
+    #[tokio::test]
+    async fn put_in_reads_the_template_on_the_callers_transaction() {
+        if std::env::var_os("ZO_META_STORE").is_none() {
+            return;
+        }
+        let db = db_with_rows().await;
+        let txn = db.begin().await.unwrap();
+        let template = destinations::Template {
+            name: "new-template".into(),
+            org_id: "myorg".into(),
+            ..Default::default()
+        };
+        let template = crate::table::templates::put_with(&txn, template)
+            .await
+            .unwrap();
+        let dest = destinations::Destination {
+            name: "uses-template".into(),
+            org_id: template.org_id,
+            module: destinations::Module::Alert {
+                template: Some(template.name),
+                destination_type: Default::default(),
+            },
+            id: None,
+        };
+        put_in(&txn, dest).await.unwrap();
+        let row = get_model_and_template(&txn, "myorg", "uses-template")
+            .await
+            .unwrap()
+            .unwrap()
+            .0;
+        assert_eq!(row.template_id, Some(template.id.unwrap().to_string()));
+        txn.rollback().await.unwrap();
+        assert!(!exists_row_on(&db, "myorg", "uses-template").await.unwrap());
+    }
+
+    #[tokio::test]
+    async fn stored_endpoint_fences_every_store_ref_for_older_readers() {
+        if std::env::var_os("ZO_META_STORE").is_none() {
+            return;
+        }
+        if std::env::var_os("O2_DESTINATION_FENCE_TEST").is_none() {
+            let path = concat!(
+                module_path!(),
+                "::stored_endpoint_fences_every_store_ref_for_older_readers"
+            );
+            let (_, test) = path.split_once("::").unwrap();
+            for enabled in ["false", "true"] {
+                let output = std::process::Command::new(std::env::current_exe().unwrap())
+                    .args(["--exact", test, "--nocapture"])
+                    .env("O2_DESTINATION_FENCE_TEST", enabled)
+                    .env("O2_SECRET_STORE_REFS_ENABLED", enabled)
+                    .output()
+                    .unwrap();
+                let stdout = String::from_utf8_lossy(&output.stdout);
+                assert!(
+                    output.status.success() && stdout.contains("1 passed"),
+                    "refs enabled={enabled}: {stdout}\n{}",
+                    String::from_utf8_lossy(&output.stderr)
+                );
+            }
+            return;
+        }
+        let enabled = std::env::var("O2_DESTINATION_FENCE_TEST").unwrap() == "true";
+        assert_eq!(
+            config::get_config().common.secret_store_refs_enabled,
+            enabled
+        );
+        let db = db_with_rows().await;
+        for pipeline in [false, true] {
+            for (field, value, fenced) in [
+                (
+                    "url",
+                    serde_json::json!("https://example.com/{{secrets.PATH}}"),
+                    true,
+                ),
+                (
+                    "headers",
+                    serde_json::json!({"Authorization": "Bearer {{secrets.TOKEN}}"}),
+                    true,
+                ),
+                (
+                    "metadata",
+                    serde_json::json!({"routing_key": "{{secrets.KEY}}"}),
+                    true,
+                ),
+                (
+                    "headers",
+                    serde_json::json!({"Authorization": "literal"}),
+                    false,
+                ),
+            ] {
+                let fenced = fenced && enabled;
+                let mut input = serde_json::json!({"url":"https://example.com"});
+                input[field] = value;
+                let endpoint: destinations::Endpoint = serde_json::from_value(input).unwrap();
+                let module = if pipeline {
+                    destinations::Module::Pipeline {
+                        endpoint: endpoint.clone(),
+                    }
+                } else {
+                    destinations::Module::Alert {
+                        template: None,
+                        destination_type: destinations::DestinationType::Http(endpoint.clone()),
+                    }
+                };
+                let dest = destinations::Destination {
+                    name: "fence".into(),
+                    org_id: "myorg".into(),
+                    module,
+                    id: None,
+                };
+                let txn = db.begin().await.unwrap();
+                put_in(&txn, dest.clone()).await.unwrap();
+                txn.commit().await.unwrap();
+                let stored = get_model_and_template(&db, "myorg", "fence")
+                    .await
+                    .unwrap()
+                    .unwrap()
+                    .0
+                    .r#type;
+                let mut expected = serde_json::to_value(&endpoint).unwrap();
+                if !pipeline {
+                    expected["type"] = serde_json::json!("http");
+                }
+                if fenced {
+                    expected["url"] = serde_json::json!({"t": endpoint.url});
+                }
+                assert_eq!(stored, expected);
+                assert_eq!(
+                    serde_json::from_value::<FrozenEndpoint>(stored).is_err(),
+                    fenced
+                );
+                let read = get_on(&db, "myorg", "fence").await.unwrap().unwrap();
+                assert_eq!(
+                    serde_json::to_value(read.module).unwrap(),
+                    serde_json::to_value(dest.module).unwrap()
+                );
+                let rows = list_models(&db, Some("myorg"), None).await.unwrap();
+                assert!(decode_models(rows).iter().any(|dest| dest.name == "fence"));
+            }
+        }
+    }
 
     fn make_model(id: &str, module: &str, type_json: serde_json::Value) -> Model {
         Model {

@@ -505,7 +505,7 @@ mod tests {
         }
 
         fn user() -> String {
-            format!("{}@example.com", config::ider::uuid())
+            format!("{}@example.com", config::ider::ksuid())
         }
 
         fn add_table(org: &str, name: &str) -> String {

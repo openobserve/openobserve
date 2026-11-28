@@ -42,7 +42,7 @@ pub async fn submit(
     start_time: i64,
     end_time: i64,
 ) -> Result<String, errors::Error> {
-    let job_id = ider::uuid();
+    let job_id = ider::ksuid();
     let created_at = now_micros();
     let updated_at = created_at;
     let job = Model {

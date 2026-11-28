@@ -227,6 +227,10 @@ export interface BrowserStep {
   /** Present only on a `subtest` step. `name` is a display cache and never leaves the editor. */
   subtest?: { id: string; name?: string };
   value?: string;
+  /** Who set the server-held value of this step (V39); the value itself never reaches the editor. */
+  valueSet?: WriteOnlyMeta;
+  /** The author chose to replace the server-held value, so `value` is sent as typed. */
+  valueReplaced?: boolean;
   /**
    * Mouse button and click count for a `click` step, promoted from the wire.
    *
@@ -508,9 +512,16 @@ export interface HttpAssertion {
   value: string;
 }
 
+/** A write-only value the server kept: who set it and when, never the value (V39). */
+export interface WriteOnlyMeta {
+  updated_at: number;
+  updated_by: string;
+}
+
 export interface HttpCheckConfig {
   method: string;
-  headers: { name: string; value: string }[];
+  /** `secure` absent means the name rule decides (credential-like names are secure). */
+  headers: { name: string; value: string; secure?: boolean }[];
   body: string;
   follow_redirects: boolean;
   timeout_ms: number;
@@ -611,6 +622,10 @@ export interface AgentSetup {
   script_url: string;
   /** Legacy docker one-liner (drawer fallback when composing is impossible). */
   install: string;
+  /** Oldest runner that holds leases (`runner_contract=1`); named in the old-runner notice. */
+  min_runner_version?: string;
+  lease_deadline_us?: number;
+  public_locations_leased?: boolean;
 }
 
 // Full location record for admin/settings panel (GET /api/{org}/synthetics/locations)
@@ -639,6 +654,10 @@ export interface SyntheticsCapabilities {
 }
 
 export interface BrowserCheck {
+  /** Write-only slots the server holds, by slot key; each saves as `{keep: true}` until replaced. */
+  writeOnly?: Record<string, WriteOnlyMeta>;
+  /** Slot keys the user chose to replace; these save what was typed. */
+  replacedSlots?: string[];
   id?: string;
   name: string;
   url: string;
@@ -689,7 +708,15 @@ export interface BrowserCheck {
   environments?: string[];
   secrets?: { id?: string; name: string; value: string }[];
   headers?: { id?: string; key: string; value: string }[];
-  cookies?: { id?: string; name: string; value: string; domain: string }[];
+  /** `path` and `secure` round-trip so a kept cookie keeps its stored identity. */
+  cookies?: {
+    id?: string;
+    name: string;
+    value: string;
+    domain: string;
+    path?: string;
+    secure?: boolean;
+  }[];
 }
 
 // ── Private locations (GET /{org}/synthetics/locations + /{id}) ──────────────
@@ -735,6 +762,11 @@ export interface SyntheticLocationAgent {
   last_seen_at: number;
   created_at: number;
   live: boolean;
+  /** 0 after a tokenless credential resolve in the last 7 days; absent means unknown (§6 S01). */
+  runner_contract?: number;
+  /** Agent token the agent registered with, and whether it predates admin-only tokens. */
+  token_name?: string;
+  token_pre_cutover?: boolean;
 }
 
 /** One synthetic assigned to a location, in the detail page's checks table. */

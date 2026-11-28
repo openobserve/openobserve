@@ -302,6 +302,29 @@ const useManagementRoutes = () => {
     routes[0].children.push(
       ...[
         {
+          path: "secrets",
+          name: "secrets",
+          component: () => import("@/views/Secrets/SecretsPage.vue"),
+          meta: {
+            keepAlive: true,
+            titleKey: "secrets.title",
+          },
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
+        {
+          path: "secret_store_status",
+          name: "secretStoreStatus",
+          component: () => import("@/views/Secrets/SecretStoreStatusPage.vue"),
+          meta: {
+            titleKey: "secrets.rootStatus.title",
+          },
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
+        {
           path: "announcements",
           name: "announcementBanners",
           component: () => import("@/components/settings/AnnouncementBannerList.vue"),

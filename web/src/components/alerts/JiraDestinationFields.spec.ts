@@ -190,6 +190,29 @@ describe("JiraDestinationFields - connect", () => {
     expect(wrapper.find('[data-test="jira-project-select"]').exists()).toBe(false);
   });
 
+  it("refuses setup with a saved secret in the token, without calling Jira (S3)", async () => {
+    await mountFields();
+    await setCred("url", "https://acme.atlassian.net/");
+    await setCred("email", "alerts-bot@example.com");
+    await setCred("token", "{{secrets.JIRA_TOKEN}}");
+    await wrapper.find('[data-test="jira-connect-button"]').trigger("click");
+    await flushPromises();
+    expect(jiraSetup).not.toHaveBeenCalled();
+    const error = wrapper.find('[data-test="jira-setup-error"]').text();
+    expect(error).toContain("Not run: setup needs a typed token");
+    expect(error).toContain("jira_setup_needs_literal_token");
+  });
+
+  it("shows the typed-token copy when the server refuses a saved ref (S3)", async () => {
+    jiraSetup.mockRejectedValue({
+      response: { status: 400, data: { code: "jira_setup_needs_literal_token", message: "x" } },
+    });
+    await connectNew();
+    expect(wrapper.find('[data-test="jira-setup-error"]').text()).toContain(
+      "switch the token to a secret",
+    );
+  });
+
   it("asks to connect again after the login changes", async () => {
     await connectNew();
     await setCred("token", "other-token");

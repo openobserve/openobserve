@@ -96,8 +96,17 @@ import { getFoldersListByType } from "@/utils/commons";
 import { selectSyntheticsFolder, withCheckFolder } from "@/utils/synthetics/selectFolder";
 import { syntheticsEditRoute, syntheticsListRoute } from "@/utils/synthetics/routes";
 import syntheticsService from "@/services/synthetics";
+import { loggableError } from "@/services/secrets";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { templateBindingError } from "@/utils/alerts/templateBindingError";
+import SecretSaveRefusal from "@/views/Secrets/SecretSaveRefusal.vue";
+import { refusalFrom, type SecretRefusal } from "@/views/Secrets/useSecretConsumer";
+import {
+  secureNames,
+  stepUrlRefusal,
+  urlRefRefusal,
+  type UrlRefusal,
+} from "@/utils/synthetics/writeOnly";
 import { useEditorDraft } from "@/composables/useEditorDraft";
 import {
   deleteEditorDraft,
@@ -875,6 +884,21 @@ const browserDraft = useEditorDraft<BrowserTestDraft>({
   leaveOnRouteUpdate: (to, from) => to.params.id !== from.params.id,
 });
 
+const secretRefusal = ref<SecretRefusal | null>(null);
+
+const urlRefusalText = (refusal: UrlRefusal): string => {
+  const params = { name: refusal.name, code: raw(refusal.code) };
+  return refusal.kind === "secret"
+    ? t("synthetics.secretFields.urlSecretBrowser", params)
+    : t("synthetics.secretFields.urlSecureVariableBrowser", params);
+};
+
+/** A URL never carries a secret or a write-only placeholder: run results show the full URL (V34). */
+const secretFieldErrors = computed((): Record<string, string> => {
+  const refusal = urlRefRefusal(check.value.url ?? "", secureNames(check.value));
+  return refusal ? { url: urlRefusalText(refusal) } : {};
+});
+
 /** A changed secret the draft did not keep is flagged on its field until it is typed again. */
 const reentryErrors = computed<Record<string, string>>(() =>
   Object.fromEntries(
@@ -1007,6 +1031,21 @@ async function persist(after: "stay" | "exit" | "leaveDialog"): Promise<boolean>
     toast({ variant: "error", message: t("common.editorDraft.reenterBeforeSave") });
     return false;
   }
+  if (secretFieldErrors.value.url) {
+    validationErrors.value = { ...secretFieldErrors.value };
+    currentStep.value = 2;
+    toast({ variant: "error", message: raw(secretFieldErrors.value.url) });
+    return false;
+  }
+  const stepRefusal = stepUrlRefusal(check.value);
+  if (stepRefusal) {
+    const message = urlRefusalText(stepRefusal.refusal);
+    journeyFieldIssues.value = [{ path: ["journey", stepRefusal.index, "value"], message }];
+    currentStep.value = 1;
+    toast({ variant: "error", message: raw(message) });
+    return false;
+  }
+  secretRefusal.value = null;
   const toValidate = {
     name: check.value.name,
     url: check.value.url,
@@ -1135,6 +1174,11 @@ async function persist(after: "stay" | "exit" | "leaveDialog"): Promise<boolean>
     }
     if (mapReferencedSaveConflict(err)) return false;
     if (mapCompositionSaveError(err)) return false;
+    const refusal = refusalFrom(err);
+    if (refusal) {
+      secretRefusal.value = refusal;
+      return false;
+    }
     const templateError = templateBindingError(err);
     if (templateError && (check.value.template ?? null) === submittedTemplate) {
       validationErrors.value = { ...validationErrors.value, template: templateError };
@@ -1145,10 +1189,12 @@ async function persist(after: "stay" | "exit" | "leaveDialog"): Promise<boolean>
       variant: "error",
       message: err?.response?.data?.message || t("synthetics.newCheck.saveFailed"),
     });
-    console.error("[synthetics] save failed", err);
+    console.error("[synthetics] save failed", loggableError(err));
     return false;
   } finally {
     isSaving.value = false;
+    // The editor stays mounted, so its observer would keep the submitted write-only values.
+    saveMonitor.reset();
   }
 }
 
@@ -1324,6 +1370,8 @@ async function onExtractSubmit(values: ExtractForm) {
     id = res.data.id;
   } catch (err) {
     throw extractCreateError(err, values.folder);
+  } finally {
+    saveMonitor.reset();
   }
   childrenCache.value.set(id, {
     id,
@@ -2326,7 +2374,7 @@ function onClearResults() {
               :destinations="destinations"
               :folders="pickerFolders"
               :folders-loading="foldersLoading"
-              :validation-errors="{ ...validationErrors, ...reentryErrors }"
+              :validation-errors="{ ...validationErrors, ...reentryErrors, ...secretFieldErrors }"
               :variable-suggestions="variableSuggestions"
               :allow-private-locations="privateLocationsEnabled"
               :target-hint="targetHint"
@@ -2364,6 +2412,10 @@ function onClearResults() {
             }
           "
         />
+
+        <div v-if="secretRefusal" class="px-page-edge shrink-0 pt-3">
+          <SecretSaveRefusal :refusal="secretRefusal" />
+        </div>
 
         <!-- Sticky footer — tab-aware, always visible -->
         <div

@@ -23,6 +23,12 @@ import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import WriteOnlyField from "./WriteOnlyField.vue";
+import SecretPicker from "@/views/Secrets/SecretPicker.vue";
+import { useSecretPickerShown } from "@/views/Secrets/useSecretConsumer";
+import { refText } from "@/views/Secrets/secretRefs";
+import type { SecretPickerItem } from "@/services/secrets";
+import { cookieHasSecret, isKept, setReplaced, slotKey } from "@/utils/synthetics/writeOnly";
 
 const props = defineProps<{ check: BrowserCheck; validationErrors?: Record<string, string> }>();
 const emit = defineEmits<{ "update:check": [value: BrowserCheck] }>();
@@ -69,6 +75,48 @@ const authPassword = computed({
     }),
 });
 
+const passwordKey = slotKey.authPassword();
+function setPasswordKept(kept: boolean) {
+  const next = setReplaced(props.check, passwordKey, !kept);
+  emit("update:check", { ...next, auth: next.auth ? { ...next.auth, password: "" } : next.auth });
+}
+
+const pickerShown = useSecretPickerShown();
+const checkId = computed(() => String(props.check.id ?? ""));
+
+/** A password is one value, so a picked ref replaces it and the kept value with it. */
+function pickPassword(item: SecretPickerItem) {
+  const next = setReplaced(props.check, passwordKey, true);
+  const password = refText(item.kind, item.name);
+  emit("update:check", {
+    ...next,
+    auth: next.auth
+      ? { ...next.auth, password }
+      : { type: "basic" as const, username: "", password },
+  });
+}
+
+// ── Browser secrets (write-only, V39) ─────────────────────────────────────────
+
+const browserSecrets = computed(() => props.check.secrets ?? []);
+
+function patchBrowserSecret(index: number, value: string, base: BrowserCheck = props.check) {
+  const secrets = (base.secrets ?? []).map((s, i) => (i === index ? { ...s, value } : s));
+  emit("update:check", { ...base, secrets });
+}
+
+function setBrowserSecretKept(index: number, kept: boolean) {
+  const key = slotKey.browserSecret(browserSecrets.value[index].name);
+  patchBrowserSecret(index, "", setReplaced(props.check, key, !kept));
+}
+
+function removeBrowserSecret(index: number) {
+  emit("update:check", {
+    ...props.check,
+    secrets: browserSecrets.value.filter((_, i) => i !== index),
+  });
+}
+
 // ── Headers ───────────────────────────────────────────────────────────────────
 
 const headers = computed(() => props.check.headers ?? []);
@@ -114,6 +162,24 @@ function removeCookie(index: number) {
     cookies: cookies.value.filter((_, i) => i !== index),
   });
 }
+
+const cookieKey = (c: { name: string; domain: string }) => slotKey.cookie(c.name, c.domain);
+
+function setCookieKept(index: number, kept: boolean) {
+  const next = setReplaced(props.check, cookieKey(cookies.value[index]), !kept);
+  const updated = (next.cookies ?? []).map((c, i) => (i === index ? { ...c, value: "" } : c));
+  emit("update:check", { ...next, cookies: updated });
+}
+
+function pickCookie(index: number, item: SecretPickerItem) {
+  const current = cookies.value[index].value;
+  updateCookie(index, "value", `${current}${refText(item.kind, item.name)}`);
+}
+
+function setCookieSecure(index: number, secure: boolean) {
+  const updated = cookies.value.map((c, i) => (i === index ? { ...c, secure } : c));
+  emit("update:check", { ...props.check, cookies: updated });
+}
 </script>
 
 <template>
@@ -151,18 +217,155 @@ function removeCookie(index: number) {
                 t("synthetics.authNetwork.secret")
               }}</OBadge>
             </label>
-            <OInput
+            <WriteOnlyField
               v-model="authPassword"
-              type="password"
+              :meta="check.writeOnly?.[passwordKey]"
+              :kept="isKept(check, passwordKey)"
               :placeholder="t('synthetics.authNetwork.passwordPlaceholder')"
-              :error="!!validationErrors?.['auth.password']"
-              :error-message="raw(validationErrors?.['auth.password'])"
+              :error="raw(validationErrors?.['auth.password'])"
               data-test="synthetics-check-auth-network-password-input"
-            />
+              @update:kept="setPasswordKept"
+            >
+              <template v-if="pickerShown" #append>
+                <SecretPicker
+                  consumer-type="synthetics_check"
+                  :consumer-id="checkId"
+                  :locations="check.locations"
+                  data-test="synthetics-check-auth-network-password-secret-picker"
+                  @pick="pickPassword"
+                />
+              </template>
+            </WriteOnlyField>
+            <span class="text-text-secondary text-xs">{{
+              t("synthetics.secretFields.keptHint")
+            }}</span>
           </div>
         </template>
       </div>
 
+      <!-- Browser secrets and cookies saved on the check: values are write-only (V39). -->
+      <template v-if="browserSecrets.length">
+        <OSeparator />
+        <div class="flex flex-col gap-2" data-test="synthetics-check-auth-network-browser-secrets">
+          <h4 class="text-text-body text-sm font-medium">
+            {{ t("synthetics.secretFields.browserSecrets") }}
+          </h4>
+          <div
+            v-for="(secret, index) in browserSecrets"
+            :key="secret.id ?? secret.name"
+            class="flex items-start gap-2"
+          >
+            <div class="w-48 shrink-0">
+              <OInput
+                :model-value="secret.name"
+                readonly
+                :data-test="`synthetics-check-auth-network-browser-secret-name-${index}`"
+              />
+            </div>
+            <WriteOnlyField
+              class="min-w-0 flex-1"
+              :model-value="secret.value"
+              :meta="check.writeOnly?.[slotKey.browserSecret(secret.name)]"
+              :kept="isKept(check, slotKey.browserSecret(secret.name))"
+              :data-test="`synthetics-check-auth-network-browser-secret-${index}`"
+              @update:model-value="(v: string) => patchBrowserSecret(index, v)"
+              @update:kept="(kept: boolean) => setBrowserSecretKept(index, kept)"
+            />
+            <OButton
+              variant="ghost"
+              size="icon-sm"
+              icon-left="close"
+              :aria-label="t('synthetics.secretFields.removeBrowserSecret', { name: secret.name })"
+              :data-test="`synthetics-check-auth-network-remove-browser-secret-${index}-btn`"
+              @click="removeBrowserSecret(index)"
+            />
+          </div>
+        </div>
+      </template>
+
+      <template v-if="cookies.length">
+        <OSeparator />
+        <div class="flex flex-col gap-2" data-test="synthetics-check-auth-network-cookies">
+          <h4 class="text-text-body text-sm font-medium">
+            {{ t("synthetics.authNetwork.preSetCookies") }}
+          </h4>
+          <div
+            v-for="(cookie, index) in cookies"
+            :key="cookie.id ?? index"
+            class="flex flex-col gap-1"
+          >
+            <div class="flex items-start gap-2">
+              <div class="w-40 shrink-0">
+                <OInput
+                  :model-value="cookie.name"
+                  :readonly="isKept(check, cookieKey(cookie)) && !cookie.value"
+                  :placeholder="t('synthetics.authNetwork.cookieNamePlaceholder')"
+                  :data-test="`synthetics-check-auth-network-cookie-name-${index}-input`"
+                  @update:model-value="updateCookie(index, 'name', String($event))"
+                />
+              </div>
+              <WriteOnlyField
+                class="min-w-0 flex-1"
+                :model-value="cookie.value"
+                :meta="check.writeOnly?.[cookieKey(cookie)]"
+                :kept="isKept(check, cookieKey(cookie))"
+                :placeholder="t('synthetics.authNetwork.cookieValuePlaceholder')"
+                :data-test="`synthetics-check-auth-network-cookie-value-${index}`"
+                @update:model-value="(v: string) => updateCookie(index, 'value', v)"
+                @update:kept="(kept: boolean) => setCookieKept(index, kept)"
+              >
+                <template v-if="pickerShown" #append>
+                  <SecretPicker
+                    consumer-type="synthetics_check"
+                    :consumer-id="checkId"
+                    :locations="check.locations"
+                    :data-test="`synthetics-check-auth-network-cookie-${index}-secret-picker`"
+                    @pick="(item: SecretPickerItem) => pickCookie(index, item)"
+                  />
+                </template>
+              </WriteOnlyField>
+              <div class="w-40 shrink-0">
+                <OInput
+                  :model-value="cookie.domain"
+                  :readonly="isKept(check, cookieKey(cookie)) && !cookie.value"
+                  :placeholder="t('synthetics.authNetwork.cookieDomainPlaceholder')"
+                  :data-test="`synthetics-check-auth-network-cookie-domain-${index}-input`"
+                  @update:model-value="updateCookie(index, 'domain', String($event))"
+                />
+              </div>
+              <OButton
+                variant="ghost"
+                size="icon-sm"
+                icon-left="close"
+                :aria-label="t('synthetics.authNetwork.removeCookie', { index })"
+                :data-test="`synthetics-check-auth-network-remove-cookie-${index}-btn`"
+                @click="removeCookie(index)"
+              />
+            </div>
+            <span
+              v-if="isKept(check, cookieKey(cookie)) && !cookie.value"
+              class="text-text-secondary text-xs"
+              :data-test="`synthetics-check-auth-network-cookie-rename-${index}-hint`"
+            >
+              {{ t("synthetics.secretFields.cookieRenameNeedsValue") }}
+            </span>
+            <div class="flex items-center gap-2">
+              <OSwitch
+                :model-value="cookieHasSecret(cookie.value) || !!cookie.secure"
+                :disabled="cookieHasSecret(cookie.value)"
+                :label="t('synthetics.secretFields.secure')"
+                :data-test="`synthetics-check-auth-network-cookie-secure-${index}`"
+                @update:model-value="
+                  (v: boolean | string | number) => setCookieSecure(index, v === true)
+                "
+              />
+              <span v-if="cookieHasSecret(cookie.value)" class="text-text-secondary text-xs">
+                {{ t("synthetics.secretFields.cookieSecureAlways") }}
+              </span>
+            </div>
+          </div>
+        </div>
+      </template>
       <!-- Custom headers -->
       <template v-if="false">
         <OSeparator />

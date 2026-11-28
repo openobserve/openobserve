@@ -625,7 +625,7 @@ pub async fn create(
     let db = get_orm_client_rw().await;
     let org_max = create_gate(pd_table::get_settings(db, org).await?.as_ref()).map_err(Invalid)?;
     let dashboard_max = get_config().public_dashboards.max_links_per_dashboard;
-    let id = ider::uuid();
+    let id = ider::ksuid();
     let slug = gen_unique_slug().await?;
     let model = PublicDashboard {
         id: id.clone(),
@@ -4538,7 +4538,7 @@ mod tests {
     #[cfg(all(feature = "enterprise", feature = "test-utils"))]
     #[tokio::test]
     async fn gate04_a_link_variable_edit_selecting_an_unreadable_stream_is_refused() {
-        let editor = format!("{}@example.com", config::ider::uuid());
+        let editor = format!("{}@example.com", config::ider::ksuid());
         crate::authz::fake_checker().grant_read(
             &editor,
             &crate::authz::TypedStream {
@@ -5115,7 +5115,7 @@ mod tests {
             }
         );
         let (mut link, ..) = ctx_parts();
-        link.id = ider::uuid();
+        link.id = ider::ksuid();
         link.time_ranges = Some(json!([{ "type": "relative", "secs": 3600 }]).to_string());
         let live = materialize::Live {
             dashboard_updated_at: 1,
@@ -5274,7 +5274,7 @@ mod tests {
     #[tokio::test]
     async fn the_deadline_check_reads_each_enrichment_table_in_its_own_org() {
         let checker = crate::authz::fake_checker();
-        let publisher = format!("{}@example.com", config::ider::uuid());
+        let publisher = format!("{}@example.com", config::ider::ksuid());
         let panel = ManifestPanel {
             enrichment_tables: vec![("o1".to_string(), "own_lookup".into())],
             ..Default::default()
@@ -5306,7 +5306,7 @@ mod tests {
     {
         use transform::enrichment::{ENRICHMENT_TABLES, StreamTable};
         crate::authz::fake_checker();
-        let name = format!("fallback_{}", config::ider::uuid().to_lowercase());
+        let name = format!("fallback_{}", config::ider::ksuid().to_lowercase());
         let key = format!("{}/enrichment_tables/{name}", config::DEFAULT_ORG);
         let table = StreamTable {
             org_id: config::DEFAULT_ORG.into(),
@@ -5327,7 +5327,7 @@ mod tests {
         let recorded = vec![(config::DEFAULT_ORG.to_string(), name)];
         assert_eq!(run.manifest.enrichment_tables, recorded);
         // A publisher with no role in the default org.
-        let publisher = format!("{}@example.com", config::ider::uuid());
+        let publisher = format!("{}@example.com", config::ider::ksuid());
         let probe = AuthorizerProbe(tokio::sync::OnceCell::new_with(Some(Ok(()))));
         assert_eq!(
             authorize_tables("o1", &publisher, &recorded, &probe).await,

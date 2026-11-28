@@ -429,7 +429,7 @@ fn new_check_id(check: &Synthetic, use_given_id: bool) -> String {
     if use_given_id && !check.id.is_empty() {
         check.id.clone()
     } else {
-        config::ider::uuid()
+        config::ider::ksuid()
     }
 }
 

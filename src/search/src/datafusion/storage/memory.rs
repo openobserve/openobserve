@@ -405,7 +405,7 @@ mod tests {
         std::sync::Arc<std::sync::atomic::AtomicUsize>,
         std::sync::Arc<std::sync::atomic::AtomicUsize>,
     ) {
-        let id = config::ider::uuid();
+        let id = config::ider::ksuid();
         let key = Path::from(format!("files/{id}/logs/range_fixture"));
         let inner = InMemory::new();
         inner

@@ -1125,7 +1125,7 @@ mod tests {
             vec![19, 0, 23]
         );
         let directory = std::path::Path::new(&config::get_config().common.data_tmp_dir)
-            .join(config::ider::uuid());
+            .join(config::ider::ksuid());
         std::fs::create_dir_all(&directory).unwrap();
         for (name, batch) in [("old.parquet", old), ("new.parquet", new)] {
             let file = std::fs::File::create(directory.join(name)).unwrap();

@@ -54,6 +54,9 @@ import { unboundPlaceholders } from "@/components/synthetics/variables/placehold
 import type { VariableSuggestion } from "@/components/synthetics/variables/suggestions";
 import VariableSuggestionRow from "@/components/synthetics/variables/VariableSuggestionRow.vue";
 import type { CheckboxModelValue } from "@/lib/forms/Checkbox/OCheckbox.types";
+import WriteOnlyField from "@/components/synthetics/configure/WriteOnlyField.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import { stepValueKept } from "@/utils/synthetics/writeOnly";
 import BrowserJourneyLocator from "./BrowserJourneyLocator.vue";
 import BrowserJourneyAssertion from "./BrowserJourneyAssertion.vue";
 import SubtestPicker from "./SubtestPicker.vue";
@@ -521,8 +524,18 @@ const hasAdvancedChanges = computed(
       </div>
 
       <!-- Value (action-specific label) -->
+      <div v-if="showValue && stepValueKept(step)" class="flex flex-col gap-1">
+        <span class="text-text-body text-sm font-medium">{{ valueLabel }}</span>
+        <WriteOnlyField
+          model-value=""
+          :meta="step.valueSet"
+          kept
+          data-test="synthetics-journey-step-value"
+          @update:kept="(kept: boolean) => update({ valueReplaced: !kept, value: '' })"
+        />
+      </div>
       <OTemplateInput
-        v-if="showValue"
+        v-else-if="showValue"
         v-model="valueComputed"
         :label="valueLabel"
         :placeholder="valueLabel"
@@ -539,6 +552,16 @@ const hasAdvancedChanges = computed(
           <VariableSuggestionRow :suggestion="suggestion" :active="active" />
         </template>
       </OTemplateInput>
+      <OButton
+        v-if="showValue && step.valueSet && step.valueReplaced"
+        variant="outline"
+        size="sm"
+        class="self-start"
+        data-test="synthetics-journey-step-value-cancel"
+        @click="update({ valueReplaced: false, value: '' })"
+      >
+        {{ t("common.cancel") }}
+      </OButton>
       <OBanner
         v-if="unboundNames.length"
         variant="warning"

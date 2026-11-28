@@ -1301,7 +1301,7 @@ pub async fn check_and_add_to_org(
             // Create a default org for the user
             let org = Organization {
                 // id will be overridden by the service function
-                identifier: ider::uuid(),
+                identifier: ider::ksuid(),
                 name: DEFAULT_ORG.to_string(),
                 org_type: USER_DEFAULT.to_owned(),
                 service_account: None,

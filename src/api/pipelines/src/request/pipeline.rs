@@ -835,7 +835,7 @@ mod tests {
         }
 
         fn user() -> String {
-            format!("{}@example.com", config::ider::uuid())
+            format!("{}@example.com", config::ider::ksuid())
         }
 
         fn node(id: &str, org: &str, stream: &str, io_type: &str) -> serde_json::Value {
@@ -1064,7 +1064,7 @@ mod tests {
 
         /// A caller who may read both streams of [`stream_pipeline`].
         fn reader(org: &str, id: &str) -> String {
-            let caller = format!("{}@example.com", config::ider::uuid());
+            let caller = format!("{}@example.com", config::ider::ksuid());
             for name in [format!("{id}_in"), format!("{id}_out")] {
                 fake_checker().grant_read(
                     &caller,

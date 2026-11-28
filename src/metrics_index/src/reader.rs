@@ -395,7 +395,7 @@ mod tests {
             ],
         )
         .unwrap();
-        let id = config::ider::uuid();
+        let id = config::ider::ksuid();
         let mut file = FileKey::new(
             0,
             format!("{id}:default"),

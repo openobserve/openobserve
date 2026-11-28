@@ -17,6 +17,7 @@ import { mutationOptions, queryOptions } from "@tanstack/vue-query";
 import syntheticsService from "./synthetics";
 import { syntheticsKeys } from "./synthetics.querykeys";
 import { LIVE_STALE_TIME, NORMAL_STALE_TIME } from "@/composables/query/cachePolicy";
+import type { AgentSetup, SyntheticLocation, SyntheticLocationDetail } from "@/types/synthetics";
 
 export const syntheticsMonitorsQuery = (org: string, folderId?: string) =>
   queryOptions({
@@ -37,6 +38,31 @@ export const agentTokensQuery = (org: string) =>
     staleTime: NORMAL_STALE_TIME,
   });
 
+export const syntheticsLocationsQuery = (org: string) =>
+  queryOptions({
+    queryKey: syntheticsKeys.locations(org),
+    queryFn: async (): Promise<SyntheticLocation[]> =>
+      ((await syntheticsService.getLocations(org)).data as { locations?: SyntheticLocation[] })
+        .locations ?? [],
+    staleTime: NORMAL_STALE_TIME,
+  });
+
+export const syntheticsLocationQuery = (org: string, id: string) =>
+  queryOptions({
+    queryKey: syntheticsKeys.location(org, id),
+    queryFn: async () =>
+      (await syntheticsService.getLocation(org, id)).data as SyntheticLocationDetail,
+    staleTime: NORMAL_STALE_TIME,
+  });
+
+export const agentSetupQuery = (org: string) =>
+  queryOptions({
+    queryKey: syntheticsKeys.agentSetup(org),
+    // Feeds an advisory notice that viewers without agent access also see.
+    queryFn: async () => (await syntheticsService.getAgentSetup(org, true)).data as AgentSetup,
+    staleTime: NORMAL_STALE_TIME,
+  });
+
 // ── Writes ──────────────────────────────────────────────────────────────────
 
 export const createAgentTokenMutation = (org: string) =>
@@ -49,6 +75,13 @@ export const rotateAgentTokenMutation = (org: string) =>
   mutationOptions({
     mutationFn: (name?: string) => syntheticsService.rotateAgentToken(org, name),
     meta: { invalidates: [syntheticsKeys.agentTokensAll(org)], silentError: true },
+  });
+
+/** A view writes an audit event but changes no token, so it invalidates nothing. */
+export const viewAgentTokenMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: (name: string) => syntheticsService.viewAgentToken(org, name),
+    meta: { silentError: true },
   });
 
 export const setAgentTokenEnabledMutation = (org: string) =>
@@ -69,5 +102,7 @@ export const saveMonitorMutation = (org: string) =>
       vars.id
         ? syntheticsService.update(org, vars.id, vars.payload, vars.folderId)
         : syntheticsService.create(org, vars.payload, vars.folderId),
+    // The payload can hold write-only values; do not keep it once the editor lets go.
+    gcTime: 0,
     meta: { invalidates: [syntheticsKeys.monitorsAll(org)], silentError: true },
   });

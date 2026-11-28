@@ -212,7 +212,7 @@ pub async fn upsert(
         }
         None => {
             let model = oncall_schedules::ActiveModel {
-                id: Set(ider::uuid()),
+                id: Set(ider::ksuid()),
                 org_id: Set(org_id.to_string()),
                 team_id: Set(team_id.to_string()),
                 timezone: Set(timezone.to_string()),

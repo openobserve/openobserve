@@ -199,7 +199,7 @@ async fn process_zip_with_limits(
                 version: version.clone(),
                 source_file_name: minified,
                 source_map_file_name: smap,
-                file_store_id: format!("{}.js.map", config::ider::uuid()),
+                file_store_id: format!("{}.js.map", config::ider::ksuid()),
                 file_type: FileType::SourceMap,
                 cluster: cluster.clone(),
                 created_at: now,
@@ -1093,7 +1093,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_zip_file_between_old_and_new_default_is_accepted() {
-        let org = &format!("org_zip_file_ok_{}", config::ider::uuid());
+        let org = &format!("org_zip_file_ok_{}", config::ider::ksuid());
         let data = vec![0u8; 6 * MB as usize];
         let zip = build_zip(&[("big.js.map", data.as_slice())]);
         process_zip_with_limits(org, None, None, None, zip, &limits(50, 500, 5000))

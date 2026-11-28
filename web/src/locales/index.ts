@@ -21,7 +21,7 @@ import { setBadgeTranslator } from "@/lib/core/Badge/badgeI18n";
 // Only the fallback locale (en-us) is bundled into the main chunk. Every other
 // language is code-split and loaded on demand via loadLocaleMessages() so we
 // don't ship every locale file to every user on first load.
-import enLocale from "./languages/en-US.json?without=serviceVersions,autoresolve";
+import enLocale from "./languages/en-US.json?without=serviceVersions,autoresolve,secrets";
 
 // Maps an i18n locale code to its source file name (without extension).
 // Exported so tests can assert it stays in sync with the files on disk — an
@@ -127,13 +127,15 @@ export const loadLocaleMessages = async (locale: string): Promise<void> => {
 
 /** Merges the en-US blocks the entry chunk leaves out; the app awaits it before the first render. */
 export const loadLazyLocaleBlocks = async (): Promise<void> => {
-  const [serviceVersions, autoresolve] = await Promise.all([
+  const [serviceVersions, autoresolve, secrets] = await Promise.all([
     import("./languages/en-US.json?block=serviceVersions"),
     import("./languages/en-US.json?block=autoresolve"),
+    import("./languages/en-US.json?block=secrets"),
   ]);
   i18n.global.mergeLocaleMessage("en-us", {
     serviceVersions: serviceVersions.default,
     autoresolve: autoresolve.default,
+    secrets: secrets.default,
   });
 };
 

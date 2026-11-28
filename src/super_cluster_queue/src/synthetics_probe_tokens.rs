@@ -268,6 +268,20 @@ mod tests {
         }
     }
 
+    /// `add` is the owned-row writer, so a replicated token gets this region's hash and owned
+    /// row under this region's DEK; a direct insert would skip both.
+    #[test]
+    fn the_receiver_writes_through_the_owned_row_writer() {
+        let source = include_str!("synthetics_probe_tokens.rs");
+        assert!(source.contains(&["synthetics_probe_tokens::add", "(&record)"].concat()));
+        for bypass in [
+            ["Entity", "insert"].join("::"),
+            ["Active", "Model"].concat(),
+        ] {
+            assert!(!source.contains(&bypass), "{bypass} bypasses the owned row");
+        }
+    }
+
     /// The runtime tables are region-owned: `synthetics_jobs` is a lease queue,
     /// `synthetics_runs` holds a counter, `synthetics_agents` is liveness for
     /// agents that long-poll one region. Two regions holding copies is a

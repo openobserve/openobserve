@@ -29,6 +29,8 @@ pub struct Model {
     pub is_global: bool,
     pub created_at: i64,
     pub updated_at: i64,
+    /// `env_incarnation(org_id, id, created_at)`; `''` until the post-boot fill reaches the row.
+    pub incarnation: String,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

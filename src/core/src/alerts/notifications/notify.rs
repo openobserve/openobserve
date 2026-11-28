@@ -27,9 +27,9 @@ use super::{
     jira,
     org_default::{EffectiveTemplate, TemplateSource, resolve_effective_template_for},
     platform::{self, NOTHING_TO_CLOSE, Platform, PlatformRejected, platform_of},
-    send::{SendError, Subject, send_to_destination},
+    send::{SendError, Subject, refuse_unsupported_refs, send_to_destination},
 };
-use crate::alerts::{alert::send_http_notification, destinations, slack_publish};
+use crate::alerts::{alert::send_saved_http_notification, destinations, slack_publish};
 
 /// The destination metadata key that forces the legacy body or the rendered envelope (D1).
 pub const PAYLOAD_FORMAT_KEY: &str = "payload_format";
@@ -87,6 +87,10 @@ impl NotifyError {
             Some(SendError::Rejected { status, body }) => NotifyError::Rejected {
                 status: status.as_u16(),
                 body: body.clone().unwrap_or_default(),
+            },
+            Some(SendError::RedirectRefused(status)) => NotifyError::Rejected {
+                status: status.as_u16(),
+                body: e.to_string(),
             },
             Some(SendError::NoOrgMemberRecipient(_)) => {
                 NotifyError::Skipped(SkipReason::NoOrgMemberRecipient)
@@ -280,25 +284,35 @@ async fn send_routed(
     let response = match (route, dest_type) {
         (Route::PlatformResolve(platform), DestinationType::Http(endpoint)) => {
             let key = ctx.episode_id.as_deref().unwrap_or_default();
-            platform_resolve(platform, endpoint, key).await?
+            platform_resolve(&resolved.destination, platform, endpoint, key).await?
         }
         (Route::Legacy(body), DestinationType::Http(endpoint)) => {
-            send_http_notification(endpoint, body.to_string())
+            send_saved_http_notification(&resolved.destination, endpoint, None, body.to_string())
                 .await
                 .map_err(NotifyError::from_send)?
         }
-        (_, DestinationType::SlackApp(target)) => slack_publish::send_templated_post(
-            &slack_publish::QueueSink,
+        (_, DestinationType::SlackApp(target)) => {
+            refuse_unsupported_refs(dest_type).map_err(NotifyError::from_send)?;
+            slack_publish::send_templated_post(
+                &slack_publish::QueueSink,
+                org_id,
+                target,
+                template,
+                ctx,
+            )
+            .await
+            .map_err(NotifyError::from_send)?
+        }
+        _ => send_to_destination(
             org_id,
-            target,
+            Subject::Kind(subject),
+            &resolved.destination,
+            dest_type,
             template,
             ctx,
         )
         .await
         .map_err(NotifyError::from_send)?,
-        _ => send_to_destination(org_id, Subject::Kind(subject), dest_type, template, ctx)
-            .await
-            .map_err(NotifyError::from_send)?,
     };
     Ok(SendOutcome {
         response,
@@ -310,11 +324,12 @@ async fn send_routed(
 
 /// Best effort (D8): a key the platform never opened, or closed already, is a success.
 async fn platform_resolve(
+    destination: &Destination,
     platform: Platform,
     endpoint: &config::meta::destinations::Endpoint,
     key: &str,
 ) -> Result<String, NotifyError> {
-    platform::send_resolve(platform, endpoint, key)
+    platform::send_saved_resolve(destination, platform, endpoint, key)
         .await
         .or_else(|e| resolve_answer(platform, e))
 }
@@ -329,7 +344,7 @@ fn resolve_answer(platform: Platform, e: anyhow::Error) -> Result<String, Notify
             status: r.status.as_u16(),
             body: r.body.clone().unwrap_or_default(),
         }),
-        None => Err(NotifyError::Transport(e.to_string())),
+        None => Err(NotifyError::from_send(e)),
     }
 }
 

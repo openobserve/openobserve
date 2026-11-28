@@ -48,7 +48,7 @@ use openobserve_api_management::request::{OutboundAudit, url_origin_or_redacted}
 use openobserve_api_management::request::{
     alerts, announcements, authz, dashboards, db_monitoring, downtimes, folders, gen_ai_health,
     ingest_rejections, kv, metrics_usage, model_pricing, organization, public_dashboards,
-    query_history, resources, rum_analytics, sample_data, security, service_accounts,
+    query_history, resources, rum_analytics, sample_data, secrets, security, service_accounts,
     service_identity, service_streams, service_versions, short_url, slack, slos, sourcemaps,
     status, status_pages, stream, synthetics, users,
 };
@@ -114,6 +114,9 @@ use crate::{
 const FLEET_RETRY_AFTER_SECS: &str = "60";
 #[cfg(feature = "enterprise")]
 const LICENSE_DENIAL_AUDIT_MSG: &str = "The license does not entitle this feature";
+
+#[derive(Clone)]
+struct StreamAliasExtensions(axum::http::Extensions);
 
 /// Create CORS layer for axum
 pub fn cors_layer() -> CorsLayer {
@@ -344,12 +347,16 @@ fn refusal_response(error: AuthError, denial: Option<Response>) -> Response {
     }
 }
 
-/// The route template axum matched, which a caller cannot shape the way it shapes the path.
+/// Ingestion auth classifies route templates, so concrete stream aliases must keep their
+/// parameterized stream identity.
 pub(crate) fn matched_route(request: &Request) -> Option<String> {
-    request
-        .extensions()
-        .get::<MatchedPath>()
-        .map(|route| route.as_str().to_owned())
+    let route = request.extensions().get::<MatchedPath>()?.as_str();
+    if let Some((prefix, suffix)) = route.rsplit_once("/{org_id}/secrets/")
+        && matches!(suffix, "_json" | "_multi")
+    {
+        return Some(format!("{prefix}/{{org_id}}/{{stream_name}}/{suffix}"));
+    }
+    Some(route.to_owned())
 }
 
 /// Authentication middleware for API routes.
@@ -557,6 +564,9 @@ fn is_secret_write(method: &Method, path: &str) -> bool {
     if method == Method::POST && segments.ends_with(&["http_trigger", "test"]) {
         return true;
     }
+    if paths_after_org(&segments).any(is_secret_store_family_write) {
+        return true;
+    }
     if let Some(slack) = slack_path(&segments) {
         return is_slack_secret_write(method, slack);
     }
@@ -568,6 +578,43 @@ fn is_secret_write(method: &Method, path: &str) -> bool {
         || task_path
             .iter()
             .any(|segment| matches!(*segment, "auth" | "headers" | "signing"))
+}
+
+/// Store, agent-token, toolset, check, variable and runner-ack bodies hold credentials in
+/// fields `is_secret_field` misses.
+#[cfg(any(feature = "enterprise", test))]
+fn is_secret_store_family_write(rest: &[&str]) -> bool {
+    match rest {
+        ["secrets", ..]
+        | ["ai", "toolsets", ..]
+        | ["synthetics", "agent-tokens", ..]
+        | ["synthetics", "variables", ..]
+        | ["synthetics", "environments", _, "variables", ..]
+        | ["synthetics", _, "variables", ..]
+        | ["synthetics", "jobs", "ack"]
+        | ["synthetics"] => true,
+        ["synthetics", id] | ["synthetics", id, "run"] => !matches!(
+            *id,
+            "locations"
+                | "variables"
+                | "environments"
+                | "jobs"
+                | "agent"
+                | "agent-setup"
+                | "agent-tokens"
+        ),
+        _ => false,
+    }
+}
+
+// An org can itself be named `api` or `v2`, so either org slot may require redaction.
+#[cfg(any(feature = "enterprise", test))]
+fn paths_after_org<'a>(segments: &'a [&'a str]) -> impl Iterator<Item = &'a [&'a str]> {
+    let prefixed = match segments {
+        ["api" | "v2", _, rest @ ..] => Some(rest),
+        _ => None,
+    };
+    segments.get(1..).into_iter().chain(prefixed)
 }
 
 /// The segments after `{org}/slack/`: the audit layer runs below `/api` and the base URI.
@@ -1562,13 +1609,66 @@ fn autoresolve_routes(router: Router) -> Router {
         .route("/v2/{org_id}/autoresolve/saved/{autoresolve_id}/corrections/{correction_id}", delete(autoresolve::saved::remove_correction))
 }
 
+fn with_secrets_stream_aliases(mut router: Router, suffixes: &[&str]) -> Router {
+    let target = router
+        .clone()
+        .route_layer(middleware::from_fn(restore_stream_alias_extensions));
+    let service = tower::service_fn(move |mut request: Request| {
+        // Rerouting must replace the outer org capture, or tuple Path extractors see it twice.
+        let extensions = std::mem::take(request.extensions_mut());
+        request
+            .extensions_mut()
+            .insert(StreamAliasExtensions(extensions));
+        tower::ServiceExt::oneshot(target.clone(), request)
+    });
+    for suffix in suffixes {
+        // These specialize existing stream operations; they do not add secret-store operations.
+        router = router.route_service(&format!("/{{org_id}}/secrets/{suffix}"), service.clone());
+    }
+    router
+}
+
+async fn restore_stream_alias_extensions(mut request: Request, next: Next) -> Response {
+    if let Some(StreamAliasExtensions(mut extensions)) =
+        request.extensions_mut().remove::<StreamAliasExtensions>()
+    {
+        if extensions.get::<axum::extract::OriginalUri>().is_some() {
+            request
+                .extensions_mut()
+                .remove::<axum::extract::OriginalUri>();
+        }
+        extensions.extend(std::mem::take(request.extensions_mut()));
+        *request.extensions_mut() = extensions;
+    }
+    next.run(request).await
+}
+
+#[rustfmt::skip]
+fn stream_suffix_routes() -> Router {
+    Router::new()
+        .route("/{org_id}/{stream_name}/_multi", post(logs::ingest::multi))
+        .route("/{org_id}/{stream_name}/_json", post(logs::ingest::json))
+        .route("/{org_id}/{stream_name}/_around", get(search::around_v1).post(search::around_v2))
+        .route("/{org_id}/{stream_name}/_values", get(search::values))
+        .route("/{org_id}/{stream_name}/traces/{trace_id}/dag", get(traces::dag::get_trace_dag))
+}
+
+fn secrets_stream_suffix_routes() -> Router {
+    let router = Router::new().merge(stream_suffix_routes());
+    with_secrets_stream_aliases(
+        router,
+        &["_multi", "_json", "_around", "_values", "traces/values/dag"],
+    )
+}
+
 #[rustfmt::skip]
 fn service_route_table() -> Router {
     // Downtimes, Slack, search and service streams live in their own tables to keep this function under the line limit.
     let mut router = Router::new()
         .merge(downtime_routes())
         .merge(slack_routes())
-        .merge(search_routes());
+        .merge(search_routes())
+        .merge(secrets_stream_suffix_routes());
     router = public_dashboard_admin_routes(router);
     router = router.merge(service_streams_routes());
     // Full UI configuration — authenticated counterpart of the unauthenticated
@@ -1667,8 +1767,6 @@ fn service_route_table() -> Router {
 
         // Logs ingestion
         .route("/{org_id}/_bulk", post(logs::ingest::bulk))
-        .route("/{org_id}/{stream_name}/_multi", post(logs::ingest::multi))
-        .route("/{org_id}/{stream_name}/_json", post(logs::ingest::json))
         .route("/{org_id}/_hec", post(logs::ingest::hec))
         .route("/{org_id}/loki/api/v1/push", post(logs::loki::loki_push))
         .route("/{org_id}/v1/logs", post(logs::ingest::otlp_logs_write))
@@ -1688,7 +1786,6 @@ fn service_route_table() -> Router {
         .route("/{org_id}/{stream_name}/traces/session/details", get(traces::session::get_session_details))
         .route("/{org_id}/{stream_name}/traces/user", get(traces::user::get_latest_users))
         .route("/{org_id}/{stream_name}/traces/time_range", get(traces::time_index::get_trace_time_range))
-        .route("/{org_id}/{stream_name}/traces/{trace_id}/dag", get(traces::dag::get_trace_dag))
 
         // Profiles query (ingest remains under /v1/profiles)
         .route("/{org_id}/{stream_name}/profiles/meta", get(profiles_query::get_profiles_meta))
@@ -1728,8 +1825,6 @@ fn service_route_table() -> Router {
         .route("/{org_id}/_search", post(search::search))
         .route("/{org_id}/query_functions", get(search::query_functions::list))
         .route("/{org_id}/_search_partition", post(search::search_partition))
-        .route("/{org_id}/{stream_name}/_around", get(search::around_v1).post(search::around_v2))
-        .route("/{org_id}/{stream_name}/_values", get(search::values))
         .route("/{org_id}/_search_history", post(search::search_history))
         .route("/{org_id}/result_schema", post(search::result_schema))
 
@@ -2255,7 +2350,76 @@ fn service_route_table() -> Router {
         .route(
             "/{org_id}/service_identity/aliases/{alias_key}",
             put(service_identity::update_alias).delete(service_identity::delete_alias),
-        );
+        )
+        .route("/{org_id}/secrets", get(secrets::list).post(secrets::create))
+        .route("/{org_id}/secrets/status", get(secrets::status))
+        .route("/{org_id}/secrets/prescan", get(secrets::prescan))
+        .route(
+            "/{org_id}/secrets/backends",
+            get(secrets::backends::list_backends).post(secrets::backends::create_backend),
+        )
+        .route(
+            "/{org_id}/secrets/backends/{backend_id}",
+            put(secrets::backends::update_backend).delete(secrets::backends::delete_backend),
+        )
+        .route(
+            "/{org_id}/secrets/backends/{backend_id}/credential",
+            put(secrets::backends::put_backend_credential),
+        )
+        .route(
+            "/{org_id}/secrets/backends/{backend_id}/test",
+            post(secrets::backends::test_backend),
+        )
+        .route(
+            "/{org_id}/secrets/backends/{backend_id}/grants",
+            get(secrets::backends::get_backend_grants).put(secrets::backends::put_backend_grants),
+        )
+        .route(
+            "/{org_id}/secrets/backends/{backend_id}/identity",
+            get(secrets::backends::get_backend_identity),
+        )
+        .route(
+            "/{org_id}/secrets/backends/{backend_id}/trust_template",
+            get(secrets::backends::get_backend_trust_template),
+        )
+        .route(
+            "/{org_id}/secrets/backends/{backend_id}/identity/rotate",
+            post(secrets::backends::rotate_backend_identity),
+        )
+        .route(
+            "/{org_id}/secrets/backend_identities/{target_org}/{provider}",
+            put(secrets::backends::put_backend_identity),
+        )
+        .route(
+            "/{org_id}/secrets/identity_jobs",
+            get(secrets::backends::list_identity_jobs),
+        )
+        .route(
+            "/{org_id}/secrets/identities/{target_org}/{provider}/retry",
+            post(secrets::backends::retry_backend_identity),
+        )
+        .route(
+            "/{org_id}/secrets/_all/grants",
+            get(secrets::get_create_grants).put(secrets::put_create_grants),
+        )
+        .route(
+            "/{org_id}/secrets/{secret_id}",
+            get(secrets::get).put(secrets::describe).delete(secrets::delete),
+        )
+        .route(
+            "/{org_id}/secrets/{secret_id}/values/{env}",
+            put(secrets::put_value).delete(secrets::delete_value),
+        )
+        .route("/{org_id}/secrets/{secret_id}/policy", put(secrets::put_policy))
+        .route(
+            "/{org_id}/secrets/{secret_id}/grants",
+            get(secrets::get_grants).put(secrets::put_grants),
+        )
+        .route("/{org_id}/secrets/{secret_id}/usage", get(secrets::usage))
+        .route("/{org_id}/secrets/{secret_id}/restore", post(secrets::restore))
+        .route("/{org_id}/secrets/{secret_id}/purge", post(secrets::purge))
+        .route("/{org_id}/secrets/{secret_id}/refresh", post(secrets::refresh))
+        .route("/{org_id}/secrets/{secret_id}/rename", put(secrets::rename));
 
     #[cfg(feature = "enterprise")]
     {
@@ -2391,6 +2555,7 @@ fn service_route_table() -> Router {
             .route("/{org_id}/synthetics/agent-tokens", get(synthetics::list_agent_tokens).post(synthetics::create_agent_token))
             .route("/{org_id}/synthetics/agent-tokens/rotate", post(synthetics::rotate_agent_token))
             .route("/{org_id}/synthetics/agent-tokens/{name}", patch(synthetics::set_agent_token_enabled))
+            .route("/{org_id}/synthetics/agent-tokens/{name}/view", post(synthetics::view_agent_token))
             .route("/{org_id}/synthetics/locations/{id}", get(synthetics::get_location).put(synthetics::update_location).delete(synthetics::delete_location))
             .route("/{org_id}/synthetics/variables", get(synthetics::list_synthetics_variables).post(synthetics::create_synthetics_variable))
             .route("/{org_id}/synthetics/variables/{id}", put(synthetics::update_synthetics_variable).delete(synthetics::delete_synthetics_variable))
@@ -2726,12 +2891,14 @@ fn search_routes() -> Router {
 #[rustfmt::skip]
 #[cfg_attr(not(feature = "enterprise"), allow(unused_variables))]
 fn search_routes_with(llm_eval: bool) -> Router {
-    let router = Router::new()
+    let stream_routes = Router::new()
+        .route("/{org_id}/{stream_names}/_around_multi", get(search::multi_streams::around_multi))
+        .route("/{org_id}/{stream_name}/traces/{trace_id}/details", get(traces::details::get_trace_details));
+    let stream_routes = with_secrets_stream_aliases(stream_routes, &["_around_multi", "traces/values/details"]);
+    let router = stream_routes
         .route("/{org_id}/_search_multi", post(search::multi_streams::search_multi))
         .route("/{org_id}/_search_multi_stream", post(search::multi_streams::search_multi_stream))
         .route("/{org_id}/_search_partition_multi", post(search::multi_streams::_search_partition_multi))
-        .route("/{org_id}/{stream_names}/_around_multi", get(search::multi_streams::around_multi))
-        .route("/{org_id}/{stream_name}/traces/{trace_id}/details", get(traces::details::get_trace_details))
         .route("/{org_id}/prometheus/api/v1/label/{label_name}/values", get(promql::label_values))
         .route("/v2/{org_id}/downtimes/resources", post(downtimes::downtime_resources))
         .route("/v2/{org_id}/downtimes/values", post(downtimes::downtime_values))
@@ -4010,6 +4177,97 @@ mod tests {
     }
 
     #[test]
+    fn secret_store_family_writes_are_redacted() {
+        for (method, path) in [
+            (Method::POST, "default/secrets"),
+            (Method::PUT, "default/secrets/s1"),
+            (Method::DELETE, "default/secrets/s1"),
+            (Method::PUT, "default/secrets/s1/values/_org"),
+            (Method::DELETE, "default/secrets/s1/values/prod"),
+            (Method::PUT, "default/secrets/s1/policy"),
+            (Method::PUT, "default/secrets/s1/grants"),
+            (Method::PUT, "default/secrets/_all/grants"),
+            (Method::POST, "default/secrets/s1/restore"),
+            (Method::POST, "default/secrets/s1/purge"),
+            (Method::PUT, "default/secrets/s1/rename"),
+            (Method::POST, "default/secrets/backends/b1/credential"),
+            (Method::PUT, "_meta/secrets/x"),
+            (Method::DELETE, "_meta/secrets/restore_pending"),
+            (Method::POST, "api/default/secrets"),
+            (Method::POST, "api/secrets"),
+            (Method::POST, "v2/secrets"),
+            (Method::POST, "default/synthetics/agent-tokens"),
+            (Method::POST, "default/synthetics/agent-tokens/rotate"),
+            (Method::PATCH, "default/synthetics/agent-tokens/n1"),
+            (Method::POST, "default/synthetics/agent-tokens/n1/view"),
+            (Method::POST, "default/ai/toolsets"),
+            (Method::PUT, "default/ai/toolsets/t1"),
+            (Method::DELETE, "default/ai/toolsets/t1"),
+            (Method::POST, "default/synthetics"),
+            (Method::DELETE, "default/synthetics"),
+            (Method::PUT, "default/synthetics/c1"),
+            (Method::DELETE, "default/synthetics/c1"),
+            (Method::POST, "default/synthetics/c1/run"),
+            (Method::PATCH, "v2/default/synthetics/move"),
+            (Method::POST, "default/synthetics/variables"),
+            (Method::PUT, "default/synthetics/variables/v1"),
+            (Method::DELETE, "default/synthetics/variables/v1"),
+            (Method::POST, "default/synthetics/variables/v1/split"),
+            (
+                Method::POST,
+                "default/synthetics/environments/prod/variables",
+            ),
+            (
+                Method::PUT,
+                "default/synthetics/environments/prod/variables/v1",
+            ),
+            (
+                Method::POST,
+                "default/synthetics/environments/prod/variables/v1/promote",
+            ),
+            (Method::POST, "default/synthetics/c1/variables/pw/promote"),
+            (Method::POST, "default/synthetics/jobs/ack"),
+            (Method::POST, "api/default/synthetics/variables"),
+        ] {
+            assert!(is_secret_write(&method, path), "{method} {path}");
+        }
+    }
+
+    #[test]
+    fn reads_and_unrelated_routes_keep_field_level_redaction() {
+        for (method, path) in [
+            (Method::GET, "default/secrets"),
+            (Method::GET, "default/secrets/s1"),
+            (Method::GET, "_meta/secrets/status"),
+            (Method::HEAD, "default/secrets"),
+            (Method::OPTIONS, "default/secrets"),
+            (Method::GET, "default/synthetics/agent-tokens"),
+            (Method::GET, "default/ai/toolsets/t1"),
+            (Method::GET, "default/synthetics/c1"),
+            (Method::POST, "default/synthetics/locations"),
+            (Method::GET, "default/synthetics/variables"),
+            (
+                Method::GET,
+                "default/synthetics/environments/prod/variables",
+            ),
+            (Method::POST, "default/synthetics/environments"),
+            (Method::PUT, "default/synthetics/environments/prod"),
+            (
+                Method::POST,
+                "default/synthetics/environments/prod/duplicate",
+            ),
+            (Method::POST, "default/synthetics/jobs/resolve"),
+            (Method::POST, "default/synthetics/agent"),
+            (Method::POST, "default/synthetics/agent-setup/run"),
+            (Method::POST, "default/synthetics/c1/runs"),
+            (Method::POST, "default/streams/secrets_like"),
+            (Method::POST, "default/alerts/destinations"),
+        ] {
+            assert!(!is_secret_write(&method, path), "{method} {path}");
+        }
+    }
+
+    #[test]
     fn slack_secret_writes_are_redacted() {
         for (method, path) in [
             (Method::POST, "org/slack/install/exchange"),
@@ -4045,8 +4303,18 @@ mod tests {
         }
     }
 
-    /// What `audit_middleware` would store, seen from inside the `/api` and base-URI nesting.
     async fn audited_through_the_router(
+        base: &str,
+        method: Method,
+        uri: &str,
+        body: &str,
+    ) -> String {
+        audited_through(slack_routes(), base, method, uri, body).await
+    }
+
+    /// What `audit_middleware` would store, seen from inside the `/api` and base-URI nesting.
+    async fn audited_through(
+        routes: Router,
         base: &str,
         method: Method,
         uri: &str,
@@ -4070,7 +4338,7 @@ mod tests {
                 }
             }
         };
-        let api = Router::new().nest("/api", slack_routes().layer(middleware::from_fn(record)));
+        let api = Router::new().nest("/api", routes.layer(middleware::from_fn(record)));
         let app = if base.is_empty() {
             api
         } else {
@@ -4087,6 +4355,142 @@ mod tests {
         let seen = seen.lock().unwrap();
         assert_eq!(seen.len(), 1, "{uri} reached the audit layer once");
         seen[0].clone()
+    }
+
+    fn stub_secret_routes() -> Router {
+        let stub = || async { StatusCode::OK };
+        Router::new()
+            .route("/{org_id}/secrets", post(stub))
+            .route("/{org_id}/secrets/{secret_id}/values/{env}", put(stub))
+            .route("/{org_id}/ai/toolsets", post(stub))
+            .route("/{org_id}/ai/toolsets/{id}", put(stub))
+            .route("/{org_id}/synthetics", post(stub))
+            .route("/{org_id}/synthetics/{id}", put(stub))
+            .route("/{org_id}/synthetics/{id}/run", post(stub))
+            .route("/{org_id}/synthetics/variables", post(stub))
+            .route("/{org_id}/synthetics/variables/{id}", put(stub))
+            .route("/{org_id}/synthetics/variables/{id}/split", post(stub))
+            .route(
+                "/{org_id}/synthetics/environments/{env}/variables",
+                post(stub),
+            )
+            .route(
+                "/{org_id}/synthetics/environments/{env}/variables/{id}",
+                put(stub),
+            )
+            .route(
+                "/{org_id}/synthetics/environments/{env}/variables/{id}/promote",
+                post(stub),
+            )
+            .route(
+                "/{org_id}/synthetics/{id}/variables/{name}/promote",
+                post(stub),
+            )
+            .route("/{org_id}/synthetics/jobs/ack", post(stub))
+    }
+
+    async fn assert_secret_write_redacted(method: Method, path: &str, body: &str) {
+        for base in ["", "/o2"] {
+            let uri = format!("{base}/api/default/{path}");
+            let stored =
+                audited_through(stub_secret_routes(), base, method.clone(), &uri, body).await;
+            assert_eq!(stored, "[REDACTED: secret write]", "{method} {uri}");
+            assert!(!stored.contains("CANARY"), "{method} {uri}");
+        }
+    }
+
+    #[tokio::test]
+    async fn secret_store_values_are_redacted_through_the_router() {
+        let create = serde_json::json!({
+            "name": "X",
+            "value": "CANARY-ORG",
+            "env_values": [
+                {"env": "prod", "value": "CANARY-PROD"},
+                {"env": "staging", "value": "CANARY-STG"}
+            ]
+        });
+        assert_secret_write_redacted(Method::POST, "secrets", &create.to_string()).await;
+        assert_secret_write_redacted(
+            Method::PUT,
+            "secrets/s1/values/prod",
+            r#"{"value":"CANARY-ROT"}"#,
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    async fn synthetic_check_bodies_are_redacted_through_the_router() {
+        let body = serde_json::json!({
+            "target": "https://api.example.com/x?key=CANARY-Q1",
+            "body": "CANARY-B1",
+            "steps": [{"action": "type", "value": "CANARY-V1"}]
+        })
+        .to_string();
+        assert!(audited(Method::POST, "default/alerts/x", &body).contains("CANARY-B1"));
+        for (method, path) in [
+            (Method::POST, "synthetics"),
+            (Method::PUT, "synthetics/c1"),
+            (Method::POST, "synthetics/c1/run"),
+        ] {
+            assert_secret_write_redacted(method, path, &body).await;
+        }
+    }
+
+    #[tokio::test]
+    async fn synthetics_variable_values_are_redacted_through_the_router() {
+        let create = r#"{"name":"pw","value":"CANARY-C","kind":"secret"}"#;
+        let update = r#"{"value":"CANARY-U"}"#;
+        let split = r#"{"targets":[{"environment":"prod","value":"CANARY-S"}]}"#;
+        assert!(audited(Method::PUT, "default/alerts/x", update).contains("CANARY-U"));
+        for (method, path, body) in [
+            (Method::POST, "synthetics/variables", create),
+            (Method::PUT, "synthetics/variables/v1", update),
+            (Method::POST, "synthetics/variables/v1/split", split),
+            (
+                Method::POST,
+                "synthetics/environments/prod/variables",
+                create,
+            ),
+            (
+                Method::PUT,
+                "synthetics/environments/prod/variables/v1",
+                update,
+            ),
+            (
+                Method::POST,
+                "synthetics/environments/prod/variables/v1/promote",
+                r#"{"environment":"CANARY-P"}"#,
+            ),
+            (
+                Method::POST,
+                "synthetics/c1/variables/pw/promote",
+                r#"{"environment":"CANARY-P"}"#,
+            ),
+        ] {
+            assert_secret_write_redacted(method, path, body).await;
+        }
+    }
+
+    #[tokio::test]
+    async fn synthetics_job_ack_error_text_is_redacted_through_the_router() {
+        for body in [
+            r#"{"job_id":"j1","status":"failed","error":"401 for token CANARY-A"}"#,
+            r#"{"acks":[{"job_id":"j1","status":"failed","error":"CANARY-B"}]}"#,
+        ] {
+            assert_secret_write_redacted(Method::POST, "synthetics/jobs/ack", body).await;
+        }
+    }
+
+    #[tokio::test]
+    async fn toolset_credentials_are_redacted_through_the_router() {
+        for body in [
+            r#"{"mcp":{"headers":{"X-Api-Key":"CANARY-H"}}}"#,
+            r#"{"cli":{"env":{"GITHUB_PAT":"CANARY-E"}}}"#,
+            r#"{"cli":{"credential_files":[{"path":"~/.cfg","content":"CANARY-F"}]}}"#,
+        ] {
+            assert_secret_write_redacted(Method::POST, "ai/toolsets", body).await;
+            assert_secret_write_redacted(Method::PUT, "ai/toolsets/t1", body).await;
+        }
     }
 
     #[tokio::test]
@@ -5209,6 +5613,284 @@ mod tests {
             ),
             "{text}"
         );
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn secret_store_routes_return_forbidden_in_oss() {
+        let app = service_route_table();
+        for (method, path, body) in [
+            ("GET", "/o1/secrets", ""),
+            (
+                "POST",
+                "/o1/secrets",
+                r#"{"name":"key","kind":"secret","allowed_consumers":[]}"#,
+            ),
+            ("GET", "/o1/secrets/status", ""),
+            ("GET", "/o1/secrets/prescan", ""),
+            ("GET", "/o1/secrets/_all/grants", ""),
+            ("PUT", "/o1/secrets/_all/grants", r#"{"create":[]}"#),
+            ("GET", "/o1/secrets/S1", ""),
+            ("PUT", "/o1/secrets/S1", r#"{"description":"new"}"#),
+            ("DELETE", "/o1/secrets/S1", ""),
+            ("PUT", "/o1/secrets/S1/values/_org", r#"{"unset":true}"#),
+            ("DELETE", "/o1/secrets/S1/values/_org", ""),
+            (
+                "PUT",
+                "/o1/secrets/S1/policy",
+                r#"{"allowed_consumers":[],"allowed_hosts":[],"expected_policy_rev":"1"}"#,
+            ),
+            ("GET", "/o1/secrets/S1/grants", ""),
+            ("PUT", "/o1/secrets/S1/grants", "{}"),
+            ("GET", "/o1/secrets/S1/usage", ""),
+            ("POST", "/o1/secrets/S1/restore", ""),
+            ("POST", "/o1/secrets/S1/purge", ""),
+            ("PUT", "/o1/secrets/S1/rename", r#"{"new_name":"other"}"#),
+        ] {
+            let request = Request::builder()
+                .method(method)
+                .uri(path)
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(body))
+                .unwrap();
+            let response = app.clone().oneshot(request).await.unwrap();
+            assert_eq!(response.status(), StatusCode::FORBIDDEN, "{method} {path}");
+        }
+    }
+
+    #[tokio::test]
+    async fn secrets_named_stream_aliases_keep_stream_extractors_and_context() {
+        let streams = stream_suffix_routes()
+            .route(
+                "/{org_id}/{stream_names}/_around_multi",
+                get(search::multi_streams::around_multi),
+            )
+            .route_layer(middleware::from_fn(
+                |Path((org_id, stream_name)): Path<(String, String)>,
+                 path: MatchedPath,
+                 original_uri: axum::extract::OriginalUri,
+                 request: axum::extract::Request,
+                 _next: Next| async move {
+                    axum::Json(serde_json::json!({
+                        "org_id": org_id,
+                        "stream_name": stream_name,
+                        "path": path.as_str(),
+                        "context": request.extensions().get::<String>(),
+                        "query": request.uri().query(),
+                        "original_uri": original_uri.0.to_string(),
+                    }))
+                },
+            ));
+        let app = Router::new().nest(
+            "/api",
+            Router::new()
+                .route(
+                    "/{org_id}/secrets/{secret_id}",
+                    get(|| async { StatusCode::CONFLICT })
+                        .put(|| async { StatusCode::CONFLICT })
+                        .delete(|| async { StatusCode::CONFLICT }),
+                )
+                .merge(with_secrets_stream_aliases(
+                    streams,
+                    &["_multi", "_json", "_around", "_values", "_around_multi"],
+                )),
+        );
+        for (method, suffix, param) in [
+            ("POST", "_json", "stream_name"),
+            ("POST", "_multi", "stream_name"),
+            ("GET", "_around", "stream_name"),
+            ("POST", "_around", "stream_name"),
+            ("GET", "_values", "stream_name"),
+            ("GET", "_around_multi", "stream_names"),
+        ] {
+            let response = app
+                .clone()
+                .oneshot(
+                    Request::builder()
+                        .method(method)
+                        .uri(format!("/api/acme/secrets/{suffix}?type=logs"))
+                        .extension("preserved".to_owned())
+                        .body(Body::empty())
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            assert_eq!(response.status(), StatusCode::OK, "{method} {suffix}");
+            let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+                .await
+                .unwrap();
+            let payload: Value = serde_json::from_slice(&bytes).unwrap();
+            assert_eq!(payload["org_id"], "acme");
+            assert_eq!(payload["stream_name"], "secrets");
+            assert_eq!(payload["path"], format!("/{{org_id}}/{{{param}}}/{suffix}"));
+            assert_eq!(payload["context"], "preserved");
+            assert_eq!(payload["query"], "type=logs");
+            assert_eq!(
+                payload["original_uri"],
+                format!("/api/acme/secrets/{suffix}?type=logs")
+            );
+        }
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/api/acme/secrets/S1")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::CONFLICT);
+    }
+
+    #[tokio::test]
+    async fn secrets_named_stream_keeps_trace_routes_with_a_values_trace_id() {
+        let streams = stream_suffix_routes()
+            .route(
+                "/{org_id}/{stream_name}/traces/{trace_id}/details",
+                get(traces::details::get_trace_details),
+            )
+            .route_layer(middleware::from_fn(
+                |Path((org_id, stream_name, trace_id)): Path<(String, String, String)>,
+                 path: MatchedPath,
+                 _request: axum::extract::Request,
+                 _next: Next| async move {
+                    axum::Json(serde_json::json!({
+                        "org_id": org_id,
+                        "stream_name": stream_name,
+                        "trace_id": trace_id,
+                        "path": path.as_str(),
+                    }))
+                },
+            ));
+        let app = Router::new().nest(
+            "/api",
+            Router::new()
+                .route(
+                    "/{org_id}/secrets/{secret_id}/values/{env}",
+                    put(|| async { StatusCode::CONFLICT })
+                        .delete(|| async { StatusCode::CONFLICT }),
+                )
+                .merge(with_secrets_stream_aliases(
+                    streams,
+                    &["traces/values/dag", "traces/values/details"],
+                )),
+        );
+        for suffix in ["dag", "details"] {
+            let response = app
+                .clone()
+                .oneshot(
+                    Request::builder()
+                        .uri(format!("/api/acme/secrets/traces/values/{suffix}"))
+                        .body(Body::empty())
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            assert_eq!(response.status(), StatusCode::OK);
+            let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+                .await
+                .unwrap();
+            let payload: Value = serde_json::from_slice(&bytes).unwrap();
+            assert_eq!(payload["org_id"], "acme");
+            assert_eq!(payload["stream_name"], "secrets");
+            assert_eq!(payload["trace_id"], "values");
+            assert_eq!(
+                payload["path"],
+                format!("/{{org_id}}/{{stream_name}}/traces/{{trace_id}}/{suffix}")
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn secrets_named_stream_reaches_real_ingest_and_search_extractors() {
+        let app = Router::new().nest("/api", service_route_table());
+        for (method, suffix) in [
+            ("POST", "_json"),
+            ("POST", "_multi"),
+            ("GET", "_around"),
+            ("POST", "_around"),
+            ("GET", "_values"),
+            ("GET", "traces/values/dag"),
+        ] {
+            let response = app
+                .clone()
+                .oneshot(
+                    Request::builder()
+                        .method(method)
+                        .uri(format!("/api/acme/secrets/{suffix}"))
+                        .body(Body::empty())
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            assert_eq!(
+                response.status(),
+                StatusCode::BAD_REQUEST,
+                "{method} {suffix}"
+            );
+            let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+                .await
+                .unwrap();
+            let payload: Value = serde_json::from_slice(&bytes).unwrap();
+            assert_eq!(payload["message"], "Invalid request");
+        }
+        #[cfg(not(feature = "enterprise"))]
+        {
+            let response = app
+                .oneshot(
+                    Request::builder()
+                        .uri("/api/acme/secrets/traces/values/details")
+                        .body(Body::empty())
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+            let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+                .await
+                .unwrap();
+            let payload: Value = serde_json::from_slice(&bytes).unwrap();
+            assert_eq!(payload["message"], "Invalid request");
+        }
+    }
+
+    #[test]
+    fn secret_route_gates_match_registered_operations() {
+        use std::collections::BTreeSet;
+
+        let routes = openapi_coverage::parsed_routes();
+        let mut registered = BTreeSet::new();
+        for route in &routes {
+            let Some(path) = route.path.strip_prefix("/api") else {
+                continue;
+            };
+            if path == "/{org_id}/secrets" || path.starts_with("/{org_id}/secrets/") {
+                assert!(route.active, "{} {path} must be registered", route.method);
+                registered.insert((route.method.as_str(), path));
+            }
+        }
+        let mut declared = BTreeSet::new();
+        for &(method, path, gate) in secrets::SECRET_ROUTE_GATES {
+            assert_eq!(
+                gate.is_none(),
+                (method, path) == ("GET", "/{org_id}/secrets/status"),
+                "{method} {path}"
+            );
+            declared.insert((method, path));
+        }
+        assert_eq!(registered, declared);
+    }
+
+    #[test]
+    fn router_has_no_reveal_routes() {
+        for route in openapi_coverage::parsed_routes() {
+            assert!(
+                !route.path.ends_with("/reveal") && !route.path.contains("reveal_log"),
+                "{} {}",
+                route.method,
+                route.path
+            );
+        }
     }
 
     // NOTE ON WHAT IS TESTABLE HERE.
@@ -6896,26 +7578,81 @@ mod tests {
                 .nest("/api", service_routes())
                 .merge(other_service_routes()),
         );
-        for (uri, header, accepted) in [
-            (format!("/o2/api/{org}/_bulk"), "Authorization", true),
-            (format!("/o2/api/{org}/kv/_json"), "Authorization", false),
+        for (method, uri, header, accepted) in [
             (
+                "POST",
+                format!("/o2/api/{org}/_bulk"),
+                "Authorization",
+                true,
+            ),
+            (
+                "POST",
+                format!("/o2/api/{org}/secrets/_json"),
+                "Authorization",
+                true,
+            ),
+            (
+                "POST",
+                format!("/o2/api/{org}/secrets/_multi"),
+                "Authorization",
+                true,
+            ),
+            (
+                "GET",
+                format!("/o2/api/{org}/secrets/_json"),
+                "Authorization",
+                false,
+            ),
+            (
+                "GET",
+                format!("/o2/api/{org}/secrets/_multi"),
+                "Authorization",
+                false,
+            ),
+            (
+                "GET",
+                format!("/o2/api/{org}/secrets/_around"),
+                "Authorization",
+                false,
+            ),
+            (
+                "POST",
+                format!("/o2/api/{org}/secrets/_around"),
+                "Authorization",
+                false,
+            ),
+            (
+                "GET",
+                format!("/o2/api/{org}/secrets/_values"),
+                "Authorization",
+                false,
+            ),
+            (
+                "POST",
+                format!("/o2/api/{org}/kv/_json"),
+                "Authorization",
+                false,
+            ),
+            (
+                "POST",
                 format!("/o2/api/{org}/streams/_sub"),
                 "Authorization",
                 false,
             ),
             (
+                "POST",
                 format!("/o2/aws/{org}/s/_kinesis_firehose"),
                 "X-Amz-Firehose-Access-Key",
                 true,
             ),
             (
+                "POST",
                 format!("/o2/gcp/{org}/s/_sub?API-Key={credentials}"),
                 "",
                 true,
             ),
         ] {
-            let mut req = Request::builder().method(Method::POST).uri(&uri);
+            let mut req = Request::builder().method(method).uri(&uri);
             if header == "Authorization" {
                 req = req.header(header, format!("Basic {credentials}"));
             } else if !header.is_empty() {
@@ -6930,7 +7667,7 @@ mod tests {
             assert_eq!(
                 status != StatusCode::UNAUTHORIZED,
                 accepted,
-                "POST {uri}: {status}"
+                "{method} {uri}: {status}"
             );
         }
     }

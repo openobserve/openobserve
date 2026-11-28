@@ -16,20 +16,46 @@
 #[cfg(any(feature = "enterprise", test))]
 use std::time::Duration;
 use std::{
-    collections::{BTreeSet, HashSet},
+    collections::{BTreeMap, BTreeSet, HashSet},
     future::Future,
+    pin::Pin,
+    sync::OnceLock,
 };
 
-use infra::db::{get_orm_client_ro, get_orm_client_rw};
-use sea_orm::TransactionTrait;
+use config::meta::secret_store::{
+    BindRequest, ConsumerType, SecretErrorCode,
+    api::{UsageEntry, UsageHop},
+    digest::KAuth,
+};
+use infra::{
+    db::{get_orm_client_ro, get_orm_client_rw},
+    errors::Error as InfraError,
+    secret_store::{
+        bind::StrictVerb,
+        reauthorize::{self, ConsumerImage, ReauthError, Via},
+    },
+    table::{
+        entity::{synthetics_checks as check_rows, synthetics_variables as variable_entity},
+        org_secrets::{self, PinMode},
+        secret_dependencies, secret_refs,
+    },
+};
+use sea_orm::{
+    ColumnTrait, ConnectionTrait, DatabaseBackend, DatabaseTransaction, EntityTrait, QueryFilter,
+    QueryOrder, QuerySelect, Set, SqlErr, TransactionTrait,
+};
 
-use super::*;
+use super::{
+    checks::{self, CHECK_CONSUMER, SaveCompositionGuard},
+    *,
+};
 
 /// Attempts per cross-region publish: the first try plus three retries.
 #[cfg(any(feature = "enterprise", test))]
 const PUBLISH_ATTEMPTS: u32 = 4;
 #[cfg(feature = "enterprise")]
 const PUBLISH_BACKOFF: Duration = Duration::from_millis(200);
+const DEPENDENCY_BATCH_SIZE: usize = 200;
 
 #[cfg(test)]
 thread_local! {
@@ -130,6 +156,58 @@ impl std::fmt::Display for ResyncUnavailable {
 
 impl std::error::Error for ResyncUnavailable {}
 
+type VariableWriteResult<T> = anyhow::Result<(T, Option<BindRequest>)>;
+
+/// A boxed `Send` future: an `AsyncFn` write left axum unable to prove the handler `Send`.
+type WriteFuture<'t, T> = Pin<Box<dyn Future<Output = anyhow::Result<(T, bool)>> + Send + 't>>;
+
+struct VariableConsumers<'a> {
+    org: &'a str,
+    names: &'a [&'a str],
+    source_check: Option<&'a str>,
+}
+
+struct VariableCheck<'a> {
+    org: &'a str,
+    id: String,
+    before: Option<ConsumerImage>,
+    origins: Option<Origins>,
+    after: OnceLock<ConsumerImage>,
+}
+
+impl reauthorize::Consumer for VariableCheck<'_> {
+    fn org_id(&self) -> &str {
+        self.org
+    }
+
+    fn consumer_type(&self) -> ConsumerType {
+        CHECK_CONSUMER
+    }
+
+    fn consumer_id(&self) -> &str {
+        &self.id
+    }
+
+    fn load_locked<'a, 't, 'k, 'f>(
+        &'a self,
+        _: &'t DatabaseTransaction,
+        _: &'k KAuth,
+    ) -> Pin<Box<dyn Future<Output = Result<Option<ConsumerImage>, InfraError>> + Send + 'f>>
+    where
+        'a: 'f,
+        't: 'f,
+        'k: 'f,
+        Self: 'f,
+    {
+        Box::pin(async { Ok(self.after.get().or(self.before.as_ref()).cloned()) })
+    }
+}
+
+enum VariableWriteAttempt<T> {
+    Written(T, Option<BindRequest>),
+    Retry,
+}
+
 /// The org's checks and shared rows, loaded once to answer which checks resolve which row.
 struct UsageScan {
     checks: Vec<(Synthetic, BTreeSet<String>)>,
@@ -217,6 +295,11 @@ pub async fn get_environment_name(org_id: &str, id: &str) -> anyhow::Result<Opti
         .map(|env| env.name))
 }
 
+/// The authorization object of an environment, keyed by its name.
+pub fn environment_object(name: &str) -> String {
+    format!("{}:{}", get_ofga_type("synthetic_environment"), name)
+}
+
 /// The org's `global` environment, created on first use by whichever caller needs it.
 pub async fn global_environment(org_id: &str) -> anyhow::Result<SyntheticsEnvironmentRecord> {
     let conn = get_orm_client_rw().await;
@@ -281,7 +364,7 @@ pub async fn create_environment(
     validate_environment_request(&req).map_err(|e| anyhow::anyhow!(e))?;
     let now = config::utils::time::now_micros();
     let name = req.name.trim().to_string();
-    let record = SyntheticsEnvironmentRecord {
+    let mut record = SyntheticsEnvironmentRecord {
         id: synthetics_environments::environment_id(org_id, &name),
         org_id: org_id.to_string(),
         name,
@@ -292,7 +375,7 @@ pub async fn create_environment(
         updated_at: now,
     };
     let conn = get_orm_client_rw().await;
-    synthetics_environments::add(conn, &record)
+    synthetics_environments::add(conn, &mut record)
         .await
         .map_err(infra_message)?;
 
@@ -327,16 +410,16 @@ pub async fn duplicate_environment(
         .collect();
 
     let now = config::utils::time::now_micros();
-    let target = duplicate_target(&source, &request.name, created_by, now);
+    let mut target = duplicate_target(&source, &request.name, created_by, now);
 
     let txn = conn.begin().await?;
-    synthetics_environments::add(&txn, &target)
+    synthetics_environments::add(&txn, &mut target)
         .await
         .map_err(infra_message)?;
     let mut copies = Vec::with_capacity(rows.len());
     for row in &rows {
         let copy = SyntheticsVariableRecord {
-            id: config::ider::uuid(),
+            id: config::ider::ksuid(),
             org_id: org_id.to_string(),
             env: target.id.clone(),
             name: row.name.clone(),
@@ -516,6 +599,18 @@ pub async fn create_variable(
     req: SyntheticsVariableRequest,
     created_by: &str,
 ) -> anyhow::Result<SyntheticsVariableView> {
+    create_variable_with_actor(org_id, env, req, created_by, None)
+        .await
+        .map(|(view, _)| view)
+}
+
+pub async fn create_variable_with_actor(
+    org_id: &str,
+    env: Option<&SyntheticsEnvironmentRecord>,
+    req: SyntheticsVariableRequest,
+    created_by: &str,
+    actor: Option<CheckSaveActor<'_>>,
+) -> VariableWriteResult<SyntheticsVariableView> {
     let env = scope_or_global(org_id, env).await?;
     validate_variable_request(&req, env.is_global, false, None).map_err(|e| anyhow::anyhow!(e))?;
     let name = normalize_variable_name(&req.name);
@@ -535,7 +630,7 @@ pub async fn create_variable(
     let dek = synthetics_dek(org_id).await?;
     let now = config::utils::time::now_micros();
     let record = SyntheticsVariableRecord {
-        id: config::ider::uuid(),
+        id: config::ider::ksuid(),
         org_id: org_id.to_string(),
         env: env.id.clone(),
         name,
@@ -548,11 +643,24 @@ pub async fn create_variable(
         created_at: now,
         updated_at: now,
     };
-    synthetics_variables::add(conn, &record)
-        .await
-        .map_err(infra_message)?;
+    let consumers = VariableConsumers {
+        org: org_id,
+        names: &[&record.name],
+        source_check: None,
+    };
+    let row = &record;
+    let (_, request) = write_with_resign(conn, &consumers, actor, move |txn, _| {
+        Box::pin(async move {
+            synthetics_variables::insert_row(txn, row)
+                .await
+                .map_err(infra_message)?;
+            Ok(((), true))
+        })
+    })
+    .await?;
+    synthetics_variables::invalidate_and_publish(org_id).await;
     publish_batch(org_id, &[&env], std::slice::from_ref(&record), &[]).await;
-    project_view(org_id, &record).await
+    Ok((project_view(org_id, &record).await?, request))
 }
 
 /// A rename honours `force`, the same guard a delete takes.
@@ -563,10 +671,23 @@ pub async fn update_variable(
     req: SyntheticsVariableRequest,
     force: bool,
 ) -> anyhow::Result<Option<SyntheticsVariableView>> {
+    update_variable_with_actor(org_id, env, id, req, force, None)
+        .await
+        .map(|(view, _)| view)
+}
+
+pub async fn update_variable_with_actor(
+    org_id: &str,
+    env: Option<&SyntheticsEnvironmentRecord>,
+    id: &str,
+    req: SyntheticsVariableRequest,
+    force: bool,
+    actor: Option<CheckSaveActor<'_>>,
+) -> VariableWriteResult<Option<SyntheticsVariableView>> {
     let env = scope_or_global(org_id, env).await?;
     let conn = get_orm_client_rw().await;
     let Some(mut record) = scoped_variable(conn, org_id, &env, id).await? else {
-        return Ok(None);
+        return Ok((None, None));
     };
     validate_variable_request(
         &req,
@@ -598,6 +719,7 @@ pub async fn update_variable(
         }
     }
 
+    let original = record.clone();
     if let Some(value) = req.value {
         let dek = synthetics_dek(org_id).await?;
         record.value = store_value(&dek, &value)?;
@@ -609,14 +731,38 @@ pub async fn update_variable(
     record.updated_at = next_updated_at(record.updated_at);
 
     // A delete that landed since the read leaves nothing to update, and nothing to publish.
-    if !synthetics_variables::update(conn, &record)
-        .await
-        .map_err(infra_message)?
-    {
-        return Ok(None);
+    let names = [&original.name[..], &record.name[..]];
+    let consumers = VariableConsumers {
+        org: org_id,
+        names: &names,
+        source_check: None,
+    };
+    let (original, edited) = (&original, &record);
+    let (updated, request) = write_with_resign(conn, &consumers, actor, move |txn, _| {
+        Box::pin(async move {
+            let Some(mut row) = lock_variable(txn, original).await? else {
+                return Ok((false, false));
+            };
+            row.name = Set(edited.name.clone());
+            row.value = Set(edited.value.clone());
+            row.description = Set(edited.description.clone());
+            row.example = Set(edited.example.clone());
+            row.tags = Set(serde_json::to_value(&edited.tags)?);
+            row.updated_at = Set(edited.updated_at);
+            save_variable_row(txn, row, || {
+                format!("variable '{}' already exists in this scope", edited.name)
+            })
+            .await?;
+            Ok((true, true))
+        })
+    })
+    .await?;
+    if !updated {
+        return Ok((None, None));
     }
+    synthetics_variables::invalidate_and_publish(org_id).await;
     publish_batch(org_id, &[&env], std::slice::from_ref(&record), &[]).await;
-    Ok(Some(project_view(org_id, &record).await?))
+    Ok((Some(project_view(org_id, &record).await?), request))
 }
 
 /// Deletes a variable, refusing while checks still reference it.
@@ -626,10 +772,22 @@ pub async fn delete_variable(
     id: &str,
     force: bool,
 ) -> anyhow::Result<bool> {
+    delete_variable_with_actor(org_id, env, id, force, None)
+        .await
+        .map(|(deleted, _)| deleted)
+}
+
+pub async fn delete_variable_with_actor(
+    org_id: &str,
+    env: Option<&SyntheticsEnvironmentRecord>,
+    id: &str,
+    force: bool,
+    actor: Option<CheckSaveActor<'_>>,
+) -> VariableWriteResult<bool> {
     let env = scope_or_global(org_id, env).await?;
     let conn = get_orm_client_rw().await;
     let Some(record) = scoped_variable(conn, org_id, &env, id).await? else {
-        return Ok(false);
+        return Ok((false, None));
     };
     if !force {
         let users = usage_scan(conn, org_id).await?.user_names(&record);
@@ -637,13 +795,29 @@ pub async fn delete_variable(
             return Err(UsageConflict(usage_refusal(&record.name, &users, "delete")).into());
         }
     }
-    let deleted = synthetics_variables::delete(conn, org_id, id)
-        .await
-        .map_err(infra_message)?;
+    let consumers = VariableConsumers {
+        org: org_id,
+        names: &[&record.name],
+        source_check: None,
+    };
+    let row = &record;
+    let (deleted, request) = write_with_resign(conn, &consumers, actor, move |txn, _| {
+        Box::pin(async move {
+            if lock_variable(txn, row).await?.is_none() {
+                return Ok((false, false));
+            }
+            let deleted = synthetics_variables::delete_row(txn, org_id, id)
+                .await
+                .map_err(infra_message)?;
+            Ok((deleted, deleted))
+        })
+    })
+    .await?;
     if deleted {
+        synthetics_variables::invalidate_and_publish(org_id).await;
         publish_variable_delete(org_id, id).await;
     }
-    Ok(deleted)
+    Ok((deleted, request))
 }
 
 /// A check's resolved set; an environment `readable_envs` withholds contributes no rows.
@@ -750,14 +924,27 @@ pub async fn promote_check_variable(
     env: &SyntheticsEnvironmentRecord,
     owner: &str,
 ) -> anyhow::Result<SyntheticsVariableView> {
+    promote_check_variable_with_actor(org_id, check_id, name, env, owner, None)
+        .await
+        .map(|(view, _)| view)
+}
+
+pub async fn promote_check_variable_with_actor(
+    org_id: &str,
+    check_id: &str,
+    name: &str,
+    env: &SyntheticsEnvironmentRecord,
+    owner: &str,
+    actor: Option<CheckSaveActor<'_>>,
+) -> VariableWriteResult<SyntheticsVariableView> {
     let conn = get_orm_client_rw().await;
-    let (record, check) =
-        promote_check_variable_in(conn, org_id, check_id, name, env, owner).await?;
+    let ((record, check), request) =
+        promote_check_variable_in(conn, org_id, check_id, name, env, owner, actor).await?;
     synthetics_variables::invalidate_and_publish(org_id).await;
     synthetics_checks::invalidate_and_publish(org_id, check_id).await;
     publish_batch(org_id, &[env], std::slice::from_ref(&record), &[]).await;
     publish_check_update(org_id, check_id, &check).await;
-    project_view(org_id, &record).await
+    Ok((project_view(org_id, &record).await?, request))
 }
 
 /// Moves an environment's variable into global; `None` when the environment holds no such variable.
@@ -766,13 +953,24 @@ pub async fn promote_to_global(
     env: &SyntheticsEnvironmentRecord,
     id: &str,
 ) -> anyhow::Result<Option<SyntheticsVariableView>> {
+    promote_to_global_with_actor(org_id, env, id, None)
+        .await
+        .map(|(view, _)| view)
+}
+
+pub async fn promote_to_global_with_actor(
+    org_id: &str,
+    env: &SyntheticsEnvironmentRecord,
+    id: &str,
+    actor: Option<CheckSaveActor<'_>>,
+) -> VariableWriteResult<Option<SyntheticsVariableView>> {
     if env.is_global {
         anyhow::bail!("the variable is already in the '{GLOBAL_ENVIRONMENT_NAME}' environment");
     }
     let global = global_environment(org_id).await?;
     let conn = get_orm_client_rw().await;
-    let Some(mut record) = scoped_variable(conn, org_id, env, id).await? else {
-        return Ok(None);
+    let Some(record) = scoped_variable(conn, org_id, env, id).await? else {
+        return Ok((None, None));
     };
 
     if record.is_secret() {
@@ -793,16 +991,39 @@ pub async fn promote_to_global(
         anyhow::bail!(err);
     }
 
-    record.updated_at = next_updated_at(record.updated_at);
-    if !synthetics_variables::set_env(conn, org_id, id, &global.id, record.updated_at)
-        .await
-        .map_err(infra_message)?
-    {
-        return Ok(None);
+    let updated_at = next_updated_at(record.updated_at);
+    let consumers = VariableConsumers {
+        org: org_id,
+        names: &[&record.name],
+        source_check: None,
+    };
+    let (moved, target) = (&record, &global);
+    let (updated, request) = write_with_resign(conn, &consumers, actor, move |txn, _| {
+        Box::pin(async move {
+            let Some(mut row) = lock_variable(txn, moved).await? else {
+                return Ok((false, false));
+            };
+            row.env = Set(target.id.clone());
+            row.updated_at = Set(updated_at);
+            save_variable_row(txn, row, || {
+                "a variable with that name already exists in the destination scope".to_owned()
+            })
+            .await?;
+            Ok((true, true))
+        })
+    })
+    .await?;
+    if !updated {
+        return Ok((None, None));
     }
-    record.env = global.id.clone();
+    let record = SyntheticsVariableRecord {
+        env: global.id.clone(),
+        updated_at,
+        ..record
+    };
+    synthetics_variables::invalidate_and_publish(org_id).await;
     publish_batch(org_id, &[&global], std::slice::from_ref(&record), &[]).await;
-    Ok(Some(project_view(org_id, &record).await?))
+    Ok((Some(project_view(org_id, &record).await?), request))
 }
 
 pub async fn split_to_environments(
@@ -811,18 +1032,30 @@ pub async fn split_to_environments(
     targets: Vec<SplitTarget>,
     owner: &str,
 ) -> anyhow::Result<Vec<SyntheticsVariableView>> {
+    split_to_environments_with_actor(org_id, id, targets, owner, None)
+        .await
+        .map(|(views, _)| views)
+}
+
+pub async fn split_to_environments_with_actor(
+    org_id: &str,
+    id: &str,
+    targets: Vec<SplitTarget>,
+    owner: &str,
+    actor: Option<CheckSaveActor<'_>>,
+) -> VariableWriteResult<Vec<SyntheticsVariableView>> {
     if let Some(err) = split_targets_error(&targets) {
         anyhow::bail!(err);
     }
     let global = global_environment(org_id).await?;
     let dek = synthetics_dek(org_id).await?;
     let conn = get_orm_client_rw().await;
-    let (envs, created) =
-        split_to_environments_in(conn, &global, id, &targets, owner, &dek).await?;
+    let ((envs, created), request) =
+        split_to_environments_in(conn, &global, id, &targets, owner, &dek, actor).await?;
     synthetics_variables::invalidate_and_publish(org_id).await;
     let envs: Vec<&SyntheticsEnvironmentRecord> = envs.iter().collect();
     publish_batch(org_id, &envs, &created, &[id.to_string()]).await;
-    project_views(org_id, created.iter()).await
+    Ok((project_views(org_id, created.iter()).await?, request))
 }
 
 /// The global and job-environment rows the check references, decrypted; an unset one fails the job.
@@ -834,6 +1067,19 @@ pub async fn resolve_shared_variables(
 ) -> anyhow::Result<Vec<(String, String)>> {
     let conn = get_orm_client_ro().await;
     resolve_shared_variables_in(conn, org_id, env_id, check, dek).await
+}
+
+/// [`resolve_shared_variables`] over rows the caller read, so the values sent and the dependency
+/// digests checked against the signature come from one read.
+pub async fn resolve_shared_variables_from(
+    org_id: &str,
+    env_id: Option<&str>,
+    check: &Synthetic,
+    dek: &[u8],
+    rows: Vec<SyntheticsVariableRecord>,
+) -> anyhow::Result<Vec<(String, String)>> {
+    let conn = get_orm_client_ro().await;
+    shared_variables_from_rows(conn, org_id, env_id, check, dek, rows).await
 }
 
 /// Whether an org has any shared variable at all.
@@ -927,21 +1173,42 @@ async fn org_variable_state_in<C: sea_orm::ConnectionTrait>(
 }
 
 /// The promote on `conn`: the shared row appears and the check's own copy goes in one transaction.
-async fn promote_check_variable_in<C: sea_orm::ConnectionTrait + TransactionTrait>(
+async fn promote_check_variable_in<C: ConnectionTrait + TransactionTrait>(
     conn: &C,
     org_id: &str,
     check_id: &str,
     name: &str,
     env: &SyntheticsEnvironmentRecord,
     owner: &str,
-) -> anyhow::Result<(SyntheticsVariableRecord, Synthetic)> {
-    let mut check = synthetics_checks::get(conn, org_id, check_id)
-        .await
-        .map_err(infra_message)?
-        .ok_or_else(|| anyhow::anyhow!("check not found: {check_id}"))?;
-
+    actor: Option<CheckSaveActor<'_>>,
+) -> VariableWriteResult<(SyntheticsVariableRecord, Synthetic)> {
     let name = name.trim();
     validate_variable_name(name).map_err(|e| anyhow::anyhow!(e))?;
+    let consumers = VariableConsumers {
+        org: org_id,
+        names: &[name],
+        source_check: Some(check_id),
+    };
+    write_with_resign(conn, &consumers, actor, move |txn, _| {
+        Box::pin(async move {
+            let result = move_check_variable(txn, org_id, check_id, name, env, owner).await?;
+            Ok((result, true))
+        })
+    })
+    .await
+}
+
+async fn move_check_variable(
+    conn: &DatabaseTransaction,
+    org_id: &str,
+    check_id: &str,
+    name: &str,
+    env: &SyntheticsEnvironmentRecord,
+    owner: &str,
+) -> anyhow::Result<(SyntheticsVariableRecord, Synthetic)> {
+    let mut check = checks::lock_check(conn, org_id, check_id)
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("check not found: {check_id}"))?;
     let position = check
         .variables
         .iter()
@@ -979,7 +1246,7 @@ async fn promote_check_variable_in<C: sea_orm::ConnectionTrait + TransactionTrai
 
     let now = config::utils::time::now_micros();
     let record = SyntheticsVariableRecord {
-        id: config::ider::uuid(),
+        id: config::ider::ksuid(),
         org_id: org_id.to_string(),
         env: env.id.clone(),
         name: name.to_string(),
@@ -993,22 +1260,51 @@ async fn promote_check_variable_in<C: sea_orm::ConnectionTrait + TransactionTrai
         updated_at: now,
     };
     check.variables.remove(position);
-    let txn = conn.begin().await?;
-    synthetics_variables::insert_row(&txn, &record)
+    synthetics_variables::insert_row(conn, &record)
         .await
         .map_err(infra_message)?;
-    let check = synthetics_checks::update_row(&txn, org_id, check_id, &check)
+    let check = synthetics_checks::update_row(conn, org_id, check_id, &check)
         .await
         .map_err(infra_message)?;
-    txn.commit().await?;
     Ok((record, check))
 }
 
 /// The split on `conn`: refused while a check would lose the name, else one transaction.
-async fn split_to_environments_in<C: sea_orm::ConnectionTrait + TransactionTrait>(
+async fn split_to_environments_in<C: ConnectionTrait + TransactionTrait>(
     conn: &C,
     global: &SyntheticsEnvironmentRecord,
     id: &str,
+    targets: &[SplitTarget],
+    owner: &str,
+    dek: &[u8],
+    actor: Option<CheckSaveActor<'_>>,
+) -> VariableWriteResult<(
+    Vec<SyntheticsEnvironmentRecord>,
+    Vec<SyntheticsVariableRecord>,
+)> {
+    let org_id = global.org_id.as_str();
+    let source = scoped_variable(conn, org_id, global, id)
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("global variable not found: {id}"))?;
+    let consumers = VariableConsumers {
+        org: org_id,
+        names: &[&source.name],
+        source_check: None,
+    };
+    let row = &source;
+    write_with_resign(conn, &consumers, actor, move |txn, _| {
+        Box::pin(async move {
+            let result = split_variable_row(txn, global, row, targets, owner, dek).await?;
+            Ok((result, true))
+        })
+    })
+    .await
+}
+
+async fn split_variable_row(
+    conn: &DatabaseTransaction,
+    global: &SyntheticsEnvironmentRecord,
+    source: &SyntheticsVariableRecord,
     targets: &[SplitTarget],
     owner: &str,
     dek: &[u8],
@@ -1017,9 +1313,10 @@ async fn split_to_environments_in<C: sea_orm::ConnectionTrait + TransactionTrait
     Vec<SyntheticsVariableRecord>,
 )> {
     let org_id = global.org_id.as_str();
-    let source = scoped_variable(conn, org_id, global, id)
-        .await?
-        .ok_or_else(|| anyhow::anyhow!("global variable not found: {id}"))?;
+    let id = &source.id;
+    if lock_variable(conn, source).await?.is_none() {
+        anyhow::bail!("global variable not found: {id}");
+    }
 
     let known = synthetics_environments::list(conn, org_id)
         .await
@@ -1071,7 +1368,7 @@ async fn split_to_environments_in<C: sea_orm::ConnectionTrait + TransactionTrait
     let mut created = Vec::with_capacity(resolved.len());
     for (env, value) in &resolved {
         created.push(SyntheticsVariableRecord {
-            id: config::ider::uuid(),
+            id: config::ider::ksuid(),
             org_id: org_id.to_string(),
             env: env.id.clone(),
             name: source.name.clone(),
@@ -1086,17 +1383,562 @@ async fn split_to_environments_in<C: sea_orm::ConnectionTrait + TransactionTrait
         });
     }
 
-    let txn = conn.begin().await?;
     for record in &created {
-        synthetics_variables::insert_row(&txn, record)
+        synthetics_variables::insert_row(conn, record)
             .await
             .map_err(infra_message)?;
     }
-    synthetics_variables::delete_row(&txn, org_id, id)
+    synthetics_variables::delete_row(conn, org_id, id)
         .await
         .map_err(infra_message)?;
-    txn.commit().await?;
     Ok((resolved.into_iter().map(|(env, _)| env).collect(), created))
+}
+
+/// `&'t &'a ()` bounds every `'t` by `'a`, so the write may borrow what the caller owns.
+async fn write_with_resign<'a, C, T, W>(
+    conn: &C,
+    consumers: &VariableConsumers<'_>,
+    actor: Option<CheckSaveActor<'_>>,
+    write: W,
+) -> VariableWriteResult<T>
+where
+    C: ConnectionTrait + TransactionTrait,
+    W: for<'t> Fn(&'t DatabaseTransaction, &'t &'a ()) -> WriteFuture<'t, T> + Sync,
+{
+    for _ in 0..2 {
+        let ids = variable_consumer_ids(conn, consumers).await?;
+        let required = required_variable_uses(conn, consumers.org, &ids).await?;
+        let checked = variable_use_set(&required);
+        authorize_variable_write(conn, consumers.org, actor, &required, &checked).await?;
+        let keys = if checked.is_empty() {
+            None
+        } else {
+            Some((
+                reauthorize::k_auth_for(consumers.org).await?,
+                synthetics_dek(consumers.org).await?,
+            ))
+        };
+        let guard = SaveCompositionGuard::acquire(
+            consumers.org,
+            !ids.is_empty() || checks::store_latched(),
+        )
+        .await?;
+        let attempt =
+            variable_write_attempt(conn, consumers, &checked, keys.as_ref(), actor, &write).await;
+        guard.release().await;
+        if let VariableWriteAttempt::Written(value, request) = attempt? {
+            return Ok((value, request));
+        }
+    }
+    Err(variable_feeds_secret_consumer())
+}
+
+async fn variable_write_attempt<'a, C, T, W>(
+    conn: &C,
+    consumers: &VariableConsumers<'_>,
+    checked: &BTreeSet<(String, StrictVerb)>,
+    keys: Option<&(KAuth, Vec<u8>)>,
+    actor: Option<CheckSaveActor<'_>>,
+    write: &W,
+) -> anyhow::Result<VariableWriteAttempt<T>>
+where
+    C: ConnectionTrait + TransactionTrait,
+    W: for<'t> Fn(&'t DatabaseTransaction, &'t &'a ()) -> WriteFuture<'t, T> + Sync,
+{
+    let txn = conn.begin().await?;
+    let result = write_and_resign_in(&txn, consumers, checked, keys, actor, write).await;
+    match result {
+        Ok(result @ VariableWriteAttempt::Written(..)) => {
+            txn.commit().await?;
+            Ok(result)
+        }
+        result => {
+            txn.rollback().await?;
+            result
+        }
+    }
+}
+
+async fn write_and_resign_in<'a, T, W>(
+    txn: &DatabaseTransaction,
+    consumers: &VariableConsumers<'_>,
+    checked: &BTreeSet<(String, StrictVerb)>,
+    keys: Option<&(KAuth, Vec<u8>)>,
+    actor: Option<CheckSaveActor<'_>>,
+    write: &W,
+) -> anyhow::Result<VariableWriteAttempt<T>>
+where
+    W: for<'t> Fn(&'t DatabaseTransaction, &'t &'a ()) -> WriteFuture<'t, T> + Sync,
+{
+    let org = consumers.org;
+    let ids = variable_consumer_ids(txn, consumers).await?;
+    checks::lock_checks(txn, org, &ids).await?;
+    let locked_ids = variable_consumer_ids(txn, consumers).await?;
+    if locked_ids.iter().any(|id| ids.binary_search(id).is_err()) {
+        return Ok(VariableWriteAttempt::Retry);
+    }
+    let required = required_variable_uses(txn, org, &locked_ids).await?;
+    let strict = variable_use_set(&required);
+    if !strict.is_subset(checked) {
+        return Ok(VariableWriteAttempt::Retry);
+    }
+    if required.is_empty() {
+        let (value, _) = write(txn, &&()).await?;
+        return Ok(VariableWriteAttempt::Written(value, None));
+    }
+    let (Some((key, dek)), Some(actor)) = (keys, actor) else {
+        return Ok(VariableWriteAttempt::Retry);
+    };
+    let checks = prepare_variable_checks(txn, org, required, key, dek).await?;
+    let verified = verify_variable_checks(txn, &checks, key, actor.user_id).await?;
+    let (value, written) = write(txn, &&()).await?;
+    let request = if written && !verified.is_empty() {
+        resign_variable_checks(txn, org, verified, key, dek).await?;
+        Some(BindRequest {
+            saved_by: actor.user_id.to_owned(),
+            refs: Vec::new(),
+        })
+    } else {
+        None
+    };
+    Ok(VariableWriteAttempt::Written(value, request))
+}
+
+async fn variable_consumer_ids<C: ConnectionTrait>(
+    conn: &C,
+    consumers: &VariableConsumers<'_>,
+) -> anyhow::Result<Vec<String>> {
+    use secret_dependencies::{Column, Entity};
+
+    let mut ids = BTreeSet::new();
+    ids.extend(consumers.source_check.map(str::to_owned));
+    for name in consumers.names.iter().copied().collect::<BTreeSet<_>>() {
+        let mut cursor = String::new();
+        loop {
+            let batch = Entity::find()
+                .select_only()
+                .column(Column::ConsumerId)
+                .filter(Column::OrgId.eq(consumers.org))
+                .filter(Column::ConsumerType.eq(CHECK_CONSUMER.as_str()))
+                .filter(Column::DepKey.eq(name))
+                .filter(Column::ConsumerId.gt(&cursor))
+                .order_by_asc(Column::ConsumerId)
+                .limit(DEPENDENCY_BATCH_SIZE as u64)
+                .into_tuple::<String>()
+                .all(conn)
+                .await?;
+            let Some(last) = batch.last() else { break };
+            cursor.clone_from(last);
+            let more = batch.len() == DEPENDENCY_BATCH_SIZE;
+            ids.extend(batch);
+            if !more {
+                break;
+            }
+        }
+    }
+    Ok(ids.into_iter().collect())
+}
+
+async fn required_variable_uses<C: ConnectionTrait>(
+    conn: &C,
+    org: &str,
+    ids: &[String],
+) -> anyhow::Result<BTreeMap<String, BTreeSet<String>>> {
+    let mut required: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+    for ids in ids.chunks(DEPENDENCY_BATCH_SIZE) {
+        use secret_refs::{Column, Entity};
+        let refs = Entity::find()
+            .select_only()
+            .columns([Column::ConsumerId, Column::SecretId])
+            .filter(Column::OrgId.eq(org))
+            .filter(Column::ConsumerType.eq(CHECK_CONSUMER.as_str()))
+            .filter(Column::ConsumerId.is_in(ids.iter().cloned()))
+            .into_tuple::<(String, String)>()
+            .all(conn)
+            .await?;
+        for (consumer, secret) in refs {
+            required.entry(consumer).or_default().insert(secret);
+        }
+        add_store_dependencies(conn, org, ids, &mut required).await?;
+    }
+    Ok(required)
+}
+
+async fn add_store_dependencies<C: ConnectionTrait>(
+    conn: &C,
+    org: &str,
+    ids: &[String],
+    required: &mut BTreeMap<String, BTreeSet<String>>,
+) -> anyhow::Result<()> {
+    use secret_dependencies::{Column, Entity};
+    let deps = Entity::find()
+        .select_only()
+        .columns([Column::ConsumerId, Column::DepKey])
+        .filter(Column::OrgId.eq(org))
+        .filter(Column::ConsumerType.eq(CHECK_CONSUMER.as_str()))
+        .filter(
+            Column::ConsumerId.is_in(ids.iter().filter(|id| required.contains_key(*id)).cloned()),
+        )
+        .filter(Column::DepKey.starts_with("vars:"))
+        .into_tuple::<(String, String)>()
+        .all(conn)
+        .await?;
+    let dep_ids: BTreeSet<_> = deps
+        .iter()
+        .filter_map(|(_, key)| key.strip_prefix("vars:"))
+        .collect();
+    if dep_ids.is_empty() {
+        return Ok(());
+    }
+    let secret_ids: HashSet<_> = org_secrets::Entity::find()
+        .select_only()
+        .column(org_secrets::Column::Id)
+        .filter(org_secrets::Column::OrgId.eq(org))
+        .filter(org_secrets::Column::Id.is_in(dep_ids))
+        .filter(org_secrets::Column::Kind.eq("secret"))
+        .into_tuple::<String>()
+        .all(conn)
+        .await?
+        .into_iter()
+        .collect();
+    for (consumer, key) in deps {
+        if let Some(secret) = key.strip_prefix("vars:")
+            && secret_ids.contains(secret)
+            && let Some(used) = required.get_mut(&consumer)
+        {
+            used.insert(secret.to_owned());
+        }
+    }
+    Ok(())
+}
+
+fn variable_use_set(
+    required: &BTreeMap<String, BTreeSet<String>>,
+) -> BTreeSet<(String, StrictVerb)> {
+    required
+        .values()
+        .flatten()
+        .map(|id| (id.clone(), StrictVerb::Use))
+        .collect()
+}
+
+async fn authorize_variable_write<C: ConnectionTrait>(
+    conn: &C,
+    org: &str,
+    actor: Option<CheckSaveActor<'_>>,
+    required: &BTreeMap<String, BTreeSet<String>>,
+    checks: &BTreeSet<(String, StrictVerb)>,
+) -> anyhow::Result<()> {
+    let mut denied = BTreeSet::new();
+    for (id, verb) in checks {
+        let allowed = match actor {
+            Some(actor) => checks::check_secret_strict(org, actor, id, *verb)
+                .await
+                .is_ok(),
+            None => false,
+        };
+        if !allowed {
+            denied.insert(id.as_str());
+        }
+    }
+    if denied.is_empty() {
+        return Ok(());
+    }
+    let blocked: Vec<&String> = required
+        .iter()
+        .filter(|(_, secrets)| secrets.iter().any(|s| denied.contains(s.as_str())))
+        .map(|(check, _)| check)
+        .collect();
+    let refusal = CheckSecretRefusal {
+        usage: Some(blocked_usage(conn, org, &blocked).await?),
+        ..SecretErrorCode::VariableFeedsSecretConsumer.into()
+    };
+    Err(refusal.into())
+}
+
+/// The blocked checks in the `usage` shape of `secret_in_use`, so both refusals read alike.
+async fn blocked_usage<C: ConnectionTrait>(
+    conn: &C,
+    org: &str,
+    ids: &[&String],
+) -> anyhow::Result<Vec<UsageEntry>> {
+    use check_rows::{Column, Entity};
+    let mut names = BTreeMap::new();
+    for chunk in ids.chunks(DEPENDENCY_BATCH_SIZE) {
+        let rows = Entity::find()
+            .select_only()
+            .columns([Column::Id, Column::Name])
+            .filter(Column::OrgId.eq(org))
+            .filter(Column::Id.is_in(chunk.iter().map(|id| id.as_str())))
+            .into_tuple::<(String, String)>()
+            .all(conn)
+            .await?;
+        names.extend(rows);
+    }
+    Ok(ids
+        .iter()
+        .map(|id| UsageEntry {
+            path: vec![UsageHop {
+                consumer_type: CHECK_CONSUMER,
+                consumer_id: (*id).clone(),
+                consumer_name: names.get(*id).cloned().unwrap_or_else(|| (*id).clone()),
+            }],
+            field: String::new(),
+            status: "bound".into(),
+            token_name: String::new(),
+        })
+        .collect())
+}
+
+fn variable_feeds_secret_consumer() -> anyhow::Error {
+    CheckSecretRefusal::from(SecretErrorCode::VariableFeedsSecretConsumer).into()
+}
+
+async fn prepare_variable_checks<'a>(
+    txn: &DatabaseTransaction,
+    org: &'a str,
+    required: BTreeMap<String, BTreeSet<String>>,
+    key: &KAuth,
+    dek: &[u8],
+) -> anyhow::Result<Vec<VariableCheck<'a>>> {
+    let ids: Vec<_> = required
+        .values()
+        .flatten()
+        .cloned()
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect();
+    let mut legacy = BTreeSet::new();
+    for ids in ids.chunks(DEPENDENCY_BATCH_SIZE) {
+        legacy.extend(
+            org_secrets::lock_for_share(txn, org, ids)
+                .await?
+                .into_iter()
+                .filter(|row| row.pin_mode == PinMode::Legacy)
+                .map(|row| row.id),
+        );
+    }
+    let mut loaded = Vec::with_capacity(required.len());
+    for (id, used) in required {
+        let pin = !legacy.is_disjoint(&used);
+        let snapshot = match variable_check_snapshot(txn, org, &id).await {
+            Ok(snapshot) => Some(snapshot),
+            Err(error) if is_check_refusal(&error) => None,
+            Err(error) => return Err(error),
+        };
+        loaded.push((id, pin, snapshot));
+    }
+    let rows = named_variable_rows(
+        txn,
+        org,
+        loaded
+            .iter()
+            .filter_map(|(_, _, snapshot)| snapshot.as_ref()),
+    )
+    .await?;
+    let mut checks = Vec::with_capacity(loaded.len());
+    for (id, pin, snapshot) in loaded {
+        let image = snapshot.map(|(snapshot, names)| {
+            variable_check_image_of(&snapshot, &names, key, &rows, dek, pin)
+        });
+        let (before, origins) = match image {
+            Some(Ok((image, origins))) => (Some(image), origins),
+            Some(Err(error)) if !is_check_refusal(&error) => return Err(error),
+            _ => (None, None),
+        };
+        checks.push(VariableCheck {
+            org,
+            id,
+            before,
+            origins,
+            after: OnceLock::new(),
+        });
+    }
+    Ok(checks)
+}
+
+async fn verify_variable_checks<'a>(
+    txn: &'a DatabaseTransaction,
+    checks: &'a [VariableCheck<'a>],
+    key: &'a KAuth,
+    user: &str,
+) -> anyhow::Result<Vec<(&'a VariableCheck<'a>, reauthorize::Verified<'a>)>> {
+    let mut verified = Vec::new();
+    for check in checks {
+        let via = Via::UserDependency {
+            user_id: user.to_owned(),
+        };
+        match reauthorize::verify_locked(txn, check, key, via).await {
+            Ok(proof) => verified.push((check, proof)),
+            Err(ReauthError::Stale(_)) => continue,
+            Err(ReauthError::Infra(error)) => return Err(infra_message(error)),
+        }
+    }
+    Ok(verified)
+}
+
+async fn resign_variable_checks(
+    txn: &DatabaseTransaction,
+    org: &str,
+    verified: Vec<(&VariableCheck<'_>, reauthorize::Verified<'_>)>,
+    key: &KAuth,
+    dek: &[u8],
+) -> anyhow::Result<()> {
+    let mut loaded = Vec::with_capacity(verified.len());
+    for (check, proof) in verified {
+        let snapshot = variable_check_snapshot(txn, org, &check.id).await?;
+        loaded.push((check, proof, snapshot));
+    }
+    let rows =
+        named_variable_rows(txn, org, loaded.iter().map(|(_, _, snapshot)| snapshot)).await?;
+    for (check, proof, (snapshot, names)) in loaded {
+        let (image, origins) =
+            variable_check_image_of(&snapshot, &names, key, &rows, dek, check.origins.is_some())?;
+        if origins != check.origins {
+            return Err(CheckSecretRefusal::from(SecretErrorCode::SecretPinRequired).into());
+        }
+        check.after.get_or_init(|| image);
+        reauthorize::resign(txn, proof)
+            .await
+            .map_err(|error| match error {
+                ReauthError::Stale(stale) => anyhow::anyhow!(stale.to_string()),
+                ReauthError::Infra(error) => infra_message(error),
+            })?;
+    }
+    Ok(())
+}
+
+pub(super) async fn variable_check_image(
+    txn: &DatabaseTransaction,
+    org: &str,
+    id: &str,
+    key: &KAuth,
+    rows: &[SyntheticsVariableRecord],
+    dek: &[u8],
+    pin: bool,
+) -> anyhow::Result<(ConsumerImage, Option<Origins>)> {
+    let (snapshot, names) = variable_check_snapshot(txn, org, id).await?;
+    variable_check_image_of(&snapshot, &names, key, rows, dek, pin)
+}
+
+/// The check as signed, expanded, with the placeholder names it reads.
+async fn variable_check_snapshot(
+    txn: &DatabaseTransaction,
+    org: &str,
+    id: &str,
+) -> anyhow::Result<(Synthetic, BTreeSet<String>)> {
+    let stale = || CheckSecretRefusal::from(SecretErrorCode::ConsumerStale);
+    let mut snapshot = synthetics_checks::get(txn, org, id)
+        .await
+        .map_err(infra_message)?
+        .ok_or_else(stale)?;
+    decrypt_synthetic_secrets(org, &mut snapshot)
+        .await
+        .map_err(|_| stale())?;
+    crate::job_api::expand_snapshot_for_save(txn, &mut snapshot).await?;
+    let names = placeholder_names(&check_placeholder_text(&snapshot));
+    Ok((snapshot, names))
+}
+
+fn variable_check_image_of(
+    snapshot: &Synthetic,
+    names: &BTreeSet<String>,
+    key: &KAuth,
+    rows: &[SyntheticsVariableRecord],
+    dek: &[u8],
+    pin: bool,
+) -> anyhow::Result<(ConsumerImage, Option<Origins>)> {
+    let stale = || CheckSecretRefusal::from(SecretErrorCode::ConsumerStale);
+    let deps = checks::check_dependencies_from_rows(snapshot, key, names, rows, dek)
+        .map_err(|_| stale())?;
+    let origins = pin
+        .then(|| variable_check_origins(snapshot, names, rows, dek))
+        .transpose()
+        .map_err(|_| stale())?;
+    Ok((checks::synthetics_consumer_image(snapshot, deps)?, origins))
+}
+
+fn is_check_refusal(error: &anyhow::Error) -> bool {
+    error.is::<crate::job_api::ConfigError>() || error.is::<CheckSecretRefusal>()
+}
+
+/// Only the variables the snapshots name: images read no other row, so the org's rest is skipped.
+async fn named_variable_rows<'s>(
+    txn: &DatabaseTransaction,
+    org: &str,
+    snapshots: impl Iterator<Item = &'s (Synthetic, BTreeSet<String>)>,
+) -> anyhow::Result<Vec<SyntheticsVariableRecord>> {
+    let names: Vec<String> = snapshots
+        .flat_map(|(_, names)| names.iter().cloned())
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect();
+    let mut rows = Vec::new();
+    for chunk in names.chunks(DEPENDENCY_BATCH_SIZE) {
+        rows.extend(
+            synthetics_variables::list_named(txn, org, chunk)
+                .await
+                .map_err(infra_message)?,
+        );
+    }
+    Ok(rows)
+}
+
+fn variable_check_origins(
+    snapshot: &Synthetic,
+    names: &BTreeSet<String>,
+    rows: &[SyntheticsVariableRecord],
+    dek: &[u8],
+) -> anyhow::Result<Origins> {
+    let global = synthetics_environments::global_environment_id(&snapshot.org_id);
+    let mut shared = EnvVars::new();
+    for env in snapshot.environments.iter().map(String::as_str).chain(
+        snapshot
+            .environments
+            .is_empty()
+            .then_some(config::meta::secret_store::ORG_ENV_ID),
+    ) {
+        let applicable = applicable_shared_rows(rows.iter().cloned(), names, Some(env), &global);
+        shared.insert(env.to_owned(), shared_variable_values(&applicable, dek)?);
+    }
+    Ok(check_origins(snapshot, &shared))
+}
+
+async fn lock_variable(
+    txn: &DatabaseTransaction,
+    original: &SyntheticsVariableRecord,
+) -> anyhow::Result<Option<variable_entity::ActiveModel>> {
+    use variable_entity::{Column, Entity};
+    let mut query = Entity::find()
+        .filter(Column::OrgId.eq(&original.org_id))
+        .filter(Column::Id.eq(&original.id));
+    if txn.get_database_backend() == DatabaseBackend::Postgres {
+        query = query.lock_exclusive();
+    }
+    let Some(row) = query.one(txn).await? else {
+        return Ok(None);
+    };
+    if SyntheticsVariableRecord::from(row.clone()) != *original {
+        return Err(UsageConflict(
+            "the variable changed while this request was in progress".into(),
+        )
+        .into());
+    }
+    Ok(Some(row.into()))
+}
+
+async fn save_variable_row(
+    txn: &DatabaseTransaction,
+    row: variable_entity::ActiveModel,
+    duplicate: impl FnOnce() -> String,
+) -> anyhow::Result<()> {
+    match variable_entity::Entity::update(row).exec(txn).await {
+        Ok(_) => Ok(()),
+        Err(error) if matches!(error.sql_err(), Some(SqlErr::UniqueConstraintViolation(_))) => {
+            Err(NameConflict(duplicate()).into())
+        }
+        Err(error) => Err(infra_message(error.into())),
+    }
 }
 
 async fn resolve_shared_variables_in<C: sea_orm::ConnectionTrait>(
@@ -1109,15 +1951,21 @@ async fn resolve_shared_variables_in<C: sea_orm::ConnectionTrait>(
     let rows = synthetics_variables::list_cached(conn, org_id)
         .await
         .map_err(infra_message)?;
+    shared_variables_from_rows(conn, org_id, env_id, check, dek, rows).await
+}
+
+async fn shared_variables_from_rows<C: sea_orm::ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    env_id: Option<&str>,
+    check: &Synthetic,
+    dek: &[u8],
+    rows: Vec<SyntheticsVariableRecord>,
+) -> anyhow::Result<Vec<(String, String)>> {
     let global_id = synthetics_environments::global_environment_id(org_id);
     let referenced = placeholder_names(&check_placeholder_text(check));
     // Only what the check names reaches the probe, which also redacts every value it is sent.
-    let applicable = order_for_merge(
-        rows.into_iter()
-            .filter(|v| referenced.contains(&v.name) && applies_to(v, env_id, &global_id))
-            .collect(),
-        &global_id,
-    );
+    let applicable = applicable_shared_rows(rows.into_iter(), &referenced, env_id, &global_id);
     if let Some(unset) = first_unset_secret(&applicable, &check.variables, &referenced) {
         let env = synthetics_environments::get_by_id(conn, org_id, &unset.env)
             .await
@@ -1132,8 +1980,28 @@ async fn resolve_shared_variables_in<C: sea_orm::ConnectionTrait>(
             guard_failure: false,
         }));
     }
+    shared_variable_values(&applicable, dek)
+}
+
+fn applicable_shared_rows(
+    rows: impl Iterator<Item = SyntheticsVariableRecord>,
+    names: &BTreeSet<String>,
+    env: Option<&str>,
+    global: &str,
+) -> Vec<SyntheticsVariableRecord> {
+    order_for_merge(
+        rows.filter(|row| names.contains(&row.name) && applies_to(row, env, global))
+            .collect(),
+        global,
+    )
+}
+
+fn shared_variable_values(
+    rows: &[SyntheticsVariableRecord],
+    dek: &[u8],
+) -> anyhow::Result<Vec<(String, String)>> {
     let mut out = Vec::new();
-    for row in applicable.iter() {
+    for row in rows {
         let value = if row.value.starts_with("AESenc:") {
             decrypt_secret(dek, &row.value)?
         } else {
@@ -1956,10 +2824,6 @@ async fn grant_new_environment(org_id: &str, name: &str) {
         remove_object_grants(org_id, &object).await;
         set_ownership(org_id, &object, "", "").await;
     }
-}
-
-fn environment_object(name: &str) -> String {
-    format!("{}:{}", get_ofga_type("synthetic_environment"), name)
 }
 
 fn environment_view(record: SyntheticsEnvironmentRecord) -> SyntheticsEnvironmentView {
@@ -2939,7 +3803,10 @@ mod tests {
         db.execute_unprepared(&checks).await.unwrap();
         for table in [
             schema.create_table_from_entity(infra::table::entity::synthetics_environments::Entity),
+            schema.create_table_from_entity(infra::table::synthetics_env_retired::Entity),
             schema.create_table_from_entity(infra::table::entity::synthetics_variables::Entity),
+            schema.create_table_from_entity(secret_dependencies::Entity),
+            schema.create_table_from_entity(secret_refs::Entity),
             // Saving a check also rewrites its subtest references.
             schema.create_table_from_entity(infra::table::entity::synthetics_refs::Entity),
         ] {
@@ -2965,7 +3832,7 @@ mod tests {
                 .unwrap()
                 .0;
         }
-        let record = SyntheticsEnvironmentRecord {
+        let mut record = SyntheticsEnvironmentRecord {
             id: synthetics_environments::environment_id(org, name),
             org_id: org.into(),
             name: name.into(),
@@ -2975,7 +3842,7 @@ mod tests {
             created_at: 1,
             updated_at: 1,
         };
-        synthetics_environments::add(db, &record).await.unwrap();
+        synthetics_environments::add(db, &mut record).await.unwrap();
         record
     }
 
@@ -3065,16 +3932,24 @@ mod tests {
         };
         stored_check(&db, org, "c1", check).await;
 
-        let err = promote_check_variable_in(&db, org, "c1", "API_HOST", &global, "asha@acme.com")
-            .await
-            .unwrap_err()
-            .to_string();
+        let err =
+            promote_check_variable_in(&db, org, "c1", "API_HOST", &global, "asha@acme.com", None)
+                .await
+                .unwrap_err()
+                .to_string();
         assert!(err.contains("no variable named"), "{err}");
 
-        let (record, check) =
-            promote_check_variable_in(&db, org, "c1", "  api_host ", &global, "asha@acme.com")
-                .await
-                .unwrap();
+        let ((record, check), _) = promote_check_variable_in(
+            &db,
+            org,
+            "c1",
+            "  api_host ",
+            &global,
+            "asha@acme.com",
+            None,
+        )
+        .await
+        .unwrap();
         assert_eq!(record.env, global.id);
         assert_eq!(record.name, "api_host");
         assert_eq!(record.value, "y");
@@ -3100,11 +3975,18 @@ mod tests {
         };
         stored_check(&db, org, "c1", check).await;
 
-        let err =
-            promote_check_variable_in(&db, org, "c1", "_auth_token", &global, "asha@acme.com")
-                .await
-                .unwrap_err()
-                .to_string();
+        let err = promote_check_variable_in(
+            &db,
+            org,
+            "c1",
+            "_auth_token",
+            &global,
+            "asha@acme.com",
+            None,
+        )
+        .await
+        .unwrap_err()
+        .to_string();
         assert!(err.contains("reserved"), "{err}");
     }
 
@@ -3121,10 +4003,11 @@ mod tests {
         };
         stored_check(&db, org, "c1", check).await;
 
-        let err = promote_check_variable_in(&db, org, "c1", "API_HOST", &global, "asha@acme.com")
-            .await
-            .unwrap_err()
-            .to_string();
+        let err =
+            promote_check_variable_in(&db, org, "c1", "API_HOST", &global, "asha@acme.com", None)
+                .await
+                .unwrap_err()
+                .to_string();
         assert!(err.contains("'staging'"), "{err}");
         let reread = synthetics_checks::get(&db, org, "c1")
             .await
@@ -3168,6 +4051,7 @@ mod tests {
             &[target("prod", "https://prod.test")],
             "asha@acme.com",
             &[7u8; 64],
+            None,
         )
         .await
         .unwrap_err()
@@ -3175,7 +4059,7 @@ mod tests {
         assert!(err.contains("Both"), "{err}");
         assert_eq!(synthetics_variables::list(&db, org).await.unwrap().len(), 1);
 
-        let (envs, created) = split_to_environments_in(
+        let ((envs, created), _) = split_to_environments_in(
             &db,
             &global,
             &source.id,
@@ -3185,6 +4069,7 @@ mod tests {
             ],
             "asha@acme.com",
             &[7u8; 64],
+            None,
         )
         .await
         .unwrap();
@@ -3295,11 +4180,13 @@ mod tests {
         let db = variables_db().await;
         let org = "f46-dup-env";
         let first = stored_env(&db, org, "staging").await;
-        let again = SyntheticsEnvironmentRecord {
+        let mut again = SyntheticsEnvironmentRecord {
             id: "other-id".into(),
             ..first
         };
-        let raw = synthetics_environments::add(&db, &again).await.unwrap_err();
+        let raw = synthetics_environments::add(&db, &mut again)
+            .await
+            .unwrap_err();
         assert!(
             matches!(raw, infra::errors::Error::DuplicateName(_)),
             "{raw}"

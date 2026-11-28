@@ -136,7 +136,11 @@ pub fn context_object(ctx: &NotificationContext) -> Value {
     }
 
     for (key, value) in &ctx.metadata {
-        out.entry(key.clone()).or_insert_with(|| str_or_null(value));
+        if !config::get_config().common.secret_store_refs_enabled
+            || !config::meta::secret_store::grammar::has_secret_ref(value)
+        {
+            out.entry(key.clone()).or_insert_with(|| str_or_null(value));
+        }
     }
 
     if let Some(labels) = &ctx.group_labels {

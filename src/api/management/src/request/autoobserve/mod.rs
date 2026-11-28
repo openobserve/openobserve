@@ -1039,8 +1039,8 @@ mod tests {
         use openobserve_core::authz::{TypedStream, fake_checker};
 
         let checker = fake_checker();
-        let org = format!("ao_{}", config::ider::uuid());
-        let wide = format!("wide_{}", config::ider::uuid());
+        let org = format!("ao_{}", config::ider::ksuid());
+        let wide = format!("wide_{}", config::ider::ksuid());
         checker.grant_read_all(&wide, &org, StreamType::Logs);
         let ids: Vec<(String, String)> = (0..20)
             .map(|i| ("logs".to_string(), format!("s{i}")))
@@ -1056,7 +1056,7 @@ mod tests {
         assert_eq!(calls.streams, 0);
         assert_eq!(calls.org_wide, vec![vec![StreamType::Logs]]);
 
-        let single = format!("single_{}", config::ider::uuid());
+        let single = format!("single_{}", config::ider::ksuid());
         checker.grant_read(
             &single,
             &TypedStream {

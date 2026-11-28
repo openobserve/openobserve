@@ -882,7 +882,7 @@ mod tests {
 
     fn caller() -> Headers<UserEmail> {
         Headers(UserEmail {
-            user_id: format!("{}@example.com", config::ider::uuid()),
+            user_id: format!("{}@example.com", config::ider::ksuid()),
         })
     }
 

@@ -1041,7 +1041,7 @@ mod tests {
 
         fn denied_user() -> Headers<UserEmail> {
             Headers(UserEmail {
-                user_id: format!("{}@example.com", config::ider::uuid()),
+                user_id: format!("{}@example.com", config::ider::ksuid()),
             })
         }
 
@@ -1106,7 +1106,7 @@ mod tests {
         #[tokio::test]
         async fn an_invalid_update_from_a_denied_user_gets_the_validation_400() {
             fake_checker();
-            let id = config::ider::uuid();
+            let id = config::ider::ksuid();
             stored_config("ad_org1", &id, true).await;
             let req = UpdateAnomalyConfigRequest {
                 histogram_interval: Some("0m".to_string()),
@@ -1122,7 +1122,7 @@ mod tests {
         #[tokio::test]
         async fn detect_and_train_on_a_disabled_config_answer_before_the_stream_check() {
             fake_checker();
-            let id = config::ider::uuid();
+            let id = config::ider::ksuid();
             stored_config("ad_org1", &id, false).await;
             let detected =
                 detect_anomalies(Path(("ad_org1".to_string(), id.clone())), denied_user()).await;

@@ -29,6 +29,7 @@ use config::{
     meta::{
         alerts::alert::Alert,
         destinations::{Destination, DestinationType, Endpoint, Module},
+        secret_store::{SecretErrorCode, grammar},
     },
     utils::{
         base64,
@@ -44,7 +45,10 @@ use db::alerts::destinations::DestinationError;
 use reqwest::{Method, StatusCode};
 use serde::{Deserialize, Serialize};
 
-use super::{NotificationContext, STATUS_RESOLVED};
+use super::{
+    NotificationContext, STATUS_RESOLVED,
+    send::{SecretRequest, SendError, refuse_endpoint_refs, secret_error},
+};
 
 pub const UNSUPPORTED_SENDER: &str =
     "Jira destinations only accept alert, composite alert, incident and anomaly notifications.";
@@ -214,6 +218,73 @@ impl Jira {
     }
 }
 
+enum JiraSender<'a> {
+    Legacy(Jira),
+    Secret {
+        destination: &'a Destination,
+        endpoint: &'a Endpoint,
+    },
+}
+
+impl JiraSender<'_> {
+    async fn call(&self, method: Method, path: &str, body: Option<Value>) -> Result<JiraReply> {
+        let (destination, endpoint) = match self {
+            Self::Legacy(jira) => {
+                return Ok(JiraReply {
+                    value: jira.call(method, path, body).await?,
+                    status: None,
+                });
+            }
+            Self::Secret {
+                destination,
+                endpoint,
+            } => (*destination, *endpoint),
+        };
+        let builder = reqwest::Client::builder().timeout(TIMEOUT);
+        let attempt = SecretRequest::new(Some(destination), endpoint, builder)
+            .await?
+            .ok_or_else(|| {
+                secret_error(
+                    endpoint,
+                    config::meta::secret_store::SecretErrorCode::DeliveryStale,
+                )
+            })?;
+        let mut req = attempt.request(method, path);
+        if let Some(body) = body {
+            req = req.json(&body);
+        }
+        let resp = attempt.send(req).await?;
+        let status = resp.status();
+        if status.is_redirection() {
+            return Err(SendError::RedirectRefused(status).into());
+        }
+        if !status.is_success() {
+            return Err(JiraRejected {
+                status: status.as_u16(),
+                message: format!("Jira: HTTP {status}"),
+            }
+            .into());
+        }
+        let value = read_send_reply(resp, path, &attempt).await?;
+        Ok(JiraReply {
+            value,
+            status: Some(status),
+        })
+    }
+}
+
+struct JiraReply {
+    value: Value,
+    status: Option<StatusCode>,
+}
+
+impl JiraReply {
+    fn outcome(&self, legacy: impl FnOnce() -> String) -> String {
+        self.status
+            .map_or_else(legacy, |status| format!("sent status: {status}"))
+    }
+}
+
 /// A Jira answer that was not a success; the status tells a permanent refusal from a retry.
 #[derive(Debug, thiserror::Error)]
 #[error("{message}")]
@@ -237,6 +308,26 @@ pub fn is_jira(endpoint: &Endpoint) -> bool {
 
 /// Comment on the open issue for this alert, incident or anomaly, or create one; never on recovery.
 pub async fn send(endpoint: &Endpoint, ctx: &NotificationContext) -> Result<String> {
+    refuse_endpoint_refs(endpoint)?;
+    send_with(None, endpoint, ctx).await
+}
+
+pub(crate) async fn send_saved(
+    destination: &Destination,
+    endpoint: &Endpoint,
+    ctx: &NotificationContext,
+) -> Result<String> {
+    if !endpoint.uses_store_refs() {
+        return send(endpoint, ctx).await;
+    }
+    send_with(Some(destination), endpoint, ctx).await
+}
+
+async fn send_with(
+    destination: Option<&Destination>,
+    endpoint: &Endpoint,
+    ctx: &NotificationContext,
+) -> Result<String> {
     let meta = |key: &str| endpoint.metadata.get(key).map_or("", String::as_str);
     let project_key = meta("jira_project_key");
     if project_key.is_empty() {
@@ -245,22 +336,37 @@ pub async fn send(endpoint: &Endpoint, ctx: &NotificationContext) -> Result<Stri
     let Some(label) = issue_label(ctx) else {
         bail!("Jira destination has no alert, incident or anomaly id to find its issue by");
     };
-    let headers = endpoint
-        .headers
-        .iter()
-        .flatten()
-        .map(|(key, value)| (key.clone(), value.clone()))
-        .collect();
-    let jira = Jira::new(&endpoint.url, headers, endpoint.skip_tls_verify, false)?;
-
-    let slot = created_slot(&jira.base, project_key, &label);
+    let (jira, base) = match destination {
+        Some(destination) => {
+            let base = format!("{:?}/{}", destination.id, endpoint.url);
+            (
+                JiraSender::Secret {
+                    destination,
+                    endpoint,
+                },
+                base,
+            )
+        }
+        None => {
+            let headers = endpoint
+                .headers
+                .iter()
+                .flatten()
+                .map(|(key, value)| (key.clone(), value.clone()))
+                .collect();
+            let jira = Jira::new(&endpoint.url, headers, endpoint.skip_tls_verify, false)?;
+            let base = jira.base.clone();
+            (JiraSender::Legacy(jira), base)
+        }
+    };
+    let slot = created_slot(&base, project_key, &label);
     let mut created = slot.lock().await;
     let remembered = created
         .as_ref()
         .filter(|(_, at)| at.elapsed() < CREATED_TTL)
         .map(|(key, _)| key.clone());
     if let Some(key) = remembered
-        && still_open(&jira, &key).await
+        && still_open(&jira, &key).await?
     {
         drop(created);
         return comment_on(&jira, &key, ctx).await;
@@ -274,13 +380,13 @@ pub async fn send(endpoint: &Endpoint, ctx: &NotificationContext) -> Result<Stri
     };
     let query = json!({"jql": jql(project_key, &label), "fields": ["key"], "maxResults": 1});
     let found = jira.call(Method::POST, search, Some(query)).await?;
-    let open = &found["issues"][0];
+    let open = &found.value["issues"][0];
     if let Some(key) = open["key"].as_str().or_else(|| open["id"].as_str()) {
         drop(created);
         return comment_on(&jira, key, ctx).await;
     }
     if ctx.alert_status == STATUS_RESOLVED {
-        return Ok(format!("no open Jira issue with label {label}"));
+        return Ok(found.outcome(|| format!("no open Jira issue with label {label}")));
     }
 
     let extra = match meta("jira_fields") {
@@ -306,13 +412,49 @@ pub async fn send(endpoint: &Endpoint, ctx: &NotificationContext) -> Result<Stri
         .await;
     let issue = match issue {
         Ok(issue) => issue,
-        Err(refused) => return Err(name_rejected_token(&jira, refused).await),
+        Err(refused) => {
+            return Err(match &jira {
+                JiraSender::Legacy(jira) => name_rejected_token(jira, refused).await,
+                JiraSender::Secret { .. } => refused,
+            });
+        }
     };
-    let key = issue["key"].as_str().unwrap_or_default();
+    let key = issue.value["key"].as_str().unwrap_or_default();
     if !key.is_empty() {
         *created = Some((key.to_string(), Instant::now()));
     }
-    Ok(format!("created {key}"))
+    Ok(issue.outcome(|| format!("created {key}")))
+}
+
+async fn read_send_reply(
+    response: reqwest::Response,
+    path: &str,
+    attempt: &SecretRequest,
+) -> Result<Value> {
+    if path.ends_with("/comment") {
+        return Ok(Value::Null);
+    }
+    let text = response
+        .text()
+        .await
+        .map_err(|e| attempt.transport_error(e))?;
+    if text.trim().is_empty() {
+        return Ok(Value::Null);
+    }
+    let mut value: Value = serde_json::from_str(&text)
+        .map_err(|_| anyhow!("destination did not answer like a Jira server"))?;
+    if let Some(issues) = value.get_mut("issues").and_then(Value::as_array_mut) {
+        issues
+            .retain(|issue| jira_issue_id(issue).is_some_and(|id| attempt.accepts_protocol_id(id)));
+    }
+    if jira_issue_id(&value).is_some_and(|id| !attempt.accepts_protocol_id(id)) {
+        value = Value::Null;
+    }
+    Ok(value)
+}
+
+fn jira_issue_id(value: &Value) -> Option<&str> {
+    value["key"].as_str().or_else(|| value["id"].as_str())
 }
 
 /// The slot for one issue identity; idle slots are swept once a minute so the map stays small.
@@ -345,25 +487,38 @@ fn sweep_due(next: &AtomicI64, now: i64) -> bool {
 }
 
 /// An issue that cannot be read counts as gone, so the search decides instead.
-async fn still_open(jira: &Jira, key: &str) -> bool {
-    jira.call(
-        Method::GET,
-        &format!("/rest/api/2/issue/{key}?fields=status"),
-        None,
-    )
-    .await
-    .is_ok_and(|issue| issue["fields"]["status"]["statusCategory"]["key"] != "done")
+async fn still_open(jira: &JiraSender<'_>, key: &str) -> Result<bool> {
+    let response = jira
+        .call(
+            Method::GET,
+            &format!("/rest/api/2/issue/{key}?fields=status"),
+            None,
+        )
+        .await;
+    match response {
+        Ok(issue) => Ok(issue.value["fields"]["status"]["statusCategory"]["key"] != "done"),
+        Err(_) if matches!(jira, JiraSender::Legacy(_)) => Ok(false),
+        Err(err)
+            if err
+                .downcast_ref::<JiraRejected>()
+                .is_some_and(|r| r.status == 404) =>
+        {
+            Ok(false)
+        }
+        Err(err) => Err(err),
+    }
 }
 
-async fn comment_on(jira: &Jira, key: &str, ctx: &NotificationContext) -> Result<String> {
+async fn comment_on(jira: &JiraSender<'_>, key: &str, ctx: &NotificationContext) -> Result<String> {
     let body = json!({"body": comment(ctx)});
-    jira.call(
-        Method::POST,
-        &format!("/rest/api/2/issue/{key}/comment"),
-        Some(body),
-    )
-    .await?;
-    Ok(format!("commented on {key}"))
+    let response = jira
+        .call(
+            Method::POST,
+            &format!("/rest/api/2/issue/{key}/comment"),
+            Some(body),
+        )
+        .await?;
+    Ok(response.outcome(|| format!("commented on {key}")))
 }
 
 /// Jira Cloud treats a wrong token as anonymous, so only `/myself` can tell it from a bad project.
@@ -399,6 +554,7 @@ pub async fn setup(org_id: &str, req: SetupRequest) -> Result<Value> {
         },
         None => None,
     };
+    refuse_setup_refs(&req, saved.as_ref())?;
     let authorization = setup_authorization(&req, cloud, saved.as_ref())?;
     let headers = vec![
         ("Authorization".to_string(), authorization),
@@ -474,6 +630,24 @@ fn setup_authorization(
         .ok_or(DestinationError::JiraTokenChanged)?;
     let (_, value) = authorization(endpoint).ok_or(DestinationError::JiraTokenMissing)?;
     Ok(value.clone())
+}
+
+/// Setup returns Jira response data, so a value from the store must never authenticate it.
+fn refuse_setup_refs(req: &SetupRequest, saved: Option<&Destination>) -> Result<()> {
+    if !config::get_config().common.secret_store_refs_enabled {
+        return Ok(());
+    }
+    let typed = [&req.url, &req.email, &req.token];
+    if typed.iter().any(|text| grammar::has_secret_ref(text))
+        || saved
+            .and_then(http_endpoint)
+            .is_some_and(Endpoint::uses_store_refs)
+    {
+        bail!(infra::errors::Error::SecretStore(
+            SecretErrorCode::JiraSetupNeedsLiteralToken
+        ));
+    }
+    Ok(())
 }
 
 /// On a Jira save without a token, keeps the saved one; refused when nothing safe to keep.
@@ -1807,6 +1981,39 @@ mod tests {
         ] {
             assert_eq!(resolved(&req, stored), Err(CHANGED.to_string()));
         }
+    }
+
+    #[test]
+    fn setup_with_a_store_ref_needs_a_literal_token() {
+        crate::ssrf_test_support::isolated(
+            concat!(
+                module_path!(),
+                "::setup_with_a_store_ref_needs_a_literal_token"
+            ),
+            &[("O2_SECRET_STORE_REFS_ENABLED", "true")],
+            || async {
+                let refused = |req: &SetupRequest, saved: Option<&Destination>| {
+                    let err = refuse_setup_refs(req, saved).unwrap_err();
+                    assert!(matches!(
+                        err.downcast_ref::<infra::errors::Error>(),
+                        Some(infra::errors::Error::SecretStore(
+                            SecretErrorCode::JiraSetupNeedsLiteralToken
+                        ))
+                    ));
+                };
+                let saved_ref = jira_dest(SITE, "cloud", "ops@acme.com", "Basic {{secrets.JIRA}}");
+                let by_name = setup_req("", Some("Jira OPS"), SITE, "ops@acme.com");
+                refused(&by_name, Some(&saved_ref));
+                refused(
+                    &setup_req("{{secrets.JIRA}}", None, SITE, "ops@acme.com"),
+                    None,
+                );
+                let literal = jira_dest(SITE, "cloud", "ops@acme.com", SAVED_TOKEN);
+                assert!(refuse_setup_refs(&by_name, Some(&literal)).is_ok());
+                let typed = setup_req("pat-0123", None, SITE, "");
+                assert!(refuse_setup_refs(&typed, None).is_ok());
+            },
+        );
     }
 
     #[test]

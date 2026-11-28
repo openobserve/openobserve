@@ -635,7 +635,7 @@ impl Locker {
     pub(crate) fn new(key: &str) -> Self {
         Self {
             key: format!("/locker{key}"),
-            lock_id: ider::uuid(),
+            lock_id: ider::ksuid(),
             state: Arc::new(AtomicU8::new(0)),
             lost: Arc::new(watch::channel(false).0),
             tx: None,
@@ -729,12 +729,55 @@ impl Locker {
             }
         }
 
-        // start keep alive
+        self.start_keep_alive(bucket, key, revision).await;
+        Ok(())
+    }
+
+    /// One attempt that never waits; `false` when another holder has the key.
+    pub(crate) async fn try_lock(&mut self) -> Result<bool> {
+        let cfg = get_config();
+        let (bucket, new_key) = get_bucket_by_key(&cfg.nats.prefix, &self.key).await?;
+        let now = now_micros();
+        let value = Bytes::from(format!(
+            "{}:{}:{}",
+            self.lock_id,
+            cluster::LOCAL_NODE.uuid,
+            now + second_micros(LOCKER_WATCHER_UPDATE_TTL)
+        ));
+        let key = key_encode(new_key);
+
+        let mut local_mutex = LOCAL_LOCKER.lock().await;
+        let locker = local_mutex
+            .entry(key.clone())
+            .or_insert_with(|| Arc::new(Mutex::new(false)))
+            .clone();
+        drop(local_mutex);
+        let Ok(_lock_guard) = locker.try_lock() else {
+            return Ok(false);
+        };
+
+        _ = check_exist_lock(&bucket, &key, &self.key).await?;
+        let revision = match bucket.create(&key, value).await {
+            Ok(revision) => revision,
+            Err(err) if err.to_string().contains("key already exists") => return Ok(false),
+            Err(err) => {
+                return Err(Error::Message(format!(
+                    "nats lock for key: {}, error: {err}",
+                    self.key
+                )));
+            }
+        };
+        self.state.store(LOCKER_STATE_LOCKING, Ordering::SeqCst);
+        self.start_keep_alive(bucket, key, revision).await;
+        Ok(true)
+    }
+
+    async fn start_keep_alive(&mut self, bucket: jetstream::kv::Store, key: String, revision: u64) {
         let (tx, mut rx) = tokio::sync::mpsc::channel(1);
         self.tx = Some(tx);
         let lock_id = self.lock_id.clone();
         let lock_key = self.key.clone();
-        let bucket_key = key.clone();
+        let bucket_key = key;
         let state = self.state.clone();
         let lost = self.lost.clone();
         let handle = tokio::task::spawn(async move {
@@ -749,8 +792,6 @@ impl Locker {
             }
         });
         *self.keep_alive.lock().await = Some(handle);
-
-        Ok(())
     }
 
     pub(crate) async fn owned_revision(&self) -> Result<u64> {
@@ -940,7 +981,7 @@ async fn keys(kv: &jetstream::kv::Store, prefix: &str) -> Result<Vec<String>> {
     let mut consumer = kv
         .stream
         .create_consumer(jetstream::consumer::push::OrderedConfig {
-            deliver_subject: ider::uuid(),
+            deliver_subject: ider::ksuid(),
             description: Some("kv history consumer".to_string()),
             headers_only: true,
             replay_policy: jetstream::consumer::ReplayPolicy::Instant,

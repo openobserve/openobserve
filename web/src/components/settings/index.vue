@@ -74,6 +74,7 @@ import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
 import config from "@/aws-exports";
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
+import { useOrgRole } from "@/composables/useOrgRole";
 import { checkFeatureAccess, buildFeatureGateContext } from "@/utils/enterpriseFeatures";
 import { featureState, menuState } from "@/utils/featureGate";
 import { isSlackSettingsVisible, readSlackOrgConfig } from "@/utils/slackSettings";
@@ -92,6 +93,7 @@ export default defineComponent({
   setup() {
     const { t } = useI18nTyped();
     const store = useStore();
+    const { isRoot } = useOrgRole();
     const router: any = useRouter();
     const route = useRoute();
 
@@ -110,6 +112,8 @@ export default defineComponent({
       telephonySettings: "telephony",
       storageSettings: "storageSettings",
       cipherKeys: "cipher-keys",
+      secrets: "secrets",
+      secretStoreStatus: "secret_store_status",
       aiToolsets: "ai_toolsets",
       license: "license",
       orgnizationManagement: "organization_management",
@@ -295,6 +299,27 @@ export default defineComponent({
           lockedMessage: cipherKeysAccess.message,
           dataTest: "management-cipher-key-tab",
           group: "Access & Security",
+        },
+        {
+          key: "secrets",
+          label: t("secrets.title"),
+          description: t("secrets.navDesc"),
+          icon: "lock",
+          to: { name: "secrets", query: { org_identifier: org } },
+          // The store API exists only in enterprise builds.
+          visible: config.isEnterprise == "true",
+          dataTest: "management-secrets-tab",
+          group: "Access & Security",
+        },
+        {
+          key: "secret_store_status",
+          label: t("secrets.rootStatus.title"),
+          description: t("secrets.rootStatus.navDesc"),
+          icon: "dns",
+          to: { name: "secretStoreStatus", query: { org_identifier: org } },
+          visible: config.isEnterprise == "true" && meta && isRoot.value,
+          dataTest: "management-secret-store-status-tab",
+          group: "Operations",
         },
         {
           key: "regex_patterns",

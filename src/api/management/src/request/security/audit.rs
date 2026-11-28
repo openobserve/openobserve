@@ -255,7 +255,7 @@ mod tests {
             Path("org".to_string()),
             Query(SecurityAuditQuery::default()),
             Headers(UserEmail {
-                user_id: format!("{}@example.com", config::ider::uuid()),
+                user_id: format!("{}@example.com", config::ider::ksuid()),
             }),
         )
         .await;

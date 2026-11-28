@@ -57,6 +57,14 @@ impl TeamPage {
     }
 }
 
+/// Where a new record came from: the owner record an impacted one opened beside, and the user
+/// who triggered it by hand (re-checked at every send). Both `None` for a system firing.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Provenance<'a> {
+    pub origin_response_id: Option<&'a str>,
+    pub requested_by: Option<&'a str>,
+}
+
 /// A [TeamPage]'s columns, in the order `into_tuple` reads them.
 type TeamPageRow = (String, Option<String>, i64, String);
 
@@ -105,6 +113,7 @@ fn to_response(m: oncall_responses::Model) -> Option<Response> {
         closed_at: m.closed_at,
         incident_id: m.incident_id,
         exhausted_at: m.exhausted_at,
+        requested_by: m.requested_by,
         updated_at: m.updated_at,
     })
 }
@@ -244,11 +253,11 @@ pub async fn open(
     priority: i32,
     title: Option<&str>,
     role: ResponderRole,
-    origin_response_id: Option<&str>,
+    provenance: Provenance<'_>,
 ) -> Result<Response, errors::Error> {
     let client = get_orm_client_rw().await;
     let model = oncall_responses::ActiveModel {
-        id: Set(ider::uuid()),
+        id: Set(ider::ksuid()),
         org_id: Set(org_id.to_string()),
         subject_type: Set(subject.subject_type.to_i32()),
         subject_id: Set(subject.subject_id()),
@@ -260,7 +269,7 @@ pub async fn open(
         ladder_anchor: Set(None),
         ladder_run: Set(Some(FIRST_LADDER_RUN)),
         responder_role: Set(role.to_i32()),
-        origin_response_id: Set(origin_response_id.map(|s| s.to_string())),
+        origin_response_id: Set(provenance.origin_response_id.map(str::to_string)),
         priority: Set(priority),
         state: Set(ResponseState::Triggered.to_i32()),
         opened_at: Set(now_micros()),
@@ -271,6 +280,7 @@ pub async fn open(
         // Copied at open, so the page keeps pointing where the alert pointed when it fired.
         runbook_url: Set(runbook_for(org_id, subject).await),
         exhausted_at: Set(None),
+        requested_by: Set(provenance.requested_by.map(str::to_string)),
         updated_at: Set(now_micros()),
     };
     let inserted = model.insert(client).await?;
@@ -289,22 +299,12 @@ pub async fn open_or_get(
     priority: i32,
     title: Option<&str>,
     role: ResponderRole,
-    origin_response_id: Option<&str>,
+    provenance: Provenance<'_>,
 ) -> Result<(Response, bool), errors::Error> {
     if let Some(found) = get_by_subject(org_id, subject).await? {
         return Ok((found, false));
     }
-    match open(
-        org_id,
-        subject,
-        team_id,
-        priority,
-        title,
-        role,
-        origin_response_id,
-    )
-    .await
-    {
+    match open(org_id, subject, team_id, priority, title, role, provenance).await {
         Ok(created) => Ok((created, true)),
         Err(e) => match get_by_subject(org_id, subject).await? {
             Some(found) => Ok((found, false)),
@@ -788,13 +788,15 @@ pub async fn reassign_team(
 /// Hands a record to somebody on the same team, starting its ladder again. Same
 /// transfer semantics as [`reassign_team`], minus the team change: the recipient
 /// is paged from the first rung, and the page keeps climbing if they never
-/// answer.
+/// answer. `None` when the record is gone or no longer on `team_id`, the team the
+/// recipient was checked against.
 pub async fn restart_ladder(
     org_id: &str,
     id: &str,
+    team_id: &str,
     now: i64,
 ) -> Result<Option<Response>, errors::Error> {
-    hand_over(org_id, id, None, None, now).await
+    hand_over_on(get_orm_client_rw().await, org_id, id, team_id, now).await
 }
 
 /// [`restart_ladder`] only while `acked_by` still holds the page; `None` when it was not restarted.
@@ -995,15 +997,72 @@ async fn hand_over_in(
     acked_by: Option<&str>,
     now: i64,
 ) -> Result<Option<Response>, errors::Error> {
-    let Some(existing) = oncall_responses::Entity::find_by_id(id)
+    loop {
+        let Some(existing) = find_in(client, org_id, id).await? else {
+            return Ok(None);
+        };
+        let written = write_hand_over(client, &existing, to_team_id, acked_by, now).await?;
+        // Read back, not from the snapshot: after a lost race the answer is the closed record.
+        let after = find_in(client, org_id, id).await?;
+        if written == 0 && after.as_ref().map(|r| r.updated_at) != Some(existing.updated_at) {
+            if after.is_none() {
+                return Ok(None);
+            }
+            continue;
+        }
+        if acked_by.is_some() && written == 0 {
+            return Ok(None);
+        }
+        return Ok(after.and_then(to_response));
+    }
+}
+
+async fn hand_over_on(
+    client: &impl ConnectionTrait,
+    org_id: &str,
+    id: &str,
+    team_id: &str,
+    now: i64,
+) -> Result<Option<Response>, errors::Error> {
+    loop {
+        let Some(existing) = find_in(client, org_id, id).await? else {
+            return Ok(None);
+        };
+        // A recipient checked against one team must not become rung zero of another team's run.
+        if existing.team_id.as_deref() != Some(team_id) {
+            return Ok(None);
+        }
+        let written = write_hand_over(client, &existing, None, None, now).await?;
+        let after = find_in(client, org_id, id).await?;
+        if written == 0 && after.as_ref().map(|r| r.updated_at) != Some(existing.updated_at) {
+            continue;
+        }
+        return Ok(after.and_then(to_response));
+    }
+}
+
+async fn find_in(
+    client: &impl ConnectionTrait,
+    org_id: &str,
+    id: &str,
+) -> Result<Option<oncall_responses::Model>, errors::Error> {
+    Ok(oncall_responses::Entity::find_by_id(id)
         .filter(oncall_responses::Column::OrgId.eq(org_id))
         .one(client)
-        .await?
-    else {
-        return Ok(None);
-    };
+        .await?)
+}
+
+/// Writes the handoff computed from `existing` only while the row still carries its revision, so a
+/// racing handoff's team and requester are never overwritten with the stale ones (S2-03).
+async fn write_hand_over(
+    client: &impl ConnectionTrait,
+    existing: &oncall_responses::Model,
+    to_team_id: Option<&str>,
+    acked_by: Option<&str>,
+    now: i64,
+) -> Result<u64, errors::Error> {
     let Some(current) = to_response(existing.clone()) else {
-        return Ok(None);
+        return Ok(0);
     };
     // A handoff's effect on a record is decided in `Response::handed_over`; this writes it down.
     let next = current.handed_over(to_team_id, now);
@@ -1042,9 +1101,14 @@ async fn hand_over_in(
             oncall_responses::Column::ExhaustedAt,
             Expr::value(next.exhausted_at),
         )
+        .col_expr(
+            oncall_responses::Column::RequestedBy,
+            Expr::value(next.requested_by.clone()),
+        )
         .col_expr(oncall_responses::Column::UpdatedAt, next_revision(now))
-        .filter(oncall_responses::Column::Id.eq(id))
-        .filter(oncall_responses::Column::OrgId.eq(org_id))
+        .filter(oncall_responses::Column::Id.eq(&existing.id))
+        .filter(oncall_responses::Column::OrgId.eq(&existing.org_id))
+        .filter(oncall_responses::Column::UpdatedAt.eq(existing.updated_at))
         .filter(oncall_responses::Column::ClosedAt.is_null())
         .filter(oncall_responses::Column::State.ne(ResponseState::Resolved.to_i32()));
     if let Some(holder) = acked_by {
@@ -1052,16 +1116,7 @@ async fn hand_over_in(
             .filter(oncall_responses::Column::State.eq(ResponseState::Acknowledged.to_i32()))
             .filter(oncall_responses::Column::AckedBy.eq(holder));
     }
-    let result = query.exec(client).await?;
-    if acked_by.is_some() && result.rows_affected == 0 {
-        return Ok(None);
-    }
-    // Read back, not from the snapshot: after a lost race the answer is the closed record.
-    Ok(oncall_responses::Entity::find_by_id(id)
-        .filter(oncall_responses::Column::OrgId.eq(org_id))
-        .one(client)
-        .await?
-        .and_then(to_response))
+    Ok(query.exec(client).await?.rows_affected)
 }
 
 /// Records opened because `origin_id` fired — the impacted teams.
@@ -1428,7 +1483,7 @@ pub(super) async fn add_event_in<C: ConnectionTrait>(
     event: &ResponseEvent,
 ) -> Result<(), errors::Error> {
     let model = oncall_response_events::ActiveModel {
-        id: Set(ider::uuid()),
+        id: Set(ider::ksuid()),
         response_id: Set(response_id.to_string()),
         kind: Set(event.kind.to_i32()),
         at: Set(event.at),
@@ -2255,6 +2310,7 @@ mod tests {
             incident_id: None,
             runbook_url: None,
             exhausted_at: None,
+            requested_by: None,
             updated_at: 1_000,
         }
     }
@@ -2428,6 +2484,84 @@ mod tests {
         assert_eq!(next.acked_by, None);
         assert_eq!(next.ladder_anchor, Some(5_000));
         assert_eq!(next.ladder_run, Some(2));
+    }
+
+    /// A team handoff is not a human send: the requester's `use` never covered the new team.
+    #[tokio::test]
+    async fn test_a_team_handoff_drops_the_requester_and_a_person_handoff_keeps_it() {
+        let asked = oncall_responses::Model {
+            requested_by: Some("ana@o2.ai".into()),
+            ..model()
+        };
+        let db = table_with(asked.clone()).await;
+        hand_over_in(&db, "default", "resp_1", None, None, 5_000)
+            .await
+            .unwrap();
+        assert_eq!(row_in(&db).await.requested_by.as_deref(), Some("ana@o2.ai"));
+        hand_over_in(&db, "default", "resp_1", Some("team_1"), None, 6_000)
+            .await
+            .unwrap();
+        assert_eq!(row_in(&db).await.requested_by.as_deref(), Some("ana@o2.ai"));
+        hand_over_in(&db, "default", "resp_1", Some("team_2"), None, 7_000)
+            .await
+            .unwrap();
+        let moved = row_in(&db).await;
+        assert_eq!(moved.team_id.as_deref(), Some("team_2"));
+        assert_eq!(
+            moved.requested_by, None,
+            "pages after the handoff are system sends"
+        );
+    }
+
+    #[tokio::test]
+    async fn s2_03_a_handoff_read_before_a_team_handoff_does_not_restore_the_old_team() {
+        let asked = oncall_responses::Model {
+            requested_by: Some("ana@o2.ai".into()),
+            team_id: Some("team_1".into()),
+            ..model()
+        };
+        let db = table_with(asked.clone()).await;
+        let stale = find_in(&db, "default", "resp_1").await.unwrap().unwrap();
+        hand_over_in(&db, "default", "resp_1", Some("team_2"), None, 6_000)
+            .await
+            .unwrap();
+        let written = write_hand_over(&db, &stale, None, None, 7_000)
+            .await
+            .unwrap();
+        assert_eq!(written, 0, "a write from a stale revision is refused");
+        let after = hand_over_in(&db, "default", "resp_1", None, None, 7_000)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            (after.team_id.as_deref(), after.requested_by.as_deref()),
+            (Some("team_2"), None),
+            "the person handoff retries from the moved record"
+        );
+    }
+
+    #[tokio::test]
+    async fn s3_01_a_person_handoff_checked_on_one_team_does_not_restart_another() {
+        let checked_on_team_1 = oncall_responses::Model {
+            team_id: Some("team_1".into()),
+            ..model()
+        };
+        let db = table_with(checked_on_team_1).await;
+        hand_over_in(&db, "default", "resp_1", Some("team_2"), None, 6_000)
+            .await
+            .unwrap();
+        let moved = row_in(&db).await;
+        let refused = hand_over_on(&db, "default", "resp_1", "team_1", 7_000)
+            .await
+            .unwrap();
+        assert!(refused.is_none(), "the recipient was checked on team_1");
+        assert_eq!(row_in(&db).await, moved, "team_2's run is left untouched");
+        let restarted = hand_over_on(&db, "default", "resp_1", "team_2", 7_000)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(restarted.team_id.as_deref(), Some("team_2"));
+        assert_eq!(restarted.ladder_anchor, Some(7_000));
     }
 
     /// The firing prefix has to be `source#`, not a bare `source` - otherwise

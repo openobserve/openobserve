@@ -128,7 +128,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_only_intel_lists_need_the_security_grant() {
-        let stranger = format!("{}@example.com", config::ider::uuid());
+        let stranger = format!("{}@example.com", config::ider::ksuid());
         assert!(intel_list_write_allowed("org", &stranger, "geo_lookup", "POST").await);
         assert!(!intel_list_write_allowed("org", &stranger, "ioc_bad_ips", "POST").await);
     }

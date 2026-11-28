@@ -15,11 +15,14 @@
 
 #[cfg(feature = "enterprise")]
 use axum::Json;
-#[cfg(feature = "enterprise")]
-use axum::response::IntoResponse;
 use axum::{extract::Path, response::Response};
 use openobserve_api_common::extractors::Headers;
 use openobserve_core::auth::UserEmail;
+#[cfg(any(feature = "enterprise", test))]
+use {
+    axum::{http::StatusCode, response::IntoResponse},
+    config::meta::secret_store::{SecretErrorCode, api::SecretErrorBody},
+};
 #[cfg(feature = "enterprise")]
 use {o2_dex::meta::auth::RoleRequest, openobserve_core::auth::check_permissions};
 
@@ -439,7 +442,7 @@ pub async fn update_role(
         update_role.add_users.as_ref(),
         update_role.remove_users.as_ref(),
     ) {
-        return MetaHttpResponse::bad_request(msg);
+        return role_update_refusal(msg);
     }
     match o2_openfga::authorizer::roles::update_role(
         &org_id,
@@ -1509,6 +1512,20 @@ fn lookup_response<T: serde::Serialize>(
     }
 }
 
+// The store's own code lets a client tell this refusal from a malformed role update.
+#[cfg(any(feature = "enterprise", test))]
+fn role_update_refusal(msg: &str) -> Response {
+    let code = SecretErrorCode::SecretGrantsViaStoreOnly;
+    if msg != code.as_str() {
+        return MetaHttpResponse::bad_request(msg);
+    }
+    let body = SecretErrorBody {
+        code,
+        message: "Secret grants are managed on the secret, not on the role".to_string(),
+    };
+    (StatusCode::BAD_REQUEST, axum::Json(body)).into_response()
+}
+
 #[cfg(feature = "enterprise")]
 fn failure_response(e: &anyhow::Error, failure: &str) -> Response {
     // The authorizer's error carries raw OpenFGA text, which stays in the server log.
@@ -2390,6 +2407,19 @@ mod tests {
         let on = hide_slack_unless_enabled(all.clone(), true);
         assert!(keys(&on).contains(&"slack_integration".to_string()));
         assert_eq!(on.len(), all.len());
+    }
+
+    #[tokio::test]
+    async fn store_only_role_grants_get_their_own_code() {
+        let response = role_update_refusal("secret_grants_via_store_only");
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+        let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let body: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(body["code"], "secret_grants_via_store_only");
+        let other = role_update_refusal("Invalid role name");
+        assert_eq!(other.status(), StatusCode::BAD_REQUEST);
     }
 
     #[cfg(feature = "enterprise")]

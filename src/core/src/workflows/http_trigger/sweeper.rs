@@ -263,7 +263,7 @@ async fn emit_after_commit(trigger_id: &str) {
 #[cfg(test)]
 mod tests {
     use infra::table::{
-        entity::{llm_secrets, workflow_http_trigger_requests as requests},
+        entity::{credential_values, workflow_http_trigger_requests as requests},
         workflow_http_trigger_requests::{self as ledger, NewHookRequest},
         workflow_http_triggers::{AuthMode, CredentialKind},
     };
@@ -384,9 +384,9 @@ mod tests {
     }
 
     async fn secrets_of(db: &DatabaseConnection, owner_id: &str) -> u64 {
-        llm_secrets::Entity::find()
-            .filter(llm_secrets::Column::OwnerKind.eq("workflow_trigger"))
-            .filter(llm_secrets::Column::OwnerId.eq(owner_id))
+        credential_values::Entity::find()
+            .filter(credential_values::Column::OwnerKind.eq("workflow_trigger"))
+            .filter(credential_values::Column::OwnerId.eq(owner_id))
             .count(db)
             .await
             .unwrap()

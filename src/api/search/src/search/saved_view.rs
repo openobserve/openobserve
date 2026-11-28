@@ -300,7 +300,7 @@ mod tests {
     }
 
     fn new_org() -> String {
-        format!("svorg{}", config::ider::uuid()).to_lowercase()
+        format!("svorg{}", config::ider::ksuid()).to_lowercase()
     }
 
     #[tokio::test]
@@ -308,7 +308,7 @@ mod tests {
         infra::db::create_table().await.unwrap();
         let payload = CreateViewRequest {
             data: "base64-encoded-data".into(),
-            view_name: format!("query-for-blah-{}", config::ider::uuid()),
+            view_name: format!("query-for-blah-{}", config::ider::ksuid()),
             view_type: None,
         };
         let app = Router::new().route("/{org_id}/savedviews", post(create_view));

@@ -16,15 +16,18 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import config from "@/aws-exports";
 import { fakeAssistant } from "@/components/ai-assistant/__tests__/fakeAssistant";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import aiToolsets from "@/services/ai_toolsets";
+import secrets, { type SecretPickerItem } from "@/services/secrets";
 
 import AssistantToolsetForm from "./AssistantToolsetForm.vue";
 import { settingsHarness } from "./assistantSettings.test-helpers";
 import en from "@/locales/languages/en-US.json";
 
-const { fake, toast } = vi.hoisted(() => ({
+const { fake, toast, secretStore } = vi.hoisted(() => ({
+  secretStore: { ready: false },
   fake: {
     current: null as ReturnType<
       typeof import("@/components/ai-assistant/__tests__/fakeAssistant").fakeAssistant
@@ -38,6 +41,11 @@ vi.mock("@/composables/assistant", async (importOriginal) => ({
   useAssistantCapability: () => fake.current!.handle,
 }));
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast }));
+vi.mock("@/views/Secrets/useSecretConsumer", async () => {
+  const { computed } = await import("vue");
+  return { useSecretPickerShown: () => computed(() => secretStore.ready) };
+});
+vi.mock("@/services/secrets", () => ({ default: { picker: vi.fn() } }));
 vi.mock("@/components/CodeQueryEditor.vue", () => ({ default: { render: () => null } }));
 vi.mock("@/services/ai_toolsets", () => ({
   default: { list: vi.fn(), get: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn() },
@@ -51,18 +59,40 @@ const STORED = {
   data: { url: "https://pd.example/mcp", timeout_seconds: 20, headers: { Authorization: "***" } },
 };
 
+const PICKED: SecretPickerItem = {
+  id: "secret_1",
+  name: "PD_KEY",
+  kind: "secret",
+  pin_mode: "hosts",
+  private_locations: "off",
+  allowed_here: true,
+  rights: { see: true, use: true, manage: true, manage_access: true },
+};
+
+const isEnterprise = config.isEnterprise;
+
 async function settle() {
   await flushPromises();
   await new Promise((resolve) => setTimeout(resolve, 0));
   await flushPromises();
 }
 
-async function mountForm(props: Record<string, unknown>) {
-  const h = settingsHarness();
+async function mountForm(props: Record<string, unknown>, zoConfig: Record<string, unknown> = {}) {
+  const h = settingsHarness(zoConfig);
   await h.router.push("/settings/assistant/toolsets");
   const w = mount(AssistantToolsetForm, {
     props: { existing: [], mergeSecrets: true, ...props },
-    global: { plugins: h.plugins },
+    global: {
+      plugins: h.plugins,
+      stubs: {
+        SecretPicker: {
+          name: "SecretPicker",
+          props: { consumerType: String, consumerId: String, requireManage: Boolean },
+          emits: ["pick"],
+          template: "<span />",
+        },
+      },
+    },
     attachTo: document.body,
   });
   await settle();
@@ -77,6 +107,8 @@ async function save(w: ReturnType<typeof mount>) {
 let wrapper: ReturnType<typeof mount> | null = null;
 
 beforeEach(() => {
+  secretStore.ready = false;
+  vi.mocked(secrets.picker).mockResolvedValue({ data: { items: [] } } as never);
   fake.current = fakeAssistant("available");
   vi.mocked(aiToolsets.update).mockResolvedValue({ data: {} } as never);
   vi.mocked(aiToolsets.create).mockResolvedValue({ data: {} } as never);
@@ -85,10 +117,219 @@ beforeEach(() => {
 afterEach(() => {
   wrapper?.unmount();
   wrapper = null;
+  config.isEnterprise = isEnterprise;
   vi.clearAllMocks();
 });
 
 describe("AssistantToolsetForm", () => {
+  it("hides secret pickers and automation until the store is ready", async () => {
+    vi.mocked(aiToolsets.get).mockResolvedValue({ data: STORED } as never);
+    const w = (wrapper = await mountForm({ editId: "ts_1" }));
+    expect(w.findComponent({ name: "SecretPicker" }).exists()).toBe(false);
+    expect(w.find('[data-test="ai-toolset-automation"]').exists()).toBe(false);
+    expect(secrets.picker).not.toHaveBeenCalled();
+  });
+
+  it("appends picked refs to a new header value with the toolset consumer", async () => {
+    secretStore.ready = true;
+    const w = (wrapper = await mountForm({}));
+    await w.get('[data-test="ai-toolset-header-add"]').trigger("click");
+    await settle();
+    await w.get('[data-test="ai-toolset-header-0-input"] input').setValue("Bearer ");
+    const picker = w.getComponent({ name: "SecretPicker" });
+    expect(picker.props()).toMatchObject({
+      consumerType: "ai_toolset",
+      consumerId: "",
+      requireManage: true,
+    });
+    expect(picker.attributes("data-test")).toBe("ai-toolset-header-0-secret-picker");
+    picker.vm.$emit("pick", PICKED);
+    await settle();
+    expect(
+      (w.get('[data-test="ai-toolset-header-0-input"] input').element as HTMLInputElement).value,
+    ).toBe("Bearer {{secrets.PD_KEY}}");
+    picker.vm.$emit("pick", { ...PICKED, kind: "variable", name: "REGION" });
+    await settle();
+    expect(
+      (w.get('[data-test="ai-toolset-header-0-input"] input').element as HTMLInputElement).value,
+    ).toBe("Bearer {{secrets.PD_KEY}}{{vars.REGION}}");
+    expect(secrets.picker).toHaveBeenCalledWith("acme", "ai_toolset", undefined, {});
+  });
+
+  it("replaces a kept header with a picked ref", async () => {
+    secretStore.ready = true;
+    vi.mocked(aiToolsets.get).mockResolvedValue({ data: STORED } as never);
+    const w = (wrapper = await mountForm({ editId: "ts_1" }));
+    const picker = w.getComponent({ name: "SecretPicker" });
+    expect(picker.props("consumerId")).toBe("ts_1");
+    picker.vm.$emit("pick", PICKED);
+    await settle();
+    expect(w.get('[data-test="ai-toolset-header-0"]').attributes("data-state")).toBe("replacing");
+    expect(
+      (w.get('[data-test="ai-toolset-header-0-input"] input').element as HTMLInputElement).value,
+    ).toBe("{{secrets.PD_KEY}}");
+    await save(w);
+    expect(vi.mocked(aiToolsets.update).mock.calls[0][2].data).toMatchObject({
+      headers: { Authorization: "{{secrets.PD_KEY}}" },
+    });
+    expect(secrets.picker).toHaveBeenCalledWith("acme", "ai_toolset", "ts_1", {});
+  });
+
+  it.each([false, true])("gates write-header pickers on store ready=%s", async (ready) => {
+    secretStore.ready = ready;
+    config.isEnterprise = "true";
+    vi.mocked(aiToolsets.get).mockResolvedValue({
+      data: { ...STORED, data: { ...STORED.data, write_header_names: ["Authorization"] } },
+    } as never);
+    const w = (wrapper = await mountForm({ editId: "ts_1" }, { autoresolve_enabled: true }));
+    const picker = w
+      .findAllComponents({ name: "SecretPicker" })
+      .find((item) => item.attributes("data-test") === "ai-toolset-write-header-0-secret-picker");
+    expect(!!picker).toBe(ready);
+    if (!picker) return;
+    expect(picker.props()).toMatchObject({
+      consumerType: "ai_toolset",
+      consumerId: "ts_1",
+      requireManage: true,
+    });
+    picker.vm.$emit("pick", { ...PICKED, name: "WRITE_KEY" });
+    await settle();
+    picker.vm.$emit("pick", { ...PICKED, kind: "variable", name: "REGION" });
+    await settle();
+    expect(w.get('[data-test="ai-toolset-write-header-0"]').attributes("data-state")).toBe(
+      "replacing",
+    );
+    expect(
+      (w.get('[data-test="ai-toolset-write-header-0-input"] input').element as HTMLInputElement)
+        .value,
+    ).toBe("{{secrets.WRITE_KEY}}{{vars.REGION}}");
+  });
+
+  it.each(["typed", "unchanged"])("checks manage on a %s write-header ref", async (state) => {
+    secretStore.ready = true;
+    config.isEnterprise = "true";
+    vi.mocked(secrets.picker).mockResolvedValue({
+      data: {
+        items: [{ ...PICKED, name: "WRITE_KEY", rights: { ...PICKED.rights, manage: false } }],
+      },
+    } as never);
+    vi.mocked(aiToolsets.get).mockResolvedValue({
+      data: {
+        ...STORED,
+        data: {
+          ...STORED.data,
+          write_header_names: ["Authorization"],
+          write_header_refs: { Authorization: "Bearer {{secrets.WRITE_KEY}}" },
+        },
+      },
+    } as never);
+    const w = (wrapper = await mountForm({ editId: "ts_1" }, { autoresolve_enabled: true }));
+    if (state === "typed") {
+      await w.get('[data-test="ai-toolset-write-header-0-replace"]').trigger("click");
+      await settle();
+      await w
+        .get('[data-test="ai-toolset-write-header-0-input"] input')
+        .setValue("Bearer {{secrets.WRITE_KEY}}");
+      await settle();
+    }
+    expect(
+      w.get('[data-test="ai-toolset-automation-switch-btn"]').attributes("disabled"),
+    ).toBeDefined();
+    expect(w.get('[data-test="ai-toolset-automation-locked"]').text()).toContain("WRITE_KEY");
+    if (state === "unchanged") {
+      await w.get('[data-test="ai-toolset-write-header-0-replace"]').trigger("click");
+      await settle();
+    }
+    await w
+      .get('[data-test="ai-toolset-write-header-0-input"] input')
+      .setValue("Bearer replacement");
+    await settle();
+    expect(
+      w.get('[data-test="ai-toolset-automation-switch-btn"]').attributes("disabled"),
+    ).toBeUndefined();
+    expect(w.find('[data-test="ai-toolset-automation-locked"]').exists()).toBe(false);
+  });
+
+  it.each([
+    { ready: false, edit: false },
+    { ready: false, edit: true },
+    { ready: true, edit: false },
+    { ready: true, edit: true },
+  ])("sends automation only when ready=$ready on edit=$edit", async ({ ready, edit }) => {
+    secretStore.ready = ready;
+    vi.mocked(aiToolsets.get).mockResolvedValue({
+      data: { ...STORED, automation_allowed: true },
+    } as never);
+    const w = (wrapper = await mountForm(edit ? { editId: "ts_1" } : {}));
+    if (!edit) {
+      await w.get('[data-test="ai-toolset-name-input"] input').setValue("pager");
+      await w.get('[data-test="ai-toolset-mcp-url"] input').setValue("https://pd.example/mcp");
+      if (ready) {
+        const toggle = w.get('[data-test="ai-toolset-automation-switch-btn"]');
+        expect(toggle.attributes("aria-checked")).toBe("false");
+        await toggle.trigger("click");
+      }
+    } else if (ready) {
+      expect(
+        w.get('[data-test="ai-toolset-automation-switch-btn"]').attributes("aria-checked"),
+      ).toBe("true");
+    }
+    if (ready)
+      expect(w.get('[data-test="ai-toolset-automation"]').text()).toContain("secret.export");
+    await save(w);
+    const body = edit
+      ? vi.mocked(aiToolsets.update).mock.calls[0][2]
+      : vi.mocked(aiToolsets.create).mock.calls[0][1];
+    if (ready) expect(body).toHaveProperty("automation_allowed", true);
+    else expect(body).not.toHaveProperty("automation_allowed");
+  });
+
+  it("disables automation when a referenced secret cannot be managed", async () => {
+    secretStore.ready = true;
+    vi.mocked(secrets.picker).mockResolvedValue({
+      data: { items: [{ ...PICKED, rights: { ...PICKED.rights, manage: false } }] },
+    } as never);
+    const w = (wrapper = await mountForm({}));
+    await w.get('[data-test="ai-toolset-header-add"]').trigger("click");
+    await settle();
+    await w.get('[data-test="ai-toolset-header-0-key"] input').setValue("Authorization");
+    await w.get('[data-test="ai-toolset-header-0-input"] input').setValue("{{secrets.PD_KEY}}");
+    await settle();
+    expect(
+      w.get('[data-test="ai-toolset-automation-switch-btn"]').attributes("disabled"),
+    ).toBeDefined();
+    expect(w.get('[data-test="ai-toolset-automation-locked"]').text()).toBe(
+      "Needs manage on every secret in this toolset (missing: PD_KEY).",
+    );
+  });
+
+  it("checks manage on a saved unchanged header ref and drops the check after replacement", async () => {
+    secretStore.ready = true;
+    vi.mocked(secrets.picker).mockResolvedValue({
+      data: { items: [{ ...PICKED, rights: { ...PICKED.rights, manage: false } }] },
+    } as never);
+    vi.mocked(aiToolsets.get).mockResolvedValue({
+      data: {
+        ...STORED,
+        data: { ...STORED.data, headers: { Authorization: "Bearer {{secrets.PD_KEY}}" } },
+      },
+    } as never);
+    const w = (wrapper = await mountForm({ editId: "ts_1" }));
+    expect(w.get('[data-test="ai-toolset-header-0"]').attributes("data-state")).toBe("unchanged");
+    expect(
+      w.get('[data-test="ai-toolset-automation-switch-btn"]').attributes("disabled"),
+    ).toBeDefined();
+    expect(w.get('[data-test="ai-toolset-automation-locked"]').text()).toContain("PD_KEY");
+    await w.get('[data-test="ai-toolset-header-0-replace"]').trigger("click");
+    await settle();
+    await w.get('[data-test="ai-toolset-header-0-input"] input').setValue("Bearer replacement");
+    await settle();
+    expect(
+      w.get('[data-test="ai-toolset-automation-switch-btn"]').attributes("disabled"),
+    ).toBeUndefined();
+    expect(w.find('[data-test="ai-toolset-automation-locked"]').exists()).toBe(false);
+  });
+
   it("keeps an unchanged secret as the mask on a merging server", async () => {
     vi.mocked(aiToolsets.get).mockResolvedValue({ data: STORED } as never);
     const w = (wrapper = await mountForm({ editId: "ts_1" }));

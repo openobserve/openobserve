@@ -16,7 +16,7 @@
 use std::sync::Arc;
 
 use chrono::{DateTime, Datelike, Utc};
-use config::ider::uuid;
+use config::ider::ksuid;
 use datafusion::{
     common::{
         Result,
@@ -262,7 +262,7 @@ impl TreeNodeRewriter for BroadcastJoinRewriter {
 fn generate_result_path(trace_id: &str) -> String {
     let datetime: DateTime<Utc> = Utc::now();
 
-    let id = uuid();
+    let id = ksuid();
     format!(
         "join/{}/{}/{}/{trace_id}/{id}.arrow",
         datetime.year(),

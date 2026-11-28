@@ -2,6 +2,8 @@ use infra::db::get_orm_client_ro;
 
 use super::*;
 
+const REDACTED: &str = "[REDACTED]";
+
 // ── Runs API ──────────────────────────────────────────────────────────────────
 
 /// One run in the list response. `status` is a human-readable string derived from `run_result`.
@@ -52,6 +54,29 @@ pub(crate) fn row_to_summary(row: synthetics_runs::RunRow) -> RunSummary {
         created_at: row.created_at,
         completed_at: row.completed_at,
     }
+}
+
+/// Replaces each value and its base64 and URL-encoded forms; longest form first so a value never
+/// leaves a fragment of a longer encoding behind.
+pub fn redact_run_text(text: &str, values: &[String]) -> String {
+    let mut forms: Vec<String> = values
+        .iter()
+        .filter(|v| !v.is_empty())
+        .flat_map(|v| {
+            let b64 = config::utils::base64::encode(v);
+            [
+                v.clone(),
+                b64.trim_end_matches('=').to_owned(),
+                b64,
+                urlencoding::encode(v).into_owned(),
+            ]
+        })
+        .collect();
+    forms.sort_unstable_by(|a, b| b.len().cmp(&a.len()).then_with(|| a.cmp(b)));
+    forms.dedup();
+    forms.iter().fold(text.to_owned(), |acc, form| {
+        acc.replace(form.as_str(), REDACTED)
+    })
 }
 
 /// ⚠️ Region-local, and there is no way to make it otherwise: `synthetics_runs`
@@ -109,4 +134,24 @@ pub async fn get_run_detail(
     Ok(row
         .filter(|r| r.org_id == org_id && r.synthetics_id == synthetics_id)
         .map(row_to_summary))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::redact_run_text;
+
+    #[test]
+    fn run_text_hides_each_value_and_its_encodings() {
+        let values = vec!["s3cr3t/pas".to_owned(), String::new()];
+        let b64 = config::utils::base64::encode("s3cr3t/pas");
+        let text = format!(
+            "fill failed: s3cr3t/pas; header Basic {b64}; unpadded {}; url ?p=s3cr3t%2Fpas",
+            b64.trim_end_matches('=')
+        );
+        let out = redact_run_text(&text, &values);
+        assert!(!out.contains("s3cr3t"), "{out}");
+        assert!(!out.contains(b64.trim_end_matches('=')), "{out}");
+        assert_eq!(out.matches("[REDACTED]").count(), 4, "{out}");
+        assert_eq!(redact_run_text("plain error", &values), "plain error");
+    }
 }

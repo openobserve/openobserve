@@ -23,7 +23,7 @@ use crate::common::meta::organization::OrgIngestionToken;
 pub async fn create_default_token(org_id: &str, created_by: &str) -> Result<(), anyhow::Error> {
     let token_value = org_ingestion_tokens::generate_token();
     let record = org_ingestion_tokens::OrgIngestionTokenRecord {
-        id: ider::uuid(),
+        id: ider::ksuid(),
         org_id: org_id.to_string(),
         name: "default".to_string(),
         token: token_value.clone(),
@@ -105,7 +105,7 @@ pub async fn create_token(
     let splunk_token = with_splunk_token.then(org_ingestion_tokens::generate_splunk_token);
     let now = chrono::Utc::now().timestamp_micros();
     let record = org_ingestion_tokens::OrgIngestionTokenRecord {
-        id: ider::uuid(),
+        id: ider::ksuid(),
         org_id: org_id.to_string(),
         name: name.to_string(),
         token: token_value.clone(),

@@ -42,7 +42,7 @@ pub async fn set_view(org_id: &str, view: &CreateViewRequest) -> Result<View, Er
             view.view_name
         )));
     }
-    let view_id = config::ider::uuid();
+    let view_id = config::ider::ksuid();
     let view = View {
         org_id: org_id.into(),
         view_id: view_id.clone(),

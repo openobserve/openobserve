@@ -28,13 +28,14 @@ use config::meta::synthetics_variables::{
     PromoteVariableRequest, SplitVariableRequest, SyntheticsEnvironmentRequest,
     SyntheticsVariableRequest,
 };
-#[cfg(feature = "enterprise")]
 use openobserve_api_common::extractors::Headers;
-#[cfg(feature = "enterprise")]
 use openobserve_core::auth::UserEmail;
 use openobserve_synthetics::service::{
-    NameConflict, ResyncUnavailable, SyntheticsEnvironmentRecord, UsageConflict,
+    CheckSaveActor, CheckSecretRefusal, NameConflict, ResyncUnavailable,
+    SyntheticsEnvironmentRecord, UsageConflict,
 };
+
+use super::StrictAuthz;
 
 /// Confirmation that the caller has seen the deletion guard's list.
 #[derive(Debug, Default, serde::Deserialize)]
@@ -78,6 +79,37 @@ struct GetCheck {
     resource: &'static str,
     use_self_context: bool,
     use_self_parent: bool,
+}
+
+/// The caller's strict authorizer; a caller outside the org gets none, so a write feeding a
+/// check with store refs is refused rather than re-signed.
+struct VariableWriter {
+    authz: Option<StrictAuthz>,
+    role: String,
+    user_id: String,
+}
+
+impl VariableWriter {
+    async fn of(org_id: &str, user_id: &str) -> Self {
+        let authz = super::caller_role(org_id, user_id)
+            .await
+            .map(|role| StrictAuthz { role });
+        let role = authz
+            .as_ref()
+            .map(|authz| authz.role.to_string())
+            .unwrap_or_default();
+        Self {
+            authz,
+            role,
+            user_id: user_id.to_owned(),
+        }
+    }
+
+    fn actor(&self) -> Option<CheckSaveActor<'_>> {
+        self.authz
+            .as_ref()
+            .map(|authz| authz.actor(&self.user_id, &self.role))
+    }
 }
 
 // Only documents the resolved-variables answer, whose shape the `envs` query parameter picks.
@@ -145,7 +177,7 @@ pub async fn list_synthetics_variables(
 )]
 pub async fn create_synthetics_variable(
     Path(org_id): Path<String>,
-    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+    Headers(user_email): Headers<UserEmail>,
     Json(body): Json<SyntheticsVariableRequest>,
 ) -> Response {
     // OSS has no per-request identity to attribute a write to.
@@ -153,8 +185,17 @@ pub async fn create_synthetics_variable(
     let created_by = user_email.user_id.clone();
     #[cfg(not(feature = "enterprise"))]
     let created_by = String::new();
-    match openobserve_synthetics::service::create_variable(&org_id, None, body, &created_by).await {
-        Ok(view) => MetaHttpResponse::json(view),
+    let writer = VariableWriter::of(&org_id, &user_email.user_id).await;
+    match openobserve_synthetics::service::create_variable_with_actor(
+        &org_id,
+        None,
+        body,
+        &created_by,
+        writer.actor(),
+    )
+    .await
+    {
+        Ok((view, _)) => MetaHttpResponse::json(view),
         Err(e) => update_error(e),
     }
 }
@@ -186,12 +227,22 @@ pub async fn create_synthetics_variable(
 pub async fn update_synthetics_variable(
     Path((org_id, id)): Path<(String, String)>,
     Query(q): Query<ForceQuery>,
+    Headers(user_email): Headers<UserEmail>,
     Json(body): Json<SyntheticsVariableRequest>,
 ) -> Response {
-    match openobserve_synthetics::service::update_variable(&org_id, None, &id, body, q.force).await
+    let writer = VariableWriter::of(&org_id, &user_email.user_id).await;
+    match openobserve_synthetics::service::update_variable_with_actor(
+        &org_id,
+        None,
+        &id,
+        body,
+        q.force,
+        writer.actor(),
+    )
+    .await
     {
-        Ok(Some(view)) => MetaHttpResponse::json(view),
-        Ok(None) => MetaHttpResponse::not_found("variable not found"),
+        Ok((Some(view), _)) => MetaHttpResponse::json(view),
+        Ok((None, _)) => MetaHttpResponse::not_found("variable not found"),
         Err(e) => update_error(e),
     }
 }
@@ -221,11 +272,21 @@ pub async fn update_synthetics_variable(
 pub async fn delete_synthetics_variable(
     Path((org_id, id)): Path<(String, String)>,
     Query(q): Query<ForceQuery>,
+    Headers(user_email): Headers<UserEmail>,
 ) -> Response {
-    match openobserve_synthetics::service::delete_variable(&org_id, None, &id, q.force).await {
-        Ok(true) => MetaHttpResponse::ok("variable deleted"),
-        Ok(false) => MetaHttpResponse::not_found("variable not found"),
-        Err(e) => MetaHttpResponse::conflict(e),
+    let writer = VariableWriter::of(&org_id, &user_email.user_id).await;
+    match openobserve_synthetics::service::delete_variable_with_actor(
+        &org_id,
+        None,
+        &id,
+        q.force,
+        writer.actor(),
+    )
+    .await
+    {
+        Ok((true, _)) => MetaHttpResponse::ok("variable deleted"),
+        Ok((false, _)) => MetaHttpResponse::not_found("variable not found"),
+        Err(e) => delete_error(e),
     }
 }
 
@@ -446,7 +507,7 @@ pub async fn list_synthetics_environment_variables(
 )]
 pub async fn create_synthetics_environment_variable(
     Path((org_id, env)): Path<(String, String)>,
-    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+    Headers(user_email): Headers<UserEmail>,
     Json(body): Json<SyntheticsVariableRequest>,
 ) -> Response {
     // OSS has no per-request identity to attribute a write to.
@@ -459,15 +520,17 @@ pub async fn create_synthetics_environment_variable(
         Ok(None) => return MetaHttpResponse::not_found("environment not found"),
         Err(response) => return response,
     };
-    match openobserve_synthetics::service::create_variable(
+    let writer = VariableWriter::of(&org_id, &user_email.user_id).await;
+    match openobserve_synthetics::service::create_variable_with_actor(
         &org_id,
         Some(&record),
         body,
         &created_by,
+        writer.actor(),
     )
     .await
     {
-        Ok(view) => MetaHttpResponse::json(view),
+        Ok((view, _)) => MetaHttpResponse::json(view),
         Err(e) => update_error(e),
     }
 }
@@ -500,6 +563,7 @@ pub async fn create_synthetics_environment_variable(
 pub async fn update_synthetics_environment_variable(
     Path((org_id, env, id)): Path<(String, String, String)>,
     Query(q): Query<ForceQuery>,
+    Headers(user_email): Headers<UserEmail>,
     Json(body): Json<SyntheticsVariableRequest>,
 ) -> Response {
     let record = match resolve_environment(&org_id, &env).await {
@@ -507,17 +571,19 @@ pub async fn update_synthetics_environment_variable(
         Ok(None) => return MetaHttpResponse::not_found("environment not found"),
         Err(response) => return response,
     };
-    match openobserve_synthetics::service::update_variable(
+    let writer = VariableWriter::of(&org_id, &user_email.user_id).await;
+    match openobserve_synthetics::service::update_variable_with_actor(
         &org_id,
         Some(&record),
         &id,
         body,
         q.force,
+        writer.actor(),
     )
     .await
     {
-        Ok(Some(view)) => MetaHttpResponse::json(view),
-        Ok(None) => MetaHttpResponse::not_found("variable not found"),
+        Ok((Some(view), _)) => MetaHttpResponse::json(view),
+        Ok((None, _)) => MetaHttpResponse::not_found("variable not found"),
         Err(e) => update_error(e),
     }
 }
@@ -548,18 +614,26 @@ pub async fn update_synthetics_environment_variable(
 pub async fn delete_synthetics_environment_variable(
     Path((org_id, env, id)): Path<(String, String, String)>,
     Query(q): Query<ForceQuery>,
+    Headers(user_email): Headers<UserEmail>,
 ) -> Response {
     let record = match resolve_environment(&org_id, &env).await {
         Ok(Some(record)) => record,
         Ok(None) => return MetaHttpResponse::not_found("environment not found"),
         Err(response) => return response,
     };
-    match openobserve_synthetics::service::delete_variable(&org_id, Some(&record), &id, q.force)
-        .await
+    let writer = VariableWriter::of(&org_id, &user_email.user_id).await;
+    match openobserve_synthetics::service::delete_variable_with_actor(
+        &org_id,
+        Some(&record),
+        &id,
+        q.force,
+        writer.actor(),
+    )
+    .await
     {
-        Ok(true) => MetaHttpResponse::ok("variable deleted"),
-        Ok(false) => MetaHttpResponse::not_found("variable not found"),
-        Err(e) => MetaHttpResponse::conflict(e),
+        Ok((true, _)) => MetaHttpResponse::ok("variable deleted"),
+        Ok((false, _)) => MetaHttpResponse::not_found("variable not found"),
+        Err(e) => delete_error(e),
     }
 }
 
@@ -635,12 +709,21 @@ async fn resolve_environment(
 
 /// 409 for a taken name or the reference guard, like a delete, so the client can confirm or rename.
 fn update_error(error: anyhow::Error) -> Response {
-    if error.downcast_ref::<UsageConflict>().is_some()
+    if let Some(refusal) = error.downcast_ref::<CheckSecretRefusal>() {
+        super::check_secret_refusal_response(refusal)
+    } else if error.downcast_ref::<UsageConflict>().is_some()
         || error.downcast_ref::<NameConflict>().is_some()
     {
         MetaHttpResponse::conflict(error)
     } else {
         MetaHttpResponse::bad_request(error)
+    }
+}
+
+fn delete_error(error: anyhow::Error) -> Response {
+    match error.downcast_ref::<CheckSecretRefusal>() {
+        Some(refusal) => super::check_secret_refusal_response(refusal),
+        None => MetaHttpResponse::conflict(error),
     }
 }
 
@@ -739,7 +822,7 @@ pub async fn get_synthetic_resolved_variables(
 )]
 pub async fn promote_synthetic_variable(
     Path((org_id, id, name)): Path<(String, String, String)>,
-    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+    Headers(user_email): Headers<UserEmail>,
     Json(body): Json<PromoteVariableRequest>,
 ) -> Response {
     // OSS has no per-request identity to attribute a write to.
@@ -764,16 +847,18 @@ pub async fn promote_synthetic_variable(
         return response;
     }
 
-    match openobserve_synthetics::service::promote_check_variable(
+    let writer = VariableWriter::of(&org_id, &user_email.user_id).await;
+    match openobserve_synthetics::service::promote_check_variable_with_actor(
         &org_id,
         &id,
         &name,
         &destination,
         &created_by,
+        writer.actor(),
     )
     .await
     {
-        Ok(view) => MetaHttpResponse::json(view),
+        Ok((view, _)) => MetaHttpResponse::json(view),
         Err(e) => update_error(e),
     }
 }
@@ -803,7 +888,7 @@ pub async fn promote_synthetic_variable(
 )]
 pub async fn promote_environment_variable(
     Path((org_id, env, id)): Path<(String, String, String)>,
-    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+    Headers(user_email): Headers<UserEmail>,
 ) -> Response {
     let record = match resolve_environment(&org_id, &env).await {
         Ok(Some(record)) => record,
@@ -822,9 +907,17 @@ pub async fn promote_environment_variable(
         }
     }
 
-    match openobserve_synthetics::service::promote_to_global(&org_id, &record, &id).await {
-        Ok(Some(view)) => MetaHttpResponse::json(view),
-        Ok(None) => MetaHttpResponse::not_found("variable not found"),
+    let writer = VariableWriter::of(&org_id, &user_email.user_id).await;
+    match openobserve_synthetics::service::promote_to_global_with_actor(
+        &org_id,
+        &record,
+        &id,
+        writer.actor(),
+    )
+    .await
+    {
+        Ok((Some(view), _)) => MetaHttpResponse::json(view),
+        Ok((None, _)) => MetaHttpResponse::not_found("variable not found"),
         Err(e) => update_error(e),
     }
 }
@@ -854,7 +947,7 @@ pub async fn promote_environment_variable(
 )]
 pub async fn split_synthetics_variable(
     Path((org_id, id)): Path<(String, String)>,
-    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+    Headers(user_email): Headers<UserEmail>,
     Json(body): Json<SplitVariableRequest>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
@@ -877,15 +970,17 @@ pub async fn split_synthetics_variable(
         }
     }
 
-    match openobserve_synthetics::service::split_to_environments(
+    let writer = VariableWriter::of(&org_id, &user_email.user_id).await;
+    match openobserve_synthetics::service::split_to_environments_with_actor(
         &org_id,
         &id,
         body.targets,
         &created_by,
+        writer.actor(),
     )
     .await
     {
-        Ok(views) => MetaHttpResponse::json(views),
+        Ok((views, _)) => MetaHttpResponse::json(views),
         Err(e) => update_error(e),
     }
 }

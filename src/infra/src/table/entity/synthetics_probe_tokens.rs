@@ -28,6 +28,9 @@ pub struct Model {
     pub created_by: String,
     pub created_at: i64,
     pub updated_at: i64,
+    /// Hex SHA-256 of `token`; `''` for a row written by an older node.
+    pub token_sha256: String,
+    pub token_ref: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

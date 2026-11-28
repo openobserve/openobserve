@@ -210,7 +210,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :placeholder="t('alert_destinations.api_header_value')"
                         :aria-label="t('alert_destinations.api_header_value')"
                         tabindex="0"
-                      />
+                      >
+                        <template v-if="secretPickerShown" #append>
+                          <SecretPicker
+                            :consumer-type="secretConsumerType"
+                            :consumer-id="destination?.name ?? ''"
+                            :data-test="`add-destination-prebuilt-header-${index}-secret-picker`"
+                            @pick="(item: SecretPickerItem) => pickSecretIntoHeader(index, item)"
+                          />
+                        </template>
+                      </OFormInput>
                     </div>
                     <div class="ms-0 w-1/6">
                       <OButton
@@ -360,7 +369,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="w-full py-2">
                 <div class="py-1 font-bold">{{ t("alert_destinations.headers") }}</div>
                 <div v-for="(header, index) in apiHeaders" :key="index" class="flex gap-2 pb-2">
-                  <div class="ms-0 w-5/12">
+                  <div class="ms-0 w-5/12" :data-test="`add-destination-header-${index}-key`">
                     <OFormInput
                       :data-test="`add-destination-header-${header['key']}-key-input`"
                       :name="`apiHeaders[${index}].key`"
@@ -369,16 +378,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       tabindex="0"
                     />
                   </div>
-                  <div class="ms-0 w-5/12">
+                  <div
+                    class="ms-0 flex w-5/12 flex-nowrap items-start gap-1"
+                    :data-test="`add-destination-header-${index}-value`"
+                  >
                     <OFormInput
+                      class="min-w-0 flex-1"
                       :data-test="`add-destination-header-${header['key']}-value-input`"
                       :name="`apiHeaders[${index}].value`"
                       :placeholder="t('alert_destinations.api_header_value')"
                       :aria-label="t('alert_destinations.api_header_value')"
                       tabindex="0"
                     />
+                    <SecretPicker
+                      v-if="secretPickerShown"
+                      :consumer-type="secretConsumerType"
+                      :consumer-id="destination?.name ?? ''"
+                      :data-test="`add-destination-header-${index}-secret-picker`"
+                      @pick="(item: SecretPickerItem) => pickSecretIntoHeader(index, item)"
+                    />
                   </div>
-                  <div class="ms-0 w-1/6">
+                  <div class="ms-0 w-1/6" :data-test="`add-destination-header-${index}-actions`">
                     <OButton
                       :data-test="`add-destination-header-${header['key']}-delete-btn`"
                       class="ms-1"
@@ -470,6 +490,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OFormSelect>
             </template>
           </OForm>
+          <div
+            v-if="secretConsumer.toBind.value.length || secretConsumer.refusal.value"
+            class="flex flex-col gap-3 px-3 pb-3"
+          >
+            <SecretBindBox
+              v-if="secretConsumer.toBind.value.length"
+              v-model:pins="secretConsumer.pins.value"
+              v-model:allow="secretConsumer.allow.value"
+              :items="secretConsumer.toBind.value"
+            />
+            <SecretSaveRefusal
+              v-if="secretConsumer.refusal.value"
+              :refusal="secretConsumer.refusal.value"
+            />
+          </div>
         </div>
         <div
           class="border-border-default flex w-full flex-col gap-3 border-t px-4 py-4 sm:flex-row sm:items-center sm:justify-between"
@@ -490,7 +525,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
             <OButton
               data-test="destination-test-button"
-              :loading="isTestInProgress"
+              :loading="isTestInProgress || savedTestRunning"
+              :disabled="testNeedsSave"
               variant="outline"
               size="sm"
               @click="handleTestDestination"
@@ -498,6 +534,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ t("alert_destinations.test") }}
             </OButton>
+            <span
+              v-if="testNeedsSave"
+              class="text-text-secondary text-xs"
+              data-test="destination-test-save-first"
+              >{{ t("secrets.consumer.saveThenTest") }}</span
+            >
+            <span
+              v-else-if="savedTestOutcome"
+              class="text-sm"
+              :class="savedTestOutcome.ok ? 'text-status-success-text' : 'text-status-error-text'"
+              data-test="destination-test-status-only"
+              >{{ formatTestOutcome(t, savedTestOutcome) }}</span
+            >
           </div>
           <div v-else></div>
 
@@ -554,7 +603,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts" setup>
 import { saveDestinationMutation } from "@/services/alert_destination.queries";
 import { useOrgId } from "@/composables/query/useOrgId";
-import { useMutation } from "@tanstack/vue-query";
+import { useMutation, useQuery } from "@tanstack/vue-query";
+import SecretPicker from "@/views/Secrets/SecretPicker.vue";
+import SecretBindBox from "@/views/Secrets/SecretBindBox.vue";
+import SecretSaveRefusal from "@/views/Secrets/SecretSaveRefusal.vue";
+import { refusalFrom, useSecretConsumer } from "@/views/Secrets/useSecretConsumer";
+import { formatTestOutcome } from "@/views/Secrets/secretRefs";
+import secretsService, { type SecretPickerItem, type StatusOnlyOutcome } from "@/services/secrets";
+import { secretStoreStatusQuery } from "@/services/secrets.queries";
 import { ref, computed, nextTick, onBeforeMount, onActivated, onMounted, watch } from "vue";
 import type { PropType } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
@@ -769,6 +825,38 @@ const saveDestinationWrite = useMutation(() =>
   saveDestinationMutation(orgId.value, () => isUpdatingDestination.value),
 );
 const router = useRouter();
+
+// The picker only appears once every node can bind refs, so a bind it offers can succeed.
+const secretStatus = useQuery(() =>
+  Object.assign(secretStoreStatusQuery(orgId.value), {
+    enabled: !!orgId.value && config.isEnterprise == "true",
+  }),
+);
+const secretPickerShown = computed(() => secretStatus.data.value?.store_ready === true);
+const secretConsumerType = computed(() =>
+  props.isAlerts ? ("alert_destination" as const) : ("pipeline_destination" as const),
+);
+const secretRefTexts = computed(() => [urlVal.value, ...apiHeaders.value.map((h) => h.value)]);
+const secretConsumer = useSecretConsumer(orgId, secretConsumerType, secretRefTexts, urlVal);
+const formIsDirty = form.useStore((s: any) => !!s.isDirty);
+// A draft that carries a store ref is refused before any decryption (V37), so test only saved, unchanged ones.
+const testNeedsSave = computed(
+  () =>
+    isCustomWebhook.value &&
+    secretConsumer.hasRef.value &&
+    (!props.destination || formIsDirty.value),
+);
+const savedTestOutcome = ref<StatusOnlyOutcome | null>(null);
+const savedTestRunning = ref(false);
+
+const pickSecretIntoHeader = (index: number, item: SecretPickerItem) => {
+  const current = apiHeaders.value[index]?.value;
+  form.setFieldValue(
+    `apiHeaders[${index}].value` as FormFieldPath<AddDestinationForm>,
+    secretConsumer.insert(current, item) as never,
+  );
+  secretConsumer.refusal.value = null;
+};
 
 // Prebuilt destinations composable
 const {
@@ -1358,6 +1446,27 @@ const selectDestinationType = (type: string) => {
 
 // Handle prebuilt and custom Web Hook destination tests
 const handleTestDestination = async () => {
+  if (isCustomWebhook.value && secretConsumer.hasRef.value) {
+    if (testNeedsSave.value || !props.destination) return;
+    savedTestRunning.value = true;
+    savedTestOutcome.value = null;
+    secretConsumer.refusal.value = null;
+    try {
+      const res = await secretsService.testSavedDestination(
+        orgId.value,
+        props.destination.name,
+        templateVal.value || undefined,
+      );
+      savedTestOutcome.value = res.data;
+    } catch (err) {
+      const refusal = refusalFrom(err);
+      if (refusal) secretConsumer.refusal.value = refusal;
+      else savedTestOutcome.value = { ok: false };
+    } finally {
+      savedTestRunning.value = false;
+    }
+    return;
+  }
   if (isCustomWebhook.value) {
     // testCustomDestination reports every failure through lastTestResult.
     await testCustomDestination({
@@ -1448,7 +1557,9 @@ const slackSetupMetadataFor = (value: AddDestinationForm): SlackSetupMetadata | 
 };
 
 async function handlePrebuiltSave(value: AddDestinationForm) {
+  secretConsumer.refusal.value = null;
   try {
+    const secretBinds = await secretConsumer.binds();
     // Scope credentials to the ACTIVE type's fields (dropping any keys left over
     // from a previous type selection) and coerce them exactly as the schema does.
     const credentials = prebuiltDestinationDefaults(
@@ -1476,6 +1587,7 @@ async function handlePrebuiltSave(value: AddDestinationForm) {
         value.skip_tls_verify || false, // skipTlsVerify
         templateOverride,
         slackSetupMetadataFor(value),
+        secretBinds,
       );
     } else {
       // Create new prebuilt destination
@@ -1487,15 +1599,16 @@ async function handlePrebuiltSave(value: AddDestinationForm) {
         value.skip_tls_verify || false, // skipTlsVerify
         templateOverride,
         slackSetupMetadataFor(value),
+        secretBinds,
       );
     }
 
     // `createDestination`/`updateDestination` above come from usePrebuiltDestinations,
     // which invalidates the scope itself.
     finishSave();
-  } catch {
-    // The composable presents a sanitized error toast and rethrows so submission
-    // state settles without exposing credential-bearing request details.
+  } catch (error: unknown) {
+    const refusal = refusalFrom(error);
+    if (refusal) secretConsumer.refusal.value = refusal;
   }
 }
 
@@ -1537,7 +1650,9 @@ function withPayloadFormat(
 // superRefine) passes — the schema, not a manual guard, gates the save. `value`
 // is the validated payload source of truth; the payload is built with explicit
 // keys so no schema-only field (e.g. `credentials`) leaks into the request.
-function saveCustomDestination(value: AddDestinationForm) {
+async function saveCustomDestination(value: AddDestinationForm) {
+  secretConsumer.refusal.value = null;
+  const secretBinds = await secretConsumer.binds();
   const dismiss = toast({
     variant: "loading",
     message: t("common.pleaseWait"),
@@ -1566,6 +1681,10 @@ function saveCustomDestination(value: AddDestinationForm) {
   if (isCustomWebhook.value) {
     payload.metadata = withPayloadFormat(props.destination?.metadata, value.payload_format);
   }
+  if (secretBinds.length) {
+    (payload as Partial<DestinationPayload> & { secret_binds?: unknown }).secret_binds =
+      secretBinds;
+  }
 
   if (isUpdatingDestination.value) {
     track("Button Click", {
@@ -1584,6 +1703,11 @@ function saveCustomDestination(value: AddDestinationForm) {
       })
       .catch((err: any) => {
         dismiss();
+        const refusal = refusalFrom(err);
+        if (refusal) {
+          secretConsumer.refusal.value = refusal;
+          return;
+        }
         if (err.response?.status == 403) {
           return;
         }
@@ -1609,6 +1733,11 @@ function saveCustomDestination(value: AddDestinationForm) {
       })
       .catch((err: any) => {
         dismiss();
+        const refusal = refusalFrom(err);
+        if (refusal) {
+          secretConsumer.refusal.value = refusal;
+          return;
+        }
         if (err.response?.status == 403) {
           return;
         }

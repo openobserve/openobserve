@@ -1898,7 +1898,7 @@ mod tests {
         };
         use svix_ksuid::KsuidLike;
 
-        let org = format!("cal_det_{}", config::ider::uuid());
+        let org = format!("cal_det_{}", config::ider::ksuid());
         let (detection, plain) = (
             svix_ksuid::Ksuid::new(None, None).to_string(),
             svix_ksuid::Ksuid::new(None, None).to_string(),
@@ -1936,7 +1936,7 @@ mod tests {
         use svix_ksuid::KsuidLike;
 
         crate::request::security::tests::meta_store().await;
-        let org = format!("cal_fixed_{}", config::ider::uuid());
+        let org = format!("cal_fixed_{}", config::ider::ksuid());
         let id = || svix_ksuid::Ksuid::new(None, None).to_string();
         let (silent, wired, incident) = (id(), id(), id());
         for (alert_id, destinations, creates_incident) in [
@@ -2005,7 +2005,7 @@ mod tests {
         };
         use svix_ksuid::KsuidLike;
 
-        let org = format!("cal_count_{}", config::ider::uuid());
+        let org = format!("cal_count_{}", config::ider::ksuid());
         let id = || svix_ksuid::Ksuid::new(None, None).to_string();
         let (detection, wired, mine, theirs) = (id(), id(), id(), id());
         for (alert_id, siem, destinations) in [
@@ -2063,7 +2063,7 @@ mod tests {
         };
         use svix_ksuid::KsuidLike;
 
-        let org = format!("cal_tile_{}", config::ider::uuid());
+        let org = format!("cal_tile_{}", config::ider::ksuid());
         let id = || svix_ksuid::Ksuid::new(None, None).to_string();
         let (detection, wired, plain) = (id(), id(), id());
         for (alert_id, siem, destinations) in [

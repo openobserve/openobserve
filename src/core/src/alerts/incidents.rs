@@ -8253,7 +8253,7 @@ mod tests {
                 2,
                 Some(TITLE),
                 ResponderRole::Owner,
-                None,
+                infra::table::oncall_responses::Provenance::default(),
             )
             .await
             .unwrap();
@@ -8659,7 +8659,7 @@ mod tests {
                     2,
                     Some(TITLE),
                     ResponderRole::Owner,
-                    None,
+                    infra::table::oncall_responses::Provenance::default(),
                 )
                 .await
                 .unwrap();
@@ -9164,7 +9164,7 @@ mod tests {
             l0.mode.p2 = config::meta::oncall::L0Mode::Off;
             let team_id = format!("team-{org_id}");
             oncall_policies::ActiveModel {
-                id: Set(config::ider::uuid()),
+                id: Set(config::ider::ksuid()),
                 org_id: Set(org_id.to_string()),
                 team_id: Set(team_id.clone()),
                 rungs: Set("[]".to_string()),
@@ -10662,7 +10662,7 @@ mod tests {
             (false, true, None, Some(KeyType::AlertId), &none),
             (false, true, None, None, &none),
         ] {
-            let org = format!("kinds_{}", config::ider::uuid());
+            let org = format!("kinds_{}", config::ider::ksuid());
             let mut alert = Alert::default();
             alert.id = Some(Ksuid::new(None, None));
             alert.org_id.clone_from(&org);
@@ -10853,7 +10853,7 @@ mod tests {
             (bare, 2 * HOUR, "other", false, false),
             (keyed, 2 * HOUR, "member", true, true),
         ] {
-            let org = format!("join_guard_{}", config::ider::uuid());
+            let org = format!("join_guard_{}", config::ider::ksuid());
             let existing = create(&org, "P2", stored.clone(), &kind.to_string(), HOUR, None)
                 .await
                 .unwrap();
@@ -10928,7 +10928,7 @@ mod tests {
         ];
         let mut opened = Vec::new();
         for (levels, before, during) in rows {
-            let org = format!("moved_level_{}", config::ider::uuid());
+            let org = format!("moved_level_{}", config::ider::ksuid());
             let dims = serde_json::json!({"service": "api"});
             let incident = create(&org, "P1", dims, "Primary", MINUTE, None);
             let id = incident.await.unwrap().id;
@@ -11014,7 +11014,7 @@ mod tests {
         const MINUTE: i64 = 60_000_000;
         let _db = crate::alerts::rca_runs::tests::db().await;
         crate::alerts::rca_runs::tests::rca_off();
-        let org = format!("membership_{}", config::ider::uuid());
+        let org = format!("membership_{}", config::ider::ksuid());
         let dims = serde_json::json!({"service": "api"});
         let incident =
             infra::table::alert_incidents::create(&org, "P3", dims, "Primary", MINUTE, None);
@@ -11050,7 +11050,7 @@ mod tests {
         const MINUTE: i64 = 60_000_000;
         let _db = crate::alerts::rca_runs::tests::db().await;
         crate::alerts::rca_runs::tests::rca_off();
-        let org = format!("membership_{}", config::ider::uuid());
+        let org = format!("membership_{}", config::ider::ksuid());
         let dims = serde_json::json!({"service": "api"});
         let incident = create(&org, "P3", dims, "Primary", MINUTE, None)
             .await
@@ -12017,6 +12017,7 @@ mod tests {
             priority: 2,
             responder_role: ResponderRole::Owner,
             exhausted_at: None,
+            requested_by: None,
             origin_response_id: None,
             state,
             opened_at: 0,
@@ -12734,7 +12735,7 @@ mod tests {
 
         const HOUR: i64 = 3_600_000_000;
         let _db = db().await;
-        let org = format!("case_join_{}", config::ider::uuid());
+        let org = format!("case_join_{}", config::ider::ksuid());
         let dims = serde_json::json!({"security_ip": "185.220.101.47", "security_detection": "sigma:sqli"});
         let case = create_security_case(
             &org,
@@ -12890,7 +12891,7 @@ mod tests {
 
         const HOUR: i64 = 3_600_000_000;
         let _db = db().await;
-        let org = format!("case_join_new_{}", config::ider::uuid());
+        let org = format!("case_join_new_{}", config::ider::ksuid());
         let case = create_security_case(
             &org,
             "P2",
@@ -12965,7 +12966,7 @@ mod tests {
 
         const HOUR: i64 = 3_600_000_000;
         let _db = db().await;
-        let org = format!("case_absorb_{}", config::ider::uuid());
+        let org = format!("case_absorb_{}", config::ider::ksuid());
         let at = CaseActivity {
             first_event_at: HOUR,
             last_event_at: HOUR,
@@ -13061,7 +13062,7 @@ mod tests {
 
         const HOUR: i64 = 3_600_000_000;
         let _db = db().await;
-        let org = format!("case_span_{}", config::ider::uuid());
+        let org = format!("case_span_{}", config::ider::ksuid());
         let span = |first, last, historical| CaseActivity {
             first_event_at: first,
             last_event_at: last,
@@ -13182,7 +13183,7 @@ mod tests {
 
         const HOUR: i64 = 3_600_000_000;
         let _db = db().await;
-        let org = format!("ao_dest_{}", config::ider::uuid());
+        let org = format!("ao_dest_{}", config::ider::ksuid());
         let mut alert = Alert::default();
         alert.id = Some(Ksuid::new(None, None));
         alert.org_id = org.clone();
@@ -13227,7 +13228,7 @@ mod tests {
 
         const HOUR: i64 = 3_600_000_000;
         let _db = db().await;
-        let org = format!("case_cap_{}", config::ider::uuid());
+        let org = format!("case_cap_{}", config::ider::ksuid());
         let mut alert = Alert::default();
         alert.id = Some(Ksuid::new(None, None));
         alert.org_id = org.clone();
@@ -13285,7 +13286,7 @@ mod tests {
 
         const HOUR: i64 = 3_600_000_000;
         let _db = db().await;
-        let org = format!("case_rollup_{}", config::ider::uuid());
+        let org = format!("case_rollup_{}", config::ider::ksuid());
         let mut alert = Alert::default();
         alert.id = Some(Ksuid::new(None, None));
         alert.org_id = org.clone();
@@ -13329,7 +13330,7 @@ mod tests {
 
         const HOUR: i64 = 3_600_000_000;
         let _db = db().await;
-        let org = format!("case_backfill_{}", config::ider::uuid());
+        let org = format!("case_backfill_{}", config::ider::ksuid());
         let mut alert = Alert::default();
         alert.id = Some(Ksuid::new(None, None));
         alert.org_id = org.clone();

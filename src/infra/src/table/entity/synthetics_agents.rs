@@ -33,6 +33,7 @@ pub struct Model {
     /// Refreshed by register and every lease; stale ⇒ location down.
     pub last_seen_at: i64,
     pub created_at: i64,
+    pub last_tokenless_credential_resolve_at: Option<i64>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

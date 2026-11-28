@@ -622,7 +622,7 @@ mod tests {
     #[tokio::test]
     async fn only_one_confirm_holds_a_cards_decision_at_a_time() {
         crate::request::security::tests::meta_store().await;
-        let id = format!("apr_{}", config::ider::uuid());
+        let id = format!("apr_{}", config::ider::ksuid());
         assert!(claim_decision("o", &id).await);
         assert!(
             !claim_decision("o", &id).await,

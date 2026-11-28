@@ -50,6 +50,7 @@ pub mod queue_store;
 pub mod ratelimit;
 pub mod resources;
 pub mod search;
+pub mod secret_store;
 pub mod self_reporting;
 pub mod service_graph;
 pub mod service_identity;

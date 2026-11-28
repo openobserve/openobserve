@@ -21,18 +21,28 @@ use axum::{
     http::StatusCode,
     response::Response,
 };
-use config::meta::{alerts::content_spec::ContentSpec, destinations::Module};
+use config::meta::{
+    alerts::content_spec::ContentSpec,
+    destinations::{DestinationType as CoreDestinationType, Module},
+};
 use db::alerts::destinations::DestinationError;
+use infra::secret_store::{
+    redact::{HumanOutcome, OutcomeClass},
+    resolver::is_draft_with_store_ref,
+};
 use openobserve_api_common::extractors::Headers;
 #[cfg(feature = "enterprise")]
 use openobserve_core::auth::check_permissions;
 use openobserve_core::{
     alerts::{
-        destinations,
-        notifications::{TestSendError, jira, test_send as core_test_send},
+        destinations::{self, DestinationSaveError, SavePrincipal},
+        notifications::{
+            TestSendError, human, jira,
+            test_send::{test_send as core_test_send, test_send_saved},
+        },
     },
     auth::UserEmail,
-    http::destination_error_response,
+    http::{destination_error_response, secret_refusal_response},
 };
 use serde::{Deserialize, Serialize};
 
@@ -99,6 +109,7 @@ pub struct TestDestinationResponse {
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = inline(TestDestinationResponse)),
         (status = 400, description = "Error",   content_type = "application/json", body = ()),
+        (status = 409, description = "A destination with store references must be saved before testing", content_type = "application/json", body = Object),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Destinations", "operation": "create"})),
@@ -109,6 +120,30 @@ pub async fn test_destination(
     Path(org_id): Path<String>,
     Json(test_req): Json<TestDestinationRequest>,
 ) -> Response {
+    let slack_app = match serde_json::to_string(&test_req.slack_app) {
+        Ok(slack_app) => slack_app,
+        Err(_) => return MetaHttpResponse::bad_request("Invalid Slack app target"),
+    };
+    let mut fields = vec![test_req.url.as_str(), slack_app.as_str()];
+    fields.extend(test_req.method.as_deref());
+    fields.extend(test_req.body.as_deref());
+    fields.extend(test_req.template.as_deref());
+    if let Some(headers) = &test_req.headers {
+        fields.extend(
+            headers
+                .iter()
+                .flat_map(|(key, value)| [key.as_str(), value.as_str()]),
+        );
+    }
+    if let Some(recipients) = &test_req.recipients {
+        fields.extend(recipients.iter().map(String::as_str));
+    }
+    if config::get_config().common.secret_store_refs_enabled
+        && let Err(code) = is_draft_with_store_ref(&fields)
+    {
+        return secret_refusal_response(&code.into());
+    }
+
     match test_req.destination_type {
         DestinationType::Email => test_email_destination(&org_id, &test_req).await,
         DestinationType::Http => test_http_destination(&org_id, &test_req).await,
@@ -363,7 +398,12 @@ pub async fn jira_setup(
 
     match jira::setup(&org_id, req).await {
         Ok(body) => MetaHttpResponse::json(body),
-        Err(e) => MetaHttpResponse::bad_request(e),
+        Err(e) => match e.downcast_ref::<infra::errors::Error>() {
+            Some(infra::errors::Error::SecretStore(code)) => {
+                secret_refusal_response(&(*code).into())
+            }
+            _ => MetaHttpResponse::bad_request(e),
+        },
     }
 }
 
@@ -429,17 +469,13 @@ pub async fn save_destination(
         return MetaHttpResponse::forbidden("Not supported in the open source version");
     }
 
-    let dest = match dest.into(org_id, is_alert) {
-        Ok(dest) => dest,
-        Err(e) => return destination_error_response(e),
-    };
-    match destinations::save_by("", dest, true, &user_email.user_id).await {
+    match save_with_binds("", dest, org_id, is_alert, true, &user_email.user_id).await {
         Ok(v) => MetaHttpResponse::json(
             MetaHttpResponse::message(StatusCode::OK, "Destination saved")
                 .with_id(v.id.map(|id| id.to_string()).unwrap_or_default())
                 .with_name(v.name),
         ),
-        Err(e) => destination_error_response(e),
+        Err(response) => response,
     }
 }
 
@@ -486,14 +522,35 @@ pub async fn update_destination(
         return MetaHttpResponse::forbidden("Not supported in the open source version");
     }
 
-    let dest = match dest.into(org_id, is_alert) {
-        Ok(dest) => dest,
-        Err(e) => return destination_error_response(e),
-    };
-    match destinations::save_by(&name, dest, false, &user_email.user_id).await {
+    match save_with_binds(&name, dest, org_id, is_alert, false, &user_email.user_id).await {
         Ok(_) => MetaHttpResponse::ok("Destination updated"),
-        Err(e) => destination_error_response(e),
+        Err(response) => response,
     }
+}
+
+/// Create and update share the bind path, so a refusal keeps its own status and body.
+async fn save_with_binds(
+    name: &str,
+    mut dest: Destination,
+    org_id: String,
+    is_alert: bool,
+    create: bool,
+    user_id: &str,
+) -> Result<config::meta::destinations::Destination, Response> {
+    let binds = std::mem::take(&mut dest.secret_binds);
+    let dest = dest
+        .into(org_id, is_alert)
+        .map_err(destination_error_response)?;
+    let principal = destinations::SavePrincipal::for_user(&dest.org_id, user_id)
+        .await
+        .map_err(|r| secret_refusal_response(&r))?;
+    destinations::save_with_binds(name, dest, create, &principal, binds)
+        .await
+        .map(|(saved, _)| saved)
+        .map_err(|e| match e {
+            DestinationSaveError::Secret(r) => secret_refusal_response(&r),
+            DestinationSaveError::Destination(e) => destination_error_response(e),
+        })
 }
 
 /// GetDestination
@@ -804,6 +861,14 @@ pub struct TestSendRequest {
 pub struct TestSendResponse {
     pub success: bool,
     pub message: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ok: Option<bool>,
+    // Secret-bearing responses require nulls when status or class is unavailable.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<Option<u16>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<String>)]
+    pub class: Option<Option<OutcomeClass>>,
 }
 
 /// TestSendNotification
@@ -838,6 +903,7 @@ pub struct TestSendResponse {
         (status = 400, description = "Error",   content_type = "application/json", body = ()),
         (status = 403, description = "Forbidden", content_type = "application/json", body = ()),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
+        (status = 409, description = "The destination has no saved secret binding", content_type = "application/json", body = Object),
         (status = 429, description = "Rate limited", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -921,24 +987,58 @@ pub async fn test_send(
     else {
         return MetaHttpResponse::bad_request("Test-send is only supported for alert destinations");
     };
+    let has_store_ref = matches!(destination_type, CoreDestinationType::Http(endpoint) if endpoint.uses_store_refs());
 
     // Rate cap: per-user, config `ZO_ALERT_TEST_SEND_PER_MINUTE` (default 6), charged in core
     // just before dispatch.
-    match core_test_send(&org_id, user_id, destination_type, &spec, req.kind).await {
+    let sent = if has_store_ref {
+        match SavePrincipal::for_user(&org_id, user_id).await {
+            Ok(principal) => test_send_saved(&org_id, &principal, &dest, &spec, req.kind).await,
+            Err(refusal) => return secret_refusal_response(&refusal),
+        }
+    } else {
+        core_test_send(&org_id, user_id, destination_type, &spec, req.kind).await
+    };
+    match sent {
+        Ok(message) if has_store_ref => test_send_outcome_response(human::outcome_of(&Ok(message))),
         Ok(message) => MetaHttpResponse::json(TestSendResponse {
             success: true,
             message,
+            ok: None,
+            status: None,
+            class: None,
         }),
+        Err(error @ (TestSendError::RateLimited { .. } | TestSendError::Secret(_))) => {
+            test_send_error_response(error)
+        }
+        Err(error) if has_store_ref => test_send_outcome_response(error.outcome()),
         Err(e) => test_send_error_response(e),
     }
 }
 
-/// A rate-limited test-send is a 429 that says when to retry; every other failure is a 400.
+fn test_send_outcome_response(outcome: HumanOutcome) -> Response {
+    MetaHttpResponse::json(TestSendResponse {
+        success: outcome.ok,
+        message: if outcome.ok {
+            "Test sent"
+        } else {
+            "Test failed"
+        }
+        .into(),
+        ok: Some(outcome.ok),
+        status: Some(outcome.status),
+        class: Some(outcome.class),
+    })
+}
+
+/// A rate-limited test-send is a 429 that says when to retry, a store refusal keeps its own
+/// status; every other failure is a 400.
 fn test_send_error_response(e: TestSendError) -> Response {
     match e {
         TestSendError::RateLimited { retry_after_secs } => {
             MetaHttpResponse::too_many_requests_retry_after(e.to_string(), retry_after_secs)
         }
+        TestSendError::Secret(refusal) => secret_refusal_response(&refusal),
         e => MetaHttpResponse::bad_request(e.to_string()),
     }
 }
@@ -1034,6 +1134,123 @@ mod tests {
 
     fn status(err: DestinationError) -> StatusCode {
         destination_error_response(err).status()
+    }
+
+    async fn json_of(response: axum::response::Response) -> (StatusCode, serde_json::Value) {
+        let status = response.status();
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        (status, serde_json::from_slice(&body).unwrap())
+    }
+
+    #[test]
+    fn draft_destination_with_a_store_ref_requires_saving() {
+        isolated(
+            concat!(
+                module_path!(),
+                "::draft_destination_with_a_store_ref_requires_saving"
+            ),
+            &[
+                &[("O2_SECRET_STORE_REFS_ENABLED", "false")],
+                &[("O2_SECRET_STORE_REFS_ENABLED", "true")],
+            ],
+            || async {
+                for (header, expected_status) in [
+                    ("Bearer {{secrets.TOKEN}}", StatusCode::CONFLICT),
+                    ("Bearer literal", StatusCode::OK),
+                ] {
+                    let expected_status = if config::get_config().common.secret_store_refs_enabled {
+                        expected_status
+                    } else {
+                        StatusCode::OK
+                    };
+                    let req = serde_json::from_value::<TestDestinationRequest>(serde_json::json!({
+                        "headers": {"Authorization": header}
+                    }))
+                    .unwrap();
+                    let (status, body) =
+                        json_of(test_destination(Path("org".into()), Json(req)).await).await;
+                    assert_eq!(status, expected_status);
+                    if status == StatusCode::CONFLICT {
+                        assert_eq!(body["code"], "save_before_test");
+                        assert_eq!(body["message"], "Save, then test.");
+                    } else {
+                        assert_eq!(body["error"], "HTTP destination must have a url");
+                    }
+                }
+            },
+        );
+    }
+
+    #[test]
+    fn ref_free_test_send_response_preserves_its_shape() {
+        let response = super::TestSendResponse {
+            success: true,
+            message: "sent status: 200 OK".into(),
+            ok: None,
+            status: None,
+            class: None,
+        };
+        assert_eq!(
+            serde_json::to_value(response).unwrap(),
+            serde_json::json!({"success": true, "message": "sent status: 200 OK"})
+        );
+    }
+
+    #[tokio::test]
+    async fn secret_bearing_test_send_response_contains_only_the_outcome() {
+        let rejected = openobserve_core::alerts::notifications::send::SendError::Rejected {
+            status: StatusCode::UNAUTHORIZED,
+            body: Some("provider text".into()),
+        };
+        let outcome = super::human::outcome_of(&Err(rejected.into()));
+        let (status, body) = json_of(super::test_send_outcome_response(outcome)).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(
+            body,
+            serde_json::json!({
+                "success": false,
+                "message": "Test failed",
+                "ok": false,
+                "status": 401,
+                "class": "http_4xx"
+            })
+        );
+
+        let outcome = super::human::outcome_of(&Ok("sent status: 204 No Content".into()));
+        let (status, body) = json_of(super::test_send_outcome_response(outcome)).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(
+            body,
+            serde_json::json!({
+                "success": true,
+                "message": "Test sent",
+                "ok": true,
+                "status": 204,
+                "class": null
+            })
+        );
+    }
+
+    #[tokio::test]
+    async fn a_store_refusal_keeps_its_code_status_and_body() {
+        use config::meta::secret_store::SecretErrorCode;
+        for (code, expected) in [
+            (SecretErrorCode::SecretUseDenied, StatusCode::FORBIDDEN),
+            (SecretErrorCode::PinMismatch, StatusCode::CONFLICT),
+            (SecretErrorCode::RefTypo, StatusCode::BAD_REQUEST),
+        ] {
+            let wrapped = DestinationError::InfraError(infra::errors::Error::SecretStore(code));
+            let (got, body) = json_of(super::destination_error_response(wrapped)).await;
+            assert_eq!((got, body["code"].as_str()), (expected, Some(code.into())));
+        }
+        let (got, body) = json_of(super::destination_error_response(
+            DestinationError::NotFound,
+        ))
+        .await;
+        assert_eq!(got, StatusCode::NOT_FOUND);
+        assert!(body.get("code").is_none_or(|c| c.is_number()));
     }
 
     /// Runs the test at `path` once per env set, each in a child process, as the URL policy is

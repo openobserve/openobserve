@@ -2649,6 +2649,7 @@ dependencies = [
  "arrow-schema",
  "async-fs",
  "async-recursion",
+ "async-trait",
  "aws-config",
  "aws-sdk-sns",
  "axum",
@@ -2698,6 +2699,7 @@ dependencies = [
  "sea-orm",
  "serde",
  "serde_json",
+ "serde_json_canonicalizer",
  "serde_with",
  "sha2 0.10.9",
  "sha256",
@@ -2723,6 +2725,7 @@ dependencies = [
  "uuid",
  "vortex",
  "vrl",
+ "zeroize",
 ]
 
 [[package]]
@@ -5953,6 +5956,7 @@ dependencies = [
 name = "infra"
 version = "0.1.0"
 dependencies = [
+ "aes-siv",
  "anyhow",
  "arc-swap",
  "arrow",
@@ -6001,6 +6005,7 @@ dependencies = [
  "url",
  "urlencoding",
  "utoipa",
+ "zeroize",
 ]
 
 [[package]]
@@ -8028,6 +8033,7 @@ dependencies = [
  "o2_openfga",
  "openobserve-core",
  "regex",
+ "sea-orm",
  "serde",
  "serde_json",
  "tokio",
@@ -8613,6 +8619,7 @@ dependencies = [
  "urlencoding",
  "usage_reporting",
  "utoipa",
+ "zeroize",
 ]
 
 [[package]]
@@ -11080,6 +11087,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9774ba4a74de5f7b1c1451ed6cd5285a32eddb5cccb8cc655a4e50009e06477f"
 
 [[package]]
+name = "ryu-js"
+version = "1.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1f232fd0249f55adbe7f15bee58bbbd3d40708000b84e6482066d2ba599e08a9"
+
+[[package]]
 name = "salsa20"
 version = "0.10.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -11577,6 +11590,17 @@ dependencies = [
  "serde",
  "serde_core",
  "zmij",
+]
+
+[[package]]
+name = "serde_json_canonicalizer"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "87f7bb64f8c7e9f783fdfe883b5fe93a90bee1597c63705baa91842c5f698620"
+dependencies = [
+ "ryu-js",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -15569,6 +15593,7 @@ version = "1.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e13c156562582aa81c60cb29407084cdb54c4164760106ab78e6c5b0858cf64e"
 dependencies = [
+ "serde",
  "zeroize_derive",
 ]
 

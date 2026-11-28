@@ -176,7 +176,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_a_destructive_change_needs_the_security_delete_grant() {
-        let stranger = format!("{}@example.com", config::ider::uuid());
+        let stranger = format!("{}@example.com", config::ider::ksuid());
         let refused = refuse_unless_admin("org", &stranger, true)
             .await
             .unwrap_err();
@@ -246,7 +246,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_the_settings_guard_never_stamps_the_request_row_itself() {
-        let stranger = format!("{}@example.com", config::ider::uuid());
+        let stranger = format!("{}@example.com", config::ider::ksuid());
         let update = UpdateStreamSettings {
             security: Some(Some(Default::default())),
             ..Default::default()

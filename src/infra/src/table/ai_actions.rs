@@ -104,7 +104,7 @@ pub async fn insert_with<C: ConnectionTrait>(
     action: Model,
 ) -> Result<Model, errors::Error> {
     let action = fitted(Model {
-        id: config::ider::uuid(),
+        id: config::ider::ksuid(),
         ..action
     });
     let record = ActiveModel {

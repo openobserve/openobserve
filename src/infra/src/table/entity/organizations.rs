@@ -7,6 +7,8 @@ use sea_orm::entity::prelude::*;
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub identifier: String,
+    #[sea_orm(column_type = "String(StringLen::N(27))", default_value = "")]
+    pub org_incarnation: String,
     pub org_name: String,
     pub org_type: i16,
     pub status: String,
@@ -41,6 +43,7 @@ mod tests {
     fn test_model_construction() {
         let m = Model {
             identifier: "myorg".to_string(),
+            org_incarnation: String::new(),
             org_name: "My Organization".to_string(),
             org_type: 1,
             status: "active".to_string(),
@@ -58,6 +61,7 @@ mod tests {
     fn test_model_construction_cloud() {
         let m = Model {
             identifier: "myorg".to_string(),
+            org_incarnation: String::new(),
             org_name: "My Organization".to_string(),
             org_type: 1,
             status: "active".to_string(),

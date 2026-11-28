@@ -341,7 +341,7 @@ async fn accept(
     if over_limits(call, &auth) {
         return Err((HookReason::RateLimited, Some(RATE_RETRY_AFTER_SECS)));
     }
-    let run_id = config::ider::uuid();
+    let run_id = config::ider::ksuid();
     let input = payload::build_input(
         &call.trigger_id,
         &run_id,

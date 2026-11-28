@@ -15,6 +15,10 @@
 
 mod last_check;
 mod variables;
+#[cfg(test)]
+mod variables_store_tests;
+
+use std::collections::BTreeSet;
 
 use axum::{
     Json,
@@ -23,7 +27,19 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use common::meta::http::HttpResponse as MetaHttpResponse;
-use openobserve_api_common::extractors::Headers;
+use config::meta::{
+    destinations::{SecretBindInput, SecretBindPin},
+    secret_store::{Decision, SecretErrorCode, SecretStoreAuthz},
+};
+use infra::{
+    secret_store::bind::{BindPin, SecretBindOption},
+    table::synthetics_jobs::LEASE_TOKEN_PREFIX,
+};
+use openobserve_api_common::{auth::validator::authenticate_lease, extractors::Headers};
+use openobserve_synthetics::{
+    job_api::{AttemptError, JobCaller, LeasePrincipal, PresentedLease},
+    service::{CheckSaveActor, CheckSecretRefusal, bound_check_secret_ids},
+};
 use serde::Deserialize;
 use utoipa::ToSchema;
 pub use variables::*;
@@ -34,6 +50,9 @@ use crate::service::auth::UserEmail;
 // must not 403 its way through a feature it ships.
 #[cfg(feature = "enterprise")]
 use crate::service::auth::{check_folder_write_permissions, check_permissions};
+
+const AGENT_TOKEN_PREFIX: &str = "o2syn_";
+const AGENT_TOKEN_PLACEHOLDER: &str = "<o2syn-token>";
 
 // ── Local query / body types ──────────────────────────────────────────────────
 
@@ -99,6 +118,302 @@ pub struct BulkDeleteSyntheticsRequestBody {
 pub struct MoveSyntheticsRequestBody {
     pub synthetic_ids: Vec<String>,
     pub dst_folder_id: String,
+}
+
+#[derive(Deserialize, ToSchema)]
+pub struct SyntheticCreate {
+    #[serde(flatten)]
+    check: config::meta::synthetics::Synthetic,
+    #[serde(default)]
+    secret_binds: Vec<SecretBindInput>,
+}
+
+/// The update body: a full check, except that an absent `template` keeps the stored override.
+#[derive(Deserialize, ToSchema)]
+pub struct SyntheticUpdate {
+    #[serde(flatten)]
+    check: config::meta::synthetics::Synthetic,
+    /// Absent keeps the stored override; `null` or "" clears it; a name sets it.
+    #[serde(default, deserialize_with = "double_option")]
+    template: Option<Option<String>>,
+    #[serde(default)]
+    secret_binds: Vec<SecretBindInput>,
+}
+
+impl SyntheticUpdate {
+    /// The check to save: the sent override, or the stored one when the field is absent.
+    async fn into_check(
+        self,
+        stored: impl std::future::Future<Output = anyhow::Result<Option<String>>>,
+    ) -> anyhow::Result<config::meta::synthetics::Synthetic> {
+        let mut check = self.check;
+        check.template = match self.template {
+            Some(template) => template,
+            None => stored.await?,
+        };
+        Ok(check)
+    }
+}
+
+/// The stored side of a check save; a create has none.
+pub struct StoredCheck<'a> {
+    pub id: &'a str,
+    /// The route's `?folder=`: the PUT check has always read the folder from it.
+    pub folder_query: Option<&'a str>,
+}
+
+struct ParentScope {
+    parent: infra::table::synthetics_refs::ParentRef,
+    #[cfg(any(feature = "enterprise", test))]
+    environments: Vec<String>,
+    secret_ids: BTreeSet<String>,
+}
+
+/// Strict checks through the core authorizer, which maps a root user itself.
+struct StrictAuthz {
+    role: config::meta::user::UserRole,
+}
+
+impl StrictAuthz {
+    fn actor<'a>(&'a self, user_id: &'a str, role: &'a str) -> CheckSaveActor<'a> {
+        CheckSaveActor {
+            user_id,
+            role,
+            authz: self,
+        }
+    }
+}
+
+#[async_trait::async_trait]
+impl SecretStoreAuthz for StrictAuthz {
+    async fn check_strict(
+        &self,
+        org_id: &str,
+        user_id: &str,
+        _role: &str,
+        object: &str,
+        verb: &str,
+    ) -> Result<config::meta::secret_store::Decision, config::meta::secret_store::SecretErrorCode>
+    {
+        openobserve_core::authz::check_strict(org_id, user_id, self.role.clone(), object, verb)
+            .await
+    }
+
+    async fn list_objects(
+        &self,
+        _: &str,
+        _: &str,
+        _: &str,
+        _: &str,
+        _: &str,
+    ) -> Result<Vec<String>, config::meta::secret_store::SecretErrorCode> {
+        Ok(Vec::new())
+    }
+}
+
+/// Every save-time permission of a check in one place, so a replicated save is authorized exactly
+/// as a local one (R14-19). A create's POST stays with the route gate, which reads `?folder=`.
+pub async fn authorize_check_save(
+    user_id: &str,
+    org_id: &str,
+    stored: Option<&StoredCheck<'_>>,
+    new: &config::meta::synthetics::Synthetic,
+) -> Result<(), Response> {
+    #[cfg(feature = "enterprise")]
+    {
+        match stored {
+            Some(stored) => require_check_update(user_id, org_id, stored, new).await?,
+            None => require_env_access(org_id, user_id, &new.environments).await?,
+        }
+        require_readable_children(org_id, user_id, new, stored.map(|s| s.id)).await?;
+    }
+    #[cfg(not(feature = "enterprise"))]
+    let _ = new;
+    if let Some(stored) = stored {
+        require_parent_access(user_id, org_id, stored.id).await?;
+    }
+    Ok(())
+}
+
+/// PUT on the check, write access to a new folder, and use of every environment added or left.
+#[cfg(feature = "enterprise")]
+async fn require_check_update(
+    user_id: &str,
+    org_id: &str,
+    stored: &StoredCheck<'_>,
+    new: &config::meta::synthetics::Synthetic,
+) -> Result<(), Response> {
+    if !check_permissions(
+        stored.id,
+        org_id,
+        user_id,
+        "synthetics",
+        "PUT",
+        stored.folder_query,
+        false,
+        true,
+        false,
+    )
+    .await
+    {
+        return Err(MetaHttpResponse::forbidden("Forbidden"));
+    }
+    // A changed folder_id is also a move, which the `?folder=` check above does not cover.
+    if !new.folder_id.is_empty() {
+        let current = openobserve_synthetics::service::folder_of(org_id, stored.id)
+            .await
+            .ok()
+            .flatten();
+        if current.as_deref() != Some(new.folder_id.as_str())
+            && !check_folder_write_permissions(org_id, user_id, "synthetic_folder", &new.folder_id)
+                .await
+        {
+            return Err(MetaHttpResponse::forbidden("Forbidden"));
+        }
+    }
+    let environments = stored_environments(org_id, stored.id).await?;
+    require_update_env_access(org_id, user_id, &new.environments, &environments).await
+}
+
+#[cfg(feature = "enterprise")]
+async fn require_readable_children(
+    org_id: &str,
+    user_id: &str,
+    new: &config::meta::synthetics::Synthetic,
+    existing_id: Option<&str>,
+) -> Result<(), Response> {
+    match caller_can_read_children(org_id, user_id, new, existing_id).await {
+        Ok(None) => Ok(()),
+        Ok(Some(child)) => Err(MetaHttpResponse::forbidden(format!(
+            "you do not have read access to check {child}"
+        ))),
+        Err(e) => Err(MetaHttpResponse::error(
+            StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
+            e.to_string(),
+        )
+        .into_response()),
+    }
+}
+
+/// A child edit affects every parent that runs its steps under the parent's credentials.
+async fn require_parent_access(
+    user_id: &str,
+    org_id: &str,
+    child_id: &str,
+) -> Result<(), Response> {
+    let parents = openobserve_synthetics::service::composition::parents_of_child(org_id, child_id)
+        .await
+        .map_err(|e| {
+            tracing::error!("[synthetics] require_parent_access: {e}");
+            MetaHttpResponse::error(
+                StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
+                "could not load the checks that embed this check",
+            )
+            .into_response()
+        })?;
+    let mut scopes = Vec::with_capacity(parents.len());
+    for (parent, _definition) in parents {
+        scopes.push(ParentScope {
+            #[cfg(feature = "enterprise")]
+            environments: parent_environment_names(org_id, &_definition.environments).await?,
+            #[cfg(all(not(feature = "enterprise"), test))]
+            environments: Vec::new(),
+            secret_ids: load_bound_secret_ids(org_id, &parent.id).await?,
+            parent,
+        });
+    }
+    if scopes.is_empty() {
+        return Ok(());
+    }
+    #[cfg(not(feature = "enterprise"))]
+    if scopes.iter().all(|scope| scope.secret_ids.is_empty()) {
+        return Ok(());
+    }
+    let Some(role) = caller_role(org_id, user_id).await else {
+        return Err(MetaHttpResponse::forbidden("Forbidden"));
+    };
+    match parents_lacking_use(&StrictAuthz { role }, org_id, user_id, &scopes).await {
+        Ok(lacking) if lacking.is_empty() => Ok(()),
+        Ok(lacking) => Err(parent_use_conflict(org_id, user_id, lacking).await),
+        Err(code) => Err(strict_unavailable(code)),
+    }
+}
+
+#[cfg(feature = "enterprise")]
+async fn parent_environment_names(org_id: &str, ids: &[String]) -> Result<Vec<String>, Response> {
+    let mut names = Vec::new();
+    for id in ids {
+        match openobserve_synthetics::service::get_environment_name(org_id, id).await {
+            Ok(Some(name)) => names.push(name),
+            Ok(None) => {}
+            Err(e) => {
+                tracing::error!("[synthetics] require_parent_access: {e}");
+                return Err(env_load_failed());
+            }
+        }
+    }
+    Ok(names)
+}
+
+async fn parents_lacking_use(
+    authz: &dyn SecretStoreAuthz,
+    org_id: &str,
+    user_id: &str,
+    scopes: &[ParentScope],
+) -> Result<Vec<infra::table::synthetics_refs::ParentRef>, SecretErrorCode> {
+    let mut lacking = Vec::new();
+    for scope in scopes {
+        #[cfg(any(feature = "enterprise", test))]
+        if !can_use_parent_environments(authz, org_id, user_id, &scope.environments).await? {
+            lacking.push(scope.parent.clone());
+            continue;
+        }
+        if !can_use_bound_secrets(authz, org_id, user_id, &scope.secret_ids).await? {
+            lacking.push(scope.parent.clone());
+        }
+    }
+    Ok(lacking)
+}
+
+#[cfg(any(feature = "enterprise", test))]
+async fn can_use_parent_environments(
+    authz: &dyn SecretStoreAuthz,
+    org: &str,
+    user: &str,
+    environments: &[String],
+) -> Result<bool, SecretErrorCode> {
+    for name in environments {
+        let object = openobserve_synthetics::service::variables::environment_object(name);
+        if authz.check_strict(org, user, "", &object, "PUT").await? == Decision::Deny {
+            return Ok(false);
+        }
+    }
+    Ok(true)
+}
+
+async fn load_bound_secret_ids(org: &str, id: &str) -> Result<BTreeSet<String>, Response> {
+    bound_check_secret_ids(org, id).await.map_err(|e| {
+        tracing::error!("[synthetics] load bound secret ids for {org}/{id}: {e}");
+        strict_unavailable(SecretErrorCode::SecretUnavailable)
+    })
+}
+
+async fn can_use_bound_secrets(
+    authz: &dyn SecretStoreAuthz,
+    org: &str,
+    user: &str,
+    ids: &BTreeSet<String>,
+) -> Result<bool, SecretErrorCode> {
+    for id in ids {
+        if authz
+            .check_strict(org, user, "", &format!("secrets:{id}"), "GET")
+            .await?
+            == Decision::Deny
+        {
+            return Ok(false);
+        }
+    }
+    Ok(true)
 }
 
 /// Refuses a check that pins itself to an environment the caller cannot use.
@@ -428,6 +743,15 @@ struct JobAckResult {
 /// mode where presigned URLs are impossible.
 /// Keys are validated against the authed org + synthetic so a caller can only
 /// read artifacts belonging to that synthetic.
+/// Artifacts of a secret-bearing check are never served, whoever asks (D227).
+async fn refuse_secret_bearing_artifacts(org_id: &str, id: &str) -> Result<(), Response> {
+    match openobserve_synthetics::job_api::secret_bearing(org_id, id).await {
+        Ok(false) => Ok(()),
+        Ok(true) => Err(attempt_error_response(&AttemptError::CaptureOff)),
+        Err(e) => Err(attempt_error_response(&e)),
+    }
+}
+
 async fn stream_artifact(org_id: &str, synthetics_id: &str, key: &str) -> Response {
     let prefix = format!("synthetics/{org_id}/{synthetics_id}/");
     if !key.starts_with(&prefix) || key.contains("..") {
@@ -478,6 +802,9 @@ pub async fn get_artifact(
     Path((org_id, id)): Path<(String, String)>,
     Query(query): Query<ArtifactQuery>,
 ) -> Response {
+    if let Err(resp) = refuse_secret_bearing_artifacts(&org_id, &id).await {
+        return resp;
+    }
     stream_artifact(&org_id, &id, &query.key).await
 }
 
@@ -509,6 +836,9 @@ pub async fn presign_artifacts(
     Path((org_id, id)): Path<(String, String)>,
     Json(body): Json<serde_json::Value>,
 ) -> Response {
+    if let Err(resp) = refuse_secret_bearing_artifacts(&org_id, &id).await {
+        return resp;
+    }
     match serde_json::from_value::<openobserve_synthetics::job_api::PresignArtifactsRequest>(body) {
         Ok(req) => {
             match openobserve_synthetics::job_api::presign_artifacts(&org_id, &id, req).await {
@@ -531,13 +861,17 @@ pub async fn job_artifact_urls(
     headers: axum::http::HeaderMap,
     Json(body): Json<serde_json::Value>,
 ) -> Response {
-    if let Err(resp) = authorize_probe(&headers, &org_id).await {
-        return resp;
-    }
+    let caller = match authorize_job_caller(&headers, &org_id).await {
+        Ok(caller) => caller,
+        Err(resp) => return resp,
+    };
     match serde_json::from_value::<openobserve_synthetics::job_api::ArtifactUrlsRequest>(body) {
-        Ok(req) => match openobserve_synthetics::job_api::artifact_urls(req, &org_id).await {
+        Ok(req) => match openobserve_synthetics::job_api::artifact_urls(req, &caller).await {
             Ok(resp) => MetaHttpResponse::json(resp),
             Err(e) => {
+                if let Some(response) = as_attempt_error_response(&e) {
+                    return response;
+                }
                 let msg = e.to_string();
                 if msg.starts_with("forbidden") {
                     return MetaHttpResponse::forbidden(msg);
@@ -561,9 +895,10 @@ pub async fn job_upload(
     // route is registered in every build now — an OSS build that skipped it
     // would accept writes into any org's artifact prefix from anyone who can
     // reach the endpoint.
-    if let Err(resp) = authorize_probe(&headers, &org_id).await {
-        return resp;
-    }
+    let caller = match authorize_job_caller(&headers, &org_id).await {
+        Ok(caller) => caller,
+        Err(resp) => return resp,
+    };
     let key = match params.get("key") {
         Some(k) => k.clone(),
         None => return MetaHttpResponse::bad_request("missing key param"),
@@ -572,6 +907,19 @@ pub async fn job_upload(
     // write outside the caller's org (defense in depth over the token check).
     if !key.starts_with(&format!("synthetics/{org_id}/")) {
         return MetaHttpResponse::forbidden("artifact key does not belong to this org");
+    }
+    let presented = match headers
+        .get("x-o2-lease-token")
+        .map(|h| h.to_str())
+        .transpose()
+    {
+        Ok(token) => token.map(|value| PresentedLease::new(value.to_owned())),
+        Err(_) => return MetaHttpResponse::bad_request("invalid lease token header"),
+    };
+    if let Err(error) =
+        openobserve_synthetics::job_api::authorize_upload(&caller, presented.as_ref(), &key).await
+    {
+        return attempt_error_response(&error);
     }
     match infra::storage::put(&org_id, &key, body).await {
         Ok(_) => MetaHttpResponse::ok("uploaded"),
@@ -715,6 +1063,237 @@ fn lacks_listable_default(
     let default = config::meta::folder::DEFAULT_FOLDER;
     !folders.iter().any(|folder| folder.folder_id == default)
         && listable.is_none_or(|ids| ids.iter().any(|id| id == default))
+}
+
+/// Names the event the audit layer records, since these routes' request bodies are fully redacted.
+fn audit_target(operation: &str, id: &str, name: &str) -> String {
+    format!("{operation} {name} ({id})")
+}
+
+/// Hands `target` to the audit layer; an extension never reaches the client.
+fn audited(res: Response, target: String) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        let mut res = res;
+        res.extensions_mut()
+            .insert(o2_enterprise::enterprise::common::auditor::AuditTarget {
+                fleet_id: None,
+                target,
+            });
+        res
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = target;
+        res
+    }
+}
+
+fn no_store(mut res: Response) -> Response {
+    res.headers_mut().insert(
+        axum::http::header::CACHE_CONTROL,
+        axum::http::HeaderValue::from_static("no-store"),
+    );
+    res
+}
+
+/// Only these roles reach the strict check; everyone else is refused without an FGA call.
+fn admin_role(role: &config::meta::user::UserRole) -> bool {
+    matches!(
+        role,
+        config::meta::user::UserRole::Admin | config::meta::user::UserRole::Root
+    )
+}
+
+/// The caller's role in `org_id`; `None` for a user outside it.
+async fn caller_role(org_id: &str, user_id: &str) -> Option<config::meta::user::UserRole> {
+    if db::user::is_root_user(user_id) {
+        return Some(config::meta::user::UserRole::Root);
+    }
+    openobserve_core::users::get_user(Some(org_id), user_id)
+        .await
+        .map(|user| user.role)
+}
+
+/// Agent tokens need a strict org admin: folder rights and delegated org-id tokens never pass.
+async fn require_org_admin(org_id: &str, user_id: &str) -> Result<(), Response> {
+    use config::meta::secret_store::Decision;
+    let Some(role) = caller_role(org_id, user_id).await else {
+        return Err(MetaHttpResponse::forbidden("Admin or Root role required"));
+    };
+    if !admin_role(&role) {
+        return Err(MetaHttpResponse::forbidden("Admin or Root role required"));
+    }
+    match openobserve_core::authz::check_strict(
+        org_id,
+        user_id,
+        role,
+        &format!("org:{org_id}"),
+        "PUT",
+    )
+    .await
+    {
+        Ok(Decision::Allow) => Ok(()),
+        Ok(_) => Err(MetaHttpResponse::forbidden("Admin or Root role required")),
+        Err(code) => Err(strict_unavailable(code)),
+    }
+}
+
+fn strict_unavailable(code: config::meta::secret_store::SecretErrorCode) -> Response {
+    (
+        StatusCode::SERVICE_UNAVAILABLE,
+        Json(serde_json::json!({ "code": code.as_str() })),
+    )
+        .into_response()
+}
+
+/// Removes every agent token from a location response; install commands keep a placeholder.
+fn strip_agent_tokens(value: &mut serde_json::Value) {
+    match value {
+        serde_json::Value::Object(map) => {
+            map.remove("token");
+            map.values_mut().for_each(strip_agent_tokens);
+        }
+        serde_json::Value::Array(items) => items.iter_mut().for_each(strip_agent_tokens),
+        serde_json::Value::String(text) if text.contains(AGENT_TOKEN_PREFIX) => {
+            *text = mask_agent_tokens(text);
+        }
+        _ => {}
+    }
+}
+
+fn mask_agent_tokens(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut rest = text;
+    while let Some(at) = rest.find(AGENT_TOKEN_PREFIX) {
+        out.push_str(&rest[..at]);
+        out.push_str(AGENT_TOKEN_PLACEHOLDER);
+        let tail = &rest[at + AGENT_TOKEN_PREFIX.len()..];
+        let end = tail
+            .find(|c: char| !(c.is_ascii_alphanumeric() || c == '_' || c == '-'))
+            .unwrap_or(tail.len());
+        rest = &tail[end..];
+    }
+    out.push_str(rest);
+    out
+}
+
+fn tokenless_json<T: serde::Serialize>(body: T) -> Response {
+    match serde_json::to_value(body) {
+        Ok(mut value) => {
+            strip_agent_tokens(&mut value);
+            MetaHttpResponse::json(value)
+        }
+        Err(e) => {
+            tracing::error!("[synthetics] location response: {e}");
+            MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), "serialize")
+                .into_response()
+        }
+    }
+}
+
+/// A write-only slot refusal carries its own status; the body names the slot, never its value.
+fn slot_refusal_response(e: &anyhow::Error) -> Option<Response> {
+    let refusal = e.downcast_ref::<openobserve_synthetics::service::SlotRefusal>()?;
+    let status = refusal
+        .code
+        .http_status()
+        .and_then(|s| StatusCode::from_u16(s).ok())
+        .unwrap_or(StatusCode::CONFLICT);
+    Some(
+        (
+            status,
+            Json(serde_json::json!({
+                "code": refusal.code.as_str(),
+                "field": refusal.field,
+                "message": refusal.to_string(),
+            })),
+        )
+            .into_response(),
+    )
+}
+
+fn check_secret_refusal_response(refusal: &CheckSecretRefusal) -> Response {
+    let status = if refusal.code == SecretErrorCode::SecretConflict {
+        StatusCode::CONFLICT
+    } else {
+        refusal
+            .code
+            .http_status()
+            .and_then(|s| StatusCode::from_u16(s).ok())
+            .unwrap_or(StatusCode::SERVICE_UNAVAILABLE)
+    };
+    (status, Json(refusal)).into_response()
+}
+
+fn check_save_refusal_response(error: &anyhow::Error) -> Option<Response> {
+    match error.downcast_ref::<CheckSecretRefusal>() {
+        Some(refusal) => Some(check_secret_refusal_response(refusal)),
+        None => slot_refusal_response(error),
+    }
+}
+
+fn secret_bind_options(inputs: Vec<SecretBindInput>) -> Vec<SecretBindOption> {
+    inputs
+        .into_iter()
+        .map(|input| SecretBindOption {
+            secret_id: input.secret_id,
+            allow_this_consumer: input.allow_this_consumer,
+            expected_policy_rev: input.expected_policy_rev,
+            pin: match input.pin {
+                SecretBindPin::Keep(_) => BindPin::Keep,
+                SecretBindPin::Hosts(hosts) => BindPin::Hosts(hosts),
+            },
+        })
+        .collect()
+}
+
+async fn authorize_run_now_secrets(
+    org: &str,
+    user: &str,
+    id: &str,
+) -> Result<BTreeSet<String>, Response> {
+    let ids = load_bound_secret_ids(org, id).await?;
+    if ids.is_empty() {
+        return Ok(ids);
+    }
+    let allowed = match caller_role(org, user).await {
+        Some(role) => can_use_bound_secrets(&StrictAuthz { role }, org, user, &ids)
+            .await
+            .map_err(strict_unavailable)?,
+        None => false,
+    };
+    match run_now_secret_refusal(allowed) {
+        Some(refusal) => Err(check_secret_refusal_response(&refusal)),
+        None => Ok(ids),
+    }
+}
+
+fn run_now_secret_refusal(allowed: bool) -> Option<CheckSecretRefusal> {
+    (!allowed).then(|| SecretErrorCode::SecretUseDenied.into())
+}
+
+/// A response carrying a raw agent token: never cached, audited by name only.
+fn token_secret_response(
+    operation: &str,
+    secret: openobserve_synthetics::service::AgentTokenSecret,
+) -> Response {
+    let target = audit_target(operation, &secret.name, &secret.name);
+    no_store(audited(MetaHttpResponse::json(secret), target))
+}
+
+/// Check names for the audit target, read before a delete removes them; an unknown id keeps the id.
+async fn check_names(org_id: &str, ids: &[String]) -> String {
+    let mut names = Vec::with_capacity(ids.len());
+    for id in ids {
+        let name = openobserve_synthetics::service::get_synthetic(org_id, id)
+            .await
+            .ok()
+            .flatten()
+            .map_or_else(|| id.clone(), |check| check.name);
+        names.push(name);
+    }
+    names.join(",")
 }
 
 /// Keeps the folders `listable` names; `None` keeps every folder.
@@ -861,6 +1440,20 @@ fn composition_conflict(
         .into_response()
 }
 
+async fn parent_use_conflict(
+    org: &str,
+    user: &str,
+    parents: Vec<infra::table::synthetics_refs::ParentRef>,
+) -> Response {
+    let (references, hidden) = readable_parents(org, user, parents).await;
+    composition_conflict(
+        "parent_use_required",
+        "this check runs inside other checks whose environments or secrets you cannot use",
+        references,
+        hidden,
+    )
+}
+
 /// Maps a composition failure to HTTP, or returns the error back when it is not one.
 async fn composition_error_response(
     org_id: &str,
@@ -881,6 +1474,9 @@ async fn composition_error_response(
             })),
         )
             .into_response(),
+        CE::ParentSecretUseRequired(parents) => {
+            parent_use_conflict(org_id, user_id, parents.clone()).await
+        }
         CE::ReferencedBy(parents) => {
             let (references, hidden) = readable_parents(org_id, user_id, parents.clone()).await;
             composition_conflict(
@@ -939,7 +1535,7 @@ async fn checked_template(
         ("org_id" = String, Path, description = "Organization name"),
         ("folder" = Option<String>, Query, description = "Folder ID to create the synthetic in"),
     ),
-    request_body(content = config::meta::synthetics::Synthetic, description = "Synthetic definition", content_type = "application/json"),
+    request_body(content = SyntheticCreate, description = "Synthetic definition", content_type = "application/json"),
     responses(
         (status = 200, description = "Created", content_type = "application/json", body = config::meta::synthetics::Synthetic),
         (status = 500, description = "Error",   content_type = "application/json", body = Object),
@@ -953,7 +1549,10 @@ pub async fn create_synthetic(
     Path(org_id): Path<String>,
     Query(folder_query): Query<FolderQuery>,
     Headers(user_email): Headers<UserEmail>,
-    Json(body): Json<config::meta::synthetics::Synthetic>,
+    Json(SyntheticCreate {
+        check: mut body,
+        secret_binds,
+    }): Json<SyntheticCreate>,
 ) -> Response {
     // The permission gate for POST /synthetics checks the `?folder=` query
     // param, so the destination folder MUST come from the same place —
@@ -963,43 +1562,44 @@ pub async fn create_synthetic(
     // regular alerts' create_alert (get_folder(query)). Default when absent.
     // (`mut` re-bind here, not in the signature, so the OSS build — where
     // this block is cfg'd out — doesn't warn about an unused `mut`.)
-    let mut body = body;
     body.folder_id = folder_query
         .folder
         .filter(|f| !f.is_empty())
         .unwrap_or_else(|| config::meta::folder::DEFAULT_FOLDER.to_string());
 
-    #[cfg(feature = "enterprise")]
-    if let Err(response) =
-        require_env_access(&org_id, &user_email.user_id, &body.environments).await
-    {
+    if let Err(response) = authorize_check_save(&user_email.user_id, &org_id, None, &body).await {
         return response;
-    }
-
-    #[cfg(feature = "enterprise")]
-    match caller_can_read_children(&org_id, &user_email.user_id, &body, None).await {
-        Ok(None) => {}
-        Ok(Some(child)) => {
-            return MetaHttpResponse::forbidden(format!(
-                "you do not have read access to check {child}"
-            ));
-        }
-        Err(e) => {
-            return MetaHttpResponse::error(
-                StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
-                e.to_string(),
-            )
-            .into_response();
-        }
     }
 
     if let Err(response) = checked_template(&org_id, &mut body).await {
         return response;
     }
     let created_by = user_email.user_id.as_str();
-    match openobserve_synthetics::service::create_synthetic(&org_id, body, created_by).await {
-        Ok(check) => MetaHttpResponse::json(check),
+    let authz = caller_role(&org_id, created_by)
+        .await
+        .map(|role| StrictAuthz { role });
+    let role = authz
+        .as_ref()
+        .map(|authz| authz.role.to_string())
+        .unwrap_or_default();
+    let actor = authz.as_ref().map(|authz| authz.actor(created_by, &role));
+    match openobserve_synthetics::service::create_synthetic_with_binds(
+        &org_id,
+        body,
+        created_by,
+        actor,
+        secret_bind_options(secret_binds),
+    )
+    .await
+    {
+        Ok((check, _bind_request)) => {
+            let target = audit_target("synthetics.check.create", &check.id, &check.name);
+            audited(MetaHttpResponse::json(check), target)
+        }
         Err(e) => {
+            if let Some(resp) = check_save_refusal_response(&e) {
+                return resp;
+            }
             let e = match composition_error_response(&org_id, &user_email.user_id, e).await {
                 Ok(resp) => return resp,
                 Err(e) => e,
@@ -1068,16 +1668,6 @@ pub async fn get_synthetic(
     }
 }
 
-/// The update body: a full check, except that an absent `template` keeps the stored override.
-#[derive(Deserialize)]
-pub struct SyntheticUpdate {
-    #[serde(flatten)]
-    check: config::meta::synthetics::Synthetic,
-    /// Absent keeps the stored override; `null` or "" clears it; a name sets it.
-    #[serde(default, deserialize_with = "double_option")]
-    template: Option<Option<String>>,
-}
-
 /// `#[serde(default)]` alone decodes an explicit `null` to the outer `None`, losing "clear".
 fn double_option<'de, D, T>(de: D) -> Result<Option<Option<T>>, D::Error>
 where
@@ -1085,21 +1675,6 @@ where
     T: Deserialize<'de>,
 {
     Deserialize::deserialize(de).map(Some)
-}
-
-impl SyntheticUpdate {
-    /// The check to save: the sent override, or the stored one when the field is absent.
-    async fn into_check(
-        self,
-        stored: impl std::future::Future<Output = anyhow::Result<Option<String>>>,
-    ) -> anyhow::Result<config::meta::synthetics::Synthetic> {
-        let mut check = self.check;
-        check.template = match self.template {
-            Some(template) => template,
-            None => stored.await?,
-        };
-        Ok(check)
-    }
 }
 
 #[utoipa::path(
@@ -1115,7 +1690,7 @@ impl SyntheticUpdate {
         ("id" = String, Path, description = "Check ID"),
         ("folder" = Option<String>, Query, description = "Current folder ID of the synthetic (for RBAC)"),
     ),
-    request_body(content = config::meta::synthetics::Synthetic, description = "Updated synthetic definition. An absent `template` keeps the stored override; `null` or \"\" clears it.", content_type = "application/json"),
+    request_body(content = SyntheticUpdate, description = "Updated synthetic definition. An absent `template` keeps the stored override; `null` or \"\" clears it.", content_type = "application/json"),
     responses(
         (status = 200, description = "Updated",   content_type = "application/json", body = config::meta::synthetics::Synthetic),
         (status = 403, description = "Forbidden"),
@@ -1129,88 +1704,24 @@ impl SyntheticUpdate {
 )]
 pub async fn update_synthetic(
     Path((org_id, id)): Path<(String, String)>,
-    Query(_folder_query): Query<FolderQuery>,
-    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
-    Json(update): Json<SyntheticUpdate>,
+    Query(folder_query): Query<FolderQuery>,
+    Headers(user_email): Headers<UserEmail>,
+    Json(mut update): Json<SyntheticUpdate>,
 ) -> Response {
     // The stored override is read only after the permission checks pass.
-    #[cfg(feature = "enterprise")]
-    let body = &update.check;
-    #[cfg(feature = "enterprise")]
-    if !check_permissions(
-        &id,
-        &org_id,
-        &user_email.user_id,
-        "synthetics",
-        "PUT",
-        _folder_query.folder.as_deref(),
-        false,
-        true,
-        false,
-    )
-    .await
+    let stored = StoredCheck {
+        id: &id,
+        folder_query: folder_query.folder.as_deref(),
+    };
+    if let Err(response) =
+        authorize_check_save(&user_email.user_id, &org_id, Some(&stored), &update.check).await
     {
-        return MetaHttpResponse::forbidden("Forbidden");
+        return response;
     }
 
-    // An update that changes folder_id is also a move, so the destination needs
-    // its own check — the gate above only covers `?folder=`. Compared against the
-    // stored folder because a plain edit round-trips the current one unchanged.
-    #[cfg(feature = "enterprise")]
-    if !body.folder_id.is_empty() {
-        let current = openobserve_synthetics::service::folder_of(&org_id, &id)
-            .await
-            .ok()
-            .flatten();
-        if current.as_deref() != Some(body.folder_id.as_str())
-            && !check_folder_write_permissions(
-                &org_id,
-                &user_email.user_id,
-                "synthetic_folder",
-                &body.folder_id,
-            )
-            .await
-        {
-            return MetaHttpResponse::forbidden("Forbidden");
-        }
-    }
-
-    #[cfg(feature = "enterprise")]
-    {
-        let stored = match stored_environments(&org_id, &id).await {
-            Ok(stored) => stored,
-            Err(response) => return response,
-        };
-        if let Err(response) =
-            require_update_env_access(&org_id, &user_email.user_id, &body.environments, &stored)
-                .await
-        {
-            return response;
-        }
-    }
-
-    #[cfg(feature = "enterprise")]
-    match caller_can_read_children(&org_id, &user_email.user_id, body, Some(id.as_str())).await {
-        Ok(None) => {}
-        Ok(Some(child)) => {
-            return MetaHttpResponse::forbidden(format!(
-                "you do not have read access to check {child}"
-            ));
-        }
-        Err(e) => {
-            return MetaHttpResponse::error(
-                StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
-                e.to_string(),
-            )
-            .into_response();
-        }
-    }
-
-    #[cfg(feature = "enterprise")]
     let user_id = user_email.user_id.as_str();
-    #[cfg(not(feature = "enterprise"))]
-    let user_id = "";
 
+    let binds = secret_bind_options(std::mem::take(&mut update.secret_binds));
     let mut body = match update
         .into_check(openobserve_synthetics::service::template_of(&org_id, &id))
         .await
@@ -1229,9 +1740,27 @@ pub async fn update_synthetic(
     if let Err(response) = checked_template(&org_id, &mut body).await {
         return response;
     }
-    match openobserve_synthetics::service::update_synthetic(&org_id, &id, body).await {
-        Ok(check) => MetaHttpResponse::json(check),
+    let authz = caller_role(&org_id, user_id)
+        .await
+        .map(|role| StrictAuthz { role });
+    let role = authz
+        .as_ref()
+        .map(|authz| authz.role.to_string())
+        .unwrap_or_default();
+    let actor = authz.as_ref().map(|authz| authz.actor(user_id, &role));
+    match openobserve_synthetics::service::update_synthetic_with_binds(
+        &org_id, &id, body, user_id, actor, binds,
+    )
+    .await
+    {
+        Ok((check, _bind_request)) => {
+            let target = audit_target("synthetics.check.update", &id, &check.name);
+            audited(MetaHttpResponse::json(check), target)
+        }
         Err(e) => {
+            if let Some(resp) = check_save_refusal_response(&e) {
+                return resp;
+            }
             let e = match composition_error_response(&org_id, user_id, e).await {
                 Ok(resp) => return resp,
                 Err(e) => e,
@@ -1298,8 +1827,12 @@ pub async fn delete_synthetic(
     #[cfg(not(feature = "enterprise"))]
     let user_id = "";
 
+    let names = check_names(&org_id, std::slice::from_ref(&id)).await;
     match openobserve_synthetics::service::delete_synthetic(&org_id, &id).await {
-        Ok(true) => MetaHttpResponse::ok("check deleted"),
+        Ok(true) => audited(
+            MetaHttpResponse::ok("check deleted"),
+            audit_target("synthetics.check.delete", &id, &names),
+        ),
         Ok(false) => MetaHttpResponse::not_found("check not found"),
         Err(e) => {
             let e = match composition_error_response(&org_id, user_id, e).await {
@@ -1373,6 +1906,7 @@ pub async fn delete_synthetics_bulk(
     #[cfg(not(feature = "enterprise"))]
     let user_id = "";
 
+    let names = check_names(&org_id, &body.ids).await;
     match openobserve_synthetics::service::delete_synthetics_bulk(
         &org_id,
         &body.ids,
@@ -1380,7 +1914,10 @@ pub async fn delete_synthetics_bulk(
     )
     .await
     {
-        Ok(_) => MetaHttpResponse::ok("checks deleted"),
+        Ok(_) => audited(
+            MetaHttpResponse::ok("checks deleted"),
+            audit_target("synthetics.check.delete", &body.ids.join(","), &names),
+        ),
         Err(e) => {
             let e = match composition_error_response(&org_id, user_id, e).await {
                 Ok(resp) => return resp,
@@ -1458,6 +1995,7 @@ pub async fn move_synthetics(
         return MetaHttpResponse::forbidden("Forbidden");
     }
 
+    let names = check_names(&org_id, &body.synthetic_ids).await;
     match openobserve_synthetics::service::move_synthetics(
         &org_id,
         &body.synthetic_ids,
@@ -1465,7 +2003,14 @@ pub async fn move_synthetics(
     )
     .await
     {
-        Ok(_) => MetaHttpResponse::ok("checks moved"),
+        Ok(_) => audited(
+            MetaHttpResponse::ok("checks moved"),
+            audit_target(
+                "synthetics.check.move",
+                &body.synthetic_ids.join(","),
+                &names,
+            ),
+        ),
         Err(e) => {
             tracing::error!("[synthetics] move_synthetics: {e}");
             MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
@@ -1552,6 +2097,7 @@ pub async fn set_synthetic_enabled(
     ),
     responses(
         (status = 202, description = "Accepted — scheduler will fire within 5 seconds"),
+        (status = 403, description = "Secret use denied"),
         (status = 404, description = "Not found"),
         (status = 500, description = "Error", content_type = "application/json", body = Object),
     ),
@@ -1562,7 +2108,7 @@ pub async fn set_synthetic_enabled(
 )]
 pub async fn run_synthetic_now(
     Path((org_id, id)): Path<(String, String)>,
-    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+    Headers(user_email): Headers<UserEmail>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     if !check_permissions(
@@ -1590,9 +2136,28 @@ pub async fn run_synthetic_now(
             return response;
         }
     }
-    match openobserve_synthetics::service::run_synthetic_now(&org_id, &id).await {
-        Ok(()) => (StatusCode::ACCEPTED, "").into_response(),
+    let authorized = match authorize_run_now_secrets(&org_id, &user_email.user_id, &id).await {
+        Ok(ids) => ids,
+        Err(response) => return response,
+    };
+    match openobserve_synthetics::service::run_synthetic_now_with_secret_ids(
+        &org_id,
+        &id,
+        &authorized,
+    )
+    .await
+    {
+        Ok(()) => {
+            let names = check_names(&org_id, std::slice::from_ref(&id)).await;
+            audited(
+                (StatusCode::ACCEPTED, "").into_response(),
+                audit_target("synthetics.check.run", &id, &names),
+            )
+        }
         Err(e) => {
+            if let Some(refusal) = e.downcast_ref::<CheckSecretRefusal>() {
+                return check_secret_refusal_response(refusal);
+            }
             let msg = e.to_string();
             if msg.contains("not found") {
                 return MetaHttpResponse::not_found(msg);
@@ -1679,7 +2244,7 @@ pub async fn get_referenced_by(
         (status = 500, description = "Error", content_type = "application/json", body = Object),
     ),
     extensions(
-        ("x-o2-mcp" = json!({"enabled": true}))
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 pub async fn job_resolve(
@@ -1687,9 +2252,10 @@ pub async fn job_resolve(
     headers: axum::http::HeaderMap,
     Json(body): Json<serde_json::Value>,
 ) -> Response {
-    if let Err(resp) = authorize_probe(&headers, &org_id).await {
-        return resp;
-    }
+    let caller = match authorize_job_caller(&headers, &org_id).await {
+        Ok(caller) => caller,
+        Err(resp) => return resp,
+    };
     let req = match serde_json::from_value::<openobserve_synthetics::job_api::ResolveRequest>(body)
     {
         Ok(r) => r,
@@ -1698,12 +2264,26 @@ pub async fn job_resolve(
         }
     };
     let req_job_id = req.job_id.clone();
-    match openobserve_synthetics::job_api::resolve(req, &org_id).await {
-        Ok(resp) => MetaHttpResponse::json(resp),
+    let presented = req.lease_token.clone();
+    match openobserve_synthetics::job_api::resolve(req, &caller).await {
+        Ok(mut resp) => match resp.agent_audit.take() {
+            Some(audit) => audited(MetaHttpResponse::json(resp), audit.target()),
+            None => MetaHttpResponse::json(resp),
+        },
         Err(e) => {
             if let Some(cfg_err) = e.downcast_ref::<openobserve_synthetics::job_api::ConfigError>()
             {
-                return settle_config_error(&org_id, &req_job_id, cfg_err).await;
+                return settle_config_error(
+                    &org_id,
+                    &req_job_id,
+                    &caller,
+                    presented.as_ref(),
+                    cfg_err,
+                )
+                .await;
+            }
+            if let Some(response) = as_attempt_error_response(&e) {
+                return response;
             }
             let msg = e.to_string();
             if msg.starts_with("forbidden") {
@@ -1722,10 +2302,13 @@ pub async fn job_resolve(
 async fn settle_config_error(
     org_id: &str,
     job_id: &str,
+    caller: &JobCaller,
+    presented: Option<&PresentedLease>,
     err: &openobserve_synthetics::job_api::ConfigError,
 ) -> Response {
     let ack = openobserve_synthetics::job_api::AckRequest {
         job_id: job_id.to_owned(),
+        lease_token: presented.cloned(),
         claimed_by: None,
         status: "error".to_owned(),
         response_time_ms: 0.0,
@@ -1738,14 +2321,18 @@ async fn settle_config_error(
         steps_defined: 0,
         browser_ms: 0,
     };
-    if let Err(e) = process_ack(ack, org_id).await {
-        tracing::error!(job_id, "[synthetics] job_resolve: config-error ack: {e}");
-        // 5xx so the probe retries the resolve and the settlement runs again.
-        return MetaHttpResponse::error(
-            StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
-            format!("config-error settlement failed: {e}"),
-        )
-        .into_response();
+    match process_ack(ack, caller).await {
+        Ok(outcome) if !outcome.applied => {
+            return attempt_error_response(&AttemptError::Superseded);
+        }
+        Ok(_) => {}
+        Err(e) => {
+            tracing::error!(job_id, "[synthetics] job_resolve: config-error ack: {e}");
+            // 5xx so the probe retries the resolve and the settlement runs again.
+            return MetaHttpResponse::internal_error(format!(
+                "config-error settlement failed: {e}"
+            ));
+        }
     }
     if let Err(e) =
         openobserve_synthetics::job_api::report_config_error_result(org_id, job_id, err).await
@@ -1754,6 +2341,19 @@ async fn settle_config_error(
             job_id,
             "[synthetics] job_resolve: config-error result row: {e}"
         );
+    }
+    // Refusals aimed at the runner itself answer 403 with the store code; the run is settled alike.
+    for code in [
+        SecretErrorCode::AgentTokenRotationRequired,
+        SecretErrorCode::PrivateLocationRefused,
+    ] {
+        if err.status_reason.strip_prefix("secret_error:") == Some(code.as_str()) {
+            return (
+                StatusCode::FORBIDDEN,
+                Json(serde_json::json!({"code": code, "message": err.message})),
+            )
+                .into_response();
+        }
     }
     (
         StatusCode::UNPROCESSABLE_ENTITY,
@@ -1793,9 +2393,10 @@ pub async fn job_lease(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        if let Err(resp) = authorize_probe(&headers, &org_id).await {
-            return resp;
-        }
+        let token_id = match authorize_probe(&headers, &org_id).await {
+            Ok(token_id) => token_id,
+            Err(resp) => return resp,
+        };
         let req = match serde_json::from_value::<
             o2_enterprise::enterprise::synthetics::job_api::LeaseRequest,
         >(body)
@@ -1805,7 +2406,7 @@ pub async fn job_lease(
                 return MetaHttpResponse::bad_request(e.to_string());
             }
         };
-        match o2_enterprise::enterprise::synthetics::job_api::lease(req, &org_id).await {
+        match o2_enterprise::enterprise::synthetics::job_api::lease(req, &org_id, &token_id).await {
             Ok(resp) => MetaHttpResponse::json(resp),
             Err(e) => {
                 let msg = e.to_string();
@@ -1852,9 +2453,10 @@ pub async fn job_ack(
 ) -> Response {
     use openobserve_synthetics::job_api::{AckBatchRequest, AckRequest};
 
-    if let Err(resp) = authorize_probe(&headers, &org_id).await {
-        return resp;
-    }
+    let caller = match authorize_job_caller(&headers, &org_id).await {
+        Ok(caller) => caller,
+        Err(resp) => return resp,
+    };
 
     // Batch of rich acks: {"acks": [{...}, ...]}. Cadence is the sender's
     // choice — browser probe acks per execution (array of one), protocol
@@ -1865,13 +2467,20 @@ pub async fn job_ack(
             Ok(r) => r,
             Err(e) => return MetaHttpResponse::bad_request(e.to_string()),
         };
+        if let JobCaller::Lease(principal) = &caller
+            && req.acks.iter().any(|ack| ack.job_id != principal.job_id)
+        {
+            return MetaHttpResponse::error(StatusCode::UNAUTHORIZED, AttemptError::OtherJob)
+                .into_response();
+        }
         let mut results = Vec::with_capacity(req.acks.len());
         // One send for the WHOLE batch: `report_usage` spawns a task per call.
         let mut usage = Vec::new();
         for ack in req.acks {
             let job_id = ack.job_id.clone();
-            match process_ack(ack, &org_id).await {
-                Ok(mut resp) => {
+            match process_ack(ack, &caller).await {
+                Ok(outcome) => {
+                    let mut resp = outcome.response;
                     usage.append(&mut resp.usage_events);
                     results.push(serde_json::json!({
                         "job_id": job_id,
@@ -1880,6 +2489,12 @@ pub async fn job_ack(
                     }));
                 }
                 Err(e) => {
+                    if matches!(caller, JobCaller::Lease(_))
+                        && let Some(response) = as_attempt_error_response(&e)
+                    {
+                        report_step_usage(usage);
+                        return response;
+                    }
                     // No response, so no events: `ack_complete` is what
                     // authorises a bill (spec §4.1 step 3c).
                     tracing::error!(job_id = %job_id, "[synthetics] job_ack: {e}");
@@ -1901,12 +2516,16 @@ pub async fn job_ack(
             return MetaHttpResponse::bad_request(e.to_string());
         }
     };
-    match process_ack(req, &org_id).await {
-        Ok(mut resp) => {
+    match process_ack(req, &caller).await {
+        Ok(outcome) => {
+            let mut resp = outcome.response;
             report_step_usage(std::mem::take(&mut resp.usage_events));
             MetaHttpResponse::json(resp)
         }
         Err(e) => {
+            if let Some(response) = as_attempt_error_response(&e) {
+                return response;
+            }
             let msg = e.to_string();
             if msg.starts_with("forbidden") {
                 return MetaHttpResponse::forbidden(msg);
@@ -1914,6 +2533,44 @@ pub async fn job_ack(
             tracing::error!("[synthetics] job_ack: {e}");
             MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), msg).into_response()
         }
+    }
+}
+
+fn as_attempt_error_response(e: &anyhow::Error) -> Option<Response> {
+    e.downcast_ref::<AttemptError>().map(attempt_error_response)
+}
+
+fn attempt_error_response(error: &AttemptError) -> Response {
+    match error {
+        AttemptError::NotFound => MetaHttpResponse::not_found(error),
+        AttemptError::WrongOrg | AttemptError::KeyOutsideAttempt => {
+            MetaHttpResponse::forbidden(error)
+        }
+        AttemptError::Unavailable => MetaHttpResponse::internal_error(error),
+        AttemptError::OtherJob => {
+            MetaHttpResponse::error(StatusCode::UNAUTHORIZED, error).into_response()
+        }
+        AttemptError::Superseded => (
+            StatusCode::CONFLICT,
+            Json(serde_json::json!({"code": "lease_superseded"})),
+        )
+            .into_response(),
+        AttemptError::LeaseRequired => (
+            StatusCode::FORBIDDEN,
+            Json(serde_json::json!({"code": "lease_required"})),
+        )
+            .into_response(),
+        AttemptError::CaptureOff => (
+            StatusCode::CONFLICT,
+            Json(serde_json::json!({"code": "capture_off_for_secret_bearing"})),
+        )
+            .into_response(),
+        AttemptError::ProbeUpgradeRequired => (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({"code": SecretErrorCode::ProbeUpgradeRequired})),
+        )
+            .into_response(),
+        AttemptError::BadRequest(message) => MetaHttpResponse::bad_request(message),
     }
 }
 
@@ -1977,9 +2634,10 @@ fn record_step_usage_metrics(usage: &[config::meta::self_reporting::usage::Usage
 /// Runs one job ack through the enterprise service plus the per-ack side effects
 /// (telemetry, run-complete notification). Shared by both forms of `job_ack`.
 async fn process_ack(
-    req: openobserve_synthetics::job_api::AckRequest,
-    token_org: &str,
-) -> anyhow::Result<openobserve_synthetics::job_api::AckResponse> {
+    mut req: openobserve_synthetics::job_api::AckRequest,
+    caller: &JobCaller,
+) -> anyhow::Result<openobserve_synthetics::job_api::AckOutcome> {
+    openobserve_synthetics::job_api::redact_ack_error(&mut req, caller.org()).await;
     let status = req.status.clone();
     let response_time_ms = req.response_time_ms;
     let error = req.error.clone();
@@ -1987,7 +2645,8 @@ async fn process_ack(
     let error_source = req.error_source.clone();
     let checked_at = config::utils::time::now_micros();
 
-    let resp = openobserve_synthetics::job_api::ack(req, token_org).await?;
+    let outcome = openobserve_synthetics::job_api::ack_attempt(req, caller).await?;
+    let resp = &outcome.response;
 
     // Emit trigger usage record for synthetics telemetry.
     usage_reporting::publish_triggers_usage(config::meta::self_reporting::usage::TriggerData {
@@ -2029,7 +2688,7 @@ async fn process_ack(
     #[cfg(feature = "enterprise")]
     if should_notify && !resp.destinations.is_empty() {
         let notification = openobserve_core::synthetics::CheckNotification::from_ack(
-            &resp,
+            resp,
             &status,
             error.clone(),
             error_source.clone(),
@@ -2041,12 +2700,12 @@ async fn process_ack(
     }
     // The gap notices are about our side, so they go out whatever the run's own alert decided.
     #[cfg(feature = "enterprise")]
-    if let Some(gap) = openobserve_core::synthetics::GapNotification::from_ack(&resp) {
+    if let Some(gap) = openobserve_core::synthetics::GapNotification::from_ack(resp) {
         tokio::spawn(async move {
             openobserve_core::synthetics::notify_gap(gap).await;
         });
     }
-    Ok(resp)
+    Ok(outcome)
 }
 
 // ── Agent liveness API (probe-facing, authenticated via o2syn_ token) ────────
@@ -2054,7 +2713,8 @@ async fn process_ack(
 /// Resolves the org owning the `o2syn_` token in a Basic Authorization header.
 /// The auth middleware has already validated the token; this recovers the org
 /// for scoping, which the middleware does not propagate on probe paths.
-async fn probe_token_org(headers: &axum::http::HeaderMap) -> Option<String> {
+/// `(org_id, token id)` of the `o2syn_` token in a Basic Authorization header.
+async fn probe_token_record(headers: &axum::http::HeaderMap) -> Option<(String, String)> {
     let auth = headers
         .get(axum::http::header::AUTHORIZATION)?
         .to_str()
@@ -2065,37 +2725,23 @@ async fn probe_token_org(headers: &axum::http::HeaderMap) -> Option<String> {
         .await
         .ok()
         .flatten()
-        .map(|t| t.org_id)
-}
-
-/// Resolves the id of the `o2syn_` token in a Basic Authorization header — used
-/// at register to stamp `synthetics_agents.token_id` ("N agents on this token").
-#[cfg(feature = "enterprise")]
-async fn probe_token_id(headers: &axum::http::HeaderMap) -> Option<String> {
-    let auth = headers
-        .get(axum::http::header::AUTHORIZATION)?
-        .to_str()
-        .ok()?;
-    let decoded = config::utils::base64::decode(auth.strip_prefix("Basic ")?).ok()?;
-    let token = decoded.split_once(':')?.1;
-    infra::table::synthetics_probe_tokens::find_global(token)
-        .await
-        .ok()
-        .flatten()
-        .map(|t| t.id)
+        .map(|t| (t.org_id, t.id))
 }
 
 /// Authorizes a probe request against the `{org_id}` in the path: the Basic
-/// `o2syn_` token must exist and belong to that org. Returns Ok(()) when the
+/// `o2syn_` token must exist and belong to that org. Returns the token's id when the
 /// token org matches, Err(response) otherwise — this is the tenant boundary for
 /// every probe-facing route (the org in the URL, the token's org, and the
 /// job's org must all agree; the service layer enforces the last leg).
-async fn authorize_probe(headers: &axum::http::HeaderMap, org_id: &str) -> Result<(), Response> {
-    match probe_token_org(headers).await {
-        Some(token_org) if token_org == org_id => {
+async fn authorize_probe(
+    headers: &axum::http::HeaderMap,
+    org_id: &str,
+) -> Result<String, Response> {
+    match probe_token_record(headers).await {
+        Some((token_org, token_id)) if token_org == org_id => {
             match crate::request::alerts::external_events::inactive_org_response(&token_org).await {
                 Some(refusal) => Err(refusal),
-                None => Ok(()),
+                None => Ok(token_id),
             }
         }
         Some(_) => Err(MetaHttpResponse::forbidden(
@@ -2103,6 +2749,38 @@ async fn authorize_probe(headers: &axum::http::HeaderMap, org_id: &str) -> Resul
         )),
         None => Err(MetaHttpResponse::unauthorized("invalid probe token")),
     }
+}
+
+async fn authorize_job_caller(
+    headers: &axum::http::HeaderMap,
+    org_id: &str,
+) -> Result<JobCaller, Response> {
+    let lease_token = headers
+        .get(axum::http::header::AUTHORIZATION)
+        .and_then(|header| header.to_str().ok())
+        .and_then(config::utils::base64::basic_password)
+        .filter(|token| token.starts_with(LEASE_TOKEN_PREFIX));
+    if let Some(token) = lease_token {
+        let lease = authenticate_lease(org_id, &token)
+            .await
+            .ok_or_else(|| MetaHttpResponse::unauthorized("invalid lease token"))?;
+        if let Some(refusal) =
+            crate::request::alerts::external_events::inactive_org_response(&lease.org).await
+        {
+            return Err(refusal);
+        }
+        return Ok(JobCaller::Lease(LeasePrincipal {
+            org: lease.org,
+            job_id: lease.job_id,
+            attempt: lease.attempt,
+            lease_sha256: lease.lease_sha256,
+        }));
+    }
+    let token_id = authorize_probe(headers, org_id).await?;
+    Ok(JobCaller::Probe {
+        org: org_id.to_owned(),
+        token_id: Some(token_id),
+    })
 }
 
 #[utoipa::path(
@@ -2116,6 +2794,7 @@ async fn authorize_probe(headers: &axum::http::HeaderMap, org_id: &str) -> Resul
     request_body(content = Object, description = r#"{"name": "dc1-agent-01", "location_id": "...", "version": "1.2.0", "capabilities": {"types": ["http"], "icmp": false}}"#, content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 403, description = "Location not registrable with this token"),
         (status = 404, description = "Location not found"),
         (status = 500, description = "Error", content_type = "application/json", body = Object),
     ),
@@ -2127,9 +2806,10 @@ pub async fn agent_register(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        if let Err(resp) = authorize_probe(&headers, &org_id).await {
-            return resp;
-        }
+        let token_id = match authorize_probe(&headers, &org_id).await {
+            Ok(token_id) => Some(token_id),
+            Err(resp) => return resp,
+        };
         let req = match serde_json::from_value::<
             o2_enterprise::enterprise::synthetics::agent::RegisterRequest,
         >(body)
@@ -2137,11 +2817,14 @@ pub async fn agent_register(
             Ok(r) => r,
             Err(e) => return MetaHttpResponse::bad_request(e.to_string()),
         };
-        let token_id = probe_token_id(&headers).await;
         match o2_enterprise::enterprise::synthetics::agent::register(req, &org_id, token_id).await {
             Ok(resp) => MetaHttpResponse::json(resp),
             Err(e) => {
                 let msg = e.to_string();
+                // A refusal may name a location, so it must not fall into the 404 match.
+                if msg.starts_with("forbidden") {
+                    return MetaHttpResponse::forbidden(msg);
+                }
                 if msg.contains("not found") || msg.contains("disabled") {
                     return MetaHttpResponse::not_found(msg);
                 }
@@ -2289,10 +2972,9 @@ pub async fn create_location(
     match create_location(&org_id, is_root, req).await {
         Ok(mut loc) => {
             if !can_deploy_agents(&org_id, &user_email.user_id).await {
-                loc.token = None;
                 loc.install = None;
             }
-            MetaHttpResponse::json(loc)
+            tokenless_json(loc)
         }
         Err(e) => location_error_response(e),
     }
@@ -2320,7 +3002,7 @@ pub async fn agent_setup(Path(org_id): Path<String>) -> Response {
     #[cfg(feature = "enterprise")]
     {
         match o2_enterprise::enterprise::synthetics::service::agent_setup(&org_id).await {
-            Ok(resp) => MetaHttpResponse::json(resp),
+            Ok(resp) => tokenless_json(resp),
             Err(e) => {
                 tracing::error!("[synthetics] agent_setup: {e}");
                 MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
@@ -2356,11 +3038,7 @@ pub struct SetAgentTokenEnabledRequest {
     pub enabled: bool,
 }
 
-// RBAC for these routes is enforced by the OpenFGA route-permission middleware
-// (`o2_openfga/.../route_permissions.rs`): all three gate on `synthetic_folder`
-// WRITE (PUT), the same resource as `agent-setup`. No inline role check here —
-// that keeps the whole synthetics management surface consistent (a view-only
-// user is rejected before the handler runs).
+// Each token handler also requires a strict org admin (`require_org_admin`), above the route check.
 
 #[utoipa::path(
     get,
@@ -2368,11 +3046,11 @@ pub struct SetAgentTokenEnabledRequest {
     context_path = "/api",
     tag = "Synthetics",
     operation_id = "ListSyntheticsAgentTokens",
-    summary = "List the org's private-agent (o2syn_) tokens (values masked)",
+    summary = "List the org's private-agent (o2syn_) tokens: values masked, each with `pre_cutover`",
     security(("Authorization" = [])),
     params(("org_id" = String, Path, description = "Organization name")),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "`{tokens: [..]}`, token masked as `o2syn_••••••••`", content_type = "application/json", body = Object),
         (status = 403, description = "Admin or Root role required"),
     ),
     extensions(
@@ -2380,7 +3058,13 @@ pub struct SetAgentTokenEnabledRequest {
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
-pub async fn list_agent_tokens(Path(org_id): Path<String>) -> Response {
+pub async fn list_agent_tokens(
+    Path(org_id): Path<String>,
+    Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    if let Err(resp) = require_org_admin(&org_id, &user_email.user_id).await {
+        return resp;
+    }
     match openobserve_synthetics::service::list_agent_tokens(&org_id).await {
         Ok(tokens) => MetaHttpResponse::json(serde_json::json!({ "tokens": tokens })),
         Err(e) => {
@@ -2416,6 +3100,9 @@ pub async fn create_agent_token(
     Headers(user_email): Headers<UserEmail>,
     Json(body): Json<CreateAgentTokenRequest>,
 ) -> Response {
+    if let Err(resp) = require_org_admin(&org_id, &user_email.user_id).await {
+        return resp;
+    }
     match openobserve_synthetics::service::create_agent_token(
         &org_id,
         &body.name,
@@ -2423,7 +3110,7 @@ pub async fn create_agent_token(
     )
     .await
     {
-        Ok(secret) => MetaHttpResponse::json(secret),
+        Ok(secret) => token_secret_response("synthetics.agent_token.create", secret),
         Err(e) => {
             let msg = e.to_string();
             if msg.contains("already exists")
@@ -2463,6 +3150,9 @@ pub async fn rotate_agent_token(
     Headers(user_email): Headers<UserEmail>,
     Json(body): Json<RotateAgentTokenRequest>,
 ) -> Response {
+    if let Err(resp) = require_org_admin(&org_id, &user_email.user_id).await {
+        return resp;
+    }
     match openobserve_synthetics::service::rotate_agent_token(
         &org_id,
         body.name,
@@ -2470,7 +3160,7 @@ pub async fn rotate_agent_token(
     )
     .await
     {
-        Ok(secret) => MetaHttpResponse::json(secret),
+        Ok(secret) => token_secret_response("synthetics.agent_token.rotate", secret),
         Err(e) => {
             let msg = e.to_string();
             if msg.contains("already exists") {
@@ -2508,16 +3198,23 @@ pub async fn rotate_agent_token(
 )]
 pub async fn set_agent_token_enabled(
     Path((org_id, name)): Path<(String, String)>,
+    Headers(user_email): Headers<UserEmail>,
     Json(body): Json<SetAgentTokenEnabledRequest>,
 ) -> Response {
+    if let Err(resp) = require_org_admin(&org_id, &user_email.user_id).await {
+        return resp;
+    }
     match openobserve_synthetics::service::set_agent_token_enabled(&org_id, &name, body.enabled)
         .await
     {
         Ok(()) => {
             let state = if body.enabled { "enabled" } else { "disabled" };
-            MetaHttpResponse::json(serde_json::json!({
-                "message": format!("Token {state} successfully")
-            }))
+            audited(
+                MetaHttpResponse::json(serde_json::json!({
+                    "message": format!("Token {state} successfully")
+                })),
+                audit_target(&format!("synthetics.agent_token.{state}"), &name, &name),
+            )
         }
         Err(e) => {
             let msg = e.to_string();
@@ -2526,6 +3223,49 @@ pub async fn set_agent_token_enabled(
             } else {
                 MetaHttpResponse::bad_request(msg)
             }
+        }
+    }
+}
+
+#[utoipa::path(
+    post,
+    path = "/{org_id}/synthetics/agent-tokens/{name}/view",
+    context_path = "/api",
+    tag = "Synthetics",
+    operation_id = "ViewSyntheticsAgentToken",
+    summary = "Reveal a named agent token (org admins only)",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("name" = String, Path, description = "Token name"),
+    ),
+    responses(
+        (status = 200, description = "The token; sent with Cache-Control: no-store", content_type = "application/json", body = openobserve_synthetics::service::AgentTokenSecret),
+        (status = 403, description = "Admin or Root role required"),
+        (status = 404, description = "Token not found"),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Synthetics", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+pub async fn view_agent_token(
+    Path((org_id, name)): Path<(String, String)>,
+    Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    if let Err(resp) = require_org_admin(&org_id, &user_email.user_id).await {
+        return resp;
+    }
+    match openobserve_synthetics::service::view_agent_token(&org_id, &name).await {
+        Ok(Some(secret)) => token_secret_response("synthetics.agent_token.view", secret),
+        Ok(None) => MetaHttpResponse::not_found("agent token not found"),
+        Err(e) => {
+            tracing::error!("[synthetics] view_agent_token {org_id}/{name}: {e}");
+            MetaHttpResponse::error(
+                StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
+                "failed to read agent token",
+            )
+            .into_response()
         }
     }
 }
@@ -2560,7 +3300,7 @@ pub async fn get_location(
             if !can_deploy_agents(&org_id, &user_email.user_id).await {
                 detail.install = None;
             }
-            MetaHttpResponse::json(detail)
+            tokenless_json(detail)
         }
         Err(e) => {
             let msg = e.to_string();
@@ -2681,7 +3421,7 @@ pub async fn list_locations(
     #[cfg(not(feature = "enterprise"))]
     let listable = None;
     match openobserve_synthetics::service::list_locations_for_org(&org_id, listable).await {
-        Ok(capabilities) => MetaHttpResponse::json(capabilities),
+        Ok(capabilities) => tokenless_json(capabilities),
         Err(e) => {
             tracing::error!("[synthetics] list_locations: {e}");
             MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
@@ -2702,6 +3442,34 @@ mod tests {
         ReferencedByQuery, admit_listable, composition_error_response, lacks_listable_default,
         retain_listable, stamp_undefined_placeholders,
     };
+
+    #[test]
+    fn redacted_writes_name_their_operation_and_object_for_the_audit_layer() {
+        assert_eq!(
+            super::audit_target("synthetics.check.update", "c1", "login-check"),
+            "synthetics.check.update login-check (c1)"
+        );
+        let res = super::audited(
+            common::meta::http::HttpResponse::ok("check deleted"),
+            super::audit_target("synthetics.check.delete", "c1", "login-check"),
+        );
+        assert!(res.status().is_success());
+        #[cfg(feature = "enterprise")]
+        assert_eq!(
+            res.extensions()
+                .get::<o2_enterprise::enterprise::common::auditor::AuditTarget>()
+                .map(|t| (t.fleet_id.clone(), t.target.clone())),
+            Some((None, "synthetics.check.delete login-check (c1)".to_string()))
+        );
+    }
+
+    #[tokio::test]
+    async fn an_unknown_check_keeps_its_id_as_its_audit_name() {
+        assert_eq!(
+            super::check_names("no-such-org", &["c1".to_string(), "c2".to_string()]).await,
+            "c1,c2"
+        );
+    }
 
     /// An update body as a client sends it; `template` is left out when `None`.
     fn update_body(template: Option<serde_json::Value>) -> super::SyntheticUpdate {
@@ -2851,6 +3619,38 @@ mod tests {
         assert_eq!(
             openobserve_core::synthetics::check_event(false, false, false),
             NotificationEvent::Firing
+        );
+    }
+
+    #[tokio::test]
+    async fn attempt_errors_return_the_expected_http_status_and_code() {
+        use openobserve_synthetics::job_api::AttemptError;
+        use serde_json::json;
+
+        for (error, status, code) in [
+            (AttemptError::NotFound, 404, json!(404)),
+            (AttemptError::WrongOrg, 403, json!(403)),
+            (AttemptError::KeyOutsideAttempt, 403, json!(403)),
+            (AttemptError::Unavailable, 500, json!(500)),
+            (AttemptError::OtherJob, 401, json!(401)),
+            (AttemptError::Superseded, 409, json!("lease_superseded")),
+            (AttemptError::LeaseRequired, 403, json!("lease_required")),
+            (
+                AttemptError::BadRequest("bad field".into()),
+                400,
+                json!(400),
+            ),
+        ] {
+            let response = super::as_attempt_error_response(&anyhow::Error::new(error)).unwrap();
+            assert_eq!(response.status().as_u16(), status);
+            let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+                .await
+                .unwrap();
+            let body: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+            assert_eq!(body["code"], code);
+        }
+        assert!(
+            super::as_attempt_error_response(&anyhow::anyhow!("database unavailable")).is_none()
         );
     }
 
@@ -3163,5 +3963,298 @@ mod tests {
             references[1]["undefined_placeholders"],
             serde_json::json!(["PROMO_CODE"])
         );
+    }
+
+    #[test]
+    fn a_revealed_token_is_never_cached_and_its_audit_target_names_only_the_name() {
+        let secret = openobserve_synthetics::service::AgentTokenSecret {
+            name: "eu-west".into(),
+            token: format!("o2syn_{}", "ab".repeat(4)),
+        };
+        let resp = super::token_secret_response("synthetics.agent_token.view", secret);
+        assert_eq!(
+            resp.headers()
+                .get(axum::http::header::CACHE_CONTROL)
+                .unwrap(),
+            "no-store"
+        );
+        let target = super::audit_target("synthetics.agent_token.view", "eu-west", "eu-west");
+        assert_eq!(target, "synthetics.agent_token.view eu-west (eu-west)");
+        assert!(!target.contains("o2syn_"));
+    }
+
+    #[test]
+    fn only_admin_and_root_reach_the_strict_check() {
+        use config::meta::user::UserRole;
+        assert!(super::admin_role(&UserRole::Admin));
+        assert!(super::admin_role(&UserRole::Root));
+        for role in [
+            UserRole::Editor,
+            UserRole::Viewer,
+            UserRole::User,
+            UserRole::ServiceAccount,
+            UserRole::SreAgent,
+        ] {
+            assert!(!super::admin_role(&role), "{role:?}");
+        }
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn oss_agent_token_gate_allows_only_path_org_admins() {
+        use common::infra::config::{ORG_USERS, USERS};
+        use config::meta::user::{UserRole, UserType};
+
+        let email = "agent-token-admin@org-gate.test";
+        USERS.insert(
+            email.to_string(),
+            infra::table::users::UserRecord {
+                email: email.to_string(),
+                first_name: String::new(),
+                last_name: String::new(),
+                password: String::new(),
+                salt: String::new(),
+                is_root: false,
+                password_ext: None,
+                user_type: UserType::Internal,
+                created_at: 0,
+                updated_at: 0,
+                must_reset_password: false,
+                password_reset_reason: None,
+                flagged_at: None,
+                password_updated_at: None,
+            },
+        );
+        for (org_id, role) in [
+            ("agent-token-admin-org", UserRole::Admin),
+            ("agent-token-member-org", UserRole::Editor),
+        ] {
+            ORG_USERS.insert(
+                format!("{org_id}/{email}"),
+                infra::table::org_users::OrgUserRecord {
+                    email: email.to_string(),
+                    org_id: org_id.to_string(),
+                    role,
+                    token: String::new(),
+                    rum_token: None,
+                    created_at: 0,
+                    allow_static_token: false,
+                },
+            );
+        }
+        let root_email = "agent-token-root@org-gate.test";
+        ORG_USERS.insert(
+            format!("{}/{root_email}", config::DEFAULT_ORG),
+            infra::table::org_users::OrgUserRecord {
+                email: root_email.to_string(),
+                org_id: config::DEFAULT_ORG.to_string(),
+                role: UserRole::Root,
+                token: String::new(),
+                rum_token: None,
+                created_at: 0,
+                allow_static_token: false,
+            },
+        );
+
+        assert!(
+            super::require_org_admin("agent-token-admin-org", email)
+                .await
+                .is_ok()
+        );
+        assert!(
+            super::require_org_admin("agent-token-admin-org", root_email)
+                .await
+                .is_ok()
+        );
+        let denied = super::require_org_admin("agent-token-member-org", email)
+            .await
+            .unwrap_err();
+        assert_eq!(denied.status(), axum::http::StatusCode::FORBIDDEN);
+
+        USERS.remove(email);
+        ORG_USERS.remove(&format!("agent-token-admin-org/{email}"));
+        ORG_USERS.remove(&format!("agent-token-member-org/{email}"));
+        ORG_USERS.remove(&format!("{}/{root_email}", config::DEFAULT_ORG));
+    }
+
+    /// Allows only the listed `"{verb} {object}"` pairs; `fail` makes every check unavailable.
+    struct ObjectAuthz {
+        allowed: Vec<String>,
+        fail: bool,
+        calls: std::sync::Mutex<Vec<String>>,
+    }
+
+    #[async_trait::async_trait]
+    impl config::meta::secret_store::SecretStoreAuthz for ObjectAuthz {
+        async fn check_strict(
+            &self,
+            _: &str,
+            _: &str,
+            _: &str,
+            object: &str,
+            verb: &str,
+        ) -> Result<config::meta::secret_store::Decision, config::meta::secret_store::SecretErrorCode>
+        {
+            use config::meta::secret_store::{Decision, SecretErrorCode};
+            self.calls.lock().unwrap().push(format!("{verb} {object}"));
+            if self.fail {
+                return Err(SecretErrorCode::PermissionsUnavailable);
+            }
+            Ok(
+                if self
+                    .allowed
+                    .iter()
+                    .any(|o| *o == format!("{verb} {object}"))
+                {
+                    Decision::Allow
+                } else {
+                    Decision::Deny
+                },
+            )
+        }
+
+        async fn list_objects(
+            &self,
+            _: &str,
+            _: &str,
+            _: &str,
+            _: &str,
+            _: &str,
+        ) -> Result<Vec<String>, config::meta::secret_store::SecretErrorCode> {
+            Ok(Vec::new())
+        }
+    }
+
+    fn parent_scope(id: &str, environments: &[&str]) -> super::ParentScope {
+        super::ParentScope {
+            parent: infra::table::synthetics_refs::ParentRef {
+                id: id.into(),
+                name: format!("{id}-name"),
+                folder_id: "default".into(),
+            },
+            environments: environments.iter().map(|e| (*e).to_string()).collect(),
+            secret_ids: Default::default(),
+        }
+    }
+
+    #[tokio::test]
+    async fn s02_a_child_editor_needs_strict_use_of_parent_secrets() {
+        let authz = ObjectAuthz {
+            allowed: vec!["GET secrets:allowed".into()],
+            fail: false,
+            calls: Default::default(),
+        };
+        let mut allowed = parent_scope("allowed-parent", &[]);
+        allowed.secret_ids.insert("allowed".into());
+        let mut denied = parent_scope("denied-parent", &[]);
+        denied.secret_ids.insert("denied".into());
+        let lacking = super::parents_lacking_use(&authz, "org", "editor", &[allowed, denied])
+            .await
+            .unwrap();
+        assert_eq!(
+            lacking.iter().map(|p| p.id.as_str()).collect::<Vec<_>>(),
+            ["denied-parent"]
+        );
+        assert_eq!(
+            *authz.calls.lock().unwrap(),
+            ["GET secrets:allowed", "GET secrets:denied"]
+        );
+    }
+
+    #[test]
+    fn run_now_refuses_a_caller_without_secret_use() {
+        let refusal = super::run_now_secret_refusal(false).unwrap();
+        assert_eq!(
+            refusal.code,
+            config::meta::secret_store::SecretErrorCode::SecretUseDenied
+        );
+        assert_eq!(
+            super::check_secret_refusal_response(&refusal).status(),
+            axum::http::StatusCode::FORBIDDEN
+        );
+        assert!(super::run_now_secret_refusal(true).is_none());
+    }
+
+    #[tokio::test]
+    async fn s02_a_child_editor_needs_use_of_every_parent_environment() {
+        use openobserve_synthetics::service::variables::environment_object;
+        let authz = ObjectAuthz {
+            allowed: vec![format!("PUT {}", environment_object("staging"))],
+            fail: false,
+            calls: Default::default(),
+        };
+        let scopes = [
+            parent_scope("p1", &["staging"]),
+            parent_scope("p2", &["staging", "prod"]),
+            parent_scope("p3", &[]),
+            parent_scope("p4", &["prod", "staging"]),
+        ];
+        let lacking = super::parents_lacking_use(&authz, "o1", "u1", &scopes)
+            .await
+            .unwrap();
+        let ids: Vec<_> = lacking.iter().map(|p| p.id.as_str()).collect();
+        assert_eq!(ids, ["p2", "p4"]);
+        // The first refused environment settles a parent; its later ones are not asked.
+        let calls = authz.calls.lock().unwrap().clone();
+        assert_eq!(calls.len(), 4, "{calls:?}");
+        assert!(calls.iter().all(|c| c.starts_with("PUT ")), "{calls:?}");
+    }
+
+    #[tokio::test]
+    async fn s02_an_unavailable_authorizer_stops_the_child_save() {
+        let authz = ObjectAuthz {
+            allowed: vec![],
+            fail: true,
+            calls: Default::default(),
+        };
+        let err = super::parents_lacking_use(&authz, "o1", "u1", &[parent_scope("p1", &["prod"])])
+            .await
+            .unwrap_err();
+        assert_eq!(
+            err,
+            config::meta::secret_store::SecretErrorCode::PermissionsUnavailable
+        );
+        let none = super::parents_lacking_use(&authz, "o1", "u1", &[parent_scope("p1", &[])])
+            .await
+            .unwrap();
+        assert!(none.is_empty());
+    }
+
+    #[test]
+    fn location_responses_carry_no_agent_token() {
+        let token = format!("o2syn_{}", "ab".repeat(4));
+        let mut value = serde_json::json!({
+            "location": { "id": "l1", "label": "dc-1" },
+            "token": token,
+            "install": format!("docker run -e O2_TOKEN={token} -e X=1 o2/agent"),
+            "results": [{ "token": "o2syn_zz", "note": "key o2syn_zz." }],
+        });
+        super::strip_agent_tokens(&mut value);
+        let text = value.to_string();
+        assert!(!text.contains("o2syn_"), "{text}");
+        assert!(value.get("token").is_none());
+        assert_eq!(
+            value["install"],
+            "docker run -e O2_TOKEN=<o2syn-token> -e X=1 o2/agent"
+        );
+        assert_eq!(value["results"][0]["note"], "key <o2syn-token>.");
+    }
+
+    #[test]
+    fn a_slot_refusal_keeps_its_status_and_names_only_the_field() {
+        use config::meta::secret_store::SecretErrorCode;
+        let refusal = openobserve_synthetics::service::SlotRefusal {
+            code: SecretErrorCode::SlotValueRequiredOnHostChange,
+            field: "auth/password".into(),
+        };
+        let resp = super::slot_refusal_response(&anyhow::Error::new(refusal)).unwrap();
+        assert_eq!(resp.status(), axum::http::StatusCode::CONFLICT);
+        assert!(super::slot_refusal_response(&anyhow::anyhow!("other")).is_none());
+    }
+
+    #[test]
+    fn secret_bearing_artifacts_are_a_conflict() {
+        let resp = super::attempt_error_response(&super::AttemptError::CaptureOff);
+        assert_eq!(resp.status(), axum::http::StatusCode::CONFLICT);
     }
 }

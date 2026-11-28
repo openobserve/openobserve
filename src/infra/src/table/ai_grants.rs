@@ -70,7 +70,7 @@ pub async fn insert_with<C: ConnectionTrait>(
         return Ok(existing);
     }
     let model = Model {
-        id: config::ider::uuid(),
+        id: config::ider::ksuid(),
         org_id: fit(grant.org_id, 256),
         user_email: fit(grant.user_email, 256),
         tool: fit(grant.tool, 256),

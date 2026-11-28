@@ -23,7 +23,7 @@ use db::alerts::{destinations::DestinationError, templates::TemplateError};
 use infra::errors;
 
 use crate::{
-    alerts::alert::AlertError,
+    alerts::{alert::AlertError, destinations::SecretRefusal},
     common::meta::http::{ERROR_HEADER, HttpResponse as MetaHttpResponse},
     dashboards::{DashboardError, reports::ReportError},
     pipeline::db::PipelineError,
@@ -35,6 +35,9 @@ use crate::{
 };
 
 pub fn map_error_to_http_response(err: &errors::Error, trace_id: Option<String>) -> Response {
+    if let Some(refused) = store_refusal_response(err) {
+        return refused;
+    }
     // the status code mapping lives on `infra::errors::Error` so that other
     // consumers (e.g. audit logging) stay consistent with the HTTP responses
     let status =
@@ -85,7 +88,9 @@ pub fn error_code_event(
 impl From<AlertError> for Response {
     fn from(value: AlertError) -> Self {
         match &value {
-            AlertError::InfraError(err) => MetaHttpResponse::internal_error(err),
+            AlertError::InfraError(err) => {
+                store_refusal_response(err).unwrap_or_else(|| MetaHttpResponse::internal_error(err))
+            }
             AlertError::CreateDefaultFolderError => MetaHttpResponse::internal_error(value),
             AlertError::AlertNameMissing
             | AlertError::AlertNameOfgaUnsupported
@@ -183,7 +188,9 @@ impl From<AlertError> for Response {
 pub fn destination_error_response(value: DestinationError) -> Response {
     match &value {
         DestinationError::InUse(_) => MetaHttpResponse::conflict(value),
-        DestinationError::InfraError(err) => MetaHttpResponse::internal_error(err),
+        DestinationError::InfraError(err) => {
+            store_refusal_response(err).unwrap_or_else(|| MetaHttpResponse::internal_error(err))
+        }
         DestinationError::NotFound => MetaHttpResponse::not_found(value),
         DestinationError::SlackAppNeedsEnterprise => MetaHttpResponse::forbidden(value),
         DestinationError::SlackApp(refusal) => {
@@ -198,9 +205,8 @@ pub fn destination_error_response(value: DestinationError) -> Response {
 
 pub fn template_error_response(value: TemplateError) -> Response {
     match value {
-        TemplateError::InfraError(err) => {
-            MetaHttpResponse::internal_error(TemplateError::InfraError(err))
-        }
+        TemplateError::InfraError(err) => store_refusal_response(&err)
+            .unwrap_or_else(|| MetaHttpResponse::internal_error(TemplateError::InfraError(err))),
         TemplateError::NotFound => MetaHttpResponse::not_found(TemplateError::NotFound),
         TemplateError::DeleteWithDestination(destination) => {
             MetaHttpResponse::conflict(TemplateError::DeleteWithDestination(destination))
@@ -218,7 +224,8 @@ pub fn template_error_response(value: TemplateError) -> Response {
 impl From<DashboardError> for Response {
     fn from(value: DashboardError) -> Self {
         match value {
-            DashboardError::InfraError(err) => MetaHttpResponse::internal_error(err),
+            DashboardError::InfraError(err) => store_refusal_response(&err)
+                .unwrap_or_else(|| MetaHttpResponse::internal_error(err)),
             DashboardError::DashboardNotFound => MetaHttpResponse::not_found("Dashboard not found"),
             DashboardError::UpdateMissingHash => MetaHttpResponse::bad_request(
                 "Request to update existing dashboard with missing or invalid hash value",
@@ -302,7 +309,8 @@ impl From<ReportError> for Response {
 impl From<PipelineError> for Response {
     fn from(value: PipelineError) -> Self {
         match value {
-            PipelineError::InfraError(err) => MetaHttpResponse::internal_error(err),
+            PipelineError::InfraError(err) => store_refusal_response(&err)
+                .unwrap_or_else(|| MetaHttpResponse::internal_error(err)),
             PipelineError::NotFound(_) => MetaHttpResponse::not_found(value),
             PipelineError::Modified(_) | PipelineError::RunInProgress(_) => {
                 MetaHttpResponse::conflict(value)
@@ -370,9 +378,59 @@ impl From<RatelimitError> for Response {
     }
 }
 
+/// A store refusal answers with its own status and code, never as a server error.
+pub fn secret_refusal_response(refusal: &SecretRefusal) -> Response {
+    let status = StatusCode::from_u16(refusal.status()).unwrap_or(StatusCode::SERVICE_UNAVAILABLE);
+    (status, Json(refusal.body())).into_response()
+}
+
+/// Store codes ride in `SecretStore`, or as a `SecretRefusal` inside `OtherError`.
+pub fn store_refusal_response(err: &errors::Error) -> Option<Response> {
+    match err {
+        errors::Error::SecretStore(code) => Some(secret_refusal_response(&(*code).into())),
+        errors::Error::OtherError(e) => e.downcast_ref().map(secret_refusal_response),
+        _ => None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use config::meta::secret_store::SecretErrorCode;
+
     use super::*;
+
+    #[test]
+    fn a_store_code_keeps_its_status_wherever_it_is_mapped() {
+        let code = || errors::Error::SecretStore(SecretErrorCode::PinMismatch);
+        let wrapped = || {
+            errors::Error::OtherError(SecretRefusal::from(SecretErrorCode::SecretUseDenied).into())
+        };
+        assert_eq!(
+            destination_error_response(DestinationError::InfraError(code())).status(),
+            StatusCode::CONFLICT
+        );
+        assert_eq!(
+            Response::from(AlertError::InfraError(wrapped())).status(),
+            StatusCode::FORBIDDEN
+        );
+        assert_eq!(
+            template_error_response(TemplateError::InfraError(code())).status(),
+            StatusCode::CONFLICT
+        );
+        assert_eq!(
+            Response::from(PipelineError::InfraError(code())).status(),
+            StatusCode::CONFLICT
+        );
+        assert_eq!(
+            map_error_to_http_response(&code(), None).status(),
+            StatusCode::CONFLICT
+        );
+        let other = errors::Error::Message("db down".into());
+        assert_eq!(
+            destination_error_response(DestinationError::InfraError(other)).status(),
+            StatusCode::INTERNAL_SERVER_ERROR
+        );
+    }
 
     #[test]
     fn test_error_code_response_sets_numeric_code_header() {

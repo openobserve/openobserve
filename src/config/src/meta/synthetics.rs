@@ -13,7 +13,41 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::collections::HashMap;
+pub mod write_only_string {
+    use serde::{Deserialize, Deserializer, Serialize, Serializer, ser::Error};
+    use serde_json::Value;
+
+    use super::{KEEP_MARKER, MARKER_PREFIX, SET_MARKER_PREFIX, is_keep_value, set_marker_value};
+
+    #[derive(Deserialize)]
+    struct MarkerMetadata {
+        updated_at: Option<i64>,
+        updated_by: Option<String>,
+    }
+
+    pub fn serialize<S: Serializer>(value: &str, serializer: S) -> Result<S::Ok, S::Error> {
+        if value == KEEP_MARKER {
+            return serde_json::json!({"keep": true}).serialize(serializer);
+        }
+        if let Some(metadata) = value.strip_prefix(SET_MARKER_PREFIX) {
+            let metadata: MarkerMetadata = serde_json::from_str(metadata)
+                .map_err(|_| S::Error::custom("invalid set marker metadata"))?;
+            return set_marker_value(metadata.updated_at, metadata.updated_by.as_deref())
+                .serialize(serializer);
+        }
+        serializer.serialize_str(value)
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(deserializer: D) -> Result<String, D::Error> {
+        match Value::deserialize(deserializer)? {
+            Value::String(value) if !value.starts_with(MARKER_PREFIX) => Ok(value),
+            marker if is_keep_value(&marker) => Ok(KEEP_MARKER.to_owned()),
+            _ => Err(serde::de::Error::custom("invalid write-only field")),
+        }
+    }
+}
+
+use std::collections::{BTreeMap, HashMap};
 
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -23,6 +57,44 @@ use super::{
     downtimes::ActiveDowntime,
     synthetics_variables::{placeholder_names, substitute_placeholders},
 };
+
+const MARKER_PREFIX: &str = "\u{0}o2:";
+pub const KEEP_MARKER: &str = "\u{0}o2:keep";
+pub const SET_MARKER_PREFIX: &str = "\u{0}o2:set:";
+pub const SLOT_META_PREFIX: &str = "#m/";
+
+#[derive(Clone, Copy)]
+enum ValidationMode {
+    Detailed,
+    Quiet,
+}
+
+impl ValidationMode {
+    fn detail(self, args: std::fmt::Arguments<'_>) -> std::fmt::Arguments<'_> {
+        match self {
+            Self::Detailed => args,
+            Self::Quiet => format_args!(""),
+        }
+    }
+
+    fn http_url(self, field: &str, url: &str) -> Result<(), String> {
+        match self {
+            Self::Detailed => validate_http_url(field, url),
+            Self::Quiet if url.chars().any(char::is_whitespace) => {
+                Err(format!("{field}: must not contain whitespace"))
+            }
+            Self::Quiet => validate_http_url_quietly(field, url),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SlotMeta {
+    pub updated_at: i64,
+    pub updated_by: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub origins: Option<BTreeMap<String, Vec<String>>>,
+}
 
 // ── Frequency ─────────────────────────────────────────────────────────────────
 
@@ -179,12 +251,8 @@ pub struct Synthetic {
     /// When set, the scheduler uses this as the initial next_run_at instead of firing immediately.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub start: Option<i64>,
-    /// Encrypted config-embedded secret values, keyed by concrete JSON pointer
-    /// into `config` (e.g. "/headers/0/value", "/auth/secret"). Extracted at
-    /// write time so the `config` column never stores secret material — even
-    /// ciphertext lives only in the dedicated `secrets` column. Rehydrated
-    /// into `config` on the edit read and at probe resolve. Never serialized
-    /// to API clients.
+    /// JSON pointers locate encrypted values for probes. Reserved `#m/` keys hold encrypted
+    /// edit metadata and must survive probe rehydration.
     #[serde(skip)]
     pub config_secrets: std::collections::BTreeMap<String, String>,
 
@@ -256,6 +324,16 @@ pub const MAX_BROWSER_RETRIES: i32 = 2;
 pub const MAX_NET_RETRIES: i32 = 3;
 
 impl SyntheticType {
+    /// S03 slots, split only after the latch; kept out of `secret_config_paths` because
+    /// `for_each_secret` would encrypt a pre-latch plaintext body in place on a receiver.
+    pub fn write_only_split_paths(&self) -> &'static [&'static str] {
+        match self {
+            Self::Http => &["/body"],
+            Self::Browser => &["/steps/*/value"],
+            Self::Ssh | Self::Tcp | Self::Tls => &[],
+        }
+    }
+
     /// Largest `retries` value this type accepts.
     ///
     /// Note the product default is **0** for every type, and that is deliberate:
@@ -294,6 +372,72 @@ impl SyntheticType {
             Self::Tcp | Self::Tls => &[],
         }
     }
+}
+
+pub fn set_marker(updated_at: Option<i64>, updated_by: Option<&str>) -> String {
+    let metadata = serde_json::json!({"updated_at": updated_at, "updated_by": updated_by});
+    format!("{SET_MARKER_PREFIX}{metadata}")
+}
+
+pub fn set_marker_value(updated_at: Option<i64>, updated_by: Option<&str>) -> serde_json::Value {
+    serde_json::json!({"set": true, "updated_at": updated_at, "updated_by": updated_by})
+}
+
+pub fn is_keep_marker(value: &str) -> bool {
+    value == KEEP_MARKER || value.starts_with(SET_MARKER_PREFIX)
+}
+
+pub fn is_keep_value(value: &serde_json::Value) -> bool {
+    value.get("keep").and_then(serde_json::Value::as_bool) == Some(true)
+        || value.get("set").and_then(serde_json::Value::as_bool) == Some(true)
+}
+
+pub fn header_is_secure(name: &str, secure: Option<bool>) -> bool {
+    secure.unwrap_or_else(|| {
+        let name = name.to_ascii_lowercase();
+        matches!(
+            name.as_str(),
+            "authorization" | "proxy-authorization" | "cookie"
+        ) || ["-key", "-token", "-secret"]
+            .iter()
+            .any(|suffix| name.ends_with(suffix))
+    })
+}
+
+pub fn slot_key_auth_password() -> String {
+    "auth/password".to_owned()
+}
+
+pub fn slot_key_auth_token() -> String {
+    "auth/token".to_owned()
+}
+
+pub fn slot_key_cookie(name: &str, domain: &str, path: &str) -> String {
+    format!("cookie/{name}|{domain}|{path}")
+}
+
+pub fn slot_key_variable(name: &str) -> String {
+    format!("variable/{name}")
+}
+
+pub fn slot_key_header(name: &str) -> String {
+    format!("header/{}", name.to_ascii_lowercase())
+}
+
+pub fn slot_key_secret(name: &str) -> String {
+    format!("secret/{name}")
+}
+
+pub fn slot_key_step(id: &str) -> String {
+    format!("step/{id}")
+}
+
+pub fn slot_key_body() -> String {
+    "body".to_owned()
+}
+
+pub fn slot_key_ssh_secret() -> String {
+    "ssh/secret".to_owned()
 }
 
 /// Applies `f` to every secret-bearing string on a check, in one place.
@@ -488,21 +632,25 @@ impl SyntheticStatus {
 pub enum SyntheticAuth {
     Basic {
         username: String,
+        #[serde(with = "write_only_string")]
+        #[schema(value_type = String)]
         password: String,
     },
     Bearer {
+        #[serde(with = "write_only_string")]
+        #[schema(value_type = String)]
         token: String,
     },
     /// Reference to a secret stored in OO secrets manager.
-    Secret {
-        secret_name: String,
-    },
+    Secret { secret_name: String },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema, Default)]
 pub struct SyntheticCookie {
     pub name: String,
     /// Cookie value — encrypted at rest with org DEK.
+    #[serde(with = "write_only_string")]
+    #[schema(value_type = String)]
     pub value: String,
     pub domain: String,
     #[serde(default = "default_cookie_path")]
@@ -522,9 +670,10 @@ fn default_cookie_path() -> String {
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema, Default)]
 pub struct SyntheticVariable {
     pub name: String,
+    #[serde(with = "write_only_string")]
+    #[schema(value_type = String)]
     pub value: String,
-    /// UI display flag: true = mask value as ••••. No effect on storage — all values are
-    /// AES-encrypted at rest unconditionally.
+    /// Secure variables become write-only after cutover. All variables are encrypted at rest.
     #[serde(default)]
     pub secure: bool,
     /// Placeholder shown in the UI when secure=true and value is empty/redacted.
@@ -748,6 +897,8 @@ pub struct HttpConfig {
 pub struct HttpHeader {
     pub name: String,
     pub value: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub secure: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1114,7 +1265,7 @@ const MAX_JOURNEY_BUDGET_MS: u32 = 900_000;
 
 /// Lease held on a job while it runs — must stay in sync with `LEASE_SECS` in
 /// o2-enterprise `synthetics/dispatcher/mod.rs`, and is the floor the job API
-/// applies to every agent lease (`synthetics_jobs::lease_batch`).
+/// applies to every agent lease (`synthetics_jobs::lease_batch_for_org`).
 ///
 /// Applies to every check type, not just browser. Both agents ask for a 300s
 /// lease, so any check whose retry sequence runs longer than that has its lease
@@ -1317,7 +1468,7 @@ pub fn is_composition_action(action: &str) -> bool {
 
 /// Runs the per-step rules over an already-expanded journey (no `subtest` may remain).
 pub fn validate_expanded_steps(steps: &[serde_json::Value]) -> Result<(), String> {
-    validate_v2_steps(steps)?;
+    validate_v2_steps(steps, ValidationMode::Detailed)?;
     if let Some(i) = steps.iter().position(|s| {
         s.get("action")
             .and_then(|a| a.as_str())
@@ -1542,6 +1693,31 @@ pub fn with_default_scheme(value: &str) -> String {
     }
 }
 
+pub fn effective_origin(url: &str) -> String {
+    let Ok(parsed) = url::Url::parse(&with_default_scheme(url)) else {
+        return url.to_owned();
+    };
+    let Some(host) = parsed.host_str() else {
+        return url.to_owned();
+    };
+    let default_port = match parsed.scheme() {
+        "http" => 80,
+        "https" => 443,
+        "ssh" => 22,
+        _ => return url.to_owned(),
+    };
+    let port = parsed.port().unwrap_or(default_port);
+    format!("{}://{}:{port}", parsed.scheme(), host.to_ascii_lowercase())
+}
+
+pub fn substitute_vars(text: &str, vars: &[(String, String)]) -> String {
+    if !text.contains("{{") {
+        return text.to_owned();
+    }
+    let values = vars.iter().cloned().collect();
+    substitute_placeholders(text, &values)
+}
+
 /// `echo` decides whether an error quotes the value; a resolved URL may hold a secret.
 fn check_http_url(field: &str, value: &str, echo: bool) -> Result<(), String> {
     let quoted = |sep: &str| {
@@ -1597,17 +1773,21 @@ fn check_http_url(field: &str, value: &str, echo: bool) -> Result<(), String> {
     Ok(())
 }
 
-fn validate_host_target(target: &str) -> Result<(), String> {
+fn validate_host_target(target: &str, mode: ValidationMode) -> Result<(), String> {
     if target.trim().is_empty() {
         return Err("target: must not be empty".to_string());
     }
     if target.contains("://") {
         return Err(format!(
-            "target: expected host or host:port, got a URL '{target}'"
+            "target: expected host or host:port, got a URL{}",
+            mode.detail(format_args!(" '{target}'"))
         ));
     }
     if target.chars().any(char::is_whitespace) {
-        return Err(format!("target: must not contain whitespace: '{target}'"));
+        return Err(format!(
+            "target: must not contain whitespace{}",
+            mode.detail(format_args!(": '{target}'"))
+        ));
     }
     Ok(())
 }
@@ -1695,6 +1875,39 @@ impl Synthetic {
         allowed_devices: &[String],
         is_create: bool,
     ) -> Result<(), String> {
+        self.validate_with_mode(
+            allowed_locations,
+            allowed_browsers,
+            allowed_devices,
+            is_create,
+            ValidationMode::Detailed,
+        )
+    }
+
+    pub fn validate_quiet(
+        &self,
+        allowed_locations: &[String],
+        allowed_browsers: &[String],
+        allowed_devices: &[String],
+        is_create: bool,
+    ) -> Result<(), String> {
+        self.validate_with_mode(
+            allowed_locations,
+            allowed_browsers,
+            allowed_devices,
+            is_create,
+            ValidationMode::Quiet,
+        )
+    }
+
+    fn validate_with_mode(
+        &self,
+        allowed_locations: &[String],
+        allowed_browsers: &[String],
+        allowed_devices: &[String],
+        is_create: bool,
+        mode: ValidationMode,
+    ) -> Result<(), String> {
         // ── name / description / tags ──────────────────────────────────────
         if self.name.trim().is_empty() {
             return Err("name: must not be empty".to_string());
@@ -1723,9 +1936,9 @@ impl Synthetic {
         // ── target ─────────────────────────────────────────────────────────
         match self.check_type {
             SyntheticType::Http | SyntheticType::Browser => {
-                validate_http_url("target", &self.target)?
+                mode.http_url("target", &self.target)?
             }
-            _ => validate_host_target(&self.target)?,
+            _ => validate_host_target(&self.target, mode)?,
         }
 
         // ── frequency ──────────────────────────────────────────────────────
@@ -1743,8 +1956,8 @@ impl Synthetic {
                 }
                 cron::Schedule::from_str(&self.frequency.cron).map_err(|e| {
                     format!(
-                        "frequency.cron: invalid expression '{}': {e}",
-                        self.frequency.cron
+                        "frequency.cron: invalid expression{}",
+                        mode.detail(format_args!(" '{}': {e}", self.frequency.cron))
                     )
                 })?;
             }
@@ -1786,12 +1999,18 @@ impl Synthetic {
         let mut seen_locations = std::collections::HashSet::new();
         for loc in &self.locations {
             if !seen_locations.insert(loc.as_str()) {
-                return Err(format!("locations: duplicate location '{loc}'"));
+                return Err(format!(
+                    "locations: duplicate location{}",
+                    mode.detail(format_args!(" '{loc}'"))
+                ));
             }
             if !location_allowed(loc, allowed_locations) {
                 return Err(format!(
-                    "locations: unknown location '{loc}' (allowed: {})",
-                    allowed_locations.join(", ")
+                    "locations: unknown location{}",
+                    mode.detail(format_args!(
+                        " '{loc}' (allowed: {})",
+                        allowed_locations.join(", ")
+                    ))
                 ));
             }
         }
@@ -1854,8 +2073,8 @@ impl Synthetic {
                     .all(|c| c.is_ascii_alphanumeric() || c == '_');
             if !valid_name {
                 return Err(format!(
-                    "variables: invalid name '{}' (must match [A-Za-z_][A-Za-z0-9_]*)",
-                    v.name
+                    "variables: invalid name{} (must match [A-Za-z_][A-Za-z0-9_]*)",
+                    mode.detail(format_args!(" '{}'", v.name))
                 ));
             }
             if crate::meta::synthetics_variables::has_reserved_prefix(&v.name) {
@@ -1865,7 +2084,10 @@ impl Synthetic {
                 ));
             }
             if !seen_vars.insert(v.name.as_str()) {
-                return Err(format!("variables: duplicate name '{}'", v.name));
+                return Err(format!(
+                    "variables: duplicate name{}",
+                    mode.detail(format_args!(" '{}'", v.name))
+                ));
             }
         }
 
@@ -1882,7 +2104,10 @@ impl Synthetic {
                 return Err("environments: empty environment id not allowed".to_string());
             }
             if !seen_envs.insert(env.as_str()) {
-                return Err(format!("environments: duplicate environment '{env}'"));
+                return Err(format!(
+                    "environments: duplicate environment{}",
+                    mode.detail(format_args!(" '{env}'"))
+                ));
             }
         }
 
@@ -1905,8 +2130,8 @@ impl Synthetic {
             }
             if cookie.domain.trim().is_empty() {
                 return Err(format!(
-                    "cookies: domain must not be empty (cookie '{}')",
-                    cookie.name
+                    "cookies: domain must not be empty{}",
+                    mode.detail(format_args!(" (cookie '{}')", cookie.name))
                 ));
             }
         }
@@ -1923,7 +2148,7 @@ impl Synthetic {
         }
 
         // ── type-specific config ───────────────────────────────────────────
-        self.validate_config(allowed_browsers, allowed_devices)
+        self.validate_config(allowed_browsers, allowed_devices, mode)
     }
 
     /// Parses `config` into the struct matching `check_type` and validates it.
@@ -1931,11 +2156,17 @@ impl Synthetic {
         &self,
         allowed_browsers: &[String],
         allowed_devices: &[String],
+        mode: ValidationMode,
     ) -> Result<(), String> {
         let type_check = match self.check_type {
             SyntheticType::Browser => {
-                let cfg: BrowserConfig = serde_json::from_value(self.config.clone())
-                    .map_err(|e| format!("config: not a valid browser config: {e}"))?;
+                let cfg: BrowserConfig =
+                    serde_json::from_value(self.config.clone()).map_err(|e| {
+                        format!(
+                            "config: not a valid browser config{}",
+                            mode.detail(format_args!(": {e}"))
+                        )
+                    })?;
                 validate_browser_config(
                     &cfg,
                     &self.frequency,
@@ -1943,17 +2174,22 @@ impl Synthetic {
                     allowed_devices,
                     self.retries,
                     self.wait_before_retry_secs,
+                    mode,
                 )
             }
             SyntheticType::Http => {
-                let cfg: HttpConfig = serde_json::from_value(self.config.clone())
-                    .map_err(|e| format!("config: not a valid http config: {e}"))?;
+                let cfg: HttpConfig = serde_json::from_value(self.config.clone()).map_err(|e| {
+                    format!(
+                        "config: not a valid http config{}",
+                        mode.detail(format_args!(": {e}"))
+                    )
+                })?;
                 const METHODS: &[&str] =
                     &["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"];
                 if !METHODS.contains(&cfg.method.to_uppercase().as_str()) {
                     return Err(format!(
-                        "config.method: unknown HTTP method '{}'",
-                        cfg.method
+                        "config.method: unknown HTTP method{}",
+                        mode.detail(format_args!(" '{}'", cfg.method))
                     ));
                 }
                 // Reject unknown assertion fields/operators at create time —
@@ -1965,15 +2201,15 @@ impl Synthetic {
                 for (i, a) in cfg.assertions.iter().enumerate() {
                     if !ASSERTION_FIELDS.contains(&a.field.as_str()) {
                         return Err(format!(
-                            "config.assertions[{i}].field: unknown field '{}' (known: {})",
-                            a.field,
+                            "config.assertions[{i}].field: unknown field{} (known: {})",
+                            mode.detail(format_args!(" '{}'", a.field)),
                             ASSERTION_FIELDS.join(", ")
                         ));
                     }
                     if !ASSERTION_OPERATORS.contains(&a.operator.as_str()) {
                         return Err(format!(
-                            "config.assertions[{i}].operator: unknown operator '{}' (known: {})",
-                            a.operator,
+                            "config.assertions[{i}].operator: unknown operator{} (known: {})",
+                            mode.detail(format_args!(" '{}'", a.operator)),
                             ASSERTION_OPERATORS.join(", ")
                         ));
                     }
@@ -1982,20 +2218,34 @@ impl Synthetic {
             }
             SyntheticType::Tcp => serde_json::from_value::<TcpConfig>(self.config.clone())
                 .map(|_| ())
-                .map_err(|e| format!("config: not a valid tcp config: {e}")),
+                .map_err(|e| {
+                    format!(
+                        "config: not a valid tcp config{}",
+                        mode.detail(format_args!(": {e}"))
+                    )
+                }),
             SyntheticType::Tls => serde_json::from_value::<TlsConfig>(self.config.clone())
                 .map(|_| ())
-                .map_err(|e| format!("config: not a valid tls config: {e}")),
+                .map_err(|e| {
+                    format!(
+                        "config: not a valid tls config{}",
+                        mode.detail(format_args!(": {e}"))
+                    )
+                }),
             SyntheticType::Ssh => {
-                let cfg: SshConfig = serde_json::from_value(self.config.clone())
-                    .map_err(|e| format!("config: not a valid ssh config: {e}"))?;
+                let cfg: SshConfig = serde_json::from_value(self.config.clone()).map_err(|e| {
+                    format!(
+                        "config: not a valid ssh config{}",
+                        mode.detail(format_args!(": {e}"))
+                    )
+                })?;
                 if cfg.username.trim().is_empty() {
                     return Err("config.username: must not be empty".to_string());
                 }
                 if !["password", "private_key"].contains(&cfg.auth.auth_type.as_str()) {
                     return Err(format!(
-                        "config.auth.type: unknown auth type '{}' (known: password, private_key)",
-                        cfg.auth.auth_type
+                        "config.auth.type: unknown auth type{} (known: password, private_key)",
+                        mode.detail(format_args!(" '{}'", cfg.auth.auth_type))
                     ));
                 }
                 // Empty secret is allowed: the probe runs a credential-less
@@ -2032,11 +2282,15 @@ impl Synthetic {
 /// Follows the shape the HTTP assertions already use: a closed kind set, the
 /// values each kind actually needs, and errors naming both the step index and
 /// the known set — so a typo cannot silently pass forever.
-fn validate_v2_assertion(i: usize, assertion: &StepAssertion) -> Result<(), String> {
+fn validate_v2_assertion(
+    i: usize,
+    assertion: &StepAssertion,
+    mode: ValidationMode,
+) -> Result<(), String> {
     if !V2_ASSERTION_KINDS.contains(&assertion.kind.as_str()) {
         return Err(format!(
-            "config.steps[{i}].assertion.kind: unknown kind '{}' (known: {})",
-            assertion.kind,
+            "config.steps[{i}].assertion.kind: unknown kind{} (known: {})",
+            mode.detail(format_args!(" '{}'", assertion.kind)),
             V2_ASSERTION_KINDS.join(", ")
         ));
     }
@@ -2046,8 +2300,8 @@ fn validate_v2_assertion(i: usize, assertion: &StepAssertion) -> Result<(), Stri
         let expected = assertion.expected.as_deref().unwrap_or("");
         if expected.is_empty() {
             return Err(format!(
-                "config.steps[{i}].assertion: kind '{}' requires a non-empty 'expected'",
-                assertion.kind
+                "config.steps[{i}].assertion: kind{} requires a non-empty 'expected'",
+                mode.detail(format_args!(" '{}'", assertion.kind))
             ));
         }
     }
@@ -2079,12 +2333,14 @@ fn validate_locator_candidate(
     i: usize,
     c: usize,
     candidate: &LocatorCandidate,
+    mode: ValidationMode,
 ) -> Result<(), String> {
     let origin = candidate.origin.as_deref().unwrap_or("recorded");
     if !LOCATOR_ORIGINS.contains(&origin) {
         return Err(format!(
-            "config.steps[{i}].locator.candidates[{c}].origin: unknown origin '{origin}' \
+            "config.steps[{i}].locator.candidates[{c}].origin: unknown origin{} \
              (valid: {})",
+            mode.detail(format_args!(" '{origin}'")),
             LOCATOR_ORIGINS.join(", ")
         ));
     }
@@ -2103,7 +2359,8 @@ fn validate_locator_candidate(
     if origin != "composite" {
         return Err(format!(
             "config.steps[{i}].locator.candidates[{c}]: 'from' is only valid on a \
-             'composite' candidate, not on '{origin}'"
+             'composite' candidate{}",
+            mode.detail(format_args!(", not on '{origin}'"))
         ));
     }
     // One part is not a combination, it is the part itself.
@@ -2127,7 +2384,8 @@ fn validate_locator_candidate(
             (0, Some(r)) => {
                 return Err(format!(
                     "config.steps[{i}].locator.candidates[{c}].from[0]: the base part must \
-                     carry no relation, got '{r}'"
+                     carry no relation{}",
+                    mode.detail(format_args!(", got '{r}'"))
                 ));
             }
             (0, None) => {}
@@ -2141,7 +2399,8 @@ fn validate_locator_candidate(
             (_, Some(r)) if !COMPOSITE_RELATIONS.contains(&r) => {
                 return Err(format!(
                     "config.steps[{i}].locator.candidates[{c}].from[{p}].relation: unknown \
-                     relation '{r}' (valid: {})",
+                     relation{} (valid: {})",
+                    mode.detail(format_args!(" '{r}'")),
                     COMPOSITE_RELATIONS.join(", ")
                 ));
             }
@@ -2155,28 +2414,30 @@ fn validate_locator_candidate(
 /// Validate every step in a journey. There is one step format, so this is the
 /// only step-validation path — the untyped version-1 branch beside it was
 /// deleted with version 1 itself (Phase 2c).
-fn validate_v2_steps(steps: &[serde_json::Value]) -> Result<(), String> {
+fn validate_v2_steps(steps: &[serde_json::Value], mode: ValidationMode) -> Result<(), String> {
     let mut seen_ids = std::collections::HashSet::new();
 
     for (i, raw) in steps.iter().enumerate() {
-        let step: BrowserStepV2 =
-            serde_json::from_value(raw.clone()).map_err(|e| format!("config.steps[{i}]: {e}"))?;
+        let step: BrowserStepV2 = serde_json::from_value(raw.clone()).map_err(|e| match mode {
+            ValidationMode::Quiet => format!("config.steps[{i}]: invalid step"),
+            ValidationMode::Detailed => format!("config.steps[{i}]: {e}"),
+        })?;
 
-        validate_step_id(i, &step.id)?;
+        validate_step_id(i, &step.id, mode)?;
         if !seen_ids.insert(step.id.clone()) {
             return Err(format!(
-                "config.steps[{i}]: duplicate step id '{}'",
-                step.id
+                "config.steps[{i}]: duplicate step id{}",
+                mode.detail(format_args!(" '{}'", step.id))
             ));
         }
 
         if !V2_STEP_ACTIONS.contains(&step.action.as_str()) && !is_composition_action(&step.action)
         {
             return Err(format!(
-                "config.steps[{i}]: action '{}' is not valid (valid: {}). scroll, wait and \
+                "config.steps[{i}]: action{} is not valid (valid: {}). scroll, wait and \
                  screenshot have no equivalent in the recorder's action model and cannot be \
                  replayed; type and keydown are aliases of fill and press.",
-                step.action,
+                mode.detail(format_args!(" '{}'", step.action)),
                 V2_STEP_ACTIONS.join(", ")
             ));
         }
@@ -2187,8 +2448,8 @@ fn validate_v2_steps(steps: &[serde_json::Value]) -> Result<(), String> {
         }
         if step.subtest.is_some() {
             return Err(format!(
-                "config.steps[{i}]: 'subtest' is only valid on a 'subtest' step, not on '{}'",
-                step.action
+                "config.steps[{i}]: 'subtest' is only valid on a 'subtest' step{}",
+                mode.detail(format_args!(", not on '{}'", step.action))
             ));
         }
 
@@ -2197,7 +2458,7 @@ fn validate_v2_steps(steps: &[serde_json::Value]) -> Result<(), String> {
                 .url
                 .as_deref()
                 .ok_or_else(|| format!("config.steps[{i}]: navigate step missing 'url'"))?;
-            validate_http_url(&format!("config.steps[{i}].url"), url)?;
+            mode.http_url(&format!("config.steps[{i}].url"), url)?;
         }
 
         // P5.1.4 — an assertion is what an `assert` step IS, and is meaningless
@@ -2210,11 +2471,11 @@ fn validate_v2_steps(steps: &[serde_json::Value]) -> Result<(), String> {
                     V2_ASSERTION_KINDS.join(", ")
                 )
             })?;
-            validate_v2_assertion(i, assertion)?;
+            validate_v2_assertion(i, assertion, mode)?;
         } else if step.assertion.is_some() {
             return Err(format!(
-                "config.steps[{i}]: 'assertion' is only valid on an 'assert' step, not on '{}'",
-                step.action
+                "config.steps[{i}]: 'assertion' is only valid on an 'assert' step{}",
+                mode.detail(format_args!(", not on '{}'", step.action))
             ));
         }
 
@@ -2230,8 +2491,8 @@ fn validate_v2_steps(steps: &[serde_json::Value]) -> Result<(), String> {
         if needs_locator {
             let locator = step.locator.as_ref().ok_or_else(|| {
                 format!(
-                    "config.steps[{i}]: '{}' step requires a 'locator'",
-                    step.action
+                    "config.steps[{i}]: {}step requires a 'locator'",
+                    mode.detail(format_args!("'{}' ", step.action))
                 )
             })?;
             if locator.candidates.is_empty() {
@@ -2247,14 +2508,14 @@ fn validate_v2_steps(steps: &[serde_json::Value]) -> Result<(), String> {
                 ));
             }
             for (c, candidate) in locator.candidates.iter().enumerate() {
-                validate_locator_candidate(i, c, candidate)?;
+                validate_locator_candidate(i, c, candidate, mode)?;
             }
         }
 
         if (step.action == "fill" || step.action == "select") && step.value.is_none() {
             return Err(format!(
-                "config.steps[{i}]: '{}' step requires a 'value'",
-                step.action
+                "config.steps[{i}]: {}step requires a 'value'",
+                mode.detail(format_args!("'{}' ", step.action))
             ));
         }
 
@@ -2262,7 +2523,8 @@ fn validate_v2_steps(steps: &[serde_json::Value]) -> Result<(), String> {
             && !matches!(button.as_str(), "left" | "middle" | "right")
         {
             return Err(format!(
-                "config.steps[{i}].button: must be left, middle or right, got '{button}'"
+                "config.steps[{i}].button: must be left, middle or right{}",
+                mode.detail(format_args!(", got '{button}'"))
             ));
         }
 
@@ -2304,7 +2566,7 @@ fn validate_v2_steps(steps: &[serde_json::Value]) -> Result<(), String> {
     Ok(())
 }
 
-fn validate_step_id(i: usize, id: &str) -> Result<(), String> {
+fn validate_step_id(i: usize, id: &str, mode: ValidationMode) -> Result<(), String> {
     if id.is_empty() {
         return Err(format!("config.steps[{i}]: 'id' must not be empty"));
     }
@@ -2313,11 +2575,15 @@ fn validate_step_id(i: usize, id: &str) -> Result<(), String> {
         .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
     {
         return Err(format!(
-            "config.steps[{i}]: step id '{id}' may only contain letters, digits, '-' and '_'"
+            "config.steps[{i}]: step id{} may only contain letters, digits, '-' and '_'",
+            mode.detail(format_args!(" '{id}'"))
         ));
     }
     if STEP_ID_RESERVED.contains(&id) {
-        return Err(format!("config.steps[{i}]: step id '{id}' is reserved"));
+        return Err(format!(
+            "config.steps[{i}]: step id{} is reserved",
+            mode.detail(format_args!(" '{id}'"))
+        ));
     }
     Ok(())
 }
@@ -2361,6 +2627,7 @@ fn validate_browser_config(
     allowed_devices: &[String],
     retries: i32,
     wait_before_retry_secs: i32,
+    mode: ValidationMode,
 ) -> Result<(), String> {
     // ── journey budget vs. job lease ───────────────────────────────────────
     // A browser job holds a lease while it runs (o2-enterprise dispatcher,
@@ -2445,8 +2712,9 @@ fn validate_browser_config(
             .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
         {
             return Err(format!(
-                "config.test_id_attr: '{trimmed}' is not a valid attribute name \
-                 (letters, digits, '-' and '_' only)"
+                "config.test_id_attr: {}is not a valid attribute name \
+                 (letters, digits, '-' and '_' only)",
+                mode.detail(format_args!("'{trimmed}' "))
             ));
         }
     }
@@ -2471,8 +2739,8 @@ fn validate_browser_config(
         ));
     }
 
-    validate_v2_steps(&cfg.steps)?;
-    validate_browser_devices_and_schedule(cfg, frequency, allowed_browsers, allowed_devices)
+    validate_v2_steps(&cfg.steps, mode)?;
+    validate_browser_devices_and_schedule(cfg, frequency, allowed_browsers, allowed_devices, mode)
 }
 
 /// Everything about a browser config that is not the steps themselves.
@@ -2481,6 +2749,7 @@ fn validate_browser_devices_and_schedule(
     frequency: &SyntheticFrequency,
     allowed_browsers: &[String],
     allowed_devices: &[String],
+    mode: ValidationMode,
 ) -> Result<(), String> {
     // ── browser × device combos ────────────────────────────────────────────
     if cfg.browser_devices.is_empty() {
@@ -2498,22 +2767,28 @@ fn validate_browser_devices_and_schedule(
     for bd in &cfg.browser_devices {
         if !seen_combos.insert((bd.browser.as_str(), bd.device.as_str())) {
             return Err(format!(
-                "config.browser_devices: duplicate combo '{}/{}'",
-                bd.browser, bd.device
+                "config.browser_devices: duplicate combo{}",
+                mode.detail(format_args!(" '{}/{}'", bd.browser, bd.device))
             ));
         }
         if !allowed_browsers.is_empty() && !allowed_browsers.contains(&bd.browser) {
             return Err(format!(
-                "config.browser_devices: unknown browser '{}' (allowed: {})",
-                bd.browser,
-                allowed_browsers.join(", ")
+                "config.browser_devices: unknown browser{}",
+                mode.detail(format_args!(
+                    " '{}' (allowed: {})",
+                    bd.browser,
+                    allowed_browsers.join(", ")
+                ))
             ));
         }
         if !allowed_devices.is_empty() && !allowed_devices.contains(&bd.device) {
             return Err(format!(
-                "config.browser_devices: unknown device '{}' (allowed: {})",
-                bd.device,
-                allowed_devices.join(", ")
+                "config.browser_devices: unknown device{}",
+                mode.detail(format_args!(
+                    " '{}' (allowed: {})",
+                    bd.device,
+                    allowed_devices.join(", ")
+                ))
             ));
         }
     }
@@ -2543,7 +2818,8 @@ fn validate_browser_devices_and_schedule(
         ] {
             if !MODES.contains(&value.as_str()) {
                 return Err(format!(
-                    "config.capture.{field}: must be one of always|on-fail|off, got '{value}'"
+                    "config.capture.{field}: must be one of always|on-fail|off{}",
+                    mode.detail(format_args!(", got '{value}'"))
                 ));
             }
         }
@@ -2676,6 +2952,71 @@ mod limits_tests {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn typed_credentials_accept_keep_and_echoed_set_objects() {
+        for marker in [
+            serde_json::json!({"keep": true}),
+            serde_json::json!({"set": true, "updated_at": 1, "updated_by": "a"}),
+        ] {
+            let auth = serde_json::json!({"type": "basic", "username": "u", "password": marker});
+            let auth: SyntheticAuth = serde_json::from_value(auth).unwrap();
+            assert!(
+                matches!(&auth, SyntheticAuth::Basic { password, .. } if password == KEEP_MARKER)
+            );
+            assert_eq!(
+                serde_json::to_value(auth).unwrap()["password"],
+                serde_json::json!({"keep": true})
+            );
+        }
+        for invalid in [
+            serde_json::json!("\u{0}o2:keep"),
+            serde_json::json!({"keep": false}),
+            serde_json::Value::Null,
+        ] {
+            let auth = serde_json::json!({"type": "bearer", "token": invalid});
+            assert!(serde_json::from_value::<SyntheticAuth>(auth).is_err());
+        }
+    }
+
+    #[test]
+    fn typed_set_markers_serialize_only_the_edit_metadata() {
+        let expected = serde_json::json!({"set": true, "updated_at": 1, "updated_by": "a"});
+        let auth = SyntheticAuth::Bearer {
+            token: set_marker(Some(1), Some("a")),
+        };
+        assert_eq!(serde_json::to_value(auth).unwrap()["token"], expected);
+        let variable = SyntheticVariable {
+            value: set_marker(None, None),
+            ..Default::default()
+        };
+        assert_eq!(
+            serde_json::to_value(variable).unwrap()["value"],
+            serde_json::json!({"set": true, "updated_at": null, "updated_by": null})
+        );
+    }
+
+    #[test]
+    fn headers_use_the_explicit_flag_or_the_case_insensitive_name_rule() {
+        for name in [
+            "AuThOrIzAtIoN",
+            "Proxy-Authorization",
+            "Cookie",
+            "X-Api-Key",
+            "X-Token",
+            "X-Secret",
+        ] {
+            assert!(header_is_secure(name, None));
+            assert!(!header_is_secure(name, Some(false)));
+        }
+        for name in ["Accept", "Set-Cookie", "Token", "X-Key-Id"] {
+            assert!(!header_is_secure(name, None));
+            assert!(header_is_secure(name, Some(true)));
+        }
+        let before = serde_json::json!({"name": "Accept", "value": "text/html"});
+        let header: HttpHeader = serde_json::from_value(before.clone()).unwrap();
+        assert_eq!(serde_json::to_value(header).unwrap(), before);
+    }
 
     #[test]
     fn test_monitor_type_default() {
@@ -3086,6 +3427,50 @@ mod tests {
             assert!(validate_http_url("target", bad).is_err(), "{bad}");
         }
         assert!(validate_http_url_quietly("target", "https://shop.test/login").is_ok());
+    }
+
+    #[test]
+    fn quiet_snapshot_validation_hides_step_values_and_invalid_inputs() {
+        let (locs, browsers, devices) = allowed();
+        let mut check = valid_browser_synthetic();
+        check.config["steps"][1]["action"] = serde_json::json!("fill");
+        check.config["steps"][1]["value"] = serde_json::json!("s3cr3t-step");
+        check.config["steps"][0]["url"] = serde_json::json!("{{HOST}} /s3cr3t-step");
+        let err = check
+            .validate_quiet(&locs, &browsers, &devices, false)
+            .unwrap_err();
+        assert_eq!(err, "config.steps[0].url: must not contain whitespace");
+
+        check.config["steps"][0]["url"] = serde_json::json!("https://example.com");
+        check.config["steps"][0]["action"] = serde_json::json!("s3cr3t-step");
+        let err = check
+            .validate_quiet(&locs, &browsers, &devices, false)
+            .unwrap_err();
+        assert!(err.contains("config.steps[0]"));
+        assert!(!err.contains("s3cr3t-step"));
+    }
+
+    #[test]
+    fn origins_use_the_effective_scheme_host_and_port() {
+        for (url, expected) in [
+            ("EXAMPLE.test/path", "https://example.test:443"),
+            ("http://EXAMPLE.test:8080/x", "http://example.test:8080"),
+            ("http://EXAMPLE.test/", "http://example.test:80"),
+            ("ssh://EXAMPLE.test", "ssh://example.test:22"),
+            ("https://[2001:db8::1]/", "https://[2001:db8::1]:443"),
+            ("bad host", "bad host"),
+        ] {
+            assert_eq!(effective_origin(url), expected);
+        }
+    }
+
+    #[test]
+    fn variable_substitution_preserves_unbound_names() {
+        let vars = vec![("HOST".into(), "example.test".into())];
+        assert_eq!(
+            substitute_vars("https://{{HOST}}/{{MISSING}}", &vars),
+            "https://example.test/{{MISSING}}",
+        );
     }
 
     #[test]
@@ -4231,14 +4616,17 @@ mod tests {
     #[test]
     fn the_start_load_id_is_reserved_alongside_the_unattributed_sentinel() {
         for reserved in ["_start", "__unattributed__"] {
-            let err = validate_step_id(0, reserved).unwrap_err();
+            let err = validate_step_id(0, reserved, ValidationMode::Detailed).unwrap_err();
             assert_eq!(
                 err,
                 format!("config.steps[0]: step id '{reserved}' is reserved")
             );
         }
         for ok in ["start", "r0_start", "_s1"] {
-            assert!(validate_step_id(0, ok).is_ok(), "{ok}");
+            assert!(
+                validate_step_id(0, ok, ValidationMode::Detailed).is_ok(),
+                "{ok}"
+            );
         }
     }
 

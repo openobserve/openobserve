@@ -7,6 +7,7 @@ import { splitControlAttrs, warnIfUnlabelled } from "@/lib/forms/controlAttrs";
 import { useI18nTyped } from "@/types/i18n";
 import { useLockedDisabled } from "@/composables/useFeatureLock";
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, useAttrs, useId, watch } from "vue";
+import type { Directive } from "vue";
 
 const { t } = useI18nTyped();
 
@@ -108,6 +109,11 @@ const describedBy = computed(() => {
 });
 
 const isTextarea = computed(() => props.type === "textarea");
+
+// Vue mirrors even .prop value bindings into attributes; passwords need property-only writes.
+const vPasswordValue: Directive<HTMLInputElement, string | undefined> = (el, { value }) => {
+  if (value !== undefined && el.value !== value) el.value = value;
+};
 
 // ── Password reveal ────────────────────────────────────────────────────────
 // The toggle swaps the RENDERED type only; `type` itself is untouched, so a
@@ -393,10 +399,10 @@ const wrapperClasses = computed(() => [
       <!-- Text/number/etc input -->
       <input
         v-else
+        v-password-value="type === 'password' ? String(modelValue ?? '') : undefined"
         :id="inputId"
         ref="inputRef"
         :data-test="parentDataTest ? `${parentDataTest}-field` : undefined"
-        :value="String(modelValue ?? '')"
         :type="effectiveType"
         :name="name"
         :placeholder="placeholder"
@@ -426,7 +432,12 @@ const wrapperClasses = computed(() => [
             ? 'pe-2'
             : 'pe-3',
         ]"
-        v-bind="{ ...controlAttrs, 'aria-describedby': describedBy, ...inputAttrs }"
+        v-bind="{
+          ...(type === 'password' ? {} : { value: String(modelValue ?? '') }),
+          ...controlAttrs,
+          'aria-describedby': describedBy,
+          ...inputAttrs,
+        }"
         @input="handleInput"
         @blur="handleBlur"
         @focus="emit('focus', $event)"

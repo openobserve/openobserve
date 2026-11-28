@@ -42,7 +42,8 @@ vi.mock("@/services/alert_destination", async (importOriginal) => {
 
 // Mock zincutils with deterministic UUIDs
 let uuidCounter = 0;
-vi.mock("@/utils/zincutils", () => ({
+vi.mock("@/utils/zincutils", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/utils/zincutils")>()),
   isValidResourceName: vi.fn((val: string) => {
     const invalidChars = /[:/?#\s]/;
     return !invalidChars.test(val);

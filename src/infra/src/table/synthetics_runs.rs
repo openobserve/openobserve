@@ -1191,6 +1191,9 @@ mod tests {
                 result: None,
                 started_at: None,
                 completed_at: None,
+                lease_token_sha256: None,
+                lease_issuer: None,
+                env_incarnation: None,
             };
             let am: jobs::ActiveModel = job.into();
             am.reset_all().insert(db).await.unwrap();

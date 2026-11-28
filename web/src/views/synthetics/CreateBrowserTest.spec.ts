@@ -851,6 +851,41 @@ describe("CreateBrowserTest", () => {
       expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
     });
 
+    it("logs a failed save without the request body the user typed", async () => {
+      const log = vi.spyOn(console, "error").mockImplementation(() => {});
+      mockServiceUpdate.mockRejectedValue({
+        config: { data: '{"password":"hunter2"}' },
+        response: { status: 500, data: { code: "boom" } },
+      });
+      wrapper = await mountValidEdit();
+      await wrapper.find('[data-test="synthetics-create-save-exit-btn"]').trigger("click");
+      await flushPromises();
+      const saveLog = log.mock.calls.find((c) => c[0] === "[synthetics] save failed");
+      expect(saveLog?.[1]).toEqual({ status: 500, code: "boom" });
+      expect(JSON.stringify(log.mock.calls)).not.toContain("hunter2");
+      log.mockRestore();
+    });
+
+    it.each([
+      ["saved", () => Promise.resolve({})],
+      ["refused", () => Promise.reject({ response: { status: 400, data: { code: "x" } } })],
+    ])("keeps no submitted payload in the mutation cache once %s", async (_label, reply) => {
+      const log = vi.spyOn(console, "error").mockImplementation(() => {});
+      mockServiceUpdate.mockImplementation(reply as any);
+      wrapper = await mountValidEdit();
+      queryClient.getMutationCache().clear();
+      await wrapper.find('[data-test="synthetics-create-save-continue-btn"]').trigger("click");
+      await flushPromises();
+      expect(mockServiceUpdate).toHaveBeenCalled();
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      const held = queryClient
+        .getMutationCache()
+        .getAll()
+        .filter((m) => (m.state.variables as any)?.payload);
+      expect(held).toHaveLength(0);
+      log.mockRestore();
+    });
+
     // B1: the picker is on Configure, which Journey cannot reach, so a template refusal opens it.
     it("opens Configure with the template refusal under the picker", async () => {
       mockServiceUpdate.mockRejectedValue({

@@ -2702,8 +2702,8 @@ mod tests {
         use openobserve_core::authz::{TypedStream, fake_checker};
 
         let checker = fake_checker();
-        let org = format!("dbm_{}", config::ider::uuid());
-        let single = format!("single_{}", config::ider::uuid());
+        let org = format!("dbm_{}", config::ider::ksuid());
+        let single = format!("single_{}", config::ider::ksuid());
         checker.grant_read(
             &single,
             &TypedStream {
@@ -2725,7 +2725,7 @@ mod tests {
             "only the list asks the org-wide question"
         );
 
-        let wide = format!("wide_{}", config::ider::uuid());
+        let wide = format!("wide_{}", config::ider::ksuid());
         checker.grant_read_all(&wide, &org, StreamType::Traces);
         assert_eq!(
             stream_grants(&org, &wide, all.clone(), StreamType::Traces).await,

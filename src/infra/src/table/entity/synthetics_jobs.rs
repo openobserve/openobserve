@@ -40,6 +40,10 @@ pub struct Model {
     pub started_at: Option<i64>,
     /// UTC µs: when the job was acked (completed or dead-lettered).
     pub completed_at: Option<i64>,
+    /// NULL for an attempt claimed by a runner that predates lease tokens.
+    pub lease_token_sha256: Option<String>,
+    pub lease_issuer: Option<String>,
+    pub env_incarnation: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
@@ -78,6 +82,9 @@ mod tests {
             result: None,
             started_at: None,
             completed_at: None,
+            lease_token_sha256: None,
+            lease_issuer: None,
+            env_incarnation: None,
         };
         assert_eq!(m.id, "2MNfNTxePfZ1pnY5gKVLkwsVRXv");
         assert_eq!(m.synthetics_id, "mon-1");
