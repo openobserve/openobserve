@@ -3,6 +3,7 @@ import { queryClient } from "@/composables/query/queryClient";
 import { ref, computed } from "vue";
 import { useStore } from "vuex";
 import {
+  FIELD_VALUES_MAX_RANGE_HOURS,
   fieldValuesTruncated,
   fieldValuesUnavailable,
   getFieldValuesForSuggestion,
@@ -10,7 +11,7 @@ import {
   pendingFieldValues,
   requestFieldValues,
   requestFieldValuesMatching,
-  type FieldValuesTimeRange,
+  type FieldValuesWindow,
   type StreamContext,
   type ValueLookupOptions,
 } from "@/composables/fieldValueStore";
@@ -161,15 +162,16 @@ const useSqlSuggestions = () => {
   const sameStreamContext = (a: StreamContext, b: StreamContext | null): boolean =>
     !!b && a.org === b.org && a.streamType === b.streamType && a.streamName === b.streamName;
 
-  const validRange = (range: FieldValuesTimeRange | null): FieldValuesTimeRange | null =>
+  // `capped` survives so a host can tell the user only part of the range was searched.
+  const validRange = (range: FieldValuesWindow | null): FieldValuesWindow | null =>
     !!range &&
     Number.isFinite(range.startTime) &&
     Number.isFinite(range.endTime) &&
     range.startTime < range.endTime
-      ? { startTime: range.startTime, endTime: range.endTime }
+      ? { startTime: range.startTime, endTime: range.endTime, capped: range.capped }
       : null;
 
-  type RangeSource = FieldValuesTimeRange | null | (() => FieldValuesTimeRange | null);
+  type RangeSource = FieldValuesWindow | null | (() => FieldValuesWindow | null);
   // Null means the default fifteen-minute lookback; a dashboard panel or a page sets its own range.
   let rangeSource: RangeSource = null;
 
@@ -178,7 +180,7 @@ const useSqlSuggestions = () => {
     rangeSource = typeof range === "function" ? range : validRange(range);
   };
 
-  const readRange = (source: RangeSource): FieldValuesTimeRange | null =>
+  const readRange = (source: RangeSource): FieldValuesWindow | null =>
     typeof source === "function" ? validRange(source()) : source;
 
   // A function is compared by identity: its window moving with the clock is not a new setting.
@@ -202,10 +204,10 @@ const useSqlSuggestions = () => {
   };
 
   /** Field values for one column: in-session first, then stored, then the server's, deduplicated. */
-  const resolveFieldValues = async (
+  const resolveFieldValuesDetailed = async (
     fieldName: string,
     options: ValueLookupOptions = {},
-  ): Promise<string[]> => {
+  ): Promise<{ values: string[]; cappedToHours?: number }> => {
     // Search hits put raw values here, null and numbers included, and the menu works on text.
     const inSession = (
       Array.from(autoCompleteData.value.fieldValues?.[fieldName] || new Set()) as unknown[]
@@ -216,7 +218,7 @@ const useSqlSuggestions = () => {
       .filter((v) => v.length <= MAX_VALUE_LENGTH);
     const ctx = readStreamContext();
     if (!ctx) {
-      if (inSession.length) return inSession;
+      if (inSession.length) return { values: inSession };
       throw noValueLookup();
     }
     const source = rangeSource;
@@ -234,7 +236,7 @@ const useSqlSuggestions = () => {
     }
 
     // The stream can change while a lookup is awaited, and the menu must show the current stream's values.
-    if (!lookupUnchanged(ctx, source)) return resolveFieldValues(fieldName, options);
+    if (!lookupUnchanged(ctx, source)) return resolveFieldValuesDetailed(fieldName, options);
     const local = [...new Set([...inSession, ...stored])];
 
     const { prefix: typed = "", ...lookupOptions } = options;
@@ -249,7 +251,7 @@ const useSqlSuggestions = () => {
       !local.length && !fetched?.length && pendingFieldValues(ctx, fieldName, serverOptions);
     // Still answering is not "no values": staying pending lets the editor show its loading row.
     if (slow) fetched = await slow;
-    if (!lookupUnchanged(ctx, source)) return resolveFieldValues(fieldName, options);
+    if (!lookupUnchanged(ctx, source)) return resolveFieldValuesDetailed(fieldName, options);
     let merged = [...new Set([...local, ...(fetched ?? [])])];
 
     const prefix = typed.trim();
@@ -263,14 +265,20 @@ const useSqlSuggestions = () => {
     ) {
       const matching = requestFieldValuesMatching(ctx, fieldName, prefix, serverOptions);
       const matched = await awaitServer(matching);
-      if (!lookupUnchanged(ctx, source)) return resolveFieldValues(fieldName, options);
+      if (!lookupUnchanged(ctx, source)) return resolveFieldValuesDetailed(fieldName, options);
       merged = [...new Set([...merged, ...(matched ?? [])])];
     }
     if (!merged.length && fieldValuesUnavailable(ctx, fieldName, range)) {
       throw new Error("field values unavailable");
     }
-    return merged;
+    return {
+      values: merged,
+      ...(range?.capped ? { cappedToHours: FIELD_VALUES_MAX_RANGE_HOURS } : {}),
+    };
   };
+
+  const resolveFieldValues = (fieldName: string, options: ValueLookupOptions = {}) =>
+    resolveFieldValuesDetailed(fieldName, options).then((result) => result.values);
 
   /**
    * Context suggestions the PARENT still owns: stream names after FROM.
@@ -457,6 +465,7 @@ const useSqlSuggestions = () => {
     updateStreamKeywords,
     setServerFunctions,
     resolveFieldValues,
+    resolveFieldValuesDetailed,
     setValuesTimeRange,
     defaultSuggestions, // Export for use in natural language detection
   };

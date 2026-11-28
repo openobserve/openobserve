@@ -14,13 +14,13 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import type { FilterField } from "@/utils/query/filterBar";
-import type { FilterBarExtraSection } from "./QueryFilterBar.types";
+import type { FilterBarExtraSection, LoadedFieldValues } from "./QueryFilterBar.types";
 
 export interface SqlFilterBuilderProps {
   /** The page's WHERE text; the builder parses it and writes it back. */
   query: string;
   fields: FilterField[];
-  loadValues?: (field: string, search: string) => Promise<string[]>;
+  loadValues?: (field: string, search: string) => Promise<string[] | LoadedFieldValues>;
   fieldsLoading?: boolean;
   /** Offer `match_all` full-text search for typed words. */
   freeText?: boolean;

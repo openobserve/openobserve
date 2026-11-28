@@ -1321,6 +1321,7 @@
     "loadingFields": "Loading fields…",
     "noFields": "No matching fields",
     "noValues": "No suggestions. Type a value and press Enter",
+    "noCappedValues": "No values in the last {hours} h of the selected range. Type a value and press Enter",
     "noOperators": "No matching conditions",
     "removeFilter": "Remove filter",
     "clearAll": "Clear all filters",

@@ -16,7 +16,7 @@
 import type { I18nText } from "@/types/i18n";
 import type { FilterField } from "@/utils/query/filterBar";
 import type { FilterIssue, FilterLayout, FilterProfileName } from "./filterProfiles";
-import type { FilterValueLabel } from "./QueryFilterBar.types";
+import type { FilterValueLabel, LoadedFieldValues } from "./QueryFilterBar.types";
 
 export interface FilterBuilderProps {
   /** Which page's rules apply: operators, layout, depth, connectors, limits and the saved format. */
@@ -25,7 +25,7 @@ export interface FilterBuilderProps {
   modelValue: unknown;
   fields: FilterField[];
   /** Suggested values for a field; `search` is the typed needle, empty for the first page. */
-  loadValues?: (field: string, search: string) => Promise<string[]>;
+  loadValues?: (field: string, search: string) => Promise<string[] | LoadedFieldValues>;
   /** Values listed first for every field, e.g. dashboard `$variables`. */
   extraValueSuggestions?: (field: string) => string[];
   /** A soft warning for a chip's value, e.g. one not seen in recent data. */

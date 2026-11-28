@@ -777,6 +777,24 @@ describe("QueryFilterBar", () => {
       await vi.waitFor(() => expect(rowKeys()).toContain("error"));
     });
 
+    it("says when the empty lookup was capped to part of the range", async () => {
+      const loadValues = vi.fn(async () => ({ values: [] as string[], cappedToHours: 24 }));
+      mountBar({ loadValues });
+      await pickEquals("level");
+      await vi.waitFor(() =>
+        expect(document.body.textContent).toContain(
+          "No values in the last 24 h of the selected range",
+        ),
+      );
+      await leave();
+      loadValues.mockResolvedValue({ values: [] as string[] });
+      await pickEquals("level");
+      await vi.waitFor(() =>
+        expect(document.body.textContent).toContain("No suggestions. Type a value and press Enter"),
+      );
+      expect(document.body.textContent).not.toContain("No values in the last");
+    });
+
     it("drops a slow answer for a field the user already left", async () => {
       let landLevel: (values: string[]) => void = () => {};
       const loadValues = vi.fn((field: string) =>

@@ -47,7 +47,7 @@ import { parseShorthand, type ShorthandFilter } from "@/utils/query/filterBarPar
 import { leafConditions } from "./codecs/types";
 import { PLACEHOLDER } from "./codecs/dashboardFilterCodec";
 import { arityFor, type FilterEditorConfig } from "./filterProfiles";
-import type { FilterBarExtraSection, FilterValueLabel } from "./QueryFilterBar.types";
+import type { FilterBarExtraSection, FilterValueLabel, LoadedFieldValues } from "./QueryFilterBar.types";
 
 export type FilterBarStep = "field" | "operator" | "value";
 
@@ -76,7 +76,7 @@ export interface FilterBarEditorOptions {
   tree: Ref<FilterGroup>;
   fields: Ref<FilterField[]>;
   config: Ref<FilterEditorConfig>;
-  loadValues: Ref<((field: string, search: string) => Promise<string[]>) | undefined>;
+  loadValues: Ref<((field: string, search: string) => Promise<string[] | LoadedFieldValues>) | undefined>;
   /** Values offered before the loaded ones for every field, e.g. dashboard `$variables`. */
   extraValues?: Ref<((field: string) => string[]) | undefined>;
   valueLabel?: Ref<((field: string, value: string) => FilterValueLabel | undefined) | undefined>;
@@ -180,6 +180,8 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
   const armedId = ref<string | null>(null);
   const values = ref<string[]>([]);
   const valuesLoading = ref(false);
+  // Hours the last lookup was narrowed to, when it covered only part of the page's range.
+  const valuesCappedToHours = ref<number | null>(null);
   // The value of a chip being edited, until the user types over it.
   const editedValue = ref<string | null>(null);
 
@@ -488,6 +490,7 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
     valueRequest++;
     values.value = [];
     valuesLoading.value = false;
+    valuesCappedToHours.value = null;
   }
 
   // Not cached here: a host's loader reads its stream, metric or time range at call time, and caches by them itself.
@@ -501,9 +504,15 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
     valuesLoading.value = true;
     try {
       const result = await loader(field, search);
-      if (request === valueRequest) values.value = result;
+      if (request === valueRequest) {
+        valuesCappedToHours.value = Array.isArray(result) ? null : (result.cappedToHours ?? null);
+        values.value = Array.isArray(result) ? result : result.values;
+      }
     } catch {
-      if (request === valueRequest) values.value = [];
+      if (request === valueRequest) {
+        values.value = [];
+        valuesCappedToHours.value = null;
+      }
     } finally {
       if (request === valueRequest) valuesLoading.value = false;
     }
@@ -1052,6 +1061,7 @@ export function useFilterBarEditor(options: FilterBarEditorOptions) {
     autoHighlight,
     searchPlaceholder,
     valuesLoading,
+    valuesCappedToHours,
     targetGroup,
     select,
     onEnter,

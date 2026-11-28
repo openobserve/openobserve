@@ -41,6 +41,12 @@ export interface FilterValueLabel {
   detail?: I18nText;
 }
 
+export interface LoadedFieldValues {
+  values: string[];
+  /** Set when the lookup covered only the latest `cappedToHours` of the page's range. */
+  cappedToHours?: number;
+}
+
 /** Rows from the host, not filters; each picks through `extra-select` with its own key. */
 export interface FilterBarExtraSection {
   title: I18nText;
@@ -61,7 +67,7 @@ export interface QueryFilterBarProps {
   /** Overrides the profile's layout. */
   layout?: FilterLayout;
   /** Suggested values for a field; `search` is the typed needle, empty for the first page. */
-  loadValues?: (field: string, search: string) => Promise<string[]>;
+  loadValues?: (field: string, search: string) => Promise<string[] | LoadedFieldValues>;
   /** Values listed first for every field, e.g. dashboard `$variables`. */
   extraValueSuggestions?: (field: string) => string[];
   /** Listed above the fields while the bar is empty and nothing is typed. */
