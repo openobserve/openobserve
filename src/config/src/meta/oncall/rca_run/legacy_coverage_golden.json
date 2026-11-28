@@ -1,0 +1,111 @@
+{
+  "verdict": {
+    "probable_cause": "pool exhausted",
+    "claimed_confidence": "high",
+    "claimed_outcome": "root_cause_identified",
+    "page_recommendation": {
+      "action": "page",
+      "reason": "customers see errors"
+    },
+    "report_ref": "report"
+  },
+  "ledger": {
+    "hypotheses": [
+      {
+        "id": "h1",
+        "statement": "h1 statement",
+        "status": "root_cause",
+        "reason": "h1 reason",
+        "evidence": [
+          {
+            "id": "e1",
+            "tool": "PrometheusRangeQuery",
+            "query": "pool_active",
+            "polarity": "supports",
+            "strength": "decisive",
+            "observation": "e1 obs",
+            "first_cited_seq": 1
+          },
+          {
+            "id": "e2",
+            "tool": "GetLatestTraces",
+            "query": "slow",
+            "polarity": "supports",
+            "strength": "decisive",
+            "observation": "e2 obs",
+            "first_cited_seq": 1
+          }
+        ],
+        "lead_ids": [],
+        "first_seen_seq": 1,
+        "history": []
+      },
+      {
+        "id": "h2",
+        "statement": "h2 statement",
+        "status": "ruled_out",
+        "reason": "h2 reason",
+        "evidence": [
+          {
+            "id": "e3",
+            "tool": "SearchSQL",
+            "query": "SELECT * FROM app",
+            "polarity": "rules_out",
+            "strength": "supporting",
+            "observation": "e3 obs",
+            "first_cited_seq": 2
+          }
+        ],
+        "lead_ids": [],
+        "first_seen_seq": 2,
+        "history": []
+      }
+    ],
+    "truncations": 0
+  },
+  "tool_log": [
+    {
+      "call_id": "call_1",
+      "tool": "PrometheusRangeQuery",
+      "key_arg": "pool_active",
+      "success": true,
+      "started_at_us": 1,
+      "duration_ms": 12,
+      "signal": "metrics",
+      "target": {
+        "signal": "metrics",
+        "streams": []
+      },
+      "result_summary": "call_1 summary"
+    },
+    {
+      "call_id": "call_2",
+      "tool": "GetLatestTraces",
+      "key_arg": "slow",
+      "success": true,
+      "started_at_us": 2,
+      "duration_ms": 12,
+      "signal": "traces",
+      "target": {
+        "signal": "traces",
+        "streams": []
+      },
+      "result_summary": "call_2 summary"
+    },
+    {
+      "call_id": "call_3",
+      "tool": "SearchSQL",
+      "key_arg": "SELECT * FROM app",
+      "success": true,
+      "started_at_us": 3,
+      "duration_ms": 12,
+      "signal": "logs",
+      "target": {
+        "signal": "logs",
+        "streams": []
+      },
+      "result_summary": "call_3 summary"
+    }
+  ],
+  "grade_json": "{\"band\":\"high\",\"claimed\":\"high\",\"graded\":\"high\",\"reasons\":[\"two_decisive_classes_and_ruled_out\"],\"decisive_classes\":[\"metrics\",\"traces\"],\"ruled_out\":[\"h2 statement\"],\"unverified\":[],\"subject_id\":\"h1\"}"
+}

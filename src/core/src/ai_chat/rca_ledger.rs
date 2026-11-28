@@ -23,8 +23,8 @@ use config::{
         oncall::{
             confidence::{SignalClass, ToolCallRecord, signal_class, stream_type},
             rca_run::{
-                LedgerCall, LedgerTool, RcaSubmit, change_rows, evidence_target, exit_code,
-                observed_window, parse_submit, summarize_result,
+                LedgerCall, LedgerTool, RcaSubmit, call_coverage, change_rows, evidence_target,
+                exit_code, observed_window, parse_submit, summarize_result,
             },
         },
     },
@@ -371,7 +371,7 @@ fn tool_record(call: &ToolPart<'_>) -> Option<ToolCallRecord> {
     } else {
         signal_class(call.tool, &input)
     };
-    let (result_summary, result_count, error_type, observed) = match (body, failure) {
+    let (result_summary, result_count, error_type, observed, coverage) = match (body, failure) {
         (Some(body), None) => {
             let (summary, count) = summarize_result(call.tool, &body);
             (
@@ -379,12 +379,14 @@ fn tool_record(call: &ToolPart<'_>) -> Option<ToolCallRecord> {
                 count,
                 None,
                 observed_window(call.tool, &body, &target),
+                Some(call_coverage(call.tool, &input, &body, &target)),
             )
         }
         (_, failure) => (
             String::new(),
             None,
             Some(failure.unwrap_or_else(|| error_text(state.get("error")))),
+            None,
             None,
         ),
     };
@@ -407,6 +409,7 @@ fn tool_record(call: &ToolPart<'_>) -> Option<ToolCallRecord> {
         observed,
         change_rows,
         result_summary,
+        coverage,
     })
 }
 
@@ -436,6 +439,8 @@ pub(crate) mod tests {
     pub(crate) const INCIDENT_ARG: &str = r#"{"incident_id":"inc_1"}"#;
     pub(crate) const H1: &str = "The orders-db pool ran dry";
     pub(crate) const H2: &str = "A node ran out of CPU";
+    const EVIDENCE_START: i64 = 1_792_179_000_000_000;
+    const EVIDENCE_END: i64 = EVIDENCE_START + 3_600_000_000;
 
     /// One evidence item of a `record_hypothesis` input.
     pub(crate) fn item(id: &str, tool: &str, query: &str, polarity: &str, strength: &str) -> Value {
@@ -1595,5 +1600,628 @@ pub(crate) mod tests {
         assert_eq!(actual.calls.len(), 4);
         assert!(actual.open_question.is_some());
         assert_eq!(without_seqs(actual), without_seqs(expected));
+    }
+
+    fn produced_record(id: &str, tool: &str, input: Value, body: Value) -> ToolCallRecord {
+        let mut session = Session::new();
+        session.message("msg_a1", "assistant", json!({"created":T}));
+        session.tool(
+            "msg_a1",
+            id,
+            &format!("o2_{tool}"),
+            "completed",
+            input,
+            json!({"output":body.to_string()}),
+            100,
+            110,
+        );
+        decode_run(&session.events).tool_log.remove(0)
+    }
+
+    fn timed_sql(sql: &str, start: i64, end: i64) -> Value {
+        json!({"type":"logs", "request_body":{"query":{"sql":sql, "start_time":start, "end_time":end, "from":0}}})
+    }
+
+    fn rule_item(record: &ToolCallRecord) -> Value {
+        let mut item = item("e3", "SearchSQL", "", "rules_out", "decisive");
+        item["ref"] = json!(config::meta::oncall::confidence::call_ref(&record.call_id));
+        item["claim_scope"] =
+            json!({"stream":"db_logs", "start_us":EVIDENCE_START, "end_us":EVIDENCE_END});
+        item
+    }
+
+    fn produced_grade(
+        mut records: Vec<ToolCallRecord>,
+        rules: Vec<Value>,
+        trust: &config::meta::oncall::confidence::GradeTrust,
+    ) -> config::meta::oncall::confidence::ConfidenceGrade {
+        use std::collections::BTreeMap;
+
+        use config::meta::oncall::{confidence::grade_confidence_with, rca_run::build_ledger};
+
+        records.extend([
+            produced_record(
+                "m1",
+                "PrometheusRangeQuery",
+                json!({"query":"up"}),
+                json!({"data":{"result":[]}}),
+            ),
+            produced_record(
+                "l1",
+                "SearchSQL",
+                timed_sql("SELECT * FROM app", EVIDENCE_START, EVIDENCE_END),
+                json!({"hits":[{}], "is_partial":false}),
+            ),
+        ]);
+        let calls = [
+            LedgerCall {
+                seq: 1,
+                at_us: 1,
+                tool: LedgerTool::Hypothesis,
+                input: hypothesis(
+                    "h1",
+                    "pool exhausted",
+                    "root_cause",
+                    vec![
+                        item("e1", "PrometheusRangeQuery", "up", "supports", "decisive"),
+                        item(
+                            "e2",
+                            "SearchSQL",
+                            "SELECT * FROM app",
+                            "supports",
+                            "decisive",
+                        ),
+                    ],
+                ),
+            },
+            LedgerCall {
+                seq: 2,
+                at_us: 2,
+                tool: LedgerTool::Hypothesis,
+                input: hypothesis("h2", "DB host fault", "ruled_out", rules),
+            },
+        ];
+        let (ledger, blind_spots, _) = build_ledger(&calls, Some(3));
+        let submit = parse_submit(&json!({"markdown":"report", "verdict":verdict("pool exhausted", "high", "root_cause_identified")})).unwrap();
+        grade_confidence_with(
+            submit.verdict.as_ref().unwrap(),
+            ledger.as_ref(),
+            &blind_spots,
+            &records,
+            &BTreeMap::new(),
+            trust,
+        )
+    }
+
+    #[test]
+    fn raw_metadata_free_legacy_runs_keep_their_high_grade() {
+        use std::collections::BTreeMap;
+
+        use config::meta::oncall::{
+            agent::Confidence,
+            rca_run::{EndedBy, RCA_STAGES, RunEndInput, record_run_end},
+        };
+
+        let stages = RCA_STAGES.map(|(name, _)| name);
+        for extra in [false, true] {
+            let mut session = ledger_session(&stages);
+            if extra {
+                session.tool(
+                    "msg_a1",
+                    "legacy_extra",
+                    "o2_SearchSQL",
+                    "completed",
+                    timed_sql(
+                        "SELECT * FROM app ORDER BY _timestamp ASC",
+                        EVIDENCE_START,
+                        EVIDENCE_END,
+                    ),
+                    json!({"output":json!({"hits":[{"_timestamp":EVIDENCE_START + 60_000_000}],
+                        "next_after":null}).to_string()}),
+                    3_500,
+                    3_501,
+                );
+            }
+            submit(
+                &mut session,
+                "legacy_report",
+                "completed",
+                json!({"markdown":"report", "verdict":verdict(H1, "high", "root_cause_identified")}),
+                4_000,
+            );
+            let transcript = decode_run(&session.events);
+            assert!(transcript.tool_log.iter().all(|record| {
+                record
+                    .coverage
+                    .as_ref()
+                    .is_none_or(|coverage| !coverage.has_grading_metadata())
+            }));
+            if extra {
+                let coverage = transcript
+                    .tool_log
+                    .iter()
+                    .find(|record| record.call_id == "call_legacy_extra")
+                    .unwrap()
+                    .coverage
+                    .as_ref()
+                    .unwrap();
+                assert!(coverage.requested_window.is_some());
+                assert!(coverage.effective_window.is_some());
+                assert_eq!(coverage.page_offset, Some(0));
+                assert_eq!(coverage.observed_from_us, Some(EVIDENCE_START + 60_000_000));
+            }
+            let end = record_run_end(&RunEndInput {
+                submit: transcript.submit.as_ref(),
+                calls: &transcript.calls,
+                tool_log: &transcript.tool_log,
+                stages_run: &transcript.stages_run,
+                ended_by: EndedBy::Agent,
+                completed: true,
+                steer_authors: &BTreeMap::new(),
+                ended_at_us: us(5_000),
+            });
+            let grade = end.record.grade.unwrap();
+            assert_eq!(
+                (grade.claimed, grade.graded, grade.band),
+                (Confidence::High, Confidence::High, Confidence::High)
+            );
+            assert_eq!(grade.ruled_out, [H2]);
+        }
+    }
+
+    #[test]
+    fn raw_partial_reads_and_narrowed_windows_cannot_rule_out() {
+        use config::meta::oncall::{agent::Confidence, confidence::GradeTrust};
+
+        for (body, counts) in [
+            (json!({"hits":[], "is_partial":true}), false),
+            (
+                json!({"hits":[], "is_partial":false, "has_more":true}),
+                false,
+            ),
+            (json!({"hits":[], "is_partial":false}), true),
+            (json!({"hits":[], "has_more":false}), true),
+            (
+                json!({"hits":[], "is_partial":false, "new_start_time":EVIDENCE_START + 1, "new_end_time":EVIDENCE_END}),
+                false,
+            ),
+            (
+                json!({"hits":[], "is_partial":false, "next_after":{"id":7}}),
+                false,
+            ),
+            (json!({"hits":[]}), false),
+        ] {
+            let record = produced_record(
+                "r1",
+                "SearchSQL",
+                timed_sql("SELECT * FROM db_logs", EVIDENCE_START, EVIDENCE_END),
+                body.clone(),
+            );
+            let evidence = rule_item(&record);
+            let grade = produced_grade(vec![record], vec![evidence], &GradeTrust::default());
+            assert_eq!(!grade.ruled_out.is_empty(), counts, "{body}");
+            assert_eq!(
+                grade.graded,
+                if counts {
+                    Confidence::High
+                } else {
+                    Confidence::Medium
+                },
+                "{body}"
+            );
+        }
+    }
+
+    #[test]
+    fn raw_complete_reads_must_cover_the_claim_without_a_gap() {
+        use config::meta::oncall::confidence::GradeTrust;
+
+        let mid = EVIDENCE_START + 1_800_000_000;
+        for (second_start, counts) in [(mid + 1, true), (mid + 2, false)] {
+            let first = produced_record(
+                "r1",
+                "SearchSQL",
+                timed_sql("SELECT * FROM db_logs", EVIDENCE_START, mid),
+                json!({"hits":[], "is_partial":false}),
+            );
+            let second = produced_record(
+                "r2",
+                "SearchSQL",
+                timed_sql("SELECT * FROM db_logs", second_start, EVIDENCE_END),
+                json!({"hits":[], "is_partial":false}),
+            );
+            let mut evidence = vec![rule_item(&first), rule_item(&second)];
+            evidence[1]["id"] = json!("e4");
+            let grade = produced_grade(vec![first, second], evidence, &GradeTrust::default());
+            assert_eq!(!grade.ruled_out.is_empty(), counts);
+        }
+    }
+
+    #[test]
+    fn raw_search_cannot_prove_absence_across_regions() {
+        use config::meta::oncall::confidence::GradeTrust;
+
+        let record = produced_record(
+            "r1",
+            "SearchSQL",
+            timed_sql("SELECT * FROM db_logs", EVIDENCE_START, EVIDENCE_END),
+            json!({"hits":[], "is_partial":false}),
+        );
+        let evidence = rule_item(&record);
+        let trust = GradeTrust {
+            super_cluster: true,
+            serving_region: Some("west".into()),
+        };
+        assert!(
+            produced_grade(vec![record.clone()], vec![evidence.clone()], &trust)
+                .ruled_out
+                .is_empty()
+        );
+        let trust = GradeTrust {
+            super_cluster: false,
+            serving_region: Some("west".into()),
+        };
+        let mut wrong_region = evidence;
+        wrong_region["claim_scope"]["region"] = json!("east");
+        assert!(
+            produced_grade(vec![record], vec![wrong_region], &trust)
+                .ruled_out
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn raw_service_scope_needs_positive_selectors() {
+        use config::meta::oncall::confidence::GradeTrust;
+
+        for (selector, counted) in [
+            ("service_name = 'checkout'", true),
+            ("'checkout' = service_name", true),
+            ("service_name IN ('checkout', 'billing')", true),
+            ("service_name = 'checkout' AND level = 'error'", true),
+            ("(service_name = 'checkout')", true),
+            ("service_name != 'checkout'", false),
+            ("NOT (service_name = 'checkout')", false),
+            ("service_name NOT IN ('checkout')", false),
+            ("service_name LIKE 'checkout%'", false),
+            ("service_name NOT LIKE 'checkout%'", false),
+            ("service_name = 'checkout' OR level = 'error'", false),
+            (
+                "service_name = 'checkout' AND service_name != 'checkout'",
+                false,
+            ),
+            ("service_name = 'billing' AND message = 'checkout'", false),
+            ("message = 'checkout'", false),
+        ] {
+            for tool in ["SearchSQL", "GetLatestTraces"] {
+                let sql = format!("SELECT * FROM db_logs WHERE {selector}");
+                let input = if tool == "SearchSQL" {
+                    timed_sql(&sql, EVIDENCE_START, EVIDENCE_END)
+                } else {
+                    json!({"stream_name":"db_logs", "start_time":EVIDENCE_START,
+                        "end_time":EVIDENCE_END, "filter":selector})
+                };
+                let record =
+                    produced_record("scope", tool, input, json!({"hits":[], "is_partial":false}));
+                let mut evidence = rule_item(&record);
+                evidence["tool"] = json!(tool);
+                evidence["claim_scope"]["service"] = json!("checkout");
+                let grade = produced_grade(vec![record], vec![evidence], &GradeTrust::default());
+                assert_eq!(!grade.ruled_out.is_empty(), counted, "{tool}: {selector}");
+            }
+        }
+    }
+
+    #[test]
+    fn raw_native_service_scope_binds_the_resolved_service() {
+        use config::meta::oncall::confidence::GradeTrust;
+
+        for (service, counted) in [("checkout", true), ("billing", false)] {
+            let record = produced_record(
+                "native_scope",
+                "CompareServiceVersions",
+                json!({"request_body":{"service":service}}),
+                json!({"service":service, "is_partial":false,
+                    "_o2_request_bounds":{"effective_window":{"start_us":EVIDENCE_START, "end_us":EVIDENCE_END}},
+                    "arms":{"a":{"version":"v2"}, "b":{"version":"v1"}},
+                    "traces":{"insufficient":false, "error_rate":{"delta":0.2, "lo":0.1, "hi":0.3,
+                        "insufficient":false, "straddles_zero":false, "ci_kind":"variance"}}}),
+            );
+            let mut evidence = rule_item(&record);
+            evidence["tool"] = json!("CompareServiceVersions");
+            evidence["claim_scope"]
+                .as_object_mut()
+                .unwrap()
+                .remove("stream");
+            evidence["claim_scope"]["service"] = json!("checkout");
+            let grade = produced_grade(vec![record], vec![evidence], &GradeTrust::default());
+            assert_eq!(!grade.ruled_out.is_empty(), counted, "{service}");
+        }
+    }
+
+    #[test]
+    fn raw_series_store_the_shared_onset_and_flat_series_store_none() {
+        for (step, expected) in [
+            (true, Some(EVIDENCE_START + 50 * 60_000_000)),
+            (false, None),
+        ] {
+            let values: Vec<Value> = (0..60)
+                .map(|minute| {
+                    let value = if step && minute >= 50 {
+                        100.0
+                    } else {
+                        10.0 + (minute % 3) as f64
+                    };
+                    json!([EVIDENCE_START / 1_000_000 + minute * 60, value.to_string()])
+                })
+                .collect();
+            let record = produced_record(
+                "series",
+                "PrometheusRangeQuery",
+                json!({"query":"error_rate", "start":EVIDENCE_START / 1_000_000, "end":EVIDENCE_END / 1_000_000}),
+                json!({"data":{"resultType":"matrix", "result":[{"metric":{}, "values":values}]}}),
+            );
+            assert_eq!(record.coverage.unwrap().observed_from_us, expected);
+        }
+    }
+
+    #[test]
+    fn raw_sql_buckets_use_each_series_own_baseline() {
+        let mut rows = Vec::new();
+        for minute in 0..60 {
+            let at = EVIDENCE_START + minute * 60_000_000;
+            rows.push(json!({"bucket":at, "service_name":"rising", "host_id":1,
+                "value":if minute < 50 {10} else {100}}));
+            rows.push(json!({"bucket":at, "service_name":"flat", "host_id":2,
+                "value":1000}));
+        }
+        let counted_rows: Vec<_> = rows
+            .iter()
+            .cloned()
+            .map(|mut row| {
+                row.as_object_mut().unwrap().remove("host_id");
+                row
+            })
+            .collect();
+        for (sql, rows) in [
+            (
+                "SELECT histogram(_timestamp, '1 minute') AS bucket, service_name, host_id, \
+                AVG(duration_ms) AS value FROM app GROUP BY bucket, service_name, host_id",
+                rows,
+            ),
+            (
+                "SELECT histogram(_timestamp, '1 minute') AS bucket, service_name, \
+                COUNT(_timestamp) AS value FROM app GROUP BY bucket, service_name",
+                counted_rows,
+            ),
+        ] {
+            let record = produced_record(
+                "buckets",
+                "SearchSQL",
+                timed_sql(sql, EVIDENCE_START, EVIDENCE_END),
+                json!({"hits":rows, "is_partial":false}),
+            );
+            assert_eq!(
+                record.coverage.unwrap().observed_from_us,
+                Some(EVIDENCE_START + 50 * 60_000_000),
+                "{sql}"
+            );
+        }
+    }
+
+    #[test]
+    fn raw_rows_date_only_ascending_or_aggregated_reads_with_time_columns() {
+        let rows = json!({"hits":[{"_timestamp":EVIDENCE_START + 60_000_000}, {"_timestamp":EVIDENCE_START + 120_000_000}], "is_partial":false});
+        for (sql, body, expected) in [
+            (
+                "SELECT * FROM app ORDER BY _timestamp ASC",
+                rows.clone(),
+                Some(EVIDENCE_START + 60_000_000),
+            ),
+            (
+                "SELECT * FROM app ORDER BY _timestamp DESC LIMIT 10",
+                rows.clone(),
+                None,
+            ),
+            ("SELECT * FROM app LIMIT 10", rows.clone(), None),
+            (
+                "SELECT COALESCE(_timestamp, 0) AS ts FROM app LIMIT 10",
+                json!({"hits":[{"ts":EVIDENCE_START + 60_000_000}], "is_partial":false}),
+                None,
+            ),
+            (
+                "SELECT _timestamp AS ts, (SELECT COUNT(*) FROM app) AS total FROM app LIMIT 10",
+                json!({"hits":[{"ts":1792179060000000_i64,"total":12}]}),
+                None,
+            ),
+            (
+                "SELECT _timestamp AS ts, COUNT(*) OVER () AS total FROM app LIMIT 10",
+                json!({"hits":[{"ts":EVIDENCE_START + 60_000_000,"total":12}]}),
+                None,
+            ),
+            (
+                "SELECT count(*) FROM app ORDER BY _timestamp ASC",
+                json!({"hits":[{"count":12}], "is_partial":false}),
+                None,
+            ),
+            (
+                "SELECT * FROM app ORDER BY _timestamp ASC",
+                json!({"hits":[], "format":"ndjson", "data":json!({"_timestamp":EVIDENCE_START + 60_000_000}).to_string()}),
+                Some(EVIDENCE_START + 60_000_000),
+            ),
+            (
+                "SELECT * FROM app ORDER BY _timestamp ASC",
+                json!({"hits":[], "format":"csv", "data":format!("message,_timestamp\n\"error, seen\",{}\n", EVIDENCE_START + 60_000_000)}),
+                Some(EVIDENCE_START + 60_000_000),
+            ),
+            (
+                "SELECT * FROM app ORDER BY _timestamp ASC",
+                json!({"hits":[], "format":"md_table", "data":format!("| message | _timestamp |\n| --- | --- |\n| error\\|seen | {} |", EVIDENCE_START + 60_000_000)}),
+                Some(EVIDENCE_START + 60_000_000),
+            ),
+            (
+                "SELECT MIN(_timestamp) AS first_seen FROM app",
+                json!({"hits":[{"first_seen":EVIDENCE_START + 60_000_000}]}),
+                Some(EVIDENCE_START + 60_000_000),
+            ),
+            (
+                "SELECT COALESCE(MIN(_timestamp), 0) AS first_seen FROM app",
+                json!({"hits":[{"first_seen":EVIDENCE_START + 60_000_000}]}),
+                Some(EVIDENCE_START + 60_000_000),
+            ),
+        ] {
+            let record = produced_record(
+                "rows",
+                "SearchSQL",
+                timed_sql(sql, EVIDENCE_START, EVIDENCE_END),
+                body,
+            );
+            assert_eq!(record.coverage.unwrap().observed_from_us, expected, "{sql}");
+        }
+    }
+
+    #[test]
+    fn produced_coverage_and_ledger_fields_survive_record_and_summary() {
+        use std::collections::BTreeMap;
+
+        use config::meta::{
+            alerts::rca_runs::RunState,
+            oncall::rca_run::{
+                EndedBy, RcaRunRecord, RunEndInput, record_run_end, summary_from_record,
+            },
+        };
+
+        let record = produced_record(
+            "rows",
+            "SearchSQL",
+            timed_sql(
+                "SELECT * FROM app ORDER BY _timestamp ASC",
+                EVIDENCE_START,
+                EVIDENCE_END,
+            ),
+            json!({"hits":[{"_timestamp":EVIDENCE_START + 60_000_000}], "is_partial":false}),
+        );
+        let mut hypothesis = hypothesis(
+            "h1",
+            "pool exhausted",
+            "root_cause",
+            vec![item(
+                "e1",
+                "SearchSQL",
+                "SELECT * FROM app ORDER BY _timestamp ASC",
+                "supports",
+                "decisive",
+            )],
+        );
+        hypothesis["prediction"] = json!("Errors rise");
+        hypothesis["refutation"] = json!("Errors stay flat");
+        hypothesis["checks"] = json!([{"check":"silence", "result":"unchecked"}]);
+        let calls = [LedgerCall {
+            seq: 1,
+            at_us: 1,
+            tool: LedgerTool::Hypothesis,
+            input: hypothesis,
+        }];
+        let log = [record];
+        let authors = BTreeMap::new();
+        let end = record_run_end(&RunEndInput {
+            submit: None,
+            calls: &calls,
+            tool_log: &log,
+            stages_run: &[],
+            ended_by: EndedBy::Agent,
+            completed: false,
+            steer_authors: &authors,
+            ended_at_us: 2,
+        });
+        let stored: RcaRunRecord =
+            serde_json::from_str(&serde_json::to_string(&end.record).unwrap()).unwrap();
+        assert_eq!(stored, end.record);
+        assert_eq!(stored.evidence[0].coverage, log[0].coverage);
+        assert_eq!(stored.cited_calls[0].coverage, log[0].coverage);
+        let summary = summary_from_record("run", RunState::Failed, "v".into(), &stored);
+        assert_eq!(summary.evidence[0].coverage, log[0].coverage);
+        assert_eq!(
+            summary.hypotheses[0].prediction.as_deref(),
+            Some("Errors rise")
+        );
+        assert_eq!(summary.hypotheses[0].checks.as_ref().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn raw_native_comparisons_need_variance_and_independent_runtime_evidence() {
+        use std::collections::BTreeMap;
+
+        use config::meta::oncall::{
+            agent::Confidence,
+            confidence::{GradeTrust, call_ref, grade_confidence_with},
+            rca_run::build_ledger,
+        };
+
+        for (ci_kind, corroborating_tool, expected) in [
+            ("variance", "GetLatestTraces", Confidence::Medium),
+            ("variance", "SearchSQL", Confidence::High),
+            ("sketch_band", "SearchSQL", Confidence::Medium),
+        ] {
+            let native = produced_record(
+                "native",
+                "CompareServiceVersions",
+                json!({"request_body":{"service":"checkout"}}),
+                json!({"service":"checkout", "arms":{"a":{"version":"v2", "start_time":EVIDENCE_START, "end_time":EVIDENCE_END},
+                    "b":{"version":"v1", "start_time":EVIDENCE_START, "end_time":EVIDENCE_END}},
+                    "traces":{"insufficient":false, "error_rate":{"delta":0.2, "lo":0.1, "hi":0.3,
+                        "insufficient":false, "straddles_zero":false, "ci_kind":ci_kind}}}),
+            );
+            let corroborating = produced_record(
+                "corroboration",
+                corroborating_tool,
+                if corroborating_tool == "SearchSQL" {
+                    timed_sql("SELECT * FROM app", EVIDENCE_START, EVIDENCE_END)
+                } else {
+                    json!({"stream_name":"spans", "start_time":EVIDENCE_START, "end_time":EVIDENCE_END})
+                },
+                json!({"hits":[{}], "is_partial":false}),
+            );
+            let rule = produced_record(
+                "rule",
+                "SearchSQL",
+                timed_sql("SELECT * FROM db_logs", EVIDENCE_START, EVIDENCE_END),
+                json!({"hits":[], "is_partial":false}),
+            );
+            let mut native_item = item("e1", "CompareServiceVersions", "", "supports", "decisive");
+            native_item["ref"] = json!(call_ref(&native.call_id));
+            let mut corroboration = item("e2", corroborating_tool, "", "supports", "decisive");
+            corroboration["ref"] = json!(call_ref(&corroborating.call_id));
+            let calls = [
+                LedgerCall {
+                    seq: 1,
+                    at_us: 1,
+                    tool: LedgerTool::Hypothesis,
+                    input: hypothesis(
+                        "h1",
+                        "pool exhausted",
+                        "root_cause",
+                        vec![native_item, corroboration],
+                    ),
+                },
+                LedgerCall {
+                    seq: 2,
+                    at_us: 2,
+                    tool: LedgerTool::Hypothesis,
+                    input: hypothesis("h2", "DB host fault", "ruled_out", vec![rule_item(&rule)]),
+                },
+            ];
+            let (ledger, spots, _) = build_ledger(&calls, Some(3));
+            let submit = parse_submit(&json!({"markdown":"report", "verdict":verdict("pool exhausted", "high", "root_cause_identified")})).unwrap();
+            let grade = grade_confidence_with(
+                submit.verdict.as_ref().unwrap(),
+                ledger.as_ref(),
+                &spots,
+                &[native, corroborating, rule],
+                &BTreeMap::new(),
+                &GradeTrust::default(),
+            );
+            assert_eq!(grade.graded, expected, "{ci_kind}, {corroborating_tool}");
+        }
     }
 }

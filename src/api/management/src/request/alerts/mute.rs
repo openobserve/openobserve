@@ -70,11 +70,13 @@ pub async fn mute_alert(
         use openobserve_core::alerts::mute;
 
         let source = mute::source_of(super::ack::ack_source(delegated.as_deref(), &headers));
+        let caller =
+            super::ack::caller_of(&org_id, &user_email.user_id, delegated.as_deref(), &headers);
         let target = match target_of(&org_id, &alert_id).await {
             Ok(t) => t,
             Err(resp) => return resp,
         };
-        match mute::mute(&target, &req, &user_email.user_id, source).await {
+        match mute::mute(&target, &req, &caller, source).await {
             Ok(body) => created(body),
             Err(e) => error_response(e),
         }
@@ -120,29 +122,33 @@ pub async fn mute_alert(
 pub async fn extend_alert_mute(
     Path((org_id, alert_id, downtime_id)): Path<(String, String, String)>,
     Headers(user_email): Headers<UserEmail>,
+    delegated: Option<Extension<DelegatedCaller>>,
+    headers: HeaderMap,
     #[cfg(feature = "enterprise")] Json(req): Json<AlertMuteExtendRequest>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
+        let caller =
+            super::ack::caller_of(&org_id, &user_email.user_id, delegated.as_deref(), &headers);
         let target = match target_of(&org_id, &alert_id).await {
             Ok(t) => t,
             Err(resp) => return resp,
         };
-        match openobserve_core::alerts::mute::extend(
-            &target,
-            &downtime_id,
-            &req,
-            &user_email.user_id,
-        )
-        .await
-        {
+        match openobserve_core::alerts::mute::extend(&target, &downtime_id, &req, &caller).await {
             Ok(body) => crate::common::meta::http::HttpResponse::json(body),
             Err(e) => error_response(e),
         }
     }
     #[cfg(not(feature = "enterprise"))]
     {
-        let _ = (org_id, alert_id, downtime_id, user_email);
+        let _ = (
+            org_id,
+            alert_id,
+            downtime_id,
+            user_email,
+            delegated,
+            headers,
+        );
         crate::request::downtimes::not_supported()
     }
 }
@@ -181,9 +187,13 @@ pub async fn cancel_alert_mute(
     Path((org_id, alert_id, downtime_id)): Path<(String, String, String)>,
     #[cfg(feature = "enterprise")] Query(query): Query<CancelDowntimeQuery>,
     Headers(user_email): Headers<UserEmail>,
+    delegated: Option<Extension<DelegatedCaller>>,
+    headers: HeaderMap,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
+        let caller =
+            super::ack::caller_of(&org_id, &user_email.user_id, delegated.as_deref(), &headers);
         let target = match target_of(&org_id, &alert_id).await {
             Ok(t) => t,
             Err(resp) => return resp,
@@ -192,7 +202,7 @@ pub async fn cancel_alert_mute(
             &target,
             &downtime_id,
             query.version,
-            &user_email.user_id,
+            &caller,
             None,
         )
         .await
@@ -203,7 +213,14 @@ pub async fn cancel_alert_mute(
     }
     #[cfg(not(feature = "enterprise"))]
     {
-        let _ = (org_id, alert_id, downtime_id, user_email);
+        let _ = (
+            org_id,
+            alert_id,
+            downtime_id,
+            user_email,
+            delegated,
+            headers,
+        );
         crate::request::downtimes::not_supported()
     }
 }
@@ -256,8 +273,8 @@ mod tests {
         let two = || Path(("default".to_string(), "a1".to_string(), "d1".to_string()));
         let responses = [
             mute_alert(one(), user(), None, HeaderMap::new()).await,
-            extend_alert_mute(two(), user()).await,
-            cancel_alert_mute(two(), user()).await,
+            extend_alert_mute(two(), user(), None, HeaderMap::new()).await,
+            cancel_alert_mute(two(), user(), None, HeaderMap::new()).await,
         ];
         for response in responses {
             assert_eq!(response.status(), StatusCode::FORBIDDEN);
@@ -334,6 +351,8 @@ mod tests {
                 Headers(UserEmail {
                     user_id: root.to_string(),
                 }),
+                None,
+                HeaderMap::new(),
             )
         };
         let cancelled = |name: &'static str| {
@@ -390,6 +409,229 @@ mod tests {
         assert!(matches!(ended, Ok(MuteAnswer::Done(_))), "{ended:?}");
         assert!(cancelled("snooze").await);
         assert!(!port.mute_in_force(&org, &snooze).await.unwrap());
+    }
+
+    /// F22 refuses an AI mute of a plain firing, F24 one of a P1 alert in an incident (D34, D40).
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn an_ai_principal_cannot_mute_or_extend_where_a_page_would_go_quiet() {
+        use axum::body::to_bytes;
+        use config::{
+            meta::{
+                alerts::{alert::Alert, priority::AlertPriority},
+                folder::{DEFAULT_FOLDER, Folder, FolderType},
+                user::{SRE_AGENT_EMAIL_PREFIX, SRE_AGENT_EMAIL_SUFFIX, UserRole},
+            },
+            utils::delegation::SCOPE_ASSISTANT,
+        };
+
+        if std::env::var("ZO_META_STORE").is_err() {
+            eprintln!("skipped: needs the meta store CI configures through ZO_META_STORE");
+            return;
+        }
+        std::fs::create_dir_all(&config::get_config().common.data_db_dir).expect("db dir");
+        infra::db_init().await.expect("meta store");
+        infra::table::migrate().await.expect("migrations");
+        let now = config::utils::time::now_micros();
+        let org = format!("ai_mute_{now}");
+        let root = format!("root-{org}@example.com");
+        let agent = format!("{SRE_AGENT_EMAIL_PREFIX}{org}{SRE_AGENT_EMAIL_SUFFIX}");
+        for email in [&root, &agent] {
+            common::infra::config::ORG_USERS.insert(
+                format!("{}/{email}", config::DEFAULT_ORG),
+                infra::table::org_users::OrgUserRecord {
+                    role: UserRole::Root,
+                    token: String::new(),
+                    rum_token: None,
+                    org_id: config::DEFAULT_ORG.to_string(),
+                    email: email.clone(),
+                    created_at: 0,
+                    allow_static_token: false,
+                },
+            );
+        }
+        let folder = Folder {
+            folder_id: DEFAULT_FOLDER.to_string(),
+            name: DEFAULT_FOLDER.to_string(),
+            description: String::new(),
+            icon: None,
+        };
+        infra::table::folders::get_or_create(&org, folder.clone(), FolderType::Downtimes)
+            .await
+            .unwrap();
+        let mut alerts = Vec::new();
+        for (name, priority) in [
+            ("plain", AlertPriority::P1),
+            ("incident-p1", AlertPriority::P1),
+            ("incident-p3", AlertPriority::P3),
+        ] {
+            let id = svix_ksuid::Ksuid::new(None, None);
+            let mut alert = Alert::default();
+            alert.id = Some(id);
+            alert.org_id = org.clone();
+            alert.name = name.to_string();
+            alert.priority = Some(priority);
+            common::infra::config::ALERTS.write().await.insert(
+                db::alerts::alert::cache_alert_key(&org, &id.to_string()),
+                (folder.clone(), alert),
+            );
+            alerts.push(id.to_string());
+        }
+        let [plain, incident_p1, incident_p3] = <[String; 3]>::try_from(alerts).unwrap();
+        for alert_id in [&incident_p1, &incident_p3] {
+            let incident = infra::table::alert_incidents::create(
+                &org,
+                "P2",
+                serde_json::json!({}),
+                "alert",
+                now,
+                Some(alert_id.clone()),
+            )
+            .await
+            .unwrap();
+            infra::table::alert_incidents::add_alert_to_incident(
+                &incident.id,
+                alert_id,
+                alert_id,
+                "alert",
+                now,
+                "test",
+            )
+            .await
+            .unwrap();
+        }
+        let mut mcp = HeaderMap::new();
+        mcp.insert("x-o2-mcp", axum::http::HeaderValue::from_static("loopback"));
+        let assistant = DelegatedCaller {
+            link_id: "lnk_01".to_string(),
+            installation_id: "inst_01".to_string(),
+            org: org.clone(),
+            jti: "jti-0001".to_string(),
+            scope: SCOPE_ASSISTANT.to_string(),
+        };
+        let ai = [
+            (root.clone(), Some(assistant), HeaderMap::new()),
+            (root.clone(), None, mcp),
+            (agent.clone(), None, HeaderMap::new()),
+        ];
+        let user = |email: &str| {
+            Headers(UserEmail {
+                user_id: email.to_string(),
+            })
+        };
+        let mute = |alert_id: &str, email: &str, d: Option<DelegatedCaller>, h: HeaderMap| {
+            mute_alert(
+                Path((org.clone(), alert_id.to_string())),
+                user(email),
+                d.map(Extension),
+                h,
+                Json(AlertMuteRequest {
+                    minutes: Some(30),
+                    ..Default::default()
+                }),
+            )
+        };
+        let rows = || async {
+            let conn = infra::db::get_orm_client_rw().await;
+            infra::table::downtimes::list_with(conn, &org, None)
+                .await
+                .unwrap()
+                .len()
+        };
+
+        for (email, d, h) in &ai {
+            for alert_id in [&plain, &incident_p1] {
+                let before = rows().await;
+                let refused = mute(alert_id, email, d.clone(), h.clone()).await;
+                assert_eq!(
+                    refused.status(),
+                    StatusCode::FORBIDDEN,
+                    "{email} {alert_id}"
+                );
+                assert_eq!(rows().await, before, "a refused mute writes no downtime");
+            }
+        }
+        let low = mute(&incident_p3, &root, ai[1].1.clone(), ai[1].2.clone()).await;
+        assert_eq!(
+            low.status(),
+            StatusCode::CREATED,
+            "a P3 in an incident stays s15's"
+        );
+
+        let muted = mute(&incident_p1, &root, None, HeaderMap::new()).await;
+        assert_eq!(muted.status(), StatusCode::CREATED);
+        let muted: AlertMuteResponse =
+            serde_json::from_slice(&to_bytes(muted.into_body(), usize::MAX).await.unwrap())
+                .unwrap();
+        for (email, d, h) in &ai {
+            let refused = extend_alert_mute(
+                Path((org.clone(), incident_p1.clone(), muted.downtime_id.clone())),
+                user(email),
+                d.clone().map(Extension),
+                h.clone(),
+                Json(AlertMuteExtendRequest {
+                    version: muted.version,
+                    minutes: Some(1440),
+                    until_clear: false,
+                    ends_at: None,
+                }),
+            )
+            .await;
+            assert_eq!(refused.status(), StatusCode::FORBIDDEN, "{email}: extend");
+        }
+        let row = infra::table::downtimes::get_rw(&org, &muted.downtime_id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            row.schedule.ends_at,
+            Some(muted.ends_at),
+            "the person's end stands"
+        );
+
+        let firing = mute(&plain, &root, None, HeaderMap::new()).await;
+        assert_eq!(firing.status(), StatusCode::CREATED);
+        let firing: AlertMuteResponse =
+            serde_json::from_slice(&to_bytes(firing.into_body(), usize::MAX).await.unwrap())
+                .unwrap();
+        let unmute =
+            |alert_id: &String,
+             m: &AlertMuteResponse,
+             (email, d, h): &(String, Option<DelegatedCaller>, HeaderMap)| {
+                cancel_alert_mute(
+                    Path((org.clone(), alert_id.clone(), m.downtime_id.clone())),
+                    Query(CancelDowntimeQuery {
+                        version: Some(m.version),
+                    }),
+                    user(email),
+                    d.clone().map(Extension),
+                    h.clone(),
+                )
+            };
+        for caller in &ai {
+            let refused = unmute(&plain, &firing, caller).await;
+            assert_eq!(
+                refused.status(),
+                StatusCode::FORBIDDEN,
+                "{}: unmute a firing",
+                caller.0
+            );
+        }
+        let kept = infra::table::downtimes::get_rw(&org, &firing.downtime_id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            kept.cancelled_at, None,
+            "a refused unmute keeps the downtime"
+        );
+        // With v2 off an incident's alert keeps the Live result; ack's rule tests cover v2 on.
+        let live = unmute(&incident_p1, &muted, &ai[1]).await;
+        assert_eq!(
+            live.status(),
+            StatusCode::OK,
+            "an incident's unmute with v2 off"
+        );
     }
 
     #[cfg(feature = "enterprise")]

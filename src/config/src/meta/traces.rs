@@ -435,6 +435,18 @@ pub mod session {
     }
 }
 
+pub fn build_trace_query(stream_name: &str, extra_selects: &str) -> String {
+    format!(
+        "SELECT trace_id, min({}) as zo_sql_timestamp, \
+        min(start_time) as trace_start_time, max(end_time) as trace_end_time, \
+        (max(end_time) - min(start_time)) as zo_sql_duration, \
+        {extra_selects} \
+        FROM {}",
+        crate::TIMESTAMP_COL_NAME,
+        crate::utils::sql::quote_identifier(stream_name)
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::HashSet;

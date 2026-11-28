@@ -635,6 +635,7 @@ pub(crate) mod tests {
             profiles_streams: json!([]),
             field_name_mapping: None,
             last_seen: 0,
+            streams_cut: 0,
         }
     }
 

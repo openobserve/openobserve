@@ -78,7 +78,7 @@ const ASSISTANT_SYNTAX_ROLES = [
 ];
 
 /** Ratchets. Both only ever go down; see the module docstring. */
-const MAX_PENDING = 82;
+const MAX_PENDING = 78;
 const MAX_EXEMPT = 38;
 /** Manifest entries on a bare alias, which are never judged. Only goes down. */
 const MAX_UNJUDGED = 7;

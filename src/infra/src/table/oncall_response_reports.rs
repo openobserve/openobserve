@@ -15,13 +15,12 @@
 
 //! What an L0 run reported for one record — one row per run, both subject types.
 
-use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, Set};
+use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, Set, sea_query::Expr};
 
 use super::entity::oncall_response_reports::{ActiveModel, Column, Entity, Model};
 use crate::{db::get_orm_client_rw, errors};
 
-/// Upsert on `(org_id, response_id)` — a re-analysis must replace the row, and
-/// a replayed super-cluster message must not duplicate it.
+/// Only a newer report can replace the report already shown for the response.
 pub async fn put(
     org_id: &str,
     response_id: &str,
@@ -53,9 +52,12 @@ pub async fn put_with<C: ConnectionTrait>(
         .on_conflict(
             sea_orm::sea_query::OnConflict::columns([Column::OrgId, Column::ResponseId])
                 .update_columns([Column::Report, Column::Model, Column::GeneratedAt])
+                .action_and_where(Expr::cust(
+                    "excluded.generated_at > oncall_response_reports.generated_at",
+                ))
                 .to_owned(),
         )
-        .exec(conn)
+        .exec_without_returning(conn)
         .await?;
     Ok(())
 }

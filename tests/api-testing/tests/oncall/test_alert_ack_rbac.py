@@ -11,6 +11,7 @@ from __future__ import annotations
 import pytest
 
 from support.client import OpenObserveClient
+from support.incidents import list_all_incidents
 from support.wait import wait_until
 
 from .oncall_helpers import OnCallClient, make_user, paging_alert, uniq
@@ -138,9 +139,7 @@ def test_an_ack_on_the_page_acks_the_alert(oncall: OnCallClient, admin):
 
 def _incident_for(oncall: OnCallClient, alert_id: str) -> dict:
     def _ours():
-        r = oncall.v2("GET", "alerts/incidents?limit=1000")
-        assert r.status_code == 200, r.text
-        found = [i for i in r.json()["incidents"]
+        found = [i for i in list_all_incidents(oncall.v2)
                  if any(g.get("alert_id") == alert_id for g in i.get("alert_groups") or [])]
         return found[0] if found else None
 

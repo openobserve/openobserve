@@ -66,8 +66,9 @@ pub use preset::{
     resolve_anchor as preset_anchor,
 };
 pub use rca::{
-    BundleItem, BundleRole, EvidenceBundle, MAX_BUNDLE_ITEMS, MAX_OFFERED_ACTIONS, OfferedAction,
-    RcaContext,
+    BundleItem, BundleRole, DeclaredContext, DeclaredContextWindow, EvidenceBundle,
+    LOCAL_SERVING_REGION, MAX_BUNDLE_ITEMS, MAX_DECLARED_QUERY_BYTES, MAX_OFFERED_ACTIONS,
+    OfferedAction, RcaCapabilities, RcaContext, RcaEdition,
 };
 pub use response::{
     DEFAULT_FLAP_DAMPENING_SECS, FIRST_LADDER_RUN, NewAlertEffect, NoBlastRadius, PageDecision,

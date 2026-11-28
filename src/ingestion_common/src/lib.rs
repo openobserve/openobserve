@@ -36,6 +36,7 @@ pub enum SystemJobType {
     AutoObserve,
     ServiceSignals,
     SessionReplay,
+    ChangeEvents,
 }
 
 impl SystemJobType {
@@ -52,6 +53,7 @@ impl SystemJobType {
             SystemJobType::AutoObserve => "autoobserve",
             SystemJobType::ServiceSignals => "service_signals",
             SystemJobType::SessionReplay => "session_replay",
+            SystemJobType::ChangeEvents => "change_events",
         }
     }
 }

@@ -1047,15 +1047,21 @@ pub async fn group_status(
     let Some(slo) = slos_table::get(db, org, id).await? else {
         return Ok(Vec::new());
     };
-    let rows = infra::table::slo::load_all_groups(db, &slo.id).await?;
+    group_status_for(&slo).await
+}
+
+pub(crate) async fn group_status_for(
+    slo: &Slo,
+) -> Result<Vec<config::meta::slo::SloStatusView>, anyhow::Error> {
+    let rows = infra::table::slo::load_all_groups(get_orm_client_ro().await, &slo.id).await?;
     let cfg = get_config();
     let now_secs = now_micros() / 1_000_000;
     Ok(rows
         .into_iter()
-        .filter(|r| !r.group_key.is_empty())
+        .filter(|r| !r.group_key.is_empty() && r.definition_generation == slo.definition_generation)
         .map(|r| {
             view_of(
-                &slo,
+                slo,
                 &r,
                 cfg.slo.min_coverage,
                 now_secs,

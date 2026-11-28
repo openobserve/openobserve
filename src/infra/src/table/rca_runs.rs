@@ -18,11 +18,11 @@
 use std::str::FromStr;
 
 use config::meta::alerts::{
-    incidents::IncidentEvent,
+    incidents::{IncidentEvent, IncidentEventType},
     rca_runs::{
         RcaRun, RcaRunItem, RcaSummary, ReportFormat, RunError, RunMode, RunState, RunStats,
-        RunSubjectType, RunSummaryFields, RunTrigger, is_live_blocking, is_stale, is_v1_run_id,
-        next_previous,
+        RunSubjectType, RunSummaryFields, RunTrigger, SkipReason, is_live_blocking, is_stale,
+        is_v1_run_id, next_previous,
     },
     rca_steering::SteerRecord,
 };
@@ -34,11 +34,17 @@ use sea_orm::{
 };
 use svix_ksuid::KsuidLike;
 
-pub use super::entity::rca_runs::Model;
 use super::{
     alert_incidents::CaseFilter,
     entity::{alert_incident_alerts, alert_incidents, rca_runs},
-    incident_events, rca_steering,
+    incident_events,
+    rca_delivery_obligations::{self, Obligation, ObligationKind, Recipient},
+    rca_skipped_pages::{self, NewSkippedPage},
+    rca_steering,
+};
+pub use super::{
+    entity::rca_runs::Model,
+    rca_fence::{RECLASSIFIED_ERROR_CODE, RECLASSIFIED_ERROR_REASON},
 };
 use crate::db::{get_orm_client_ro, get_orm_client_rw};
 
@@ -53,11 +59,8 @@ const STEERED_BY_MAX: usize = 3;
 const ORG_SCAN_BATCH: u64 = 200;
 /// Rows [list_for_org] reads per page at most, however few `keep` admits.
 const ORG_SCAN_MAX: usize = 5_000;
-
-/// A new run id: a KSUID, so ids sort by time.
-pub fn new_run_id() -> String {
-    svix_ksuid::Ksuid::new(None, None).to_string()
-}
+/// Skipped pages a subject keeps per run of its history limit.
+const SKIPPED_PAGES_PER_HISTORY_RUN: usize = 4;
 
 /// The row [start_run] inserts.
 #[derive(Debug, Clone)]
@@ -74,6 +77,10 @@ pub struct NewRun {
     /// Serialized `Vec<SubjectRef>`: the pending on-call records of an alert run.
     pub oncall_subjects: Option<serde_json::Value>,
     pub context_used: Option<serde_json::Value>,
+    /// One delivery obligation is armed per recipient in the start transaction (I6).
+    pub recipients: Vec<Recipient>,
+    /// The page that asked for the run; a refused page without one is keyed by its refusal time.
+    pub page_key: Option<String>,
 }
 
 /// The values [start_run] decides with.
@@ -105,6 +112,30 @@ pub enum StartResult {
     CoolingDown,
 }
 
+/// Why a start was refused, and the run that covers it.
+struct Refusal {
+    reason: SkipReason,
+    covering_run_id: Option<String>,
+    retry_after_us: Option<i64>,
+}
+
+impl Refusal {
+    fn in_flight(covering_run_id: Option<String>) -> Self {
+        Self {
+            reason: SkipReason::InFlight,
+            covering_run_id,
+            retry_after_us: None,
+        }
+    }
+
+    fn result(&self) -> StartResult {
+        match self.reason {
+            SkipReason::InFlight => StartResult::InFlight,
+            SkipReason::CoolingDown => StartResult::CoolingDown,
+        }
+    }
+}
+
 /// One [update_run] write. `state: None` is a progress write.
 #[derive(Debug, Clone, Default)]
 pub struct RunUpdate {
@@ -132,6 +163,7 @@ pub struct RunUpdate {
     pub continuations_inc: bool,
     /// Final stats cannot change lifecycle state; partial result is filled only if absent.
     pub final_stats_only: bool,
+    pub withhold_if_case: bool,
     /// Appended to the incident's timeline in the same transaction (incident subjects).
     pub event: Option<IncidentEvent>,
     /// Answer deadline of a `waiting_input` run; `Some(None)` clears it.
@@ -145,6 +177,12 @@ pub struct RunUpdate {
     pub now_us: i64,
     /// The incident's status episode the write belongs to; it loses once the incident left it.
     pub episode: Option<crate::table::alert_incidents::Episode>,
+}
+
+pub struct RunApplied {
+    pub obligations: Vec<Obligation>,
+    pub event: Option<IncidentEvent>,
+    pub fenced: bool,
 }
 
 /// Changes to the incident's `rca_summary`.
@@ -191,6 +229,11 @@ struct SeenSummary {
     rca_outcome: Option<String>,
     rca_confidence: Option<String>,
     rca_summary: Option<String>,
+}
+
+/// A new run id: a KSUID, so ids sort by time.
+pub fn new_run_id() -> String {
+    svix_ksuid::Ksuid::new(None, None).to_string()
 }
 
 /// `SELECT ... FOR UPDATE`, except on SQLite, which serializes writers and has no row lock.
@@ -284,14 +327,12 @@ pub async fn start_run_with<C: TransactionTrait>(
             None => guards.first_run && seen.rca_run_id.is_some(),
         };
         if started_since {
-            txn.rollback().await?;
-            return Ok(StartResult::InFlight);
+            return refuse(txn, &new, &guards, Refusal::in_flight(seen.rca_run_id)).await;
         }
         if seen_state.is_some_and(|state| {
             is_live_blocking(state, seen_updated_at, now, guards.rca_timeout_secs)
         }) {
-            txn.rollback().await?;
-            return Ok(StartResult::InFlight);
+            return refuse(txn, &new, &guards, Refusal::in_flight(seen.rca_run_id)).await;
         }
 
         if let Some(cooldown) = guards.cooldown_us {
@@ -303,12 +344,16 @@ pub async fn start_run_with<C: TransactionTrait>(
                     .add(rca_runs::Column::SubjectId.eq(new.subject_id.as_str())),
             )
             .await?;
-            if newest
-                .and_then(|run| run.ended_at)
-                .is_some_and(|ended_at| now.saturating_sub(ended_at) < cooldown)
+            if let Some(run) = newest
+                && let Some(ended_at) = run.ended_at
+                && now.saturating_sub(ended_at) < cooldown
             {
-                txn.rollback().await?;
-                return Ok(StartResult::CoolingDown);
+                let refusal = Refusal {
+                    reason: SkipReason::CoolingDown,
+                    covering_run_id: Some(run.run_id),
+                    retry_after_us: Some(ended_at.saturating_add(cooldown)),
+                };
+                return refuse(txn, &new, &guards, refusal).await;
             }
         }
 
@@ -376,6 +421,14 @@ pub async fn start_run_with<C: TransactionTrait>(
         }
     }
 
+    let run_number = next_run_number(&txn, &new.org_id, new.subject_type, &new.subject_id).await?;
+    let mut used = new
+        .context_used
+        .clone()
+        .unwrap_or_else(|| serde_json::json!({}));
+    if used.get("history_read").is_none() {
+        used["history_read"] = serde_json::Value::Bool(false);
+    }
     rca_runs::ActiveModel {
         run_id: Set(new.run_id.clone()),
         org_id: Set(new.org_id.clone()),
@@ -400,16 +453,19 @@ pub async fn start_run_with<C: TransactionTrait>(
         stats: Set(None),
         stage: Set(None),
         stage_index: Set(None),
-        context_used: Set(encode_opt(new.context_used.as_ref(), "context_used")?),
+        context_used: Set(Some(encode(&used, "context_used")?)),
         continuations: Set(0),
         oncall_subjects: Set(encode_opt(new.oncall_subjects.as_ref(), "oncall_subjects")?),
         input_deadline_at: Set(None),
         pending_question_id: Set(None),
         questions_asked: Set(0),
         deadline_closed_at: Set(None),
+        run_number: Set(Some(run_number)),
+        fenced: Set(false),
     }
     .insert(&txn)
     .await?;
+    rca_delivery_obligations::arm_in(&txn, &new.org_id, &new.run_id, &new.recipients, now).await?;
 
     if let Some(row) = guidance_row.as_ref() {
         rca_steering::insert_in(&txn, row).await?;
@@ -436,6 +492,193 @@ pub async fn start_run_with<C: TransactionTrait>(
         replaced_stale,
         replaced_run_id,
     })
+}
+
+/// A refused start: its skipped pages and their events commit together, or none do; a failed
+/// record never changes the refusal, so the caller keeps the page's hold for the covering run.
+async fn refuse(
+    txn: DatabaseTransaction,
+    new: &NewRun,
+    guards: &StartGuards<'_>,
+    refusal: Refusal,
+) -> Result<StartResult, DbErr> {
+    let recorded = match record_skipped_pages(&txn, new, guards, &refusal).await {
+        Ok(true) => txn.commit().await,
+        Ok(false) => {
+            if let Err(error) = txn.rollback().await {
+                log::warn!(
+                    "[RCA_RUNS] rollback with no skipped pages to record for {}/{}: {error}",
+                    new.org_id,
+                    new.subject_id
+                );
+            }
+            return Ok(refusal.result());
+        }
+        Err(error) => {
+            if let Err(rollback) = txn.rollback().await {
+                log::warn!(
+                    "[RCA_RUNS] rollback after a failed skipped-page record for {}/{}: {rollback}",
+                    new.org_id,
+                    new.subject_id
+                );
+            }
+            Err(error)
+        }
+    };
+    if let Err(error) = recorded {
+        log::warn!(
+            "[RCA_RUNS] refused {} start for {}/{} recorded no skipped page: {error}",
+            new.trigger.as_str(),
+            new.org_id,
+            new.subject_id
+        );
+        config::metrics::oncall::skipped_page_unrecorded(&new.org_id);
+    }
+    Ok(refusal.result())
+}
+
+/// Writes the refusal's skipped pages and their events; `false` when there is nothing to record.
+async fn record_skipped_pages(
+    txn: &DatabaseTransaction,
+    new: &NewRun,
+    guards: &StartGuards<'_>,
+    refusal: &Refusal,
+) -> Result<bool, DbErr> {
+    let pages = skipped_pages(txn, new, guards, refusal).await?;
+    if pages.is_empty() {
+        return Ok(false);
+    }
+    let stored = rca_skipped_pages::insert_in(txn, &pages).await?;
+    // `prune_with` runs only on a start, so sustained refusals keep the cap here.
+    rca_skipped_pages::retain_newest_in(
+        txn,
+        &new.org_id,
+        new.subject_type,
+        &new.subject_id,
+        skipped_page_cap(guards.history_limit),
+    )
+    .await?;
+    if new.subject_type == RunSubjectType::Incident {
+        for page in stored {
+            let event = IncidentEvent {
+                timestamp: page.at_us,
+                seq: 0,
+                event_type: IncidentEventType::AnalysisSkipped {
+                    response_id: page.response_id.clone(),
+                    reason: page.reason,
+                    covering_run_id: page.covering_run_id.clone(),
+                    covering_run_number: page.covering_run_number,
+                    retry_after_us: page.retry_after_us,
+                },
+            };
+            incident_events::append_in(txn, &new.org_id, &new.subject_id, event).await?;
+        }
+    }
+    Ok(true)
+}
+
+/// One skipped page per recipient of a page that asked for a run; manual, Slack, resume and
+/// new-incident starts write none.
+async fn skipped_pages(
+    txn: &DatabaseTransaction,
+    new: &NewRun,
+    guards: &StartGuards<'_>,
+    refusal: &Refusal,
+) -> Result<Vec<NewSkippedPage>, DbErr> {
+    let pages_reach_admission = matches!(
+        new.trigger,
+        RunTrigger::AutoNewAlertType | RunTrigger::AutoReopen
+    );
+    let Some(covering_run_id) = refusal
+        .covering_run_id
+        .as_deref()
+        .filter(|id| !id.is_empty())
+    else {
+        return Ok(Vec::new());
+    };
+    if !pages_reach_admission || new.recipients.is_empty() {
+        return Ok(Vec::new());
+    }
+    let covering_run_number = run_number_of(txn, &new.org_id, covering_run_id).await?;
+    // A page with no key (a Reopen) is keyed by its refusal time, so two refusals never collapse.
+    let firing_key = match new.page_key.as_deref() {
+        Some(key) => format!("{}|{key}", new.trigger.as_str()),
+        None => format!("{}|{}", new.trigger.as_str(), guards.now_us),
+    };
+    Ok(new
+        .recipients
+        .iter()
+        .map(|recipient| NewSkippedPage {
+            org_id: new.org_id.clone(),
+            subject_type: new.subject_type,
+            subject_id: new.subject_id.clone(),
+            incident_id: new.incident_id.clone(),
+            response_id: Some(recipient.response_id.clone()),
+            firing_key: firing_key.clone(),
+            reason: refusal.reason,
+            covering_run_id: covering_run_id.to_string(),
+            covering_run_number,
+            retry_after_us: refusal.retry_after_us,
+            cooldown_us: guards.cooldown_us,
+            at_us: guards.now_us,
+        })
+        .collect())
+}
+
+fn skipped_page_cap(history_limit: usize) -> usize {
+    history_limit
+        .max(1)
+        .saturating_mul(SKIPPED_PAGES_PER_HISTORY_RUN)
+}
+
+/// `max + 1` of the subject's numbered runs. An incident start already holds the incident row;
+/// an alert start has no row to lock, so Postgres serializes the subject with an advisory lock.
+async fn next_run_number(
+    txn: &DatabaseTransaction,
+    org_id: &str,
+    subject_type: RunSubjectType,
+    subject_id: &str,
+) -> Result<i32, DbErr> {
+    crate::race_point!("rca_runs.before_run_number");
+    if txn.get_database_backend() == sea_orm::DatabaseBackend::Postgres {
+        let key = format!(
+            "rca_run_number|{org_id}|{}|{subject_id}",
+            subject_type.as_str()
+        );
+        txn.execute(sea_orm::Statement::from_sql_and_values(
+            sea_orm::DatabaseBackend::Postgres,
+            "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+            [key.into()],
+        ))
+        .await?;
+    }
+    let max = rca_runs::Entity::find()
+        .select_only()
+        .column_as(rca_runs::Column::RunNumber.max(), "max_run_number")
+        .filter(rca_runs::Column::OrgId.eq(org_id))
+        .filter(rca_runs::Column::SubjectType.eq(subject_type.as_str()))
+        .filter(rca_runs::Column::SubjectId.eq(subject_id))
+        .into_tuple::<Option<i32>>()
+        .one(txn)
+        .await?
+        .flatten();
+    Ok(max.unwrap_or(0).saturating_add(1))
+}
+
+async fn run_number_of(
+    txn: &DatabaseTransaction,
+    org_id: &str,
+    run_id: &str,
+) -> Result<Option<u32>, DbErr> {
+    let number = rca_runs::Entity::find_by_id(run_id)
+        .filter(rca_runs::Column::OrgId.eq(org_id))
+        .select_only()
+        .column(rca_runs::Column::RunNumber)
+        .into_tuple::<Option<i32>>()
+        .one(txn)
+        .await?
+        .flatten();
+    Ok(number.and_then(|n| u32::try_from(n).ok()))
 }
 
 /// Ends a `running` run as `failed`/`stale`.
@@ -485,8 +728,17 @@ async fn fail_stale_with(
         .filter(rca_runs::Column::State.eq(RunState::Running.as_str()))
         .exec(txn)
         .await?;
-    Ok((ended.rows_affected > 0)
-        .then(|| parse_or(&run.trigger, RunTrigger::Legacy, &run.run_id, "trigger")))
+    if ended.rows_affected == 0 {
+        return Ok(None);
+    }
+    rca_delivery_obligations::settle_in(txn, org_id, run_id, ObligationKind::NoVerdict, now)
+        .await?;
+    Ok(Some(parse_or(
+        &run.trigger,
+        RunTrigger::Legacy,
+        &run.run_id,
+        "trigger",
+    )))
 }
 
 async fn prune_with(
@@ -507,6 +759,14 @@ async fn prune_with(
         .into_tuple()
         .all(txn)
         .await?;
+    rca_skipped_pages::retain_newest_in(
+        txn,
+        org_id,
+        subject_type,
+        subject_id,
+        skipped_page_cap(history_limit),
+    )
+    .await?;
 
     let keep = history_limit.saturating_add(1);
     if runs.len() <= keep {
@@ -528,8 +788,10 @@ async fn prune_with(
     if doomed.is_empty() {
         return Ok(());
     }
-    // A pruned run's steering rows go with it.
+    // A pruned run's steering rows and settled obligations go with it; a pending one still owes
+    // its record a release, which ENT delivers as no verdict once the run is gone.
     rca_steering::delete_for_runs_in(txn, org_id, &doomed).await?;
+    rca_delivery_obligations::delete_for_runs_in(txn, org_id, &doomed).await?;
     rca_runs::Entity::delete_many()
         .filter(rca_runs::Column::OrgId.eq(org_id))
         .filter(rca_runs::Column::RunId.is_in(doomed))
@@ -655,6 +917,15 @@ pub async fn update_run(org_id: &str, run_id: &str, upd: RunUpdate) -> Result<bo
     update_run_with(get_orm_client_rw().await, org_id, run_id, upd).await
 }
 
+/// [`update_run`] returning `None` on a lost guard, else the obligations a terminal write settled.
+pub async fn update_run_owing(
+    org_id: &str,
+    run_id: &str,
+    upd: RunUpdate,
+) -> Result<Option<Vec<Obligation>>, DbErr> {
+    update_run_owing_with(get_orm_client_rw().await, org_id, run_id, upd).await
+}
+
 /// Lock incident before run; recheck state guards inside the transaction.
 pub async fn update_run_with<C: TransactionTrait>(
     db: &C,
@@ -662,9 +933,40 @@ pub async fn update_run_with<C: TransactionTrait>(
     run_id: &str,
     upd: RunUpdate,
 ) -> Result<bool, DbErr> {
+    Ok(update_run_owing_with(db, org_id, run_id, upd)
+        .await?
+        .is_some())
+}
+
+/// [`update_run_with`]; the owed set is read in the ending transaction, so no later read decides
+/// it.
+pub async fn update_run_owing_with<C: TransactionTrait>(
+    db: &C,
+    org_id: &str,
+    run_id: &str,
+    upd: RunUpdate,
+) -> Result<Option<Vec<Obligation>>, DbErr> {
+    Ok(update_run_applied_with(db, org_id, run_id, upd)
+        .await?
+        .map(|applied| applied.obligations))
+}
+
+pub async fn update_run_applied_with<C: TransactionTrait>(
+    db: &C,
+    org_id: &str,
+    run_id: &str,
+    upd: RunUpdate,
+) -> Result<Option<RunApplied>, DbErr> {
     if upd.final_stats_only {
-        return final_stats_with(db, org_id, run_id, &upd).await;
+        return Ok(final_stats_with(db, org_id, run_id, &upd)
+            .await?
+            .then(|| RunApplied {
+                obligations: Vec::new(),
+                event: None,
+                fenced: false,
+            }));
     }
+    crate::race_point!("rca_fence.before_begin");
     let txn = db.begin().await?;
     let now = upd.now_us;
     let from: Vec<_> = allowed_from(upd.state)
@@ -674,70 +976,35 @@ pub async fn update_run_with<C: TransactionTrait>(
         .collect();
     let allowed = |state: &str| RunState::from_str(state).is_ok_and(|s| from.contains(&s));
 
-    let Some((subject_type, subject_id, _)) = rca_runs::Entity::find_by_id(run_id)
-        .filter(rca_runs::Column::OrgId.eq(org_id))
-        .select_only()
-        .columns([
-            rca_runs::Column::SubjectType,
-            rca_runs::Column::SubjectId,
-            rca_runs::Column::State,
-        ])
-        .into_tuple::<(String, String, String)>()
-        .one(&txn)
-        .await?
-        .filter(|(_, _, state)| allowed(state.as_str()))
-    else {
+    let Some(held) = super::rca_fence::lock_run(&txn, org_id, run_id).await? else {
         txn.rollback().await?;
-        return Ok(false);
+        return Ok(None);
     };
-
-    // The incident and its summary after `upd`, while the incident still names this run.
-    let incident = if subject_type == RunSubjectType::Incident.as_str() {
-        let named = alert_incidents::Entity::find_by_id(subject_id.as_str())
-            .filter(alert_incidents::Column::OrgId.eq(org_id))
-            .filter(alert_incidents::Column::RcaRunId.eq(run_id));
-        let held = match upd.episode.as_ref() {
-            Some(episode) => episode.held(named),
-            None => named,
-        };
-        let Some(stored) = locked(
-            &txn,
-            held.select_only()
-                .column(alert_incidents::Column::RcaSummary),
-        )
-        .into_tuple::<Option<String>>()
-        .one(&txn)
-        .await?
-        else {
+    if !allowed(&held.run.state) {
+        txn.rollback().await?;
+        return Ok(None);
+    }
+    let (upd, fenced) = super::rca_fence::apply(&held, upd);
+    let incident = if held.run.subject_type == RunSubjectType::Incident.as_str() {
+        let Some(stored) = held.incident.as_ref().filter(|incident| {
+            incident.rca_run_id.as_deref() == Some(run_id)
+                && upd.episode.as_ref().is_none_or(|episode| {
+                    episode.status == incident.status && episode.resolved_at == incident.resolved_at
+                })
+        }) else {
             txn.rollback().await?;
-            return Ok(false);
+            return Ok(None);
         };
+        // PostgreSQL pads the `char(27)` id; the run's own copy matches the bound filter.
         Some((
-            subject_id,
-            merge_summary(decode_summary(stored.as_deref()), &upd),
+            held.run.subject_id.clone(),
+            merge_summary(decode_summary(stored.rca_summary.as_deref()), &upd),
         ))
     } else {
         None
     };
-
-    let Some((_, started_at, stored_stats)) = locked(
-        &txn,
-        rca_runs::Entity::find_by_id(run_id)
-            .filter(rca_runs::Column::OrgId.eq(org_id))
-            .select_only()
-            .columns([
-                rca_runs::Column::State,
-                rca_runs::Column::StartedAt,
-                rca_runs::Column::Stats,
-            ]),
-    )
-    .into_tuple::<(String, i64, Option<String>)>()
-    .one(&txn)
-    .await?
-    .filter(|(state, ..)| allowed(state.as_str())) else {
-        txn.rollback().await?;
-        return Ok(false);
-    };
+    let started_at = held.run.started_at;
+    let stored_stats = held.run.stats.clone();
 
     let terminal = upd.state.is_some_and(|s| s.is_terminal());
     let mut update = rca_runs::Entity::update_many()
@@ -830,9 +1097,10 @@ pub async fn update_run_with<C: TransactionTrait>(
     }
     if update.exec(&txn).await?.rows_affected == 0 {
         txn.rollback().await?;
-        return Ok(false);
+        return Ok(None);
     }
 
+    let mut stored_event = None;
     if let Some((incident_id, summary)) = incident {
         let mut write = alert_incidents::Entity::update_many()
             .col_expr(alert_incidents::Column::RcaUpdatedAt, Expr::value(now))
@@ -863,16 +1131,34 @@ pub async fn update_run_with<C: TransactionTrait>(
         }
         if write.exec(&txn).await?.rows_affected == 0 {
             txn.rollback().await?;
-            return Ok(false);
+            return Ok(None);
         }
 
         if let Some(event) = upd.event {
-            incident_events::append_in(&txn, org_id, &incident_id, event).await?;
+            incident_events::append_in(&txn, org_id, &incident_id, event.clone()).await?;
+            stored_event = Some(event);
+        }
+    }
+
+    // The deliveries this run owes become due in the transaction that ends it.
+    let mut owed = Vec::new();
+    if let Some(state) = upd.state.filter(|s| s.is_terminal()) {
+        let kind = if state == RunState::Completed {
+            ObligationKind::Verdict
+        } else {
+            ObligationKind::NoVerdict
+        };
+        if rca_delivery_obligations::settle_in(&txn, org_id, run_id, kind, now).await? > 0 {
+            owed = rca_delivery_obligations::for_run_in(&txn, org_id, run_id).await?;
         }
     }
 
     txn.commit().await?;
-    Ok(true)
+    Ok(Some(RunApplied {
+        obligations: owed,
+        event: stored_event,
+        fenced,
+    }))
 }
 
 /// Stats-only writes preserve terminal state and never overwrite a stored result.
@@ -883,79 +1169,39 @@ async fn final_stats_with<C: TransactionTrait>(
     upd: &RunUpdate,
 ) -> Result<bool, DbErr> {
     let txn = db.begin().await?;
-    let Some((subject_type, subject_id)) = rca_runs::Entity::find_by_id(run_id)
-        .filter(rca_runs::Column::OrgId.eq(org_id))
-        .select_only()
-        .columns([rca_runs::Column::SubjectType, rca_runs::Column::SubjectId])
-        .into_tuple::<(String, String)>()
-        .one(&txn)
-        .await?
-    else {
+    let Some(held) = super::rca_fence::lock_run(&txn, org_id, run_id).await? else {
         txn.rollback().await?;
         return Ok(false);
     };
-
-    if subject_type == RunSubjectType::Incident.as_str()
-        && let Some(stored) = locked(
-            &txn,
-            alert_incidents::Entity::find_by_id(subject_id.as_str())
-                .filter(alert_incidents::Column::OrgId.eq(org_id))
-                .filter(alert_incidents::Column::RcaRunId.eq(run_id))
-                .select_only()
-                .column(alert_incidents::Column::RcaSummary),
-        )
-        .into_tuple::<Option<String>>()
-        .one(&txn)
-        .await?
+    let (upd, _) = super::rca_fence::apply(&held, upd.clone());
+    let stored_stats = held.run.stats.clone();
+    let stored_result = held.run.result.clone();
+    let state = held.run.state.clone();
+    if held.run.subject_type == RunSubjectType::Incident.as_str()
+        && let Some(incident) = held
+            .incident
+            .as_ref()
+            .filter(|row| row.rca_run_id.as_deref() == Some(run_id))
     {
-        let mut summary = decode_summary(stored.as_deref());
-        if let Some(p) = upd.summary.as_ref() {
-            if let Some(steps) = p.steps {
-                summary.steps = steps;
-            }
-            if let Some(tool_calls) = p.tool_calls {
-                summary.tool_calls = tool_calls;
-            }
-            if p.reusable_steps.is_some() {
-                summary.reusable_steps = p.reusable_steps;
-            }
-            if p.unblocked_by.is_some() {
-                summary.unblocked_by = p.unblocked_by.clone();
-            }
+        let mut counts = upd.clone();
+        counts.state = None;
+        counts.error = None;
+        if let Some(summary) = counts.summary.as_mut() {
+            summary.detail = None;
+            summary.deadline_at = None;
         }
-        if let Some(user) = upd.steered_by_add.as_ref() {
-            add_steered_by(&mut summary, user);
-        }
+        let summary = merge_summary(decode_summary(incident.rca_summary.as_deref()), &counts);
         alert_incidents::Entity::update_many()
             .col_expr(
                 alert_incidents::Column::RcaSummary,
                 Expr::value(encode(&summary, "rca_summary")?),
             )
-            .filter(alert_incidents::Column::Id.eq(subject_id.as_str()))
+            .filter(alert_incidents::Column::Id.eq(held.run.subject_id.as_str()))
             .filter(alert_incidents::Column::OrgId.eq(org_id))
             .filter(alert_incidents::Column::RcaRunId.eq(run_id))
             .exec(&txn)
             .await?;
     }
-
-    let Some((stored_stats, stored_result, state)) = locked(
-        &txn,
-        rca_runs::Entity::find_by_id(run_id)
-            .filter(rca_runs::Column::OrgId.eq(org_id))
-            .select_only()
-            .columns([
-                rca_runs::Column::Stats,
-                rca_runs::Column::Result,
-                rca_runs::Column::State,
-            ]),
-    )
-    .into_tuple::<(Option<String>, Option<String>, String)>()
-    .one(&txn)
-    .await?
-    else {
-        txn.rollback().await?;
-        return Ok(false);
-    };
     let stats = merge_stats(stored_stats.as_deref(), upd.stats.as_ref(), None);
     let mut update = rca_runs::Entity::update_many()
         .col_expr(
@@ -972,6 +1218,12 @@ async fn final_stats_with<C: TransactionTrait>(
             Expr::value(encode(result, "result")?),
         );
     }
+    if let Some(used) = upd.context_used.as_ref() {
+        update = update.col_expr(
+            rca_runs::Column::ContextUsed,
+            Expr::value(encode(used, "context_used")?),
+        );
+    }
     update
         .filter(rca_runs::Column::RunId.eq(run_id))
         .filter(rca_runs::Column::OrgId.eq(org_id))
@@ -979,6 +1231,17 @@ async fn final_stats_with<C: TransactionTrait>(
         .await?;
     txn.commit().await?;
     Ok(true)
+}
+
+pub async fn live_run_for_session(org_id: &str, session_id: &str) -> Result<Option<Model>, DbErr> {
+    let mut runs = rca_runs::Entity::find()
+        .filter(rca_runs::Column::OrgId.eq(org_id))
+        .filter(rca_runs::Column::SessionId.eq(session_id))
+        .filter(rca_runs::Column::State.is_in(["running", "waiting_input"]))
+        .limit(2)
+        .all(get_orm_client_rw().await)
+        .await?;
+    Ok(if runs.len() == 1 { runs.pop() } else { None })
 }
 
 /// One run.
@@ -991,7 +1254,7 @@ pub async fn get_rw(org_id: &str, run_id: &str) -> Result<Option<Model>, DbErr> 
     get_with(get_orm_client_rw().await, org_id, run_id).await
 }
 
-async fn get_with<C: ConnectionTrait>(
+pub async fn get_with<C: ConnectionTrait>(
     conn: &C,
     org_id: &str,
     run_id: &str,
@@ -1469,8 +1732,10 @@ pub async fn reopen_waiting_with<C: TransactionTrait>(
     Ok(true)
 }
 
-/// Deletes every run of the org.
+/// Deletes every run of the org, with its skipped pages and delivery obligations.
 pub async fn delete_by_org(org_id: &str) -> Result<(), DbErr> {
+    rca_skipped_pages::delete_by_org(org_id).await?;
+    rca_delivery_obligations::delete_by_org(org_id).await?;
     rca_runs::Entity::delete_many()
         .filter(rca_runs::Column::OrgId.eq(org_id))
         .exec(get_orm_client_rw().await)
@@ -1495,10 +1760,35 @@ pub fn error_of(m: &Model) -> Option<RunError> {
 }
 
 /// The API form of a run.
-pub fn to_run(m: Model) -> RcaRun {
+pub fn to_run(mut m: Model) -> RcaRun {
+    let fenced = super::rca_fence::row_fenced(&m);
+    if fenced {
+        m.report = None;
+        m.outcome = None;
+        m.confidence = None;
+        m.result = None;
+        m.pending_question_id = None;
+    }
     let state = state_of(&m);
-    let error = error_of(&m);
+    let mut error = error_of(&m);
+    if fenced && let Some(error) = error.as_mut() {
+        error.details = None;
+    }
     let stats = decode(m.stats.as_deref());
+    let mut context_used = decode::<serde_json::Value>(m.context_used.as_deref());
+    if let Some(used) = context_used
+        .as_mut()
+        .and_then(serde_json::Value::as_object_mut)
+    {
+        used.remove("history_read");
+        used.remove("history_injected");
+        if fenced {
+            used.remove("past_causes");
+        }
+        if used.is_empty() {
+            context_used = None;
+        }
+    }
     RcaRun {
         report_format: ReportFormat::V2,
         subject_type: parse_or(
@@ -1528,7 +1818,7 @@ pub fn to_run(m: Model) -> RcaRun {
         session_id: m.session_id,
         stage: m.stage,
         stage_index: m.stage_index,
-        context_used: decode(m.context_used.as_deref()),
+        context_used,
         continuations: m.continuations,
         oncall_subjects: decode(m.oncall_subjects.as_deref()),
         input_deadline_at: m.input_deadline_at,
@@ -1560,6 +1850,7 @@ pub fn to_item(m: &Model) -> RcaRunItem {
         cancelled_by: m.cancelled_by.clone(),
         error_reason: error_of(m).map(|e| e.reason),
         has_record: m.result.is_some(),
+        run_number: m.run_number.and_then(|n| u32::try_from(n).ok()),
     }
 }
 
@@ -1611,7 +1902,9 @@ mod tests {
     use sea_orm::{ConnectOptions, Database, DatabaseConnection, Schema};
 
     use super::*;
-    use crate::table::entity::incident_events as events_entity;
+    use crate::table::entity::{
+        incident_events as events_entity, rca_skipped_pages as rca_skipped_entity,
+    };
 
     const ORG: &str = "acme";
     const SEC: i64 = 1_000_000;
@@ -1626,9 +1919,14 @@ mod tests {
             schema.create_table_from_entity(alert_incidents::Entity),
             schema.create_table_from_entity(events_entity::Entity),
             schema.create_table_from_entity(crate::table::entity::rca_steering::Entity),
+            schema.create_table_from_entity(crate::table::entity::rca_delivery_obligations::Entity),
+            schema.create_table_from_entity(crate::table::entity::rca_skipped_pages::Entity),
         ] {
             db.execute(backend.build(&stmt)).await.unwrap();
         }
+        crate::table::migration::create_incident_recovery_checks_for_test(db)
+            .await
+            .unwrap();
     }
 
     async fn db() -> DatabaseConnection {
@@ -1671,6 +1969,7 @@ mod tests {
             security_case: Set(false),
             historical: Set(false),
             last_detection_at: Set(None),
+            ..Default::default()
         }
         .insert(db)
         .await
@@ -1679,6 +1978,7 @@ mod tests {
             org_id: Set(ORG.to_string()),
             incident_id: Set(id.to_string()),
             events: Set(serde_json::json!([])),
+            seq: Set(0),
         }
         .insert(db)
         .await
@@ -1698,6 +1998,8 @@ mod tests {
             guidance: None,
             oncall_subjects: None,
             context_used: None,
+            recipients: Vec::new(),
+            page_key: None,
         }
     }
 
@@ -2616,9 +2918,14 @@ mod tests {
                 fresh.stage.clone(),
                 fresh.stage_index,
                 fresh.continuations,
-                fresh.context_used.clone()
+                decode::<serde_json::Value>(fresh.context_used.as_deref())
             ),
-            (None, None, 0, None)
+            (
+                None,
+                None,
+                0,
+                Some(serde_json::json!({"history_read": false}))
+            )
         );
 
         let context = serde_json::json!({"past_causes": [], "skills": ["k8s"], "toolsets": ["o2"]});
@@ -2639,9 +2946,12 @@ mod tests {
             (row.stage.as_deref(), row.stage_index),
             (Some("traces"), Some(4))
         );
-        assert_eq!(decode(row.context_used.as_deref()), Some(context));
+        let mut kept = context.clone();
+        kept["history_read"] = serde_json::Value::Bool(false);
+        assert_eq!(decode(row.context_used.as_deref()), Some(kept));
         assert_eq!(row.continuations, 2);
         let item = to_run(row);
+        assert_eq!(item.context_used, Some(context));
         assert_eq!(item.continuations, 2);
         let summary = summary_of(&inc(&db, "inc-1").await);
         assert_eq!(
@@ -3395,6 +3705,8 @@ mod tests {
             pending_question_id: None,
             questions_asked: 0,
             deadline_closed_at: None,
+            run_number: None,
+            fenced: false,
         })
         .insert(db)
         .await
@@ -3578,5 +3890,700 @@ mod tests {
             "a case's run, and a run whose incident is gone, stay hidden"
         );
         assert_eq!(list(CaseFilter::OnlyCases).await, ["r-case"]);
+    }
+
+    /// I6: the start arms one obligation per recipient with the run row, the terminal write
+    /// settles and returns them, and a prune deletes a run's settled rows but keeps pending ones.
+    #[tokio::test]
+    async fn obligations_arm_with_the_start_settle_with_the_end_and_go_with_a_prune() {
+        use config::meta::oncall::{SubjectRef, SubjectType};
+
+        use crate::table::entity::rca_delivery_obligations as obligations;
+
+        async fn rows(db: &DatabaseConnection, run_id: &str) -> Vec<(String, Option<String>)> {
+            obligations::Entity::find()
+                .filter(obligations::Column::RunId.eq(run_id))
+                .order_by_asc(obligations::Column::ResponseId)
+                .all(db)
+                .await
+                .unwrap()
+                .into_iter()
+                .map(|row| (row.state, row.kind))
+                .collect()
+        }
+        async fn start_owing(db: &DatabaseConnection, responses: &[&str], now: i64) -> String {
+            let mut new = new_run(RunSubjectType::Incident, "inc-1");
+            new.recipients = responses
+                .iter()
+                .map(|id| Recipient {
+                    response_id: id.to_string(),
+                    subject: SubjectRef::new(SubjectType::Incident, "inc-1", 1),
+                    ladder_run: 1,
+                })
+                .collect();
+            match start_run_with(db, new, guards(now), None, None)
+                .await
+                .unwrap()
+            {
+                StartResult::Started { run_id, .. } => run_id,
+                other => panic!("expected Started, got {other:?}"),
+            }
+        }
+        let armed = ("armed".to_string(), None);
+        let pending = |kind: &str| ("pending".to_string(), Some(kind.to_string()));
+
+        let db = db().await;
+        incident(&db, "inc-1").await;
+        let completed = start_owing(&db, &["resp_1", "resp_2"], T0).await;
+        assert_eq!(rows(&db, &completed).await, [armed.clone(), armed.clone()]);
+        let owed = update_run_owing_with(
+            &db,
+            ORG,
+            &completed,
+            finish_update(RunState::Completed, T0 + SEC),
+        )
+        .await
+        .unwrap()
+        .expect("the completion wins");
+        let mut owed: Vec<_> = owed.into_iter().map(|o| o.response_id).collect();
+        owed.sort();
+        assert_eq!(owed, ["resp_1", "resp_2"]);
+        assert_eq!(
+            rows(&db, &completed).await,
+            [pending("verdict"), pending("verdict")]
+        );
+        let again = update_run_owing_with(
+            &db,
+            ORG,
+            &completed,
+            finish_update(RunState::Completed, T0 + SEC),
+        )
+        .await
+        .unwrap();
+        assert!(again.is_none(), "a lost guard owes nothing");
+
+        let failed = start_owing(&db, &["resp_3", "resp_4"], T0 + 2 * SEC).await;
+        finish(&db, &failed, RunState::Failed, T0 + 3 * SEC).await;
+        assert_eq!(
+            rows(&db, &failed).await,
+            [pending("no_verdict"), pending("no_verdict")]
+        );
+        obligations::Entity::update_many()
+            .col_expr(obligations::Column::State, Expr::value("done"))
+            .filter(obligations::Column::ResponseId.eq("resp_4"))
+            .exec(&db)
+            .await
+            .unwrap();
+
+        // Limit 0 keeps the new run and the newest completed one; the failed run is pruned.
+        start_with_limit(&db, "inc-1", 0).await;
+        assert!(run(&db, &failed).await.is_none());
+        assert_eq!(rows(&db, &failed).await, [pending("no_verdict")]);
+        assert_eq!(rows(&db, &completed).await.len(), 2);
+    }
+
+    fn keyed_page(trigger: RunTrigger, page_key: &str, responses: &[&str]) -> NewRun {
+        NewRun {
+            page_key: Some(page_key.to_string()),
+            ..page_start(trigger, responses)
+        }
+    }
+
+    /// An automatic page for `inc-1` with one recipient per response id.
+    fn page_start(trigger: RunTrigger, responses: &[&str]) -> NewRun {
+        use config::meta::oncall::{SubjectRef, SubjectType};
+
+        let mut new = new_run(RunSubjectType::Incident, "inc-1");
+        new.trigger = trigger;
+        new.started_by = "system".to_string();
+        new.recipients = responses
+            .iter()
+            .map(|id| Recipient {
+                response_id: id.to_string(),
+                subject: SubjectRef::new(SubjectType::Incident, "inc-1", 1),
+                ladder_run: 1,
+            })
+            .collect();
+        new
+    }
+
+    async fn skipped_rows(db: &DatabaseConnection) -> Vec<rca_skipped_entity::Model> {
+        rca_skipped_entity::Entity::find()
+            .order_by_asc(rca_skipped_entity::Column::ResponseId)
+            .all(db)
+            .await
+            .unwrap()
+    }
+
+    fn skipped_events(events: Vec<IncidentEventType>) -> Vec<IncidentEventType> {
+        events
+            .into_iter()
+            .filter(|e| matches!(e, IncidentEventType::AnalysisSkipped { .. }))
+            .collect()
+    }
+
+    /// X07: an `in_flight` refusal of a new alert type's page writes its row and its event.
+    #[tokio::test]
+    async fn a_refused_page_writes_one_row_and_one_event_in_one_transaction() {
+        let db = db().await;
+        incident(&db, "inc-1").await;
+        let live = start(&db, "inc-1", T0).await;
+        let refused = start_run_with(
+            &db,
+            keyed_page(RunTrigger::AutoNewAlertType, "alert_a", &["resp_1"]),
+            guards(T0 + SEC),
+            Some(IncidentEvent::ai_analysis_begin()),
+            None,
+        )
+        .await
+        .unwrap();
+        assert_eq!(refused, StartResult::InFlight);
+        let rows = skipped_rows(&db).await;
+        assert_eq!(rows.len(), 1);
+        assert_eq!(
+            (rows[0].reason.as_str(), rows[0].covering_run_id.as_str()),
+            ("in_flight", live.as_str())
+        );
+        assert_eq!(rows[0].covering_run_number, Some(1));
+        assert_eq!(rows[0].response_id.as_deref(), Some("resp_1"));
+        let events = skipped_events(event_types(&db, "inc-1").await);
+        assert!(
+            matches!(
+                events.as_slice(),
+                [IncidentEventType::AnalysisSkipped {
+                    response_id: Some(response),
+                    reason: SkipReason::InFlight,
+                    covering_run_id,
+                    covering_run_number: Some(1),
+                    retry_after_us: None,
+                }] if response == "resp_1" && *covering_run_id == live
+            ),
+            "{events:?}"
+        );
+
+        // The same page refused again by the same run stores nothing new.
+        start_run_with(
+            &db,
+            keyed_page(RunTrigger::AutoNewAlertType, "alert_a", &["resp_1"]),
+            guards(T0 + 2 * SEC),
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+        assert_eq!(skipped_rows(&db).await.len(), 1);
+        assert_eq!(skipped_events(event_types(&db, "inc-1").await).len(), 1);
+
+        // A failed event append rolls the skipped row back, and the page stays refused.
+        let unrecorded = || {
+            config::metrics::oncall::ONCALL_SKIPPED_PAGES_UNRECORDED
+                .with_label_values(&[ORG])
+                .get()
+        };
+        let before = unrecorded();
+        db.execute_unprepared("DROP TABLE incident_events")
+            .await
+            .unwrap();
+        let failed = start_run_with(
+            &db,
+            page_start(RunTrigger::AutoReopen, &["resp_2"]),
+            guards(T0 + 3 * SEC),
+            None,
+            None,
+        )
+        .await;
+        assert!(matches!(failed, Ok(StartResult::InFlight)), "{failed:?}");
+        assert_eq!(skipped_rows(&db).await.len(), 1);
+        assert_eq!(unrecorded(), before + 1);
+    }
+
+    /// Two alert types and two Reopens refused by one live run are four pages, four rows and
+    /// four events.
+    #[tokio::test]
+    async fn distinct_pages_refused_by_one_run_keep_their_own_rows_and_events() {
+        let db = db().await;
+        incident(&db, "inc-1").await;
+        let live = start(&db, "inc-1", T0).await;
+        let pages = [
+            keyed_page(RunTrigger::AutoNewAlertType, "alert_a", &["resp_1"]),
+            keyed_page(RunTrigger::AutoNewAlertType, "alert_b", &["resp_1"]),
+            page_start(RunTrigger::AutoReopen, &["resp_1"]),
+            page_start(RunTrigger::AutoReopen, &["resp_1"]),
+        ];
+        for (at, page) in (1..).zip(pages) {
+            let refused = start_run_with(&db, page, guards(T0 + at * SEC), None, None)
+                .await
+                .unwrap();
+            assert_eq!(refused, StartResult::InFlight);
+        }
+        let rows = skipped_rows(&db).await;
+        assert_eq!(rows.len(), 4);
+        assert!(rows.iter().all(|row| row.covering_run_id == live));
+        let mut times: Vec<i64> = rows.iter().map(|row| row.at_us).collect();
+        times.sort_unstable();
+        assert_eq!(times, [T0 + SEC, T0 + 2 * SEC, T0 + 3 * SEC, T0 + 4 * SEC]);
+        assert_eq!(skipped_events(event_types(&db, "inc-1").await).len(), 4);
+    }
+
+    /// A `cooling_down` refusal names when the page may run: the covering run's end plus the
+    /// cooldown.
+    #[tokio::test]
+    async fn a_cooling_down_page_carries_its_retry_time() {
+        let db = db().await;
+        incident(&db, "inc-1").await;
+        let done = start(&db, "inc-1", T0).await;
+        finish(&db, &done, RunState::Completed, T0 + 60 * SEC).await;
+        let cooldown = 30 * 60 * SEC;
+        let refused = start_run_with(
+            &db,
+            page_start(RunTrigger::AutoReopen, &["resp_1", "resp_2"]),
+            StartGuards {
+                cooldown_us: Some(cooldown),
+                ..guards(T0 + 120 * SEC)
+            },
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+        assert_eq!(refused, StartResult::CoolingDown);
+        let rows = skipped_rows(&db).await;
+        assert_eq!(rows.len(), 2);
+        for row in &rows {
+            assert_eq!(row.reason, "cooling_down");
+            assert_eq!(row.covering_run_id, done);
+            assert_eq!(row.retry_after_us, Some(T0 + 60 * SEC + cooldown));
+            assert_eq!(row.cooldown_us, Some(cooldown));
+        }
+        let events = skipped_events(event_types(&db, "inc-1").await);
+        assert_eq!(events.len(), 2);
+        assert!(events.iter().all(|e| matches!(
+            e,
+            IncidentEventType::AnalysisSkipped { retry_after_us: Some(at), .. }
+                if *at == T0 + 60 * SEC + cooldown
+        )));
+    }
+
+    /// User, Slack (`manual`) and new-incident starts never reach page admission: none written.
+    #[tokio::test]
+    async fn starts_that_are_not_pages_write_no_skipped_page() {
+        let db = db().await;
+        incident(&db, "inc-1").await;
+        start(&db, "inc-1", T0).await;
+        for trigger in [
+            RunTrigger::Manual,
+            RunTrigger::Reanalyze,
+            RunTrigger::AutoNewIncident,
+            RunTrigger::EvidenceSettled,
+        ] {
+            let refused = start_run_with(
+                &db,
+                page_start(trigger, &["resp_1"]),
+                guards(T0 + SEC),
+                None,
+                None,
+            )
+            .await
+            .unwrap();
+            assert_eq!(refused, StartResult::InFlight, "{trigger}");
+        }
+        assert!(skipped_rows(&db).await.is_empty());
+        assert!(skipped_events(event_types(&db, "inc-1").await).is_empty());
+    }
+
+    /// X09: each subject numbers its own runs from 1, and a number never changes.
+    #[tokio::test]
+    async fn runs_are_numbered_per_subject_and_keep_their_number() {
+        let db = db().await;
+        incident(&db, "inc-1").await;
+        incident(&db, "inc-2").await;
+        let mut numbered = Vec::new();
+        for at in 0..3 {
+            let run_id = start(&db, "inc-1", T0 + at * 60 * SEC).await;
+            finish(&db, &run_id, RunState::Completed, T0 + at * 60 * SEC + SEC).await;
+            numbered.push(run_id);
+        }
+        let other = start(&db, "inc-2", T0).await;
+        let mut numbers = Vec::new();
+        for id in &numbered {
+            numbers.push(run(&db, id).await.unwrap().run_number);
+        }
+        assert_eq!(numbers, [Some(1), Some(2), Some(3)]);
+        assert_eq!(run(&db, &other).await.unwrap().run_number, Some(1));
+        let item = to_item(&run(&db, &numbered[1]).await.unwrap());
+        assert_eq!(item.run_number, Some(2));
+    }
+
+    /// X09 race: two alert starts at once get distinct, gap-free numbers on either store.
+    #[tokio::test]
+    async fn concurrent_starts_get_distinct_gap_free_run_numbers() {
+        if !crate::table::testing::meta_store().await {
+            return;
+        }
+        let side = |alert: String, race: Option<crate::race::Barriers>| async move {
+            let new = new_run(RunSubjectType::Alert, &alert);
+            let start = start_run_with(get_orm_client_rw().await, new, guards(T0), None, None);
+            let result = match race {
+                Some(race) => race.run(start).await,
+                None => start.await,
+            };
+            match result.unwrap() {
+                StartResult::Started { run_id, .. } => run_id,
+                other => panic!("expected Started, got {other:?}"),
+            }
+        };
+        let numbers_of = |alert: String| async move {
+            let mut numbers: Vec<Option<i32>> = rca_runs::Entity::find()
+                .filter(rca_runs::Column::OrgId.eq(ORG))
+                .filter(rca_runs::Column::SubjectId.eq(alert.as_str()))
+                .all(get_orm_client_rw().await)
+                .await
+                .unwrap()
+                .into_iter()
+                .map(|run| run.run_number)
+                .collect();
+            numbers.sort();
+            numbers
+        };
+        let store: config::meta::meta_store::MetaStore =
+            config::get_config().common.meta_store.as_str().into();
+        if store == config::meta::meta_store::MetaStore::PostgreSQL {
+            let alert = crate::table::testing::unique("run_number_alert");
+            let race = crate::race::Barriers::new();
+            race.arm("rca_runs.before_run_number", 2);
+            let a = tokio::spawn(side(alert.clone(), Some(race.clone())));
+            let b = tokio::spawn(side(alert.clone(), Some(race.clone())));
+            let (a, b) = (a.await.unwrap(), b.await.unwrap());
+            race.assert_all_met();
+            assert_ne!(a, b);
+            side(alert.clone(), None).await;
+            assert_eq!(numbers_of(alert).await, [Some(1), Some(2), Some(3)]);
+            return;
+        }
+        let runs = crate::race::in_both_orders(|_| {
+            let alert = crate::table::testing::unique("run_number_alert");
+            let pair = (side(alert.clone(), None), side(alert, None));
+            async move { pair }
+        })
+        .await;
+        for run in runs {
+            let alert = rca_runs::Entity::find_by_id(run.a.as_str())
+                .one(get_orm_client_rw().await)
+                .await
+                .unwrap()
+                .unwrap()
+                .subject_id;
+            side(alert.clone(), None).await;
+            assert_eq!(
+                numbers_of(alert).await,
+                [Some(1), Some(2), Some(3)],
+                "{:?}",
+                run.order
+            );
+        }
+    }
+    async fn fence_fixture(db: &DatabaseConnection, read_history: bool) -> (String, String) {
+        use config::meta::oncall::{SubjectRef, SubjectType};
+        // Real ids fill PostgreSQL's `char(27)`; a shorter one comes back padded.
+        let incident_id = format!("{:_<27}", crate::table::testing::unique("fence"));
+        incident(db, &incident_id).await;
+        let mut new = new_run(RunSubjectType::Incident, &incident_id);
+        new.context_used = Some(serde_json::json!({"history_read": read_history}));
+        new.recipients = vec![Recipient {
+            response_id: format!("page_{incident_id}"),
+            subject: SubjectRef::new(SubjectType::Incident, &incident_id, 1),
+            ladder_run: 1,
+        }];
+        let StartResult::Started { run_id, .. } = start_run_with(db, new, guards(T0), None, None)
+            .await
+            .unwrap()
+        else {
+            panic!("run refused");
+        };
+        (incident_id, run_id)
+    }
+
+    fn fence_patch(state: RunState) -> RunUpdate {
+        let mut patch = finish_update(state, T0 + SEC);
+        patch.withhold_if_case = true;
+        patch.result = Some(serde_json::json!({"private": "partial record"}));
+        patch.summary = Some(RunSummaryPatch {
+            detail: Some(Some("private blind spot".into())),
+            ..Default::default()
+        });
+        if state == RunState::Failed {
+            patch.error = Some(RunError {
+                code: "timeout".into(),
+                reason: "Timed out".into(),
+                details: Some("private failure".into()),
+                trigger_type: Some("manual".into()),
+            });
+            patch.event = Some(IncidentEvent::ai_analysis_failed(
+                "Timed out",
+                RunTrigger::Manual.analysis_trigger_type(),
+                Some("private failure".into()),
+            ));
+        }
+        if state == RunState::WaitingInput {
+            patch.pending_question_id = Some(Some("private question".into()));
+            patch.event = Some(IncidentEvent::ai_analysis_needs_input(
+                "r",
+                "q",
+                "private need",
+                "private question",
+                T0 + 10 * SEC,
+            ));
+        }
+        patch
+    }
+
+    async fn assert_fence(db: &DatabaseConnection, id: &str, run_id: &str, code: &str) {
+        let row = run(db, run_id).await.unwrap();
+        assert_eq!(row.state, "failed");
+        assert!(
+            row.report.is_none()
+                && row.outcome.is_none()
+                && row.confidence.is_none()
+                && row.result.is_none()
+        );
+        let error = error_of(&row).unwrap();
+        assert_eq!(error.code, code);
+        assert_eq!(error.details, None);
+        let summary = decode_summary(inc(db, id).await.rca_summary.as_deref());
+        assert_eq!(summary.detail.as_deref(), Some(error.reason.as_str()));
+        let owed = rca_delivery_obligations::for_run_in(db, ORG, run_id)
+            .await
+            .unwrap();
+        assert_eq!(owed.len(), 1);
+        assert_eq!(owed[0].kind, Some(ObligationKind::NoVerdict));
+    }
+
+    async fn wait_at(race: &crate::race::Barriers, point: &'static str) {
+        tokio::time::timeout(std::time::Duration::from_secs(30), async {
+            while race.arrived(point) != 1 {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+    }
+
+    async fn wait_for_pg_incident_lock(db: &DatabaseConnection) {
+        tokio::time::timeout(std::time::Duration::from_secs(30), async {
+            loop {
+                let row = db.query_one(sea_orm::Statement::from_string(
+                    sea_orm::DatabaseBackend::Postgres,
+                    "SELECT COUNT(*) AS count FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock' AND query ILIKE '%alert_incidents%'".to_string(),
+                )).await.unwrap().unwrap();
+                if row.try_get::<i64>("", "count").unwrap() > 0 { break; }
+                tokio::task::yield_now().await;
+            }
+        }).await.unwrap();
+    }
+
+    async fn fence_order(db: &DatabaseConnection, state: RunState, first: bool) {
+        let (id, run_id) = fence_fixture(db, true).await;
+        if first {
+            crate::table::alert_incidents::mark_security_case_with(db, ORG, &id)
+                .await
+                .unwrap();
+            update_run_with(db, ORG, &run_id, fence_patch(state))
+                .await
+                .unwrap();
+            let code = if state == RunState::Failed {
+                "timeout"
+            } else {
+                crate::table::rca_fence::RECLASSIFIED_ERROR_CODE
+            };
+            assert_fence(db, &id, &run_id, code).await;
+        } else {
+            update_run_with(db, ORG, &run_id, fence_patch(state))
+                .await
+                .unwrap();
+            crate::table::alert_incidents::mark_security_case_with(db, ORG, &id)
+                .await
+                .unwrap();
+            let row = run(db, &run_id).await.unwrap();
+            assert_eq!(row.state, state.as_str());
+            assert!(!row.fenced);
+            assert!(row.result.is_some());
+            if state == RunState::Failed {
+                assert_eq!(
+                    error_of(&row).unwrap().details.as_deref(),
+                    Some("private failure")
+                );
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn fenced_completion_vs_reclassify_a_b_e_h_serial_orders() {
+        if !crate::table::testing::meta_store().await {
+            return;
+        }
+        let db = get_orm_client_rw().await;
+        for state in [
+            RunState::Completed,
+            RunState::Failed,
+            RunState::WaitingInput,
+        ] {
+            for first in [true, false] {
+                if !first && state == RunState::WaitingInput {
+                    let (id, run_id) = fence_fixture(db, true).await;
+                    update_run_with(db, ORG, &run_id, fence_patch(state))
+                        .await
+                        .unwrap();
+                    crate::table::alert_incidents::mark_security_case_with(db, ORG, &id)
+                        .await
+                        .unwrap();
+                    assert_eq!(run(db, &run_id).await.unwrap().state, "waiting_input");
+                } else {
+                    fence_order(db, state, first).await;
+                }
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn fenced_completion_vs_reclassify_a_before_first_wait() {
+        if !crate::table::testing::meta_store().await {
+            return;
+        }
+        let db = get_orm_client_rw().await;
+        let (id, run_id) = fence_fixture(db, true).await;
+        let race = crate::race::Barriers::new();
+        race.arm("rca_fence.before_begin", 2);
+        let task = {
+            let (race, run_id) = (race.clone(), run_id.clone());
+            tokio::spawn(async move {
+                race.run(update_run_with(
+                    get_orm_client_rw().await,
+                    ORG,
+                    &run_id,
+                    fence_patch(RunState::Completed),
+                ))
+                .await
+            })
+        };
+        wait_at(&race, "rca_fence.before_begin").await;
+        crate::table::alert_incidents::mark_security_case_with(db, ORG, &id)
+            .await
+            .unwrap();
+        race.wait("rca_fence.before_begin").await;
+        assert!(task.await.unwrap().unwrap());
+        race.assert_all_met();
+        assert_fence(
+            db,
+            &id,
+            &run_id,
+            crate::table::rca_fence::RECLASSIFIED_ERROR_CODE,
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    async fn fenced_completion_vs_reclassify_b_e_postgres_lock_overlap() {
+        if !crate::table::testing::meta_store().await
+            || get_orm_client_rw().await.get_database_backend()
+                != sea_orm::DatabaseBackend::Postgres
+        {
+            return;
+        }
+        for state in [RunState::Completed, RunState::Failed] {
+            let db = get_orm_client_rw().await;
+            let (id, run_id) = fence_fixture(db, true).await;
+            let race = crate::race::Barriers::new();
+            race.arm("rca_fence.after_run_lock", 2)
+                .arm("rca_fence.before_reclassify_lock", 2);
+            let writer = {
+                let (race, run_id) = (race.clone(), run_id.clone());
+                tokio::spawn(async move {
+                    race.run(update_run_with(
+                        get_orm_client_rw().await,
+                        ORG,
+                        &run_id,
+                        fence_patch(state),
+                    ))
+                    .await
+                })
+            };
+            wait_at(&race, "rca_fence.after_run_lock").await;
+            let marker = {
+                let (race, id) = (race.clone(), id.clone());
+                tokio::spawn(async move {
+                    race.run(crate::table::alert_incidents::mark_security_case_with(
+                        get_orm_client_rw().await,
+                        ORG,
+                        &id,
+                    ))
+                    .await
+                })
+            };
+            wait_at(&race, "rca_fence.before_reclassify_lock").await;
+            race.wait("rca_fence.before_reclassify_lock").await;
+            wait_for_pg_incident_lock(db).await;
+            race.wait("rca_fence.after_run_lock").await;
+            assert!(writer.await.unwrap().unwrap());
+            marker.await.unwrap().unwrap();
+            race.assert_all_met();
+            let row = run(db, &run_id).await.unwrap();
+            assert_eq!(row.state, state.as_str());
+            assert!(!row.fenced);
+            assert!(row.result.is_some());
+        }
+    }
+
+    #[tokio::test]
+    async fn fenced_completion_vs_reclassify_c_d_f_j_stats_and_deadline() {
+        if !crate::table::testing::meta_store().await {
+            return;
+        }
+        let db = get_orm_client_rw().await;
+        for state in [RunState::Cancelled, RunState::Completed] {
+            let (id, run_id) = fence_fixture(db, true).await;
+            crate::table::alert_incidents::mark_security_case_with(db, ORG, &id)
+                .await
+                .unwrap();
+            update_run_with(db, ORG, &run_id, fence_patch(state))
+                .await
+                .unwrap();
+            let mut stats = fence_patch(RunState::Failed);
+            stats.final_stats_only = true;
+            stats.stats = Some(RunStats {
+                steps: Some(7),
+                ..Default::default()
+            });
+            update_run_with(db, ORG, &run_id, stats).await.unwrap();
+            let row = run(db, &run_id).await.unwrap();
+            assert!(row.result.is_none());
+            assert_eq!(
+                decode::<RunStats>(row.stats.as_deref()).unwrap().steps,
+                Some(7)
+            );
+            if state == RunState::Completed {
+                assert_fence(
+                    db,
+                    &id,
+                    &run_id,
+                    crate::table::rca_fence::RECLASSIFIED_ERROR_CODE,
+                )
+                .await;
+            }
+        }
+        let (id, run_id) = fence_fixture(db, false).await;
+        crate::table::alert_incidents::mark_security_case_with(db, ORG, &id)
+            .await
+            .unwrap();
+        let mut patch = fence_patch(RunState::Completed);
+        patch.withhold_if_case = false;
+        update_run_with(db, ORG, &run_id, patch).await.unwrap();
+        let row = run(db, &run_id).await.unwrap();
+        assert_eq!(row.state, "completed");
+        assert!(row.report.is_some() && row.result.is_some());
+        assert!(
+            !crate::table::rca_fence::is_fenced_with(db, &row)
+                .await
+                .unwrap()
+        );
     }
 }

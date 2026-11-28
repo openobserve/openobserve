@@ -35,24 +35,27 @@ use config::{
         },
         oncall::{
             SubjectRef,
+            confidence::GradeTrust,
             rca_run::{
-                EndedBy, RcaRunRecord, RcaSubmit, RunEndInput, RunEndResult, protocol_stage,
-                record_run_end, stage_index,
+                EndedBy, LedgerTool, RcaRunRecord, RcaSubmit, RunEndInput, RunEndResult,
+                protocol_stage, record_run_end, record_run_end_with, stage_index,
             },
         },
     },
     metrics::{
-        RCA_ANSWER_WAIT_SECONDS, RCA_CONFIDENCE_GRADE_TOTAL, RCA_HYPOTHESIS_LEFT_TESTING_TOTAL,
-        RCA_LEDGER_INVALID_CALL_TOTAL, RCA_LEDGER_TRUNCATED_TOTAL, RCA_OUTCOME_CLAIM_TOTAL,
-        RCA_OUTCOME_TOTAL, RCA_QUESTIONS_TOTAL, RCA_RUN_CONTINUATIONS_TOTAL,
-        RCA_RUN_DURATION_SECONDS, RCA_RUN_STEPS, RCA_RUN_TOOL_CALLS, RCA_RUNS_WITHOUT_REPORT_TOTAL,
-        RCA_TIMELINE_UNVERIFIED_TOTAL, RCA_UNVERIFIED_CITATIONS_TOTAL, RCA_VERDICT_REVISED_TOTAL,
+        RCA_ANSWER_WAIT_SECONDS, RCA_CONFIDENCE_GRADE_TOTAL, RCA_FIRST_HYPOTHESIS_SECONDS,
+        RCA_HYPOTHESIS_LEFT_TESTING_TOTAL, RCA_LEDGER_INVALID_CALL_TOTAL,
+        RCA_LEDGER_TRUNCATED_TOTAL, RCA_OUTCOME_CLAIM_TOTAL, RCA_OUTCOME_TOTAL,
+        RCA_QUESTIONS_TOTAL, RCA_RUN_CONTINUATIONS_TOTAL, RCA_RUN_DURATION_SECONDS, RCA_RUN_STEPS,
+        RCA_RUN_TOOL_CALLS, RCA_RUNS_WITHOUT_REPORT_TOTAL, RCA_TIMELINE_UNVERIFIED_TOTAL,
+        RCA_UNVERIFIED_CITATIONS_TOTAL, RCA_VERDICT_REVISED_TOTAL,
     },
     utils::time::now_micros,
 };
 use futures::StreamExt;
 use infra::table::{
     ai_chat_sessions, ai_chat_turns,
+    rca_delivery_obligations::Obligation,
     rca_runs::{self as runs_table, Model as RunRow, RunSummaryPatch, RunUpdate},
 };
 use o2_enterprise::enterprise::{
@@ -368,10 +371,14 @@ pub async fn start_forked_rca_turn(
 }
 
 async fn start_turn(
-    run: RcaTurnRun,
+    mut run: RcaTurnRun,
     prompt: RcaPrompt,
     fork: Option<ForkedSession>,
 ) -> Result<TurnStarted, RcaTurnError> {
+    super::rca_capabilities::enrich_context(
+        &mut run.context,
+        &super::rca_capabilities::rca_capabilities(&run.org_id),
+    );
     // A cancel may have ended the run since the decision to continue it.
     if run.session_id.is_some() {
         match runs_table::get_rw(&run.org_id, &run.run_id).await {
@@ -404,6 +411,7 @@ async fn start_turn(
                 }) => {
                     if let Some(used) = patch.context_used.as_mut() {
                         used["resumed_from"] = resumed_from;
+                        used["history_injected"] = Value::Bool(true);
                     }
                     patch.stats = Some(RunStats {
                         steps: Some(reused.steps),
@@ -435,6 +443,8 @@ async fn start_turn(
             }
         }
     };
+
+    guard_history_fence(&run.org_id, &run.run_id).await?;
 
     // The run reads as SysRcaAgent; this is `sre_agent_email(org)` and its token.
     let (email, token) = crate::organization::get_sre_agent_credentials(&run.org_id)
@@ -573,6 +583,39 @@ fn rca_policy(settings: Option<&OrgAiSettings>) -> Value {
     json!({ "data_sharing_level": level.as_str() })
 }
 
+async fn guard_history_fence(org_id: &str, run_id: &str) -> Result<(), RcaTurnError> {
+    let run = runs_table::get_rw(org_id, run_id)
+        .await
+        .map_err(|error| RcaTurnError::Other(error.to_string()))?
+        .ok_or_else(|| RcaTurnError::Other(format!("run {run_id} is no longer present")))?;
+    if !infra::table::rca_fence::is_fenced(&run)
+        .await
+        .map_err(|error| RcaTurnError::Other(error.to_string()))?
+    {
+        return Ok(());
+    }
+    if let Some(owed) = rca_runs::fail_run_with(
+        org_id,
+        run_id,
+        runs_table::to_item(&run).trigger,
+        runs_table::RECLASSIFIED_ERROR_CODE,
+        runs_table::RECLASSIFIED_ERROR_REASON,
+        None,
+        RunUpdate {
+            withhold_if_case: true,
+            ..Default::default()
+        },
+    )
+    .await
+    .map_err(|error| RcaTurnError::Other(error.to_string()))?
+    {
+        apply_obligations(org_id, run_id, &owed).await;
+    }
+    Err(RcaTurnError::Other(
+        runs_table::RECLASSIFIED_ERROR_REASON.to_string(),
+    ))
+}
+
 /// Expose only the context actually provided to this run.
 fn context_used(context: &Value, mcps: &[McpEntry], skills: &[SkillEntry]) -> Value {
     let past_causes: Vec<Value> = context
@@ -585,7 +628,19 @@ fn context_used(context: &Value, mcps: &[McpEntry], skills: &[SkillEntry]) -> Va
         .collect();
     let skills: Vec<&str> = skills.iter().map(|s| s.name.as_str()).collect();
     let toolsets: Vec<&str> = mcps.iter().map(|m| m.name.as_str()).collect();
-    json!({ "past_causes": past_causes, "skills": skills, "toolsets": toolsets })
+    let history_injected = !past_causes.is_empty()
+        || context
+            .get("previous_analysis")
+            .and_then(Value::as_str)
+            .is_some_and(|value| !value.is_empty())
+        || context
+            .get("similar_causes")
+            .and_then(Value::as_array)
+            .is_some_and(|value| !value.is_empty());
+    json!({ "past_causes": past_causes, "skills": skills, "toolsets": toolsets,
+        "history_injected": history_injected, "history_read": false,
+        "history_reads_allowed": context.get("history_reads_allowed").and_then(Value::as_bool).unwrap_or(false),
+        "capabilities": context.get("capabilities") })
 }
 
 /// One `[past:<cause>] <summary>` context line as `{id: "past:<cause>", summary}`.
@@ -682,6 +737,24 @@ async fn finalize(
     ending.end(end.result, &turn_id, resume).await
 }
 
+/// Applies the run's due deliveries now; the escalation tick's sweep retries what fails.
+async fn apply_obligations(org_id: &str, run_id: &str, owed: &[Obligation]) {
+    if owed.is_empty() {
+        return;
+    }
+    if let Err(e) = rca_service::apply_delivery_obligations(org_id, run_id).await {
+        log::warn!("[RCA_TURN] delivery of run {run_id} deferred to the sweep: {e:#}");
+    }
+}
+
+/// The subjects no obligation of the run covers; they keep best-effort delivery.
+fn unowed(subjects: Vec<SubjectRef>, owed: &[Obligation]) -> Vec<SubjectRef> {
+    subjects
+        .into_iter()
+        .filter(|subject| !owed.iter().any(|o| o.subject == *subject))
+        .collect()
+}
+
 /// Read on the primary so finalization sees the turn's latest committed events.
 async fn read_session(
     org_id: &str,
@@ -769,8 +842,7 @@ impl RunEnd {
             && let Some(question) = transcript.and_then(|t| t.open_question.as_ref())
         {
             if self.run.questions_asked < MAX_QUESTIONS {
-                self.wait_for_answer(question).await;
-                return None;
+                return self.wait_for_answer(question).await;
             }
             return self.close_deadline_now(question, resume).await;
         }
@@ -800,7 +872,7 @@ impl RunEnd {
         reconcile_steering(&self.org_id, &self.run, self.transcript.as_ref(), terminal).await;
     }
 
-    async fn wait_for_answer(&self, question: &TranscriptQuestion) {
+    async fn wait_for_answer(&self, question: &TranscriptQuestion) -> Option<RunState> {
         let wait_minutes =
             i64::try_from(get_o2_config().incidents.rca_answer_wait_minutes).unwrap_or(i64::MAX);
         let deadline = now_micros().saturating_add(wait_minutes.saturating_mul(60_000_000));
@@ -824,18 +896,47 @@ impl RunEnd {
             ..patch
         };
         match rca_runs::update_run(&self.org_id, &self.run.run_id, patch).await {
-            Ok(true) => log::info!(
-                "[RCA_TURN] run {} waits for an answer to question {} until {deadline}",
-                self.run.run_id,
-                question.question_id
-            ),
+            Ok(true) => match runs_table::get_rw(&self.org_id, &self.run.run_id).await {
+                Ok(Some(run)) if runs_table::to_item(&run).state == RunState::Failed => {
+                    let owed = infra::table::rca_delivery_obligations::for_run(
+                        &self.org_id,
+                        &self.run.run_id,
+                    )
+                    .await;
+                    match owed {
+                        Ok(owed) => self.release_without_verdict(&owed).await,
+                        Err(error) => {
+                            log::error!("[RCA_TURN] cannot read fenced deliveries: {error}")
+                        }
+                    }
+                    count_run_end(
+                        &self.org_id,
+                        self.item.trigger,
+                        RunState::Failed,
+                        infra::table::rca_fence::RECLASSIFIED_ERROR_CODE,
+                    );
+                    self.observe(RunState::Failed);
+                    Some(RunState::Failed)
+                }
+                Ok(_) => None,
+                Err(error) => {
+                    log::error!("[RCA_TURN] cannot read paused run: {error}");
+                    None
+                }
+            },
             // Ended meanwhile (a cancel): it keeps its counts.
-            Ok(false) => self.write_final_stats().await,
+            Ok(false) => {
+                self.write_final_stats().await;
+                None
+            }
             // The run stays `running` with its turn ended; the sweeper finalizes it again.
-            Err(e) => log::warn!(
-                "[RCA_TURN] could not pause run {} on its question: {e}",
-                self.run.run_id
-            ),
+            Err(e) => {
+                log::warn!(
+                    "[RCA_TURN] could not pause run {} on its question: {e}",
+                    self.run.run_id
+                );
+                None
+            }
         }
     }
 
@@ -944,9 +1045,13 @@ impl RunEnd {
     /// The final stats and summary counts, written with the run's end.
     fn counts(&self) -> RunUpdate {
         let Some(thread) = self.thread.as_ref() else {
-            return RunUpdate::default();
+            return RunUpdate {
+                withhold_if_case: self.read_history(),
+                ..Default::default()
+            };
         };
         RunUpdate {
+            withhold_if_case: self.read_history(),
             stats: Some(RunStats {
                 steps: Some(thread.steps),
                 tool_calls: Some(thread.tool_calls),
@@ -962,6 +1067,47 @@ impl RunEnd {
                 ..Default::default()
             }),
             ..Default::default()
+        }
+    }
+
+    fn read_history(&self) -> bool {
+        infra::table::rca_fence::read_history(&self.run)
+            || self.transcript.as_ref().is_some_and(|transcript| {
+                transcript.tool_log.iter().any(|call| {
+                    call.success
+                        && call.result_count.is_some_and(|count| count > 0)
+                        && matches!(
+                            call.tool.as_str(),
+                            "ListIncidents"
+                                | "ListIncidentRcaRuns"
+                                | "GetIncidentRcaRun"
+                                | "GetIncidentBrief"
+                                | "GetSimilarIncidents"
+                                | "ListAutoObserveIncidents"
+                        )
+                })
+            })
+    }
+
+    async fn completion_withheld(&self, owed: &[Obligation]) -> bool {
+        match runs_table::get_rw(&self.org_id, &self.run.run_id).await {
+            Ok(Some(run)) if runs_table::to_item(&run).state == RunState::Completed => false,
+            Ok(Some(run)) => {
+                let code = runs_table::error_of(&run)
+                    .map(|error| error.code)
+                    .unwrap_or_default();
+                count_run_end(&self.org_id, self.item.trigger, RunState::Failed, &code);
+                self.observe(RunState::Failed);
+                self.release_without_verdict(owed).await;
+                true
+            }
+            other => {
+                log::error!(
+                    "[RCA_TURN] cannot verify committed completion {}: {other:?}",
+                    self.run.run_id
+                );
+                true
+            }
         }
     }
 
@@ -1021,16 +1167,20 @@ impl RunEnd {
             EndedBy::Agent
         };
         let authors = self.steer_authors().await;
-        let mut end = record_run_end(&RunEndInput {
-            submit: Some(submit),
-            calls: &transcript.calls,
-            tool_log: &transcript.tool_log,
-            stages_run: &transcript.stages_run,
-            ended_by,
-            completed: true,
-            steer_authors: &authors,
-            ended_at_us: now_micros(),
-        });
+        let trust = run_grade_trust(&self.run, &self.org_id);
+        let mut end = record_run_end_with(
+            &RunEndInput {
+                submit: Some(submit),
+                calls: &transcript.calls,
+                tool_log: &transcript.tool_log,
+                stages_run: &transcript.stages_run,
+                ended_by,
+                completed: true,
+                steer_authors: &authors,
+                ended_at_us: now_micros(),
+            },
+            &trust,
+        );
         if ended_by == EndedBy::AnswerDeadline {
             end.record.answer_deadline_need = transcript
                 .questions
@@ -1055,18 +1205,22 @@ impl RunEnd {
             let summary = patch.summary.get_or_insert_with(RunSummaryPatch::default);
             summary.detail = Some(detail);
         }
-        match rca_runs::complete_run(&self.org_id, &self.run.run_id, &submit.markdown, patch).await
+        match rca_runs::complete_run_owing(&self.org_id, &self.run.run_id, &submit.markdown, patch)
+            .await
         {
-            Ok(true) => {
+            Ok(Some(owed)) => {
+                if self.completion_withheld(&owed).await {
+                    return Some(RunState::Failed);
+                }
                 count_run_end(&self.org_id, self.item.trigger, RunState::Completed, "");
                 count_record(&self.org_id, self.item.trigger, &end);
                 self.report_defects(submit);
                 self.observe(RunState::Completed);
-                self.deliver(&submit.markdown, &end).await;
+                self.deliver(&submit.markdown, &end, &owed).await;
                 Some(RunState::Completed)
             }
             // Ended meanwhile (a cancel wins over a report): it keeps its counts.
-            Ok(false) => {
+            Ok(None) => {
                 self.write_final_stats().await;
                 None
             }
@@ -1115,15 +1269,18 @@ impl RunEnd {
             let summary = patch.summary.get_or_insert_with(RunSummaryPatch::default);
             summary.detail = Some(Some(detail));
         }
-        match rca_runs::complete_run(&self.org_id, &self.run.run_id, &report, patch).await {
-            Ok(true) => {
+        match rca_runs::complete_run_owing(&self.org_id, &self.run.run_id, &report, patch).await {
+            Ok(Some(owed)) => {
+                if self.completion_withheld(&owed).await {
+                    return Some(RunState::Failed);
+                }
                 count_run_end(&self.org_id, self.item.trigger, RunState::Completed, "");
                 count_record(&self.org_id, self.item.trigger, &end);
                 self.observe(RunState::Completed);
-                self.deliver(&report, &end).await;
+                self.deliver(&report, &end, &owed).await;
                 Some(RunState::Completed)
             }
-            Ok(false) => {
+            Ok(None) => {
                 self.write_final_stats().await;
                 None
             }
@@ -1142,20 +1299,34 @@ impl RunEnd {
         }
     }
 
-    /// Hand a completed run's report, verdict and grade to the on-call path.
-    async fn deliver(&self, report: &str, end: &RunEndResult) {
+    /// Hand a completed run's report, verdict and grade to the on-call path; `owed` are the
+    /// obligations its completion settled, and every record they miss is told directly.
+    async fn deliver(&self, report: &str, end: &RunEndResult, owed: &[Obligation]) {
         let verdict = end.verdict.as_ref();
         let grade = end.record.grade.as_ref();
+        apply_obligations(&self.org_id, &self.run.run_id, owed).await;
         match self.item.subject_type {
             RunSubjectType::Incident => {
-                rca_service::deliver_incident_result(
-                    &self.org_id,
-                    &self.run.subject_id,
-                    report,
-                    verdict,
-                    grade,
-                )
-                .await;
+                if owed.is_empty() {
+                    rca_service::deliver_incident_result(
+                        &self.org_id,
+                        &self.run.subject_id,
+                        report,
+                        verdict,
+                        grade,
+                    )
+                    .await;
+                } else {
+                    rca_service::deliver_alert_result(
+                        &self.org_id,
+                        &self.unowed_records(owed).await,
+                        report,
+                        verdict,
+                        grade,
+                        None,
+                    )
+                    .await;
+                }
                 crate::autoobserve::next_step::on_run_finished(
                     &self.org_id,
                     &self.run.subject_id,
@@ -1167,7 +1338,7 @@ impl RunEnd {
             RunSubjectType::Alert => {
                 rca_service::deliver_alert_result(
                     &self.org_id,
-                    &self.subjects(),
+                    &unowed(self.subjects(), owed),
                     report,
                     verdict,
                     grade,
@@ -1358,15 +1529,15 @@ impl RunEnd {
         )
         .await
         {
-            Ok(true) => {
+            Ok(Some(owed)) => {
                 if let Some(end) = end.as_ref() {
                     count_record(&self.org_id, self.item.trigger, end);
                 }
                 self.observe(RunState::Failed);
-                self.release_without_verdict().await;
+                self.release_without_verdict(&owed).await;
                 Some(RunState::Failed)
             }
-            Ok(false) => {
+            Ok(None) => {
                 self.write_final_stats().await;
                 None
             }
@@ -1381,15 +1552,31 @@ impl RunEnd {
     }
 
     /// No verdict is coming, so no triage hold waits out its budget for one.
-    async fn release_without_verdict(&self) {
+    async fn release_without_verdict(&self, owed: &[Obligation]) {
+        apply_obligations(&self.org_id, &self.run.run_id, owed).await;
         match self.item.subject_type {
-            RunSubjectType::Incident => {
+            RunSubjectType::Incident if owed.is_empty() => {
                 rca_service::no_verdict_for_incident(&self.org_id, &self.run.subject_id).await
             }
+            RunSubjectType::Incident => {
+                let rest = self.unowed_records(owed).await;
+                rca_service::no_verdict_for_subjects(&self.org_id, &rest).await
+            }
             RunSubjectType::Alert => {
-                rca_service::no_verdict_for_subjects(&self.org_id, &self.subjects()).await
+                let rest = unowed(self.subjects(), owed);
+                rca_service::no_verdict_for_subjects(&self.org_id, &rest).await
             }
         }
+    }
+
+    /// The incident's records with no obligation on this run, such as one opened while it ran.
+    async fn unowed_records(&self, owed: &[Obligation]) -> Vec<SubjectRef> {
+        super::incidents::incident_records(&self.org_id, &self.run.subject_id)
+            .await
+            .into_iter()
+            .filter(|record| !owed.iter().any(|o| o.response_id == record.id))
+            .map(|record| record.subject)
+            .collect()
     }
 
     /// The pending on-call records an alert run was started for.
@@ -1413,6 +1600,7 @@ impl RunEnd {
             state,
             self.run.started_at,
             self.thread.as_ref(),
+            self.transcript.as_ref(),
         );
     }
 }
@@ -1422,6 +1610,7 @@ pub(crate) fn observe_end(
     state: RunState,
     started_at_us: i64,
     thread: Option<&ThreadStats>,
+    transcript: Option<&RunTranscript>,
 ) {
     let seconds = now_micros().saturating_sub(started_at_us).max(0) as f64 / 1_000_000.0;
     RCA_RUN_DURATION_SECONDS
@@ -1430,6 +1619,44 @@ pub(crate) fn observe_end(
     if let Some(thread) = thread {
         observe_counts(org_id, thread);
     }
+    observe_first_hypothesis(org_id, started_at_us, transcript);
+}
+
+/// Kept apart from `observe_end` so a path that reads the transcript late still times the run at
+/// its end.
+pub(crate) fn observe_first_hypothesis(
+    org_id: &str,
+    started_at_us: i64,
+    transcript: Option<&RunTranscript>,
+) {
+    if let Some(seconds) = transcript.and_then(|t| first_hypothesis_seconds(t, started_at_us)) {
+        RCA_FIRST_HYPOTHESIS_SECONDS
+            .with_label_values(&[org_id])
+            .observe(seconds);
+    }
+}
+
+/// The transcript of a run ended outside its turn, or None when the session cannot be read.
+pub(crate) async fn read_transcript(org_id: &str, run: &RunRow) -> Option<RunTranscript> {
+    match read_session(org_id, run.session_id.as_deref()).await {
+        Ok((events, _)) => Some(decode_run(&events)),
+        Err(e) => {
+            log::warn!(
+                "[RCA_TURN] cannot read the transcript of run {}: {e:#}",
+                run.run_id
+            );
+            None
+        }
+    }
+}
+
+/// A resumed run's session holds the source run's calls, which predate this run's start.
+fn first_hypothesis_seconds(transcript: &RunTranscript, started_at_us: i64) -> Option<f64> {
+    let call = transcript
+        .calls
+        .iter()
+        .find(|call| call.tool == LedgerTool::Hypothesis && call.at_us >= started_at_us)?;
+    Some((call.at_us - started_at_us) as f64 / 1_000_000.0)
 }
 
 fn observe_counts(org_id: &str, thread: &ThreadStats) {
@@ -1439,6 +1666,24 @@ fn observe_counts(org_id: &str, thread: &ThreadStats) {
     RCA_RUN_TOOL_CALLS
         .with_label_values(&[org_id])
         .observe(f64::from(thread.tool_calls));
+}
+
+fn run_grade_trust(run: &RunRow, org_id: &str) -> GradeTrust {
+    let current = super::rca_capabilities::rca_capabilities(org_id);
+    let context = runs_table::decode::<Value>(run.context_used.as_deref());
+    let used = context
+        .as_ref()
+        .and_then(|context| context.get("capabilities"));
+    GradeTrust {
+        super_cluster: used
+            .and_then(|value| value.get("super_cluster"))
+            .and_then(Value::as_bool)
+            .unwrap_or(current.super_cluster),
+        serving_region: used
+            .and_then(|value| value.get("serving_region"))
+            .and_then(Value::as_str)
+            .map(str::to_string),
+    }
 }
 
 fn partial_end(
@@ -1949,6 +2194,7 @@ where
         RunState::Cancelled,
         run.started_at,
         progress.as_ref(),
+        None,
     );
 
     // An answer may have resumed the session since the pre-read.
@@ -1956,13 +2202,8 @@ where
         stop(org_id, session_id).await;
     }
     // What the transcript shows read stays read; every other row is not read.
-    let transcript = match read_session(org_id, run.session_id.as_deref()).await {
-        Ok((events, _)) => Some(decode_run(&events)),
-        Err(e) => {
-            log::warn!("[RCA_TURN] cannot read the transcript of cancelled run {run_id}: {e:#}");
-            None
-        }
-    };
+    let transcript = read_transcript(org_id, &run).await;
+    observe_first_hypothesis(org_id, run.started_at, transcript.as_ref());
     reconcile_steering(org_id, &run, transcript.as_ref(), Some(RunState::Cancelled)).await;
     // No verdict is coming, so nothing may go on holding a page for one.
     rca_service::skip_analysis_for_incident(org_id, incident_id).await;
@@ -1992,7 +2233,7 @@ pub async fn turn_run_of(run: &RunRow) -> anyhow::Result<RcaTurnRun> {
     };
     // A later turn's session already holds the bundle its first turn read.
     let context =
-        rca_service::build_incident_context(&run.org_id, &incident_id, previous, None).await;
+        super::rca_context::incident_context(&run.org_id, &incident_id, previous, None, None).await;
     Ok(RcaTurnRun {
         org_id: run.org_id.clone(),
         run_id: run.run_id.clone(),
@@ -2236,24 +2477,25 @@ async fn sweep_run(run: RunRow, now: i64, timeout_secs: u64) -> anyhow::Result<b
         turn_message: None,
         usage: RunUsage::default(),
     };
-    if !rca_runs::fail_run(
+    let Some(owed) = rca_runs::fail_run_with(
         &ending.org_id,
         &ending.run.run_id,
         ending.item.trigger,
         runs_table::STALE_ERROR_CODE,
         runs_table::STALE_ERROR_REASON,
         None,
+        RunUpdate::default(),
     )
     .await?
-    {
+    else {
         return Ok(false);
-    }
+    };
     ending.observe(RunState::Failed);
     match ending.item.subject_type {
         RunSubjectType::Incident => {
             rca_service::skip_analysis_for_incident(&ending.org_id, &ending.run.subject_id).await;
         }
-        RunSubjectType::Alert => ending.release_without_verdict().await,
+        RunSubjectType::Alert => ending.release_without_verdict(&owed).await,
     }
     ending.reconcile(Some(RunState::Failed)).await;
     Ok(true)
@@ -2368,7 +2610,7 @@ fn lost_turn_result(
 
 #[cfg(test)]
 mod tests {
-    use config::meta::oncall::AnalysisStatus;
+    use config::meta::oncall::{AnalysisStatus, rca_run::LedgerCall};
     use infra::table::entity::ai_chat_turns as turn_rows;
     use parking_lot::Mutex;
     use sea_orm::{ActiveModelTrait, EntityTrait};
@@ -2387,6 +2629,18 @@ mod tests {
             incident_row, new_incident, start, stored, timeline,
         },
     };
+
+    const TRIGGERS: [(RunTrigger, &str); 9] = [
+        (RunTrigger::AutoNewIncident, "new incident"),
+        (RunTrigger::AutoNewAlertType, "new alert type"),
+        (RunTrigger::AutoReopen, "reopen"),
+        (RunTrigger::Manual, "manual"),
+        (RunTrigger::Reanalyze, "re-analyze"),
+        (RunTrigger::OncallPage, "on-call page"),
+        (RunTrigger::Resume, "resume"),
+        (RunTrigger::Legacy, "manual"),
+        (RunTrigger::EvidenceSettled, "settled evidence"),
+    ];
 
     #[test]
     fn an_rca_turn_carries_the_orgs_data_level_and_no_write_tier() {
@@ -2409,19 +2663,32 @@ mod tests {
         );
     }
 
-    // ---- the prompt ----
+    /// F3: a subject the run holds no obligation for still gets the direct delivery.
+    #[test]
+    fn only_the_subjects_without_an_obligation_are_told_directly() {
+        use config::meta::oncall::SubjectType;
+        use infra::table::rca_delivery_obligations::ObligationState;
 
-    const TRIGGERS: [(RunTrigger, &str); 9] = [
-        (RunTrigger::AutoNewIncident, "new incident"),
-        (RunTrigger::AutoNewAlertType, "new alert type"),
-        (RunTrigger::AutoReopen, "reopen"),
-        (RunTrigger::Manual, "manual"),
-        (RunTrigger::Reanalyze, "re-analyze"),
-        (RunTrigger::OncallPage, "on-call page"),
-        (RunTrigger::Resume, "resume"),
-        (RunTrigger::Legacy, "manual"),
-        (RunTrigger::EvidenceSettled, "settled evidence"),
-    ];
+        let armed = SubjectRef::new(SubjectType::Alert, "alert_a", 1);
+        let late = SubjectRef::new(SubjectType::Alert, "alert_b", 1);
+        let owed = [Obligation {
+            id: "o1".to_string(),
+            org_id: "org".to_string(),
+            run_id: "run".to_string(),
+            response_id: "resp_a".to_string(),
+            subject: armed.clone(),
+            ladder_run: 1,
+            kind: None,
+            state: ObligationState::Pending,
+            attempts: 0,
+            next_attempt_at_us: 0,
+        }];
+        let both = vec![armed.clone(), late.clone()];
+        assert_eq!(unowed(both.clone(), &owed), [late]);
+        assert_eq!(unowed(both.clone(), &[]), both);
+    }
+
+    // ---- the prompt ----
 
     fn incident(id: &str, title: &str, alerts: u32, severity: &str) -> RcaPromptSubject {
         RcaPromptSubject::Incident {
@@ -2785,6 +3052,81 @@ mod tests {
                 .with_label_values(&[org])
                 .get_sample_count(),
         )
+    }
+
+    /// One ledger call `after_s` seconds after `started`.
+    fn ledger_call(seq: i64, tool: LedgerTool, started: i64, after_s: i64) -> LedgerCall {
+        LedgerCall {
+            seq,
+            at_us: started + after_s * 1_000_000,
+            tool,
+            input: json!({}),
+        }
+    }
+
+    #[test]
+    fn the_first_hypothesis_is_observed_once_as_seconds_after_start() {
+        let (org, started) = ("org_first_hypothesis", 1_700_000_000_000_000);
+        let transcript = RunTranscript {
+            calls: vec![
+                ledger_call(1, LedgerTool::BlindSpot, started, 5),
+                ledger_call(2, LedgerTool::Hypothesis, started, 42),
+                ledger_call(3, LedgerTool::Hypothesis, started, 90),
+            ],
+            ..Default::default()
+        };
+        observe_end(org, RunState::Completed, started, None, Some(&transcript));
+        let first = RCA_FIRST_HYPOTHESIS_SECONDS.with_label_values(&[org]);
+        assert_eq!(
+            (first.get_sample_count(), first.get_sample_sum()),
+            (1, 42.0)
+        );
+    }
+
+    #[test]
+    fn a_run_without_a_hypothesis_observes_no_first_hypothesis() {
+        let (org, started) = ("org_no_hypothesis", 1_700_000_000_000_000);
+        let blind_spot_only = RunTranscript {
+            calls: vec![ledger_call(1, LedgerTool::BlindSpot, started, 5)],
+            ..Default::default()
+        };
+        observe_end(org, RunState::Failed, started, None, Some(&blind_spot_only));
+        observe_end(org, RunState::Failed, started, None, None);
+        let first = RCA_FIRST_HYPOTHESIS_SECONDS.with_label_values(&[org]);
+        assert_eq!(first.get_sample_count(), 0);
+    }
+
+    #[test]
+    fn a_resumed_run_skips_the_hypotheses_its_source_run_recorded() {
+        let (org, started) = ("org_resumed_hypothesis", 1_700_000_000_000_000);
+        let resumed = RunTranscript {
+            calls: vec![
+                ledger_call(1, LedgerTool::Hypothesis, started, -560),
+                ledger_call(2, LedgerTool::Hypothesis, started, 30),
+            ],
+            ..Default::default()
+        };
+        observe_end(org, RunState::Completed, started, None, Some(&resumed));
+        let first = RCA_FIRST_HYPOTHESIS_SECONDS.with_label_values(&[org]);
+        assert_eq!(
+            (first.get_sample_count(), first.get_sample_sum()),
+            (1, 30.0)
+        );
+
+        let (org, untimed) = (
+            "org_untimed_hypothesis",
+            ledger_call(1, LedgerTool::Hypothesis, 0, 0),
+        );
+        let only_copied = RunTranscript {
+            calls: vec![
+                ledger_call(1, LedgerTool::Hypothesis, started, -560),
+                untimed,
+            ],
+            ..Default::default()
+        };
+        observe_end(org, RunState::Failed, started, None, Some(&only_copied));
+        let first = RCA_FIRST_HYPOTHESIS_SECONDS.with_label_values(&[org]);
+        assert_eq!(first.get_sample_count(), 0);
     }
 
     #[tokio::test]
@@ -4856,6 +5198,8 @@ mod tests {
             skip_cooldown: true,
             oncall_subjects: None,
             context_used: None,
+            recipients: Vec::new(),
+            page_key: None,
         })
         .await
         .unwrap() else {
@@ -5204,6 +5548,128 @@ mod tests {
             ("  ", None),
         ] {
             assert_eq!(needs_detail(need).as_deref(), detail, "{need:?}");
+        }
+    }
+    #[tokio::test]
+    async fn fenced_completion_vs_reclassify_h_open_question_fails_without_need() {
+        if !crate::alerts::rca_runs::tests::s19_meta().await {
+            return;
+        }
+        let (org, incident_id) = new_incident(None).await;
+        let run_id = start(&org, &incident_id, RunTrigger::Manual).await;
+        rca_runs::update_run(
+            &org,
+            &run_id,
+            RunUpdate {
+                context_used: Some(json!({"history_read": true})),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+        infra::table::alert_incidents::mark_security_case(&org, &incident_id)
+            .await
+            .unwrap();
+        assert!(end(&org, &run_id, &asking(), TurnResult::Persisted).await);
+        let run = stored(&org, &run_id).await;
+        assert_eq!(run.state, RunState::Failed);
+        assert_eq!(
+            run.error.as_ref().unwrap().code,
+            infra::table::rca_fence::RECLASSIFIED_ERROR_CODE
+        );
+        assert!(run.pending_question_id.is_none() && run.input_deadline_at.is_none());
+        assert!(needs_input(&org, &incident_id).await.is_empty());
+        let incident = incident_row(&org, &incident_id).await;
+        let summary = runs_table::decode::<Value>(incident.rca_summary.as_deref()).unwrap();
+        assert_eq!(
+            summary["detail"],
+            infra::table::rca_fence::RECLASSIFIED_ERROR_REASON
+        );
+        assert!(!summary.to_string().contains(QUESTION_TEXT));
+        assert!(!summary.to_string().contains(NEED));
+    }
+
+    #[tokio::test]
+    async fn fenced_completion_vs_reclassify_f_answer_deadline_drops_blind_spot() {
+        if !crate::alerts::rca_runs::tests::s19_meta().await {
+            return;
+        }
+        let (org, incident_id) = new_incident(None).await;
+        let run_id = start(&org, &incident_id, RunTrigger::Manual).await;
+        rca_runs::update_run(
+            &org,
+            &run_id,
+            RunUpdate {
+                context_used: Some(json!({"history_read": true})),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+        let deadline = now_micros() - 1;
+        pause_until(&org, &run_id, deadline).await;
+        assert!(
+            runs_table::close_deadline(&org, &run_id, deadline)
+                .await
+                .unwrap()
+        );
+        infra::table::alert_incidents::mark_security_case(&org, &incident_id)
+            .await
+            .unwrap();
+        let ending = ending(&org, &run_id, &asking()).await;
+        assert_eq!(ending.complete_at_deadline().await, Some(RunState::Failed));
+        let run = stored(&org, &run_id).await;
+        assert_eq!(run.state, RunState::Failed);
+        assert!(
+            run.report.is_none()
+                && run.result.is_none()
+                && run.outcome.is_none()
+                && run.confidence.is_none()
+        );
+        let incident = incident_row(&org, &incident_id).await;
+        let summary = runs_table::decode::<Value>(incident.rca_summary.as_deref()).unwrap();
+        assert_eq!(summary["detail"], runs_table::RECLASSIFIED_ERROR_REASON);
+        assert!(!summary.to_string().contains(NEED));
+        assert!(!summary.to_string().contains(QUESTION_TEXT));
+    }
+    #[tokio::test]
+    async fn history_attempts_without_consumption_preserve_reclassified_completion() {
+        if !crate::alerts::rca_runs::tests::s19_meta().await {
+            return;
+        }
+        for (success, count) in [
+            (false, Some(1)),
+            (true, None),
+            (true, Some(0)),
+            (true, Some(1)),
+        ] {
+            let (org, inc) = new_incident(None).await;
+            let run_id = start(&org, &inc, RunTrigger::Manual).await;
+            let mut ending = ending(&org, &run_id, &one_report(SECOND_REPORT)).await;
+            let mut call = ending.transcript.as_ref().unwrap().tool_log[0].clone();
+            call.tool = "ListIncidentRcaRuns".into();
+            call.success = success;
+            call.result_count = count;
+            ending.transcript.as_mut().unwrap().tool_log.push(call);
+            infra::table::alert_incidents::mark_security_case(&org, &inc)
+                .await
+                .unwrap();
+            assert!(
+                ending
+                    .end(TurnResult::Persisted, "turn-history", None)
+                    .await
+            );
+            let row = stored(&org, &run_id).await;
+            let consumed = success && count.is_some_and(|count| count > 0);
+            assert_eq!(
+                row.state,
+                if consumed {
+                    RunState::Failed
+                } else {
+                    RunState::Completed
+                }
+            );
+            assert_eq!(row.report.is_some() && row.result.is_some(), !consumed);
         }
     }
 }

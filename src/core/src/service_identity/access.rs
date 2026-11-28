@@ -29,11 +29,18 @@ pub struct ReadableStreams {
 
 impl ReadableStreams {
     pub async fn load(org: &str, user: &str, summaries: &[WhereSummaryRecord]) -> Self {
-        let traces: HashSet<String> = summaries
+        Self::load_for_traces(org, user, Self::trace_names(summaries)).await
+    }
+
+    pub fn trace_names(summaries: &[WhereSummaryRecord]) -> HashSet<String> {
+        summaries
             .iter()
             .filter(|row| row.signal == "traces")
             .map(|row| row.source_stream.clone())
-            .collect();
+            .collect()
+    }
+
+    pub async fn load_for_traces(org: &str, user: &str, traces: HashSet<String>) -> Self {
         let rum = (StreamType::Logs, "_rumdata".to_string());
         let wanted = traces
             .iter()

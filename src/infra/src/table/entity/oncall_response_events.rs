@@ -17,6 +17,7 @@ pub struct Model {
     pub delivered: Option<bool>,
     #[sea_orm(column_type = "Text", nullable)]
     pub templates: Option<String>,
+    pub claim_token: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

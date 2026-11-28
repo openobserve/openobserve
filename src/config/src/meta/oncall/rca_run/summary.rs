@@ -186,6 +186,12 @@ pub struct SummaryHypothesis {
     pub onset_us: Option<i64>,
     #[serde(default)]
     pub history: Vec<SummaryStatusChange>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub prediction: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub refutation: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub checks: Option<Vec<super::DisproofCheck>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -313,6 +319,9 @@ pub fn hypotheses_view(
                 lead_ids: h.lead_ids.clone(),
                 first_seen_seq: h.first_seen_seq,
                 onset_us: h.onset_us,
+                prediction: h.prediction.clone(),
+                refutation: h.refutation.clone(),
+                checks: h.checks.clone(),
                 history: h
                     .history
                     .iter()

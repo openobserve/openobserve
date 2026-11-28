@@ -30,9 +30,10 @@ pub mod types;
 
 // Re-export commonly used types and functions
 pub use handler::{
-    OAuthProtectedResourceMetadata, OAuthServerMetadata, handle_mcp_request,
-    handle_mcp_request_stream,
+    OAuthProtectedResourceMetadata, OAuthServerMetadata, handle_mcp_request, handle_mcp_request_as,
+    handle_mcp_request_stream, handle_mcp_request_stream_as,
 };
+pub use protocol::{ASSISTANT_SESSION_HEADER, McpCaller};
 pub use types::{
     MCP_PROTOCOL_VERSION, MCP_PROTOCOL_VERSION_MODERN, MCP_SUPPORTED_PROTOCOL_VERSIONS, MCPRequest,
     MCPResponse, ToolAccess, decode_mcp_header_value, is_supported_protocol_version,

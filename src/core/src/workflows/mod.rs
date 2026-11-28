@@ -43,6 +43,11 @@ use crate::{
 pub mod http_trigger;
 pub mod runtime;
 
+#[cfg(test)]
+tokio::task_local! {
+    pub(crate) static CAPTURED_TRIGGERS: std::cell::RefCell<Vec<HashMap<String, Value>>>;
+}
+
 #[derive(Serialize, Deserialize, utoipa::ToSchema)]
 pub struct InputMap {
     // even though a bad naming convention, node_map is
@@ -1149,6 +1154,13 @@ pub async fn send_member_workflow_trigger(
     request: TriggerRequest<'_>,
     data: &[Value],
 ) -> Result<String, anyhow::Error> {
+    #[cfg(test)]
+    if CAPTURED_TRIGGERS
+        .try_with(|captured| captured.borrow_mut().push(request.metadata.clone()))
+        .is_ok()
+    {
+        return Ok("captured".to_string());
+    }
     let TriggerRequest {
         trace_id,
         org_id,

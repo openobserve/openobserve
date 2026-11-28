@@ -2847,6 +2847,45 @@ describe("useRoutes (router.ts)", () => {
     });
   });
 
+  describe("legacy incident link", () => {
+    const buildRouter = async () => {
+      const actual =
+        await vi.importActual<typeof import("./useEnterpriseRoutes")>("./useEnterpriseRoutes");
+      const { homeChildRoutes } = useRoutes();
+      const catchAll = homeChildRoutes.find((r: any) => r.path === "/:catchAll(.*)*");
+      return createRouter({
+        history: createMemoryHistory(),
+        routes: [
+          {
+            path: "/",
+            component: { name: "Layout" },
+            children: [...homeChildRoutes.filter((r: any) => r !== catchAll), ...actual.default()],
+          },
+          catchAll,
+        ],
+      });
+    };
+
+    it("redirects /alerts/incidents/:id to the incident page with its query", async () => {
+      const router = await buildRouter();
+      const legacy = router.resolve("/alerts/incidents/abc?org_identifier=x");
+      const record = legacy.matched.at(-1)!;
+      expect(record.path).toBe("/alerts/incidents/:id");
+      expect(record.meta.licenseFeature).toBe("incidents");
+
+      const target = router.resolve((record.redirect as any)(legacy));
+      expect(target.name).toBe("incidentDetail");
+      expect(target.params).toEqual({ id: "abc" });
+      expect(target.query).toEqual({ org_identifier: "x" });
+    });
+
+    it("leaves the alerts routes beside it where they were", async () => {
+      const router = await buildRouter();
+      expect(router.resolve("/alerts/detail/a1").name).toBe("alertDetail");
+      expect(router.resolve("/alerts/history").name).toBe("alertHistory");
+    });
+  });
+
   describe("SLO import route", () => {
     it("resolves slos/import to the import page, not an SLO detail with id 'import'", () => {
       const { homeChildRoutes } = useRoutes();

@@ -356,6 +356,25 @@ async fn call_as(
     (status, value)
 }
 
+/// [`post`] as the MCP server's loopback sends it, with its marker header.
+async fn post_mcp(user: &str, uri: &str, body: Value) -> (StatusCode, Value) {
+    let basic = BASE64_STANDARD.encode(format!("{user}:{PASSWORD}"));
+    let request = Request::builder()
+        .method(Method::POST)
+        .uri(uri)
+        .header("Authorization", format!("Basic {basic}"))
+        .header("content-type", "application/json")
+        .header("x-o2-mcp", "loopback")
+        .body(Body::from(body.to_string()))
+        .unwrap();
+    let response = app().oneshot(request).await.unwrap();
+    let status = response.status();
+    let bytes = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let value = serde_json::from_slice(&bytes)
+        .unwrap_or_else(|_| Value::String(String::from_utf8_lossy(&bytes).to_string()));
+    (status, value)
+}
+
 /// An unauthenticated form post, as a mail client or Twilio sends it.
 async fn post_form(uri: &str, form: &str) -> (StatusCode, String) {
     let request = Request::builder()
@@ -813,6 +832,93 @@ async fn a_mute_snoozes_the_open_page() {
     let until = page(&response.id).await.snoozed_until.expect("snoozed");
     assert_eq!(body["pages"][0]["snoozed_until"], until, "{body}");
     assert!(until > now_micros() + 29 * 60 * 1_000_000, "{until}");
+}
+
+/// F22 (D34, D40): an MCP call or the SRE agent cannot act on a firing's page; a person can.
+async fn an_ai_principal_cannot_act_on_a_firing_page() {
+    use config::meta::user::{SRE_AGENT_EMAIL_PREFIX, SRE_AGENT_EMAIL_SUFFIX};
+
+    let agent = format!("{SRE_AGENT_EMAIL_PREFIX}{}{SRE_AGENT_EMAIL_SUFFIX}", org());
+    add_user(&agent, UserRole::Admin, "tok-agent").await;
+    let alert_id = firing_alert("f22").await;
+    let response = alert_page(
+        &alert_id,
+        Some(&team("f22", &[admin(), agent.as_str()]).await),
+    )
+    .await;
+    cache_alert(&alert_id).await;
+    let base = format!("/api/{}/oncall/responses/{}", org(), response.id);
+    let mute = format!("/api/v2/{}/alerts/{alert_id}/mute", org());
+    for (who, by_mcp) in [(admin(), true), (agent.as_str(), false)] {
+        for (path, body, code, verb) in [
+            ("acknowledge", json!({}), "ack_refused", "acknowledge"),
+            (
+                "acknowledge",
+                json!({"take_over": true}),
+                "ack_refused",
+                "take over",
+            ),
+            ("snooze", json!({"minutes": 5}), "ack_refused", "snooze"),
+            ("unsnooze", json!({}), "ack_refused", "unsnooze"),
+            ("unacknowledge", json!({}), "ack_refused", "unacknowledge"),
+            ("resolve", json!({}), "ack_refused", "resolve"),
+            ("notes", json!({"body": "x"}), "ack_refused", "add a note"),
+            (
+                "handoff",
+                json!({"to": member()}),
+                "ack_refused",
+                "hand off",
+            ),
+            ("escalate", json!({}), "ack_refused", "escalate"),
+            (
+                "confirm-recovery",
+                json!({}),
+                "ack_refused",
+                "confirm the recovery",
+            ),
+            ("promote", json!({}), "ack_refused", "promote"),
+            ("", json!({"minutes": 30}), "mute_refused", "mute"),
+        ] {
+            let uri = if path.is_empty() {
+                mute.clone()
+            } else {
+                format!("{base}/{path}")
+            };
+            let (status, body) = if by_mcp {
+                post_mcp(who, &uri, body).await
+            } else {
+                post(who, &uri, body).await
+            };
+            assert_eq!(status, StatusCode::FORBIDDEN, "{who} {uri}: {body}");
+            assert_eq!(body["code"], code, "{who} {uri}: {body}");
+            let message = body["message"].as_str().unwrap_or_default();
+            assert!(message.contains("AI assistant"), "{who} {uri}: {body}");
+            assert!(
+                message.contains(&format!("cannot {verb}")),
+                "{who} {uri}: {body}"
+            );
+        }
+    }
+    let quiet = page(&response.id).await;
+    assert_eq!(quiet.state, ResponseState::Triggered);
+    assert_eq!(quiet.acked_by, None);
+    assert_eq!(quiet.snoozed_until, None, "a refused mute snoozes no page");
+    assert_eq!(row_holder(&alert_id).await, None);
+    let mutes = infra::table::downtimes::list(org(), None).await.unwrap();
+    assert!(
+        !mutes
+            .iter()
+            .any(|d| d.targets.iter().any(|t| t.ids.contains(&alert_id))),
+        "a refused mute writes no downtime"
+    );
+
+    let (status, body) = post(admin(), &format!("{base}/acknowledge"), json!({})).await;
+    assert_eq!(
+        status,
+        StatusCode::OK,
+        "a person still acknowledges: {body}"
+    );
+    assert_eq!(page(&response.id).await.acked_by.as_deref(), Some(admin()));
 }
 
 /// P1-1: an impacted page's Acknowledge acknowledges the whole problem (incident and alert).
@@ -1791,6 +1897,7 @@ async fn one_ack_end_to_end() {
     Box::pin(a_refused_hand_off_keeps_the_ack_and_the_page()).await;
     Box::pin(a_hand_off_clears_the_ack_and_moves_the_page()).await;
     Box::pin(a_mute_snoozes_the_open_page()).await;
+    Box::pin(an_ai_principal_cannot_act_on_a_firing_page()).await;
     Box::pin(an_impacted_page_acknowledges_the_whole_problem()).await;
     Box::pin(a_page_whose_alert_stopped_firing_still_stops_and_restarts()).await;
     Box::pin(promote_runs_the_one_rule()).await;

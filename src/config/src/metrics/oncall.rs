@@ -57,6 +57,34 @@ pub static ONCALL_DELIVERY_FAILURES: Lazy<IntCounterVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
+/// Pages sent again after their claim expired with no outcome, so the first send may have landed.
+pub static ONCALL_POSSIBLE_DUPLICATES: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "oncall_possible_duplicate_total",
+            "On-call page attempts taken over from an expired claim that recorded no outcome.",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "channel"],
+    )
+    .expect("Metric created")
+});
+
+/// Pages an analysis run refused whose skipped-page record failed to write.
+pub static ONCALL_SKIPPED_PAGES_UNRECORDED: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "oncall_skipped_page_unrecorded_total",
+            "Refused analysis starts whose skipped-page record and timeline event were not written.",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization"],
+    )
+    .expect("Metric created")
+});
+
 /// Records somebody took ownership of.
 pub static ONCALL_ACKNOWLEDGEMENTS: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
@@ -322,6 +350,12 @@ pub(super) fn register(registry: &prometheus::Registry) {
         .register(Box::new(ONCALL_DELIVERY_FAILURES.clone()))
         .expect("Metric registered");
     registry
+        .register(Box::new(ONCALL_POSSIBLE_DUPLICATES.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(ONCALL_SKIPPED_PAGES_UNRECORDED.clone()))
+        .expect("Metric registered");
+    registry
         .register(Box::new(ONCALL_ACKNOWLEDGEMENTS.clone()))
         .expect("Metric registered");
     registry
@@ -426,6 +460,20 @@ pub fn page_dispatched(org_id: &str, priority: &str, channel: &str) {
 pub fn delivery_failed(org_id: &str, channel: &str) {
     ONCALL_DELIVERY_FAILURES
         .with_label_values(&[org_id, channel])
+        .inc();
+}
+
+/// One page attempt taken over from an expired claim (M145).
+pub fn possible_duplicate(org_id: &str, channel: &str) {
+    ONCALL_POSSIBLE_DUPLICATES
+        .with_label_values(&[org_id, channel])
+        .inc();
+}
+
+/// A refused analysis start whose skipped-page record was lost.
+pub fn skipped_page_unrecorded(org_id: &str) {
+    ONCALL_SKIPPED_PAGES_UNRECORDED
+        .with_label_values(&[org_id])
         .inc();
 }
 
@@ -754,6 +802,47 @@ mod tests {
                 .get(),
             0
         );
+    }
+
+    #[test]
+    fn test_possible_duplicate_is_registered_per_org_and_channel() {
+        possible_duplicate("org_dup", "email");
+        assert_eq!(
+            ONCALL_POSSIBLE_DUPLICATES
+                .with_label_values(&["org_dup", "email"])
+                .get(),
+            1
+        );
+        let registry = Registry::new();
+        register(&registry);
+        let full = format!("{NAMESPACE}_oncall_possible_duplicate_total");
+        let family = registry
+            .gather()
+            .into_iter()
+            .find(|m| m.name() == full)
+            .expect("registered");
+        let labels: Vec<String> = family.get_metric()[0]
+            .get_label()
+            .iter()
+            .map(|l| l.name().to_string())
+            .collect();
+        assert!(labels.contains(&"organization".to_string()), "{labels:?}");
+        assert!(labels.contains(&"channel".to_string()), "{labels:?}");
+    }
+
+    #[test]
+    fn test_skipped_page_unrecorded_is_registered_per_org() {
+        skipped_page_unrecorded("org_unrecorded");
+        assert_eq!(
+            ONCALL_SKIPPED_PAGES_UNRECORDED
+                .with_label_values(&["org_unrecorded"])
+                .get(),
+            1
+        );
+        let registry = Registry::new();
+        register(&registry);
+        let full = format!("{NAMESPACE}_oncall_skipped_page_unrecorded_total");
+        assert!(registry.gather().iter().any(|m| m.name() == full));
     }
 
     #[test]

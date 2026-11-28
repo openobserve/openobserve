@@ -133,6 +133,14 @@ describe("cases", () => {
       data: { from: null, to: "d@b.c", user_id: "a@b.c" },
     });
     expect(assigned).toMatchObject({ key: "assigned", actor: "a@b.c" });
+    const comms = (to: string | null) =>
+      toTimelineEntry({
+        timestamp: 8,
+        type: "AssignmentChanged",
+        data: { from: null, to, user_id: "a@b.c", role: "comms" },
+      }).key;
+    expect(comms("d@b.c")).toBe("commsOwnerSet");
+    expect(comms(null)).toBe("commsOwnerCleared");
     const attached = toTimelineEntry({
       timestamp: 9,
       type: "AlertsAttached",

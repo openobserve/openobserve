@@ -16,9 +16,6 @@
 // Allow enterprise feature cfg check (defined at workspace level)
 #![allow(unexpected_cfgs)]
 
-use config::meta::meta_store::MetaStore;
-pub use sea_orm_migration::prelude::*;
-
 mod m20241114_000001_create_folders_table;
 mod m20241115_150000_populate_folders_table;
 mod m20241116_000001_delete_metas;
@@ -280,6 +277,7 @@ mod m20261223_000001_create_alert_leases;
 mod m20261224_000001_delete_cli_ai_toolsets;
 mod m20261225_000001_add_agent_to_ai_chat_turns;
 mod m20261225_000001_create_autoresolve_tables;
+mod m20261225_000001_create_rca_delivery_obligations;
 mod m20261225_000002_add_first_event_at_to_ai_chat_turns;
 mod m20261225_000003_add_health_to_org_ai_toolsets;
 mod m20261225_000004_create_ai_grants;
@@ -297,15 +295,24 @@ mod m20261225_000015_ai_chat_sessions_branched_from;
 mod m20261225_000016_add_approval_scope_to_ai_actions;
 mod m20261225_000017_add_oncall_policy_saved_by_person;
 mod m20261226_000001_add_oncall_team_to_incident_integrations;
+mod m20261226_000001_add_seq_to_incident_events;
 mod m20261226_000001_create_autoresolve_corrections;
 mod m20261227_000001_add_autoresolve_plan_history;
+mod m20261227_000001_add_v2_columns_to_alert_incidents;
 mod m20261228_000001_add_autoresolve_run_incident;
+mod m20261228_000001_rca_skipped_pages_and_streams_cut;
+mod m20261229_000001_create_incident_contexts_and_declare_keys;
+mod m20261231_000001_create_incident_recovery_checks;
+mod m20270101_000001_create_rca_feedback;
+mod m20270102_000001_add_oncall_delivery_claim_token;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
 
+use config::meta::meta_store::MetaStore;
 pub(crate) use m20261021_000001_create_public_dashboards::forget_draft_migrations;
 pub(crate) use m20261218_000001_add_security_case_to_alert_incidents::forget_renamed_migrations;
 pub(crate) use m20261225_000001_add_agent_to_ai_chat_turns::forget_renamed_ai_migrations;
+pub use sea_orm_migration::prelude::*;
 
 #[cfg(any(test, feature = "test-utils"))]
 pub(crate) async fn create_public_dashboards_schema_for_test(
@@ -500,6 +507,22 @@ pub(crate) async fn create_alert_calibration_configs_for_test(
 }
 
 #[cfg(any(test, feature = "test-utils"))]
+pub async fn create_incident_recovery_checks_for_test(
+    db: &sea_orm::DatabaseConnection,
+) -> Result<(), DbErr> {
+    m20261231_000001_create_incident_recovery_checks::Migration
+        .up(&SchemaManager::new(db))
+        .await
+}
+
+#[cfg(any(test, feature = "test-utils"))]
+pub async fn create_rca_feedback_for_test(db: &sea_orm::DatabaseConnection) -> Result<(), DbErr> {
+    m20270101_000001_create_rca_feedback::Migration
+        .up(&SchemaManager::new(db))
+        .await
+}
+
+#[cfg(any(test, feature = "test-utils"))]
 pub(crate) async fn create_service_identity_tables_for_test(
     db: &sea_orm::DatabaseConnection,
 ) -> Result<(), DbErr> {
@@ -510,7 +533,7 @@ pub(crate) async fn create_service_identity_tables_for_test(
 
 /// A fresh SQLite database, plus a fresh PostgreSQL schema when `ZO_META_POSTGRES_DSN` is set.
 #[cfg(any(test, feature = "test-utils"))]
-pub(crate) async fn sqlite_and_postgres_for_test(label: &str) -> Vec<sea_orm::DatabaseConnection> {
+pub async fn sqlite_and_postgres_for_test(label: &str) -> Vec<sea_orm::DatabaseConnection> {
     use sea_orm::{ConnectOptions, ConnectionTrait, Database};
     use svix_ksuid::{Ksuid, KsuidLike as _};
 
@@ -993,6 +1016,14 @@ impl MigratorTrait for Migrator {
             Box::new(m20261226_000001_create_autoresolve_corrections::Migration),
             Box::new(m20261227_000001_add_autoresolve_plan_history::Migration),
             Box::new(m20261228_000001_add_autoresolve_run_incident::Migration),
+            Box::new(m20261225_000001_create_rca_delivery_obligations::Migration),
+            Box::new(m20261226_000001_add_seq_to_incident_events::Migration),
+            Box::new(m20261227_000001_add_v2_columns_to_alert_incidents::Migration),
+            Box::new(m20261228_000001_rca_skipped_pages_and_streams_cut::Migration),
+            Box::new(m20261229_000001_create_incident_contexts_and_declare_keys::Migration),
+            Box::new(m20261231_000001_create_incident_recovery_checks::Migration),
+            Box::new(m20270101_000001_create_rca_feedback::Migration),
+            Box::new(m20270102_000001_add_oncall_delivery_claim_token::Migration),
         ]
     }
 }
@@ -1149,6 +1180,17 @@ mod tests {
         (171, "m20261226_000001_create_autoresolve_corrections"),
         (172, "m20261227_000001_add_autoresolve_plan_history"),
         (173, "m20261228_000001_add_autoresolve_run_incident"),
+        (174, "m20261225_000001_create_rca_delivery_obligations"),
+        (175, "m20261226_000001_add_seq_to_incident_events"),
+        (176, "m20261227_000001_add_v2_columns_to_alert_incidents"),
+        (177, "m20261228_000001_rca_skipped_pages_and_streams_cut"),
+        (
+            178,
+            "m20261229_000001_create_incident_contexts_and_declare_keys",
+        ),
+        (180, "m20261231_000001_create_incident_recovery_checks"),
+        (181, "m20270101_000001_create_rca_feedback"),
+        (182, "m20270102_000001_add_oncall_delivery_claim_token"),
     ];
 
     // Two branches that each claim the next version merge cleanly, so a reused number must fail
@@ -1290,6 +1332,22 @@ mod tests {
             (
                 "m20260326_000001_add_field_name_mapping_to_service_streams",
                 "m20261222_000001_incident_membership_and_catalog_cleanup",
+            ),
+            (
+                "m20260214_000001_create_incident_events_table",
+                "m20261226_000001_add_seq_to_incident_events",
+            ),
+            (
+                "m20251204_000001_create_alert_incidents_table",
+                "m20261227_000001_add_v2_columns_to_alert_incidents",
+            ),
+            (
+                "m20261016_000001_create_rca_runs",
+                "m20261228_000001_rca_skipped_pages_and_streams_cut",
+            ),
+            (
+                "m20260318_000001_recreate_service_streams_schema",
+                "m20261228_000001_rca_skipped_pages_and_streams_cut",
             ),
             (
                 "m20260725_000001_create_alert_states_tables",

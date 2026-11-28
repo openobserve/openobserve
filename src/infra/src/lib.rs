@@ -30,6 +30,7 @@ pub mod org_lifecycle;
 pub mod outbound_http;
 pub mod pipeline;
 pub mod queue;
+pub mod race;
 pub mod runtime;
 pub mod scheduler;
 pub mod schema;

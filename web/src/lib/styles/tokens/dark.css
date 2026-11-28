@@ -898,7 +898,7 @@
   --color-card-glass-solid: var(--color-surface-base);
   --color-error-tag-bg: #681a1a;
   --color-error-tag-text: #f9cbcb;
-  --color-focus-ring: #3a4180;
+  --color-focus-ring: var(--color-accent);
   --color-gray: #868a91;
   --color-hover-gray: color-mix(in srgb, var(--color-theme-accent) 8%, rgb(38, 38, 38));
   --color-hover-shadow: rgba(0, 0, 0, 0.6);

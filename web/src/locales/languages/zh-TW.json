@@ -12732,6 +12732,7 @@
       "statusOpen": "未解決",
       "statusAcknowledged": "已確認",
       "statusResolved": "已解決",
+      "pagerTotal": "{count} 個事件",
       "correlationServiceDiscovery": "服務探索",
       "correlationPrimaryMatch": "主要符合",
       "correlationSecondaryMatch": "次要符合",

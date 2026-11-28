@@ -867,6 +867,7 @@ mod tests {
                 .iter()
                 .map(|(k, v)| (k.to_string(), v.to_string()))
                 .collect(),
+            streams_cut: 0,
         }
     }
 

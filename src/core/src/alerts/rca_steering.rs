@@ -35,7 +35,7 @@ use config::{
     utils::time::now_micros,
 };
 use infra::table::{
-    ai_chat_sessions, ai_chat_turns, alert_incidents,
+    ai_chat_turns, alert_incidents,
     rca_runs::{self as runs_table, Model as RunRow, RunSummaryPatch, RunUpdate},
     rca_steering::{self as steering_table, RateCounts, SteerPatch},
 };
@@ -326,10 +326,9 @@ impl SteerDeps for LiveDeps {
         org_id: &str,
         run: &RunRow,
     ) -> anyhow::Result<Option<RunTranscript>> {
-        let Some(session_id) = run.session_id.as_deref() else {
-            return Ok(None);
-        };
-        let Some(session) = ai_chat_sessions::get(org_id, session_id).await? else {
+        let super::rca_live::RunSession::Present(session) =
+            super::rca_live::RunSession::load(org_id, run).await?
+        else {
             return Ok(None);
         };
         let events = read_committed_events(&session, -1).await?;
@@ -1127,6 +1126,8 @@ pub async fn reconcile_steering(
         return;
     }
 
+    let fenced = infra::table::rca_fence::row_fenced(run);
+    let transcript = if fenced { None } else { transcript };
     let steers = transcript_steers(transcript);
     let acks = first_acks(transcript);
     for row in rows.iter_mut() {
@@ -1261,7 +1262,10 @@ pub(crate) async fn steering_view_with(
         .await
         .map_err(internal)?;
 
-    let transcript = if steering_reads_transcript(&run, &rows) {
+    let fenced = infra::table::rca_fence::is_fenced(&run)
+        .await
+        .map_err(internal)?;
+    let transcript = if !fenced && steering_reads_transcript(&run, &rows) {
         deps.transcript(org_id, &run).await.unwrap_or_else(|e| {
             log::warn!("[RCA_STEERING] could not read the transcript of run {run_id}: {e:#}");
             None
@@ -1275,7 +1279,8 @@ pub(crate) async fn steering_view_with(
         rows,
         transcript.as_ref(),
         can_steer_permission,
-    ))
+    )
+    .await)
 }
 
 /// The transcript only changes a row the agent may still read or ack, or names the question.
@@ -1290,13 +1295,35 @@ pub fn steering_reads_transcript(run: &RunRow, rows: &[SteerRecord]) -> bool {
 }
 
 /// The steering view from loaded rows; pass `transcript` only if [steering_reads_transcript].
-pub fn build_steering_view(
+pub async fn build_steering_view(
     incident_run_id: Option<&str>,
     run: &RunRow,
     rows: Vec<SteerRecord>,
     transcript: Option<&RunTranscript>,
     can_steer_permission: bool,
 ) -> SteeringView {
+    let fenced = match infra::table::rca_fence::is_fenced(run).await {
+        Ok(fenced) => fenced,
+        Err(error) => {
+            log::warn!(
+                "[RCA_STEERING] cannot classify run {}: {error}; acknowledgements withheld",
+                run.run_id
+            );
+            true
+        }
+    };
+    if fenced {
+        let mut items = rows;
+        for item in &mut items {
+            item.agent_note = None;
+            item.acted_at = None;
+        }
+        return SteeringView {
+            items,
+            open_question: None,
+            can_steer: false,
+        };
+    }
     let steers = transcript_steers(transcript);
     let acks = first_acks(transcript);
     let items = rows
@@ -1398,7 +1425,10 @@ async fn cancel_waiting_run(
         RunState::Cancelled,
         run.started_at,
         progress.as_ref(),
+        None,
     );
+    let transcript = rca_turn::read_transcript(org_id, &run).await;
+    rca_turn::observe_first_hypothesis(org_id, run.started_at, transcript.as_ref());
     // No turn runs, so the queued rows end here.
     reconcile_steering(org_id, &run, None, Some(RunState::Cancelled)).await;
     // No verdict is coming, so nothing may go on holding a page for one.
@@ -3381,5 +3411,83 @@ mod tests {
         assert!(transcript.steers.is_empty(), "{:?}", transcript.steers);
         let (_, blocks) = split_steers(&prompt);
         assert!(blocks.is_empty());
+    }
+    #[tokio::test]
+    async fn fenced_run_serves_no_transcript() {
+        if !crate::alerts::rca_runs::tests::s19_meta().await {
+            return;
+        }
+        let (org, inc, run_id) = live_run().await;
+        assert!(
+            rca_runs::update_run(
+                &org,
+                &run_id,
+                RunUpdate {
+                    context_used: Some(
+                        json!({"history_read": true, "past_causes": ["private history"]}),
+                    ),
+                    ..Default::default()
+                },
+            )
+            .await
+            .unwrap()
+        );
+        pause(&org, &run_id).await;
+        let read = insert(
+            row(&org, &inc, &run_id, AUTHOR, SteerKind::Message),
+            SteerStatus::Read,
+        )
+        .await;
+        let mut session = Session::new();
+        user_message(&mut session, "msg_01", "Analyze incident", 0);
+        user_message(&mut session, "msg_02", &render_row(&read), 50);
+        session.message("msg_03", "assistant", json!({"created": T + 100}));
+        ack(
+            &mut session,
+            "msg_03",
+            "prt_k1",
+            &read.steer_id,
+            "applied",
+            "private ack",
+            110,
+        );
+        ask(&mut session, "msg_03", "prt_q1", "private question", 200);
+        let deps = Fake::with_transcript(decode_run(&session.events));
+        let before = steering_view_with(&deps, &org, &inc, &run_id, true)
+            .await
+            .unwrap();
+        assert!(before.open_question.is_some());
+        assert!(before.items.iter().any(|row| row.agent_note.is_some()));
+        alert_incidents::mark_security_case(&org, &inc)
+            .await
+            .unwrap();
+        for ended in [false, true] {
+            if ended {
+                assert!(
+                    rca_runs::update_run(
+                        &org,
+                        &run_id,
+                        RunUpdate {
+                            state: Some(RunState::Cancelled),
+                            expected_state: Some(RunState::WaitingInput),
+                            ..Default::default()
+                        }
+                    )
+                    .await
+                    .unwrap()
+                );
+            }
+            let view = steering_view_with(&deps, &org, &inc, &run_id, true)
+                .await
+                .unwrap();
+            assert!(view.open_question.is_none());
+            assert!(
+                view.items
+                    .iter()
+                    .all(|row| row.agent_note.is_none() && row.acted_at.is_none())
+            );
+            assert!(!view.can_steer);
+            assert!(!serde_json::to_string(&view).unwrap().contains("private"));
+        }
     }
 }

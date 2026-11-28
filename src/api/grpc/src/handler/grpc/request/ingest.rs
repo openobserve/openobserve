@@ -514,6 +514,28 @@ mod tests {
     }
 
     #[test]
+    fn the_change_events_writer_reaches_only_its_log_stream_as_json() {
+        use config::meta::alerts::change_events::CHANGE_EVENTS_STREAM as stream;
+        let writer = Some(FeatureWriter::ChangeEvents);
+        let ok = writer_req("demo-org", StreamType::Logs, stream, IngestionType::Json);
+        let (org, user, _) = resolve_caller(writer, None, Some("demo-org"), &ok).unwrap();
+        assert_eq!(org, "demo-org");
+        assert_eq!(user, IngestUser::SystemJob(SystemJobType::ChangeEvents));
+        let denied = [
+            writer_req("demo-org", StreamType::Logs, stream, IngestionType::Usage),
+            writer_req("demo-org", StreamType::Metrics, stream, IngestionType::Json),
+            writer_req("demo-org", StreamType::Logs, "default", IngestionType::Json),
+            writer_req("other-org", StreamType::Logs, stream, IngestionType::Json),
+        ];
+        for req in denied {
+            assert!(
+                resolve_caller(writer, None, Some("demo-org"), &req).is_err(),
+                "{req:?}"
+            );
+        }
+    }
+
+    #[test]
     fn the_session_replay_writer_reaches_only_its_log_stream_as_usage() {
         use config::meta::stream::SESSION_REPLAY_RESOURCES_STREAM as stream;
         let writer = Some(FeatureWriter::SessionReplay);

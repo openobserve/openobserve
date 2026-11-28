@@ -7,6 +7,7 @@ from typing import Any
 import pytest
 
 from support.client import OpenObserveClient
+from support.incidents import list_all_incidents
 from support.wait import wait_until
 
 from .multialert_helpers import AlertsClient, uniq
@@ -47,9 +48,7 @@ def incident(client: OpenObserveClient) -> Generator[dict[str, Any], None, None]
         alert_id = alerts.find_alert_id(name)
 
         def ours() -> dict | None:
-            resp = alerts._v2("GET", "alerts/incidents?limit=1000")
-            assert resp.status_code == 200, resp.text
-            found = [i for i in resp.json()["incidents"]
+            found = [i for i in list_all_incidents(alerts._v2)
                      if any(g.get("alert_id") == alert_id for g in i.get("alert_groups") or [])]
             return found[0] if found else None
 

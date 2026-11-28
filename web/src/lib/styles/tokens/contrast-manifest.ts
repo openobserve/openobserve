@@ -684,13 +684,6 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
     themes: ["light"],
   },
   {
-    fg: "--color-focus-ring",
-    category: "pending",
-    why: "fails the threshold against the page surface it is painted on",
-    issue: "WCAG-AA colour remediation (follow-up PR)",
-    themes: ["dark"],
-  },
-  {
     fg: "--color-icon-chip-error-text",
     bg: "--color-icon-chip-error-bg",
     under: ["--color-surface-base"],
@@ -1203,6 +1196,18 @@ export const CONTRAST_PAIRS: readonly ContrastPair[] = [
     bg: "--color-flame-grouped-fill",
     category: "text",
     why: "the root, grouped frames and unchanged Compare frames paint the frame label on the grouped fill (FlameGraphView.vue)",
+  },
+  {
+    fg: "--color-focus-ring",
+    category: "non-text",
+    why: "SC 1.4.11: a focus ring is drawn outside its control, on the surface around it",
+  },
+  {
+    fg: "--color-focus-ring",
+    bg: "--color-banner-error-soft-bg",
+    under: ["--color-dropdown-bg"],
+    category: "non-text",
+    why: "SC 1.4.11: the access-denied card's 'N more' button ring is drawn inside the error banner fill (OAccessDeniedCard.vue)",
   },
   {
     fg: "--color-icon-chip-error-text",

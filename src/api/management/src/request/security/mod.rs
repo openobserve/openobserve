@@ -23,6 +23,7 @@ pub mod detections;
 pub mod intel;
 #[cfg(feature = "enterprise")]
 pub mod investigate;
+pub mod rca_scope;
 #[cfg(feature = "enterprise")]
 pub mod sigma;
 #[cfg(feature = "enterprise")]
@@ -790,10 +791,15 @@ pub(crate) mod tests {
             let resp = update_incident(
                 Path((org.clone(), case.clone())),
                 triager,
+                None,
+                axum::http::HeaderMap::new(),
                 Json(UpdatePayload::Status {
                     status: IncidentStatus::Resolved,
                     verdict: None,
                     reason: None,
+                    resolution_cause: None,
+                    resolution_note: None,
+                    customer_impact: None,
                 }),
             )
             .await;

@@ -15,10 +15,7 @@
 
 use std::str::FromStr;
 
-use config::{
-    meta::triggers::{Trigger, TriggerModule, TriggerRunStamp},
-    utils::json,
-};
+use config::meta::triggers::{Trigger, TriggerModule, TriggerRunStamp};
 #[allow(clippy::single_component_path_imports)]
 use db;
 use infra::{
@@ -66,7 +63,9 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
 }
 
 async fn push(msg: Message) -> Result<()> {
-    let mut trigger: Trigger = json::from_slice(&msg.value.unwrap())?;
+    let Some(mut trigger) = replicated_trigger(&msg)? else {
+        return Ok(());
+    };
     if trigger.module == TriggerModule::Alert {
         trigger_modify_module_key(&mut trigger).await?;
     }
@@ -84,7 +83,9 @@ async fn push(msg: Message) -> Result<()> {
 }
 
 async fn update(msg: Message) -> Result<()> {
-    let mut trigger: Trigger = json::from_slice(&msg.value.unwrap())?;
+    let Some(mut trigger) = replicated_trigger(&msg)? else {
+        return Ok(());
+    };
     if trigger.module == TriggerModule::Alert {
         trigger_modify_module_key(&mut trigger).await?;
     }
@@ -231,6 +232,7 @@ async fn update(msg: Message) -> Result<()> {
                 trigger.module_key
             );
         }
+        TriggerModule::IncidentRecovery => {}
         // Keyed on the response record. Pushing a timer for a record this
         // region has not synced yet would create a job that escalates
         // nothing; the handler drops such a job, but not creating it is
@@ -356,7 +358,9 @@ async fn update(msg: Message) -> Result<()> {
 }
 
 async fn update_status(msg: Message) -> Result<()> {
-    let mut trigger: Trigger = json::from_slice(&msg.value.unwrap())?;
+    let Some(mut trigger) = replicated_trigger(&msg)? else {
+        return Ok(());
+    };
     if trigger.module == TriggerModule::Alert {
         trigger_modify_module_key(&mut trigger).await?;
     }
@@ -388,7 +392,11 @@ async fn update_status(msg: Message) -> Result<()> {
 }
 
 async fn bulk_update(msg: Message) -> Result<()> {
-    let triggers: Vec<Trigger> = json::from_slice(&msg.value.unwrap())?;
+    let mut triggers: Vec<Trigger> = crate::payload(&msg)?;
+    triggers.retain(|row| should_replicate(&row.org, &row.module, &row.module_key));
+    if triggers.is_empty() {
+        return Ok(());
+    }
     if let Err(e) = scheduler::bulk_update_triggers(triggers).await {
         log::error!("[SUPER_CLUSTER:sync] Failed to bulk update triggers error: {e}");
         return Err(e);
@@ -397,7 +405,11 @@ async fn bulk_update(msg: Message) -> Result<()> {
 }
 
 async fn bulk_update_status(msg: Message) -> Result<()> {
-    let updates: Vec<StatusUpdateTuple> = json::from_slice(&msg.value.unwrap())?;
+    let mut updates: Vec<StatusUpdateTuple> = crate::payload(&msg)?;
+    updates.retain(|(org, module, key, ..)| should_replicate(org, module, key));
+    if updates.is_empty() {
+        return Ok(());
+    }
     if let Err(e) = scheduler::bulk_update_status(updates).await {
         log::error!("[SUPER_CLUSTER:sync] Failed to bulk update triggers error: {e}");
         return Err(e);
@@ -420,7 +432,9 @@ async fn run_stamp(msg: Message) -> Result<()> {
 }
 
 async fn delete(msg: Message) -> Result<()> {
-    let mut trigger: Trigger = json::from_slice(&msg.value.unwrap())?;
+    let Some(mut trigger) = replicated_trigger(&msg)? else {
+        return Ok(());
+    };
     if trigger.module == TriggerModule::Alert {
         trigger_modify_module_key(&mut trigger).await?;
     }
@@ -437,6 +451,21 @@ async fn delete(msg: Message) -> Result<()> {
         return Err(e);
     }
     Ok(())
+}
+
+fn replicated_trigger(msg: &Message) -> Result<Option<Trigger>> {
+    let trigger: Trigger = crate::payload(msg)?;
+    Ok(should_replicate(&trigger.org, &trigger.module, &trigger.module_key).then_some(trigger))
+}
+
+fn should_replicate(org: &str, module: &TriggerModule, key: &str) -> bool {
+    if *module == TriggerModule::IncidentRecovery {
+        log::debug!(
+            "[SUPER_CLUSTER:sync] Skipping single-region incident recovery trigger {org}/{key}"
+        );
+        return false;
+    }
+    true
 }
 
 async fn trigger_modify_module_key(trigger: &mut Trigger) -> Result<()> {
@@ -475,7 +504,47 @@ async fn alert_id_key(org: &str, module_key: &str) -> Result<String> {
 
 #[cfg(test)]
 mod tests {
+    use config::utils::json;
+
     use super::*;
+
+    #[tokio::test]
+    async fn incident_recovery_messages_are_skipped() {
+        let trigger = Trigger {
+            org: "acme".to_owned(),
+            module: TriggerModule::IncidentRecovery,
+            module_key: "check:held".to_owned(),
+            ..Default::default()
+        };
+        let single = json::to_vec(&trigger).unwrap();
+        let bulk = json::to_vec(&[&trigger]).unwrap();
+        let status = json::to_vec(&[(
+            &trigger.org,
+            &trigger.module,
+            &trigger.module_key,
+            &trigger.status,
+            trigger.retries,
+            None::<String>,
+        )])
+        .unwrap();
+        for (kind, payload) in [
+            (MessageType::SchedulerPush, &single),
+            (MessageType::SchedulerUpdate, &single),
+            (MessageType::SchedulerUpdateStatus, &single),
+            (MessageType::SchedulerDelete, &single),
+            (MessageType::BulkSchedulerUpdate, &bulk),
+            (MessageType::BulkSchedulerStatusUpdate, &status),
+        ] {
+            let msg = Message::new(
+                "/scheduler/".to_owned(),
+                Some(payload.clone().into()),
+                None,
+                false,
+                kind,
+            );
+            process(msg).await.unwrap();
+        }
+    }
 
     fn stamp_message(value: Option<Vec<u8>>) -> Message {
         Message::new(

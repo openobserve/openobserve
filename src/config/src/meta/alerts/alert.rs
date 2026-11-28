@@ -183,10 +183,11 @@ pub struct Alert {
 /// `javascript:` and the bare `wiki/runbooks/checkout` somebody pastes out of a
 /// browser tab — the last of which is the common case, and the one that looks
 /// like it worked right up until a responder clicks it at 3am.
-pub fn normalize_runbook_url(raw: &str) -> Result<String, String> {
+pub fn normalize_runbook_url(raw: &str) -> Result<Option<String>, String> {
     let trimmed = raw.trim();
+    // Blank is no runbook, so clearing the field removes it.
     if trimmed.is_empty() {
-        return Err("runbook_url is empty".to_string());
+        return Ok(None);
     }
     // Long enough for a real deep link, short enough that a paste accident is
     // not persisted onto every response record the alert ever opens.
@@ -208,7 +209,7 @@ pub fn normalize_runbook_url(raw: &str) -> Result<String, String> {
     if trimmed.chars().any(char::is_whitespace) {
         return Err("runbook_url contains whitespace".to_string());
     }
-    Ok(trimmed.to_string())
+    Ok(Some(trimmed.to_string()))
 }
 
 impl MemorySize for Alert {
@@ -1232,8 +1233,8 @@ mod tests {
             "  https://wiki/rb  ",
         ] {
             assert_eq!(
-                normalize_runbook_url(good).unwrap(),
-                good.trim(),
+                normalize_runbook_url(good).unwrap().as_deref(),
+                Some(good.trim()),
                 "{good:?}"
             );
         }
@@ -1245,8 +1246,6 @@ mod tests {
     #[test]
     fn test_a_link_that_goes_nowhere_is_refused_at_save() {
         for bad in [
-            "",
-            "   ",
             "wiki/runbooks/checkout",
             "www.example.com/rb",
             "ftp://example.com/rb",
@@ -1265,6 +1264,13 @@ mod tests {
             normalize_runbook_url(&format!("https://x/{}", "a".repeat(3000))).is_err(),
             "a paste accident must not be copied onto every response record"
         );
+    }
+
+    #[test]
+    fn test_a_blank_runbook_link_is_no_runbook() {
+        for blank in ["", "   ", "\t\n"] {
+            assert_eq!(normalize_runbook_url(blank), Ok(None), "{blank:?}");
+        }
     }
 
     /// Additive, like `priority` and `tags` before it: an alert saved before

@@ -98,6 +98,7 @@ pub enum SettingCategory {
     General,
     /// Authentication and access-control settings
     Security,
+    Incidents,
 }
 
 impl SettingCategory {
@@ -111,6 +112,7 @@ impl SettingCategory {
             SettingCategory::Ingestion => "ingestion",
             SettingCategory::General => "general",
             SettingCategory::Security => "security",
+            SettingCategory::Incidents => "incidents",
         }
     }
 }
@@ -134,6 +136,7 @@ impl std::str::FromStr for SettingCategory {
             "ingestion" => Ok(SettingCategory::Ingestion),
             "general" => Ok(SettingCategory::General),
             "security" => Ok(SettingCategory::Security),
+            "incidents" => Ok(SettingCategory::Incidents),
             _ => Err(format!("Invalid setting category: {}", s)),
         }
     }
@@ -169,6 +172,7 @@ pub mod keys {
     pub const DARK_MODE_THEME_COLOR: &str = "dark_mode_theme_color";
     /// Instance-wide authentication policy for native users
     pub const PASSWORD_POLICY: &str = "password_policy";
+    pub const AUTO_RESOLVE_AT_HELD: &str = "auto_resolve_at_held";
 }
 
 /// A system setting record
@@ -305,6 +309,11 @@ impl SystemSetting {
 
     /// Validate the setting based on scope rules
     pub fn validate(&self) -> Result<(), String> {
+        if self.setting_key == keys::AUTO_RESOLVE_AT_HELD
+            && (self.scope != SettingScope::Org || !self.setting_value.is_boolean())
+        {
+            return Err("auto_resolve_at_held requires an org-level boolean".to_owned());
+        }
         match self.scope {
             SettingScope::System => {
                 if self.org_id.is_some() || self.user_id.is_some() {

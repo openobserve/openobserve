@@ -16,15 +16,16 @@
 //! Security case queue work: search across every page, bulk triage and merging.
 
 use axum::{
-    Json,
+    Extension, Json,
     extract::{Path, Query},
+    http::HeaderMap,
     response::Response,
 };
 use config::meta::alerts::incidents::{CaseVerdict, Incident, IncidentEvent, IncidentSeverity};
 use infra::table::{alert_incidents::CaseSearch, entity::alert_incidents};
 use o2_enterprise::enterprise::security::{audit, cases, tuning::MAX_TRIAGE_SUPPRESSION_MINUTES};
-use openobserve_api_common::extractors::Headers;
-use openobserve_core::auth::UserEmail;
+use openobserve_api_common::{auth::delegation::DelegatedCaller, extractors::Headers};
+use openobserve_core::{alerts::ack::Caller, auth::UserEmail};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 
@@ -395,8 +396,16 @@ pub async fn search_cases(
 pub async fn bulk_update(
     Path(org_id): Path<String>,
     Headers(user_email): Headers<UserEmail>,
+    delegated: Option<Extension<DelegatedCaller>>,
+    headers: HeaderMap,
     Json(req): Json<BulkRequest>,
 ) -> Response {
+    let caller = crate::request::alerts::ack::caller_of(
+        &org_id,
+        &user_email.user_id,
+        delegated.as_deref(),
+        &headers,
+    );
     let user_id = user_email.user_id;
     if let Err(resp) = guard_siem_case(&org_id, &user_id, "PUT", true).await {
         return resp;
@@ -442,7 +451,7 @@ pub async fn bulk_update(
             continue;
         }
         let was_open = case.status != "resolved";
-        let outcome = apply_change(&org_id, case, &change, &user_id).await;
+        let outcome = apply_change(&org_id, case, &change, &caller).await;
         let outcome = match (&outcome, &change, suppress) {
             (Ok(()), Change::Close(_, reason), Some(minutes)) if was_open => {
                 suppress_similar(&org_id, &id, minutes, reason, &user_id).await
@@ -480,8 +489,16 @@ pub async fn bulk_update(
 pub async fn merge_cases(
     Path(org_id): Path<String>,
     Headers(user_email): Headers<UserEmail>,
+    delegated: Option<Extension<DelegatedCaller>>,
+    headers: HeaderMap,
     Json(req): Json<MergeRequest>,
 ) -> Response {
+    let caller = crate::request::alerts::ack::caller_of(
+        &org_id,
+        &user_email.user_id,
+        delegated.as_deref(),
+        &headers,
+    );
     let user_id = user_email.user_id;
     if let Err(resp) = guard_siem_case(&org_id, &user_id, "PUT", true).await {
         return resp;
@@ -532,6 +549,7 @@ pub async fn merge_cases(
         &target_id,
         &sources,
         target_severity.as_deref(),
+        &user_id,
     )
     .await
     {
@@ -553,7 +571,7 @@ pub async fn merge_cases(
         {
             log::error!("[SECURITY] could not record the close of merged case {org_id}/{id}: {e}");
         }
-        if let Err(e) = close_case(&org_id, id, CaseVerdict::Duplicate, &why, &user_id).await {
+        if let Err(e) = close_case(&org_id, id, CaseVerdict::Duplicate, &why, &caller).await {
             log::error!("[SECURITY] could not finish closing merged case {org_id}/{id}: {e}");
         }
     }
@@ -594,11 +612,12 @@ pub async fn close_case(
     id: &str,
     verdict: CaseVerdict,
     reason: &str,
-    user_id: &str,
+    caller: &Caller,
 ) -> Result<(), String> {
     use openobserve_core::alerts::{ack, incidents};
 
-    incidents::authorize_status(org_id, id, "resolved", user_id)
+    let user_id = caller.email.as_str();
+    incidents::authorize_status(org_id, id, "resolved", caller)
         .await
         .map_err(|e| format!("{e:?}"))?;
     incidents::update_status(org_id, id, "resolved", user_id)
@@ -646,17 +665,18 @@ async fn apply_change(
     org_id: &str,
     case: alert_incidents::Model,
     change: &Change,
-    user_id: &str,
+    caller: &Caller,
 ) -> Result<(), String> {
     use openobserve_core::alerts::incidents;
 
+    let user_id = caller.email.as_str();
     let id = case.id.as_str();
     if !case.security_case && !super::incident_touches_siem(org_id, id).await {
         return Err("Not a Security case".to_string());
     }
     match change {
         Change::Close(..) if case.status == "resolved" => Ok(()),
-        Change::Close(verdict, reason) => close_case(org_id, id, *verdict, reason, user_id).await,
+        Change::Close(verdict, reason) => close_case(org_id, id, *verdict, reason, caller).await,
         Change::Assign(user) => incidents::update_assignee(org_id, id, user.as_deref(), user_id)
             .await
             .map(|_| ())
@@ -668,7 +688,7 @@ async fn apply_change(
                 .map_err(|e| e.to_string())
         }
         Change::Status(status) => {
-            incidents::authorize_status(org_id, id, status, user_id)
+            incidents::authorize_status(org_id, id, status, caller)
                 .await
                 .map_err(|e| format!("{e:?}"))?;
             incidents::update_status(org_id, id, status, user_id)
@@ -934,6 +954,7 @@ mod tests {
             security_case: true,
             historical: false,
             last_detection_at: None,
+            ..Default::default()
         }
     }
 

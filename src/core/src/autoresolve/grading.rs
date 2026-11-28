@@ -133,6 +133,7 @@ fn ledger(cause: &str, cited: &[PlanEvidence]) -> EvidenceLedger {
         strength: e.strength,
         observation: e.observation.clone(),
         first_cited_seq: seq,
+        claim_scope: None,
     };
     let hypothesis = |id: String, statement: String, status, seq| Hypothesis {
         id,
@@ -144,6 +145,9 @@ fn ledger(cause: &str, cited: &[PlanEvidence]) -> EvidenceLedger {
         first_seen_seq: seq,
         onset_us: None,
         history: Vec::new(),
+        prediction: None,
+        refutation: None,
+        checks: None,
     };
     let mut root = hypothesis(
         CAUSE_ID.to_string(),
@@ -294,6 +298,7 @@ mod tests {
             },
             observed: None,
             result_summary: "OK".into(),
+            coverage: None,
         }
     }
 

@@ -1043,6 +1043,7 @@ mod tests {
             security_case: false,
             historical: false,
             last_detection_at: None,
+            ..Default::default()
         }
     }
 
@@ -1088,6 +1089,7 @@ mod tests {
             profiles_streams: serde_json::json!([]),
             field_name_mapping: None,
             last_seen: 1,
+            streams_cut: 0,
         };
         let records = [
             record("checkout", &["checkout", "cart"]),

@@ -22,7 +22,9 @@
 //! 3. System level (global defaults)
 
 use anyhow::anyhow;
-use config::meta::system_settings::{SettingScope, SystemSetting};
+use config::meta::system_settings::{
+    SettingCategory, SettingScope, SystemSetting, keys::AUTO_RESOLVE_AT_HELD,
+};
 use sea_orm::{
     ActiveModelTrait,
     ActiveValue::{NotSet, Set},
@@ -69,8 +71,16 @@ pub async fn get(
     user_id: Option<&str>,
     key: &str,
 ) -> Result<Option<SystemSetting>, anyhow::Error> {
-    let client = get_orm_client_ro().await;
+    get_with(get_orm_client_ro().await, scope, org_id, user_id, key).await
+}
 
+pub async fn get_with(
+    client: &impl ConnectionTrait,
+    scope: &SettingScope,
+    org_id: Option<&str>,
+    user_id: Option<&str>,
+    key: &str,
+) -> Result<Option<SystemSetting>, anyhow::Error> {
     let mut query = Entity::find()
         .filter(Column::Scope.eq(scope.as_str()))
         .filter(Column::SettingKey.eq(key));
@@ -236,13 +246,25 @@ pub async fn list_resolved(
 
 /// Create or update a setting (upsert)
 pub async fn set(setting: &SystemSetting) -> Result<SystemSetting, anyhow::Error> {
+    set_with(get_orm_client_rw().await, setting).await
+}
+
+pub async fn set_with(
+    client: &impl ConnectionTrait,
+    setting: &SystemSetting,
+) -> Result<SystemSetting, anyhow::Error> {
     setting.validate().map_err(|e| anyhow!(e))?;
 
-    let client = get_orm_client_rw().await;
     let now = chrono::Utc::now().timestamp_micros();
+    let category = if setting.setting_key == AUTO_RESOLVE_AT_HELD {
+        Some(SettingCategory::Incidents.as_str().to_owned())
+    } else {
+        setting.setting_category.clone()
+    };
 
     // Check if setting already exists
-    let existing = get(
+    let existing = get_with(
+        client,
         &setting.scope,
         setting.org_id.as_deref(),
         setting.user_id.as_deref(),
@@ -258,7 +280,7 @@ pub async fn set(setting: &SystemSetting) -> Result<SystemSetting, anyhow::Error
             org_id: Set(setting.org_id.clone()),
             user_id: Set(setting.user_id.clone()),
             setting_key: Set(setting.setting_key.clone()),
-            setting_category: Set(setting.setting_category.clone()),
+            setting_category: Set(category),
             setting_value: Set(setting.setting_value.clone()),
             description: Set(setting.description.clone()),
             created_at: Set(existing.created_at),
@@ -281,7 +303,7 @@ pub async fn set(setting: &SystemSetting) -> Result<SystemSetting, anyhow::Error
             org_id: Set(setting.org_id.clone()),
             user_id: Set(setting.user_id.clone()),
             setting_key: Set(setting.setting_key.clone()),
-            setting_category: Set(setting.setting_category.clone()),
+            setting_category: Set(category),
             setting_value: Set(setting.setting_value.clone()),
             description: Set(setting.description.clone()),
             created_at: Set(now),

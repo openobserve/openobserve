@@ -163,6 +163,7 @@ const RESPONSE_EVENT_KINDS = [
   "ai_verdict",
   "severity_promoted",
   "flapped",
+  "promotion_owed",
 ] as const satisfies readonly ResponseEventKind[];
 const _c1: Complete<ResponseEventKind, typeof RESPONSE_EVENT_KINDS> = true;
 
@@ -346,6 +347,10 @@ const SKIPPED: Record<string, string> = {
   EndedBy: "internal finalization input; the endpoint exposes OutcomeReason",
   SuspectChangeState: "agent claim stored for metrics; UI reads code-derived ShownChangeState",
   TimelineStatus: "agent input; UI reads the evidence-checked TimelineView",
+  RcaEdition: "deployment metadata in the RCA context; the UI does not read capabilities",
+  DisproofCheckKind: "hypothesis check type; the UI does not read the checks field",
+  DisproofCheckResult: "hypothesis check outcome; the UI does not read the checks field",
+  SkipReason: "automatic RCA refusal reason; the UI does not read skipped pages",
 };
 
 // ── The re-check ────────────────────────────────────────────────────────────

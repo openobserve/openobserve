@@ -35,11 +35,13 @@ pub mod aggregation_level;
 pub mod alert;
 pub mod alert_calibration;
 pub mod auto_investigate;
+pub mod change_events;
 pub mod composite;
 pub mod condition_ops;
 pub mod content_spec;
 pub mod dispatch;
 pub mod grouping;
+pub mod incident_fields;
 pub mod incidents;
 pub mod lease;
 pub mod level;
@@ -52,6 +54,7 @@ pub mod recovery;
 pub mod state;
 pub mod state_level;
 pub mod tags;
+pub mod what_changed;
 
 /// Minimum silence applied to a realtime alert after each notification, even
 /// when the alert's own silence is 0 — without a floor, every matching

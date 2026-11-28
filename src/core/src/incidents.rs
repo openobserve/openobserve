@@ -17,7 +17,10 @@ use std::collections::HashMap;
 
 use config::meta::alerts::incidents::{IncidentEvent, IncidentEventType};
 use db::workflows::WorkflowTriggerType;
-use infra::table::workflows::get_all_associations_for_trigger_type;
+use infra::table::{
+    incident_events::{self, ReopenEffect},
+    workflows::get_all_associations_for_trigger_type,
+};
 use serde_json::Value;
 
 use crate::{
@@ -108,8 +111,15 @@ async fn get_event_metadata(
             ));
         }
 
-        IncidentEventType::Reopened { user_id, reason } => {
+        IncidentEventType::Reopened {
+            user_id,
+            reason,
+            transition_id,
+        } => {
             metadata.push(("event_type", "reopened".into()));
+            if let Some(transition_id) = transition_id {
+                metadata.push(("transition_id", transition_id.into()));
+            }
             metadata.push(("user_id", user_id.into()));
             metadata.push(("reason", reason.into()));
         }
@@ -131,10 +141,23 @@ async fn get_event_metadata(
             metadata.push(("new_title", to.into()));
             metadata.push(("user_id", user_id.into()));
         }
-        IncidentEventType::AssignmentChanged { from, to, user_id } => {
-            metadata.push(("event_type", "assignment_changed".into()));
+        IncidentEventType::AssignmentChanged {
+            from,
+            to,
+            user_id,
+            role,
+            via,
+        } => {
+            let event_type = assignment_event_type(role.as_deref());
+            metadata.push(("event_type", event_type.into()));
             if let Some(user_id) = user_id {
                 metadata.push(("user_id", user_id.into()));
+            }
+            if let Some(role) = role {
+                metadata.push(("role", role.into()));
+            }
+            if let Some(via) = via {
+                metadata.push(("via", via.into()));
             }
             metadata.push((
                 "from_user",
@@ -144,6 +167,38 @@ async fn get_event_metadata(
                 "to_user",
                 to.unwrap_or_else(|| "unknown".to_string()).into(),
             ));
+        }
+
+        IncidentEventType::OwnerTeamChanged { from, to, user_id } => {
+            metadata.push(("event_type", "owner_team_changed".into()));
+            if let Some(user_id) = user_id {
+                metadata.push(("user_id", user_id.into()));
+            }
+            metadata.push(("from_team", from.unwrap_or_default().into()));
+            metadata.push(("to_team", to.unwrap_or_default().into()));
+        }
+
+        IncidentEventType::ImpactWindowChanged {
+            from_start,
+            from_end,
+            to_start,
+            to_end,
+            user_id,
+        } => {
+            metadata.push(("event_type", "impact_window_changed".into()));
+            if let Some(user_id) = user_id {
+                metadata.push(("user_id", user_id.into()));
+            }
+            for (key, at) in [
+                ("from_start", from_start),
+                ("from_end", from_end),
+                ("to_start", to_start),
+                ("to_end", to_end),
+            ] {
+                if let Some(at) = at {
+                    metadata.push((key, at.into()));
+                }
+            }
         }
 
         IncidentEventType::Verdict {
@@ -225,11 +280,15 @@ async fn get_event_metadata(
             reason,
             trigger_type,
             error_details,
+            error_code,
         } => {
             metadata.push(("event_type", "ai_analysis_failed".into()));
             metadata.push(("reason", reason.into()));
             metadata.push(("analysis_trigger_type", trigger_type.to_string().into()));
             metadata.push(("error_details", error_details.unwrap_or_default().into()));
+            if let Some(code) = error_code {
+                metadata.push(("error_code", code.into()));
+            }
         }
         IncidentEventType::AIAnalysisCancelled { user_id } => {
             metadata.push(("event_type", "ai_analysis_cancelled".into()));
@@ -261,6 +320,190 @@ async fn get_event_metadata(
             metadata.push(("question", question.into()));
             metadata.push(("deadline_at", deadline_at.into()));
         }
+        IncidentEventType::AnalysisSkipped {
+            reason,
+            covering_run_id,
+            ..
+        } => {
+            metadata.push(("event_type", "analysis_skipped".into()));
+            metadata.push(("reason", reason.as_str().into()));
+            metadata.push(("covering_run_id", covering_run_id.into()));
+        }
+        IncidentEventType::FixApplied {
+            transition_id,
+            attempt_id,
+            kind,
+            actor,
+            ..
+        } => {
+            metadata.push(("event_type", "fix_applied".into()));
+            metadata.push(("attempt_id", attempt_id.into()));
+            metadata.push(("kind", kind.into()));
+            metadata.push(("actor", actor.into()));
+            if let Some(id) = transition_id {
+                metadata.push(("transition_id", id.into()));
+            }
+        }
+        IncidentEventType::FixSuperseded {
+            transition_id,
+            attempt_id,
+            superseded_attempt_id,
+        } => {
+            metadata.push(("event_type", "fix_superseded".into()));
+            metadata.push(("attempt_id", attempt_id.into()));
+            metadata.push(("superseded_attempt_id", superseded_attempt_id.into()));
+            if let Some(id) = transition_id {
+                metadata.push(("transition_id", id.into()));
+            }
+        }
+        IncidentEventType::FixRetracted {
+            transition_id,
+            attempt_id,
+            revived_attempt_id,
+        } => {
+            metadata.push(("event_type", "fix_retracted".into()));
+            metadata.push(("attempt_id", attempt_id.into()));
+            if let Some(id) = transition_id {
+                metadata.push(("transition_id", id.into()));
+            }
+            if let Some(id) = revived_attempt_id {
+                metadata.push(("revived_attempt_id", id.into()));
+            }
+        }
+        IncidentEventType::FixClaimed {
+            transition_id,
+            option_key,
+            actor,
+            expires_at,
+            ..
+        } => {
+            metadata.push(("event_type", "fix_claimed".into()));
+            metadata.push(("option_key", option_key.into()));
+            metadata.push(("actor", actor.into()));
+            metadata.push(("expires_at", expires_at.into()));
+            if let Some(id) = transition_id {
+                metadata.push(("transition_id", id.into()));
+            }
+        }
+        IncidentEventType::RollbackObserved {
+            transition_id,
+            attempt_id,
+            change_ref,
+            at,
+        } => {
+            metadata.push(("event_type", "rollback_observed".into()));
+            metadata.push(("transition_id", transition_id.into()));
+            metadata.push(("attempt_id", attempt_id.into()));
+            metadata.push(("change_ref", change_ref.into()));
+            metadata.push(("at", at.into()));
+        }
+        IncidentEventType::RecoveryVerified { transition_id } => {
+            metadata.push(("event_type", "recovery_verified".into()));
+            metadata.push(("transition_id", transition_id.into()));
+        }
+        IncidentEventType::RecoveryHeld { transition_id } => {
+            metadata.push(("event_type", "recovery_held".into()));
+            metadata.push(("transition_id", transition_id.into()));
+        }
+        IncidentEventType::RecoveryRelapsed {
+            transition_id,
+            check_id,
+            phase,
+        } => {
+            metadata.push(("event_type", "recovery_relapsed".into()));
+            metadata.push(("transition_id", transition_id.into()));
+            metadata.push(("check_id", check_id.into()));
+            metadata.push(("phase", phase.as_str().into()));
+            metadata.push(("actor", "system (relapse)".into()));
+        }
+        IncidentEventType::RecoveryFailed {
+            transition_id,
+            check_id,
+            reason,
+            attempt_id,
+        } => {
+            metadata.push(("event_type", "recovery_failed".into()));
+            metadata.push(("transition_id", transition_id.into()));
+            metadata.push(("check_id", check_id.into()));
+            metadata.push(("reason", reason.as_str().into()));
+            if let Some(id) = attempt_id {
+                metadata.push(("attempt_id", id.into()));
+            }
+        }
+        IncidentEventType::TeamPaged {
+            team_id,
+            actor,
+            transition_id,
+        } => {
+            metadata.push(("event_type", "team_paged".into()));
+            metadata.push(("team_id", team_id.into()));
+            metadata.push(("actor", actor.into()));
+            metadata.push(("transition_id", transition_id.into()));
+        }
+        IncidentEventType::CauseReviewed {
+            cause_class,
+            cause_text,
+            actor,
+            transition_id,
+        } => {
+            metadata.push(("event_type", "cause_reviewed".into()));
+            metadata.push(("cause_class", cause_class.as_str().into()));
+            metadata.push(("cause_text", cause_text.into()));
+            metadata.push(("actor", actor.into()));
+            metadata.push(("transition_id", transition_id.into()));
+        }
+        IncidentEventType::FeedbackGiven {
+            run_id,
+            target_kind,
+            target_id,
+            verdict,
+            actor,
+        } => {
+            metadata.push(("event_type", "feedback_given".into()));
+            metadata.push(("run_id", run_id.into()));
+            metadata.push(("target_kind", target_kind.into()));
+            metadata.push(("target_id", target_id.into()));
+            metadata.push(("verdict", verdict.into()));
+            metadata.push(("actor", actor.into()));
+        }
+        IncidentEventType::ResolutionRecorded {
+            transition_id,
+            actor,
+            details,
+        } => {
+            metadata.push(("event_type", "resolution_recorded".into()));
+            metadata.push(("transition_id", transition_id.into()));
+            metadata.push(("actor", actor.into()));
+            if let Some(cause) = details.resolution_cause {
+                metadata.push(("resolution_cause", cause.as_str().into()));
+            }
+            if let Some(note) = details.resolution_note {
+                metadata.push(("resolution_note", note.into()));
+            }
+            if let Some(impact) = details.customer_impact {
+                metadata.push(("customer_impact", impact.as_str().into()));
+            }
+        }
+        IncidentEventType::RecoveryConditionChanged {
+            check_id,
+            actor,
+            transition_id,
+            ..
+        } => {
+            metadata.push(("event_type", "recovery_condition_changed".into()));
+            metadata.push(("check_id", check_id.into()));
+            metadata.push(("actor", actor.into()));
+            metadata.push(("transition_id", transition_id.into()));
+        }
+        IncidentEventType::Declared { declared_by } => {
+            metadata.push(("event_type", "declared".into()));
+            metadata.push(("declared_by", declared_by.into()));
+        }
+        IncidentEventType::ContextAttached { context_id, kind } => {
+            metadata.push(("event_type", "context_attached".into()));
+            metadata.push(("context_id", context_id.into()));
+            metadata.push(("kind", kind.as_str().into()));
+        }
         IncidentEventType::Unknown(value) => {
             metadata.push(("event_type", "unknown".into()));
             metadata.push(("value", value));
@@ -273,6 +516,14 @@ async fn get_event_metadata(
         .collect();
 
     Ok(ret)
+}
+
+/// A comms-owner change is its own event to a workflow, never a change of the lead.
+fn assignment_event_type(role: Option<&str>) -> &'static str {
+    match role {
+        Some(config::meta::alerts::incidents::COMMS_ROLE) => "comms_owner_changed",
+        _ => "assignment_changed",
+    }
 }
 
 // NOTE: This is specifically for sending event trigger without appending event in db
@@ -298,50 +549,17 @@ pub async fn send_member_event_trigger(
     event: IncidentEvent,
     member: Option<String>,
 ) -> Result<(), anyhow::Error> {
-    let workflows = match get_all_associations_for_trigger_type(
-        org_id,
-        &WorkflowTriggerType::IncidentEvent.to_string(),
-    )
-    .await
-    {
-        Ok(v) => v,
-        Err(e) => {
-            log::error!("error getting incident event workflows for {org_id}/{incident_id} : {e}");
-            return Ok(());
-        }
-    };
+    send_event_workflows(org_id, incident_id, event, member, false).await
+}
 
-    let metadata = match get_event_metadata(org_id, incident_id, event).await {
-        Ok(v) => v,
-        Err(e) => {
-            log::error!("error getting incident event metadata for {org_id}/{incident_id} : {e}");
-            return Ok(());
-        }
-    };
-
-    for workflow in workflows {
-        let trace_id = config::ider::generate_trace_id();
-        log::info!(
-            "associating trace id {trace_id} with workflow {} for incident {incident_id} event trigger",
-            workflow.workflow_id
-        );
-        let request = TriggerRequest {
-            trace_id: &trace_id,
-            org_id,
-            source_id: incident_id.to_string(),
-            trigger_type: WorkflowTriggerType::IncidentEvent,
-            workflow_id: &workflow.workflow_id,
-            metadata: metadata.clone(),
-            member_alert_id: member.clone(),
-        };
-        if let Err(e) = send_member_workflow_trigger(request, &[]).await {
-            log::error!(
-                "error sending workflow trigger for {org_id}/{} trace_id {trace_id} incident {incident_id} : {e}",
-                workflow.workflow_id
-            );
-        }
-    }
-    Ok(())
+#[cfg(feature = "enterprise")]
+pub(crate) async fn send_rca_event_trigger(
+    org_id: &str,
+    incident_id: &str,
+    event: IncidentEvent,
+    fenced: bool,
+) -> Result<(), anyhow::Error> {
+    send_event_workflows(org_id, incident_id, event, None, fenced).await
 }
 
 pub async fn append_event(
@@ -356,11 +574,6 @@ pub async fn append_event(
     Ok(())
 }
 
-// this fn is basically a wrapper over the above with types changed
-// the ent streaming analyze fn needs to go through it and the types
-// make it so that we cannot have params which are &refs , hence
-// a thin wrapper which takes params by ownership and calls the above.
-// if found a better way remove this completely.
 pub async fn append_event_send(
     org_id: String,
     incident_id: String,
@@ -368,4 +581,123 @@ pub async fn append_event_send(
 ) -> Result<(), anyhow::Error> {
     append_event(&org_id, &incident_id, event).await?;
     Ok(())
+}
+
+async fn send_event_workflows(
+    org_id: &str,
+    incident_id: &str,
+    event: IncidentEvent,
+    member: Option<String>,
+    fenced: bool,
+) -> Result<(), anyhow::Error> {
+    let workflows = match get_all_associations_for_trigger_type(
+        org_id,
+        &WorkflowTriggerType::IncidentEvent.to_string(),
+    )
+    .await
+    {
+        Ok(v) => v,
+        Err(e) => {
+            log::error!("error getting incident event workflows for {org_id}/{incident_id} : {e}");
+            return Ok(());
+        }
+    };
+
+    let transition_id = match &event.event_type {
+        IncidentEventType::Reopened { transition_id, .. } => transition_id.clone(),
+        _ => None,
+    };
+    let mut completed = match &transition_id {
+        Some(id) => incident_events::completed_reopen_effects(org_id, incident_id, id).await?,
+        None => Default::default(),
+    };
+    let mut metadata = match get_event_metadata(org_id, incident_id, event).await {
+        Ok(v) => v,
+        Err(e) => {
+            log::error!("error getting incident event metadata for {org_id}/{incident_id} : {e}");
+            return Ok(());
+        }
+    };
+    if fenced {
+        metadata.remove("error_details");
+    }
+
+    for workflow in workflows {
+        let effect = transition_id
+            .as_ref()
+            .map(|_| ReopenEffect::Workflow(workflow.workflow_id.clone()));
+        if effect
+            .as_ref()
+            .is_some_and(|effect| completed.contains(effect))
+        {
+            continue;
+        }
+        let trace_id = config::ider::generate_trace_id();
+        log::info!(
+            "associating trace id {trace_id} with workflow {} for incident {incident_id} event trigger",
+            workflow.workflow_id
+        );
+        let request = TriggerRequest {
+            trace_id: &trace_id,
+            org_id,
+            source_id: incident_id.to_string(),
+            trigger_type: WorkflowTriggerType::IncidentEvent,
+            workflow_id: &workflow.workflow_id,
+            metadata: metadata.clone(),
+            member_alert_id: member.clone(),
+        };
+        match send_member_workflow_trigger(request, &[]).await {
+            Ok(_) => {
+                if let (Some(id), Some(effect)) = (&transition_id, effect) {
+                    incident_events::complete_reopen_effect(
+                        org_id,
+                        incident_id,
+                        id,
+                        effect.clone(),
+                    )
+                    .await?;
+                    completed.insert(effect);
+                }
+            }
+            Err(e) => {
+                log::error!(
+                    "error sending workflow trigger for {org_id}/{} trace_id {trace_id} incident {incident_id} : {e}",
+                    workflow.workflow_id
+                );
+            }
+        }
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_comms_owner_change_is_not_a_lead_assignment() {
+        assert_eq!(assignment_event_type(Some("comms")), "comms_owner_changed");
+        assert_eq!(assignment_event_type(None), "assignment_changed");
+        assert_eq!(assignment_event_type(Some("lead")), "assignment_changed");
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn workflow_metadata_keeps_empty_rca_failure_details() {
+        use config::meta::alerts::incidents::AnalysisTriggerType;
+
+        use crate::alerts::rca_runs::tests::{new_incident, s19_meta};
+
+        if !s19_meta().await {
+            return;
+        }
+        let (org, incident) = new_incident(None).await;
+        let event =
+            IncidentEvent::ai_analysis_failed("Timed out", AnalysisTriggerType::Manual, None);
+        let metadata = get_event_metadata(&org, &incident, event).await.unwrap();
+        assert_eq!(
+            metadata.get("error_details").and_then(Value::as_str),
+            Some("")
+        );
+    }
 }

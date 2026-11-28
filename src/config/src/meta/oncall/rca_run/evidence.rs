@@ -19,7 +19,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use utoipa::ToSchema;
 
-use super::{EvidenceLedger, Polarity, Strength, TimeWindow};
+use super::{CallCoverage, ClaimScope, EvidenceLedger, Polarity, Strength, TimeWindow};
 use crate::meta::{
     oncall::confidence::{
         CallLog, KEY_ARG_MAX_BYTES, SignalClass, ToolCallRecord, UnverifiedCitation, cut_bytes,
@@ -156,7 +156,7 @@ pub fn evidence_target(tool: &str, input: &Value) -> EvidenceTarget {
     target
 }
 
-fn decode_output(output: &Value) -> Cow<'_, Value> {
+pub(super) fn decode_output(output: &Value) -> Cow<'_, Value> {
     match output {
         Value::String(s) => match serde_json::from_str::<Value>(s) {
             Ok(v @ (Value::Object(_) | Value::Array(_))) => Cow::Owned(v),
@@ -442,7 +442,7 @@ impl ObservedTimes {
 }
 
 /// A positive epoch time in s, ms, µs or ns, told apart by magnitude, as microseconds.
-fn epoch_micros(n: f64) -> Option<i64> {
+pub(super) fn epoch_micros(n: f64) -> Option<i64> {
     if !n.is_finite() || n <= 0.0 {
         return None;
     }
@@ -459,7 +459,7 @@ fn epoch_micros(n: f64) -> Option<i64> {
 }
 
 /// A text cell as an epoch time: a number, or a date such as `2026-04-24T17:35:07Z`.
-fn text_micros(cell: &str) -> Option<i64> {
+pub(super) fn text_micros(cell: &str) -> Option<i64> {
     let cell = cell.trim();
     if cell.is_empty() || cell.len() > 40 {
         return None;
@@ -549,6 +549,8 @@ pub struct Citation {
     pub strength: Strength,
     /// The agent's reading of the result; never shown as the result.
     pub observation: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub claim_scope: Option<ClaimScope>,
 }
 
 /// One verified tool call that the ledger cites.
@@ -565,6 +567,8 @@ pub struct EvidenceEntry {
     pub link: EvidenceTarget,
     pub result_summary: String,
     pub duration_ms: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub coverage: Option<CallCoverage>,
     /// At least one citation is decisive and the call's signal counts toward the band. A context
     /// call (incident details, topology, a code read) explains a mechanism but never decides one.
     pub decisive: bool,
@@ -615,6 +619,7 @@ pub fn build_evidence(
                 polarity: item.polarity,
                 strength: item.strength,
                 observation: item.observation.clone(),
+                claim_scope: item.claim_scope.clone(),
             });
         }
     }
@@ -640,6 +645,7 @@ pub fn build_evidence(
                 link: acc.record.target.clone(),
                 result_summary: acc.record.result_summary.clone(),
                 duration_ms: acc.record.duration_ms,
+                coverage: acc.record.coverage.clone(),
                 decisive: acc.record.signal.counts()
                     && acc
                         .citations
@@ -695,6 +701,7 @@ mod tests {
                     polarity: Polarity::Supports,
                     strength: Strength::Decisive,
                     observation: "e2 obs".into(),
+                    claim_scope: None,
                 },
                 Citation {
                     hypothesis_id: "h4".into(),
@@ -702,6 +709,7 @@ mod tests {
                     polarity: Polarity::RulesOut,
                     strength: Strength::Supporting,
                     observation: "e7 obs".into(),
+                    claim_scope: None,
                 },
             ]
         );

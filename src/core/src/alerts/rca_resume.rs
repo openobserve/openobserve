@@ -96,6 +96,7 @@ impl ResumeSeed {
 pub enum ResumeError {
     /// 404: unknown incident or run, or a run of another incident.
     NotFound,
+    SecurityCase,
     /// 409 `not_resumable`, with the message for the user.
     NotResumable(String),
     /// 409 `nothing_to_resume`: no step finished.
@@ -130,6 +131,9 @@ pub async fn resumable_run_id(
     latest_id: &str,
     runs: &[RunRow],
 ) -> Option<String> {
+    if !infra::table::rca_fence::incident_history_allowed(org_id, incident_id).await {
+        return None;
+    }
     match resumable_from_rows(org_id, incident_id, latest_id, runs).await {
         Ok(run_id) => run_id,
         Err(e) => {
@@ -208,6 +212,9 @@ where
         .await
         .map_err(internal)?
         .ok_or(ResumeError::NotFound)?;
+    if incident.security_case {
+        return Err(ResumeError::SecurityCase);
+    }
     let run = runs_table::get_rw(org_id, run_id)
         .await
         .map_err(internal)?

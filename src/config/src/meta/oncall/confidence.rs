@@ -21,14 +21,19 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use utoipa::ToSchema;
 
+pub use super::rca_run::grading::GradeTrust;
 use super::{
     agent::Confidence,
     rca_run::{
         BlindSpot, BlindSpotAxis, EvidenceItem, EvidenceLedger, EvidenceTarget, HypothesisStatus,
-        OutcomeReason, Polarity, RcaOutcome, Strength, SubmittedVerdict, TimeWindow, subject,
+        OutcomeReason, Polarity, RcaOutcome, Strength, SubmittedVerdict, TimeWindow,
+        grading::{cited_change, effective_strength, independent_classes, rules_out},
+        subject,
     },
 };
 use crate::meta::alerts::rca_steering::STEER_ID_PREFIX;
+
+pub const COMPARE_SERVICE_VERSIONS: &str = "CompareServiceVersions";
 
 /// Statements of ruled-out hypotheses in a grade are cut to this many chars.
 const RULED_OUT_MAX_CHARS: usize = 80;
@@ -144,6 +149,8 @@ pub struct ToolCallRecord {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub change_rows: Option<String>,
     pub result_summary: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub coverage: Option<super::rca_run::CallCoverage>,
 }
 
 impl ToolCallRecord {
@@ -567,6 +574,9 @@ pub fn stream_type(tool: &str, input: &serde_json::Value) -> Option<String> {
 
 /// From the bare tool name and unwrapped input, never from the ledger.
 pub fn signal_class(tool: &str, input: &serde_json::Value) -> SignalClass {
+    if tool == COMPARE_SERVICE_VERSIONS {
+        return SignalClass::Change;
+    }
     if SEARCH_TOOLS.contains(&tool) {
         return match input.get("type").and_then(serde_json::Value::as_str) {
             Some("metrics") => SignalClass::Metrics,
@@ -763,6 +773,29 @@ pub fn grade_confidence(
     tool_log: &[ToolCallRecord],
     steer_authors: &BTreeMap<String, String>,
 ) -> ConfidenceGrade {
+    grade_confidence_with(
+        verdict,
+        ledger,
+        blind_spots,
+        tool_log,
+        steer_authors,
+        &GradeTrust::default(),
+    )
+}
+
+pub fn grade_confidence_with(
+    verdict: &SubmittedVerdict,
+    ledger: Option<&EvidenceLedger>,
+    blind_spots: &[BlindSpot],
+    tool_log: &[ToolCallRecord],
+    steer_authors: &BTreeMap<String, String>,
+    trust: &GradeTrust,
+) -> ConfidenceGrade {
+    let coverage_aware = tool_log.iter().any(|record| {
+        record.coverage.as_ref().is_some_and(|coverage| {
+            coverage.has_grading_metadata() || record.tool == COMPARE_SERVICE_VERSIONS
+        })
+    });
     let hypotheses = ledger.map(|l| l.hypotheses.as_slice()).unwrap_or_default();
 
     // Verify every item of every hypothesis.
@@ -811,7 +844,16 @@ pub fn grade_confidence(
             .evidence
             .iter()
             .zip(&verified[i])
-            .filter_map(|(item, rec)| rec.map(|r| (item.polarity, item.strength, r.signal)))
+            .filter_map(|(item, rec)| {
+                rec.map(|r| {
+                    let strength = if coverage_aware {
+                        effective_strength(item, r)
+                    } else {
+                        item.strength
+                    };
+                    (item.polarity, strength, r)
+                })
+            })
     };
 
     let ruled_out: Vec<String> = hypotheses
@@ -821,10 +863,14 @@ pub fn grade_confidence(
         .filter(|(i, (h, recs))| {
             !graded_ids.contains(i)
                 && h.status == HypothesisStatus::RuledOut
-                && h.evidence.iter().zip(recs.iter()).any(|(item, rec)| {
-                    rec.is_some()
-                        && matches!(item.polarity, Polarity::RulesOut | Polarity::Contradicts)
-                })
+                && if coverage_aware {
+                    rules_out(h, recs, trust)
+                } else {
+                    h.evidence.iter().zip(recs.iter()).any(|(item, rec)| {
+                        rec.is_some()
+                            && matches!(item.polarity, Polarity::RulesOut | Polarity::Contradicts)
+                    })
+                }
         })
         .map(|(_, (h, _))| h.statement.chars().take(RULED_OUT_MAX_CHARS).collect())
         .collect();
@@ -846,10 +892,13 @@ pub fn grade_confidence(
     // The suspect change belongs to one of the causes, so a read of it by any cause counts.
     let change_read = verdict.suspect_change.as_ref().is_some_and(|change| {
         graded_ids.iter().any(|&i| {
-            verified[i]
-                .iter()
-                .flatten()
-                .any(|r| r.reads_change(&change.reference))
+            verified[i].iter().flatten().any(|r| {
+                if coverage_aware {
+                    cited_change(&change.reference, r)
+                } else {
+                    r.reads_change(&change.reference)
+                }
+            })
         })
     });
     let change_unreachable = blind_spots.iter().any(|b| b.axis == BlindSpotAxis::Change);
@@ -857,10 +906,12 @@ pub fn grade_confidence(
         impact_outside_evidence(verdict, verified.iter().flatten().flatten().copied());
 
     let grade_cause = |cause: Option<usize>| {
-        let items: Vec<(Polarity, Strength, SignalClass)> =
+        let items: Vec<(Polarity, Strength, &ToolCallRecord)> =
             cause.map(|i| items_of(i).collect()).unwrap_or_default();
         let mut decisive_classes: Vec<SignalClass> = Vec::new();
-        for (polarity, strength, signal) in &items {
+        let mut decisive = Vec::new();
+        for (polarity, strength, record) in &items {
+            let signal = &record.signal;
             if *polarity == Polarity::Supports
                 && *strength == Strength::Decisive
                 && signal.counts()
@@ -868,7 +919,16 @@ pub fn grade_confidence(
             {
                 decisive_classes.push(*signal);
             }
+            if *polarity == Polarity::Supports && *strength == Strength::Decisive && signal.counts()
+            {
+                decisive.push(*record);
+            }
         }
+        let independent = if coverage_aware {
+            independent_classes(&decisive)
+        } else {
+            decisive_classes.len()
+        };
         let has_support = items.iter().any(|(p, ..)| *p == Polarity::Supports);
         let has_contradiction = items.iter().any(|(p, ..)| *p == Polarity::Contradicts);
 
@@ -879,7 +939,7 @@ pub fn grade_confidence(
         }
         let mut graded = if !reasons.is_empty() {
             Confidence::Low
-        } else if decisive_classes.len() >= 2 && !ruled_out.is_empty() && !has_contradiction {
+        } else if independent >= 2 && !ruled_out.is_empty() && !has_contradiction {
             reasons.push(GradeReason::TwoDecisiveClassesAndRuledOut);
             Confidence::High
         } else if !decisive_classes.is_empty() {
@@ -1213,6 +1273,7 @@ mod tests {
                     strength: Strength::Decisive,
                     observation: String::new(),
                     first_cited_seq: 1,
+                    claim_scope: None,
                 })
                 .map(|r| (r.call_id.as_str(), r.started_at_us))
         };
@@ -1688,6 +1749,17 @@ mod tests {
             vec![GradeReason::TwoDecisiveClassesAndRuledOut]
         );
         assert_eq!(read.graded, Confidence::High);
+
+        let mut covered = deploy.clone();
+        covered.coverage = Some(crate::meta::oncall::rca_run::CallCoverage {
+            is_partial: Some(false),
+            ..Default::default()
+        });
+        assert!(
+            !grade_with(&covered, "v3.8.1")
+                .reasons
+                .contains(&GradeReason::SuspectChangeNotRead)
+        );
 
         // The row is another change, or the rows held no change record.
         for (record, reference) in [(&deploy, "v3.9.0"), (&searched, "v3.8.1")] {
@@ -2777,5 +2849,30 @@ mod tests {
             &BTreeMap::new(),
         );
         assert!(!g.reasons.contains(&ImpactOutsideObservedData));
+    }
+
+    #[test]
+    fn stored_legacy_run_has_the_same_grade_json() {
+        let fixture: serde_json::Value =
+            serde_json::from_str(include_str!("rca_run/legacy_coverage_golden.json")).unwrap();
+        let verdict: SubmittedVerdict = serde_json::from_value(fixture["verdict"].clone()).unwrap();
+        let ledger: EvidenceLedger = serde_json::from_value(fixture["ledger"].clone()).unwrap();
+        let log: Vec<ToolCallRecord> = serde_json::from_value(fixture["tool_log"].clone()).unwrap();
+        assert!(log.iter().all(|record| record.coverage.is_none()));
+        let grade = grade_confidence(&verdict, Some(&ledger), &[], &log, &BTreeMap::new());
+        assert_eq!(
+            serde_json::to_string(&grade).unwrap(),
+            fixture["grade_json"].as_str().unwrap()
+        );
+        let trust = GradeTrust {
+            super_cluster: true,
+            serving_region: Some("west".into()),
+        };
+        let trusted =
+            grade_confidence_with(&verdict, Some(&ledger), &[], &log, &BTreeMap::new(), &trust);
+        assert_eq!(
+            serde_json::to_string(&trusted).unwrap(),
+            fixture["grade_json"].as_str().unwrap()
+        );
     }
 }

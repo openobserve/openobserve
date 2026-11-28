@@ -218,13 +218,30 @@ const MCP_OPT_OUT_CATEGORIES: [&str; 2] = ["authorization", "users"];
         openobserve_api_management::request::alerts::rca_runs_org::list_org_rca_runs,
         openobserve_api_management::request::alerts::incidents::list_incidents,
         openobserve_api_management::request::alerts::incidents::create_incident,
+        openobserve_api_management::request::alerts::incident_declare::preview,
+        openobserve_api_management::request::alerts::incident_declare::declare,
+        openobserve_api_management::request::alerts::incident_declare::add_context,
+        openobserve_api_management::request::alerts::incident_declare::list_contexts,
+        openobserve_api_management::request::alerts::incident_declare::get_context,
+        openobserve_api_management::request::alerts::incident_page_team::page,
+        openobserve_api_management::request::alerts::incident_mitigations::record,
+        openobserve_api_management::request::alerts::incident_mitigations::retract,
+        openobserve_api_management::request::alerts::incident_mitigations::claim,
+        openobserve_api_management::request::alerts::incident_recovery_checks::get,
+        openobserve_api_management::request::alerts::incident_recovery_checks::patch,
+        openobserve_api_management::request::alerts::incident_recovery_checks::delete,
         openobserve_api_management::request::alerts::incidents::get_incident,
+        openobserve_api_management::request::alerts::incident_brief::get,
         openobserve_api_management::request::alerts::incidents::update_incident,
+        openobserve_api_management::request::alerts::incidents::mark_incident_opened,
         openobserve_api_management::request::alerts::incidents::get_incident_stats,
         openobserve_api_management::request::alerts::incidents::trigger_incident_rca,
         openobserve_api_management::request::alerts::incidents::cancel_incident_rca,
         openobserve_api_management::request::alerts::incidents::list_incident_rca_runs,
         openobserve_api_management::request::alerts::incidents::get_incident_rca_run,
+        openobserve_api_management::request::alerts::incident_feedback::get_feedback,
+        openobserve_api_management::request::alerts::incident_feedback::post_feedback,
+        openobserve_api_management::request::alerts::incident_feedback::confirm_cause,
         openobserve_api_management::request::alerts::incidents::get_incident_rca_thread,
         openobserve_api_management::request::alerts::incidents::steer_incident_rca_run,
         openobserve_api_management::request::alerts::incidents::get_incident_rca_steering,
@@ -526,6 +543,8 @@ const MCP_OPT_OUT_CATEGORIES: [&str; 2] = ["authorization", "users"];
         openobserve_api_management::request::alerts::destinations::list_prebuilt_destinations,
         openobserve_api_management::request::alerts::destinations::test_destination,
         openobserve_api_management::request::alerts::destinations::test_send,
+        openobserve_api_management::request::alerts::change_events::ingest_changes,
+        openobserve_api_management::request::alerts::change_events::ingest_changes_url_token,
         openobserve_api_management::request::alerts::external_events::ingest_events,
         openobserve_api_management::request::alerts::external_events::ingest_events_url_token,
         openobserve_api_management::request::alerts::incident_integrations::create_integration,
@@ -789,7 +808,10 @@ const MCP_OPT_OUT_CATEGORIES: [&str; 2] = ["authorization", "users"];
             // Incidents
             openobserve_api_management::request::alerts::incidents::ListIncidentsQuery,
             openobserve_api_management::request::alerts::incidents::ListIncidentsResponse,
+            openobserve_api_management::request::alerts::incidents::SeverityCounts,
             openobserve_api_management::request::alerts::incidents::UpdatePayload,
+            openobserve_api_management::request::alerts::incidents::OpenedResponse,
+            config::meta::alerts::incident_fields::CustomerImpact,
             openobserve_api_management::request::alerts::incidents::IncidentSeverity,
             openobserve_api_management::request::alerts::incidents::IncidentStatus,
             config::meta::alerts::incidents::Incident,
@@ -2548,6 +2570,30 @@ mod tests {
         assert!(missing.is_empty(), "{missing:#?}");
     }
 
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn page_team_and_recovery_check_operations_are_documented_and_hidden_from_mcp() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let incident = "/api/v2/{org_id}/alerts/incidents/{incident_id}";
+        for (suffix, method) in [
+            ("page_team", "post"),
+            ("recovery_checks", "get"),
+            ("recovery_checks/{check_id}", "patch"),
+            ("recovery_checks/{check_id}", "delete"),
+        ] {
+            let path = format!("{incident}/{suffix}");
+            let operation = spec["paths"]
+                .get(path.as_str())
+                .and_then(|item| item.get(method))
+                .unwrap_or_else(|| panic!("{method} {path} is not documented"));
+            assert_eq!(
+                operation["x-o2-mcp"],
+                serde_json::json!({"enabled": false}),
+                "{method} {path}"
+            );
+        }
+    }
+
     #[test]
     fn query_history_paths_are_rate_limited_and_hidden_from_mcp() {
         let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
@@ -3391,6 +3437,29 @@ mod tests {
             );
         }
         assert!(paths[resume].get("get").is_none());
+    }
+
+    #[test]
+    fn incident_feedback_documents_both_editions_and_exposes_enterprise_reads_to_mcp() {
+        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
+        let paths = &spec["paths"];
+        let feedback = "/api/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/feedback";
+        let confirm = "/api/v2/{org_id}/alerts/incidents/{incident_id}/cause/confirm";
+        for (path, method, enabled, limit) in [
+            (feedback, "get", cfg!(feature = "enterprise"), "get"),
+            (feedback, "post", false, "update"),
+            (confirm, "post", false, "update"),
+        ] {
+            let op = &paths[path][method];
+            assert_eq!(op["x-o2-mcp"]["enabled"], enabled);
+            assert_eq!(op["x-o2-ratelimit"]["module"], "Alerts");
+            assert_eq!(op["x-o2-ratelimit"]["operation"], limit);
+            assert!(
+                op["summary"]
+                    .as_str()
+                    .is_some_and(|summary| !summary.is_empty())
+            );
+        }
     }
 
     #[test]

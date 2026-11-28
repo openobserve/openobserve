@@ -27,6 +27,7 @@ use config::{
 };
 use infra::table::{
     entity::alert_incidents,
+    rca_delivery_obligations::{Obligation, Recipient},
     rca_runs::{self as runs_table, NewRun, RunUpdate, StartGuards, StartResult},
 };
 use o2_enterprise::enterprise::common::config::get_config as get_o2_config;
@@ -113,6 +114,10 @@ pub struct StartRun {
     pub oncall_subjects: Option<serde_json::Value>,
     /// `context_used` stored with the row: a resumed run's `{resumed_from}`.
     pub context_used: Option<serde_json::Value>,
+    /// The on-call records owed this run's result, armed with the run row.
+    pub recipients: Vec<Recipient>,
+    /// The page that asked for an automatic run; keys its skipped-page record.
+    pub page_key: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -159,6 +164,8 @@ async fn start_run_after(
         skip_cooldown,
         oncall_subjects,
         context_used,
+        recipients,
+        page_key,
     } = req;
     let cfg = get_o2_config();
 
@@ -203,6 +210,8 @@ async fn start_run_after(
         guidance,
         oncall_subjects,
         context_used,
+        recipients,
+        page_key,
     };
     let guards = StartGuards {
         now_us,
@@ -234,7 +243,7 @@ async fn start_run_after(
                 super::rca_steering::close_unread(&org_id, &stale_run_id, RunState::Failed).await;
             }
             if let (Some(incident_id), Some(event)) = (notify_incident, begin_event) {
-                fire_workflows(&org_id, &incident_id, event).await;
+                fire_workflows(&org_id, &incident_id, event, false).await;
             }
             Ok(StartOutcome::Started { run_id })
         }
@@ -245,12 +254,21 @@ async fn start_run_after(
 
 /// Return false on a lost state guard; dispatch non-cancel workflows after commit.
 pub async fn update_run(org_id: &str, run_id: &str, patch: RunUpdate) -> anyhow::Result<bool> {
+    Ok(update_run_owing(org_id, run_id, patch).await?.is_some())
+}
+
+/// [`update_run`]; `Some` holds the delivery obligations a terminal write settled.
+pub(crate) async fn update_run_owing(
+    org_id: &str,
+    run_id: &str,
+    patch: RunUpdate,
+) -> anyhow::Result<Option<Vec<Obligation>>> {
     let incident_id = if patch.event.is_some() {
         match runs_table::get_rw(org_id, run_id).await? {
             Some(run) => incident_subject(&runs_table::to_item(&run).subject_type, &run.subject_id),
             None => {
                 log::info!("[RCA_RUNS] run {run_id} not updated: it no longer exists");
-                return Ok(false);
+                return Ok(None);
             }
         }
     } else {
@@ -268,7 +286,7 @@ pub async fn fail_run(
     reason: &str,
     details: Option<String>,
 ) -> anyhow::Result<bool> {
-    fail_run_with(
+    Ok(fail_run_with(
         org_id,
         run_id,
         trigger,
@@ -277,7 +295,8 @@ pub async fn fail_run(
         details,
         RunUpdate::default(),
     )
-    .await
+    .await?
+    .is_some())
 }
 
 /// Fail atomically with final counts; failure owns the state, error and event.
@@ -289,7 +308,7 @@ pub(crate) async fn fail_run_with(
     reason: &str,
     details: Option<String>,
     extra: RunUpdate,
-) -> anyhow::Result<bool> {
+) -> anyhow::Result<Option<Vec<Obligation>>> {
     let failed = failed_patch(trigger, code, reason, details);
     let patch = RunUpdate {
         state: failed.state,
@@ -297,8 +316,8 @@ pub(crate) async fn fail_run_with(
         event: failed.event,
         ..extra
     };
-    let ended = update_run(org_id, run_id, patch).await?;
-    if ended {
+    let ended = update_run_owing(org_id, run_id, patch).await?;
+    if ended.is_some() {
         count_run_end(org_id, trigger, RunState::Failed, code);
     }
     Ok(ended)
@@ -311,13 +330,25 @@ pub async fn complete_run(
     report: &str,
     patch: RunUpdate,
 ) -> anyhow::Result<bool> {
+    Ok(complete_run_owing(org_id, run_id, report, patch)
+        .await?
+        .is_some())
+}
+
+/// [`complete_run`]; `Some` holds the delivery obligations the completion settled.
+pub(crate) async fn complete_run_owing(
+    org_id: &str,
+    run_id: &str,
+    report: &str,
+    patch: RunUpdate,
+) -> anyhow::Result<Option<Vec<Obligation>>> {
     let patch = RunUpdate {
         state: Some(RunState::Completed),
         report: Some(report.to_string()),
         event: Some(IncidentEvent::ai_analysis_complete()),
         ..patch
     };
-    update_run(org_id, run_id, patch).await
+    update_run_owing(org_id, run_id, patch).await
 }
 
 /// `rca_runs_total`, once for each run that reaches a terminal state.
@@ -476,7 +507,7 @@ async fn write_run(
     run_id: &str,
     mut patch: RunUpdate,
     incident_id: Option<&str>,
-) -> anyhow::Result<bool> {
+) -> anyhow::Result<Option<Vec<Obligation>>> {
     // No internal host, path or agent URL reaches a reader.
     if let Some(details) = patch.error.as_mut().and_then(|e| e.details.as_mut()) {
         *details = redact_details(details);
@@ -496,28 +527,28 @@ async fn write_run(
     {
         *details = redact_details(details);
     }
-    // A cancel starts no workflow.
-    let notify = patch
-        .event
-        .as_ref()
-        .filter(|event| {
-            !matches!(
-                event.event_type,
-                IncidentEventType::AIAnalysisCancelled { .. }
-            )
-        })
-        .cloned();
-
     patch.now_us = now_micros();
-
-    if !runs_table::update_run(org_id, run_id, patch).await? {
+    let Some(applied) = runs_table::update_run_applied_with(
+        infra::db::get_orm_client_rw().await,
+        org_id,
+        run_id,
+        patch,
+    )
+    .await?
+    else {
         log::info!("[RCA_RUNS] run {run_id} not updated: its state no longer allows this write");
-        return Ok(false);
+        return Ok(None);
+    };
+    if let (Some(incident_id), Some(event)) = (incident_id, applied.event)
+        && !matches!(
+            event.event_type,
+            IncidentEventType::AIAnalysisCancelled { .. }
+        )
+    {
+        fire_workflows(org_id, incident_id, event, applied.fenced).await;
     }
-    if let (Some(incident_id), Some(event)) = (incident_id, notify) {
-        fire_workflows(org_id, incident_id, event).await;
-    }
-    Ok(true)
+    let owed = applied.obligations;
+    Ok(Some(owed))
 }
 
 fn failed_patch(
@@ -535,11 +566,16 @@ fn failed_patch(
             details: details.clone(),
             trigger_type: Some(trigger_type.to_string()),
         }),
-        event: Some(IncidentEvent::ai_analysis_failed(
-            reason,
-            trigger_type,
-            details,
-        )),
+        event: Some(IncidentEvent {
+            timestamp: now_micros(),
+            seq: 0,
+            event_type: IncidentEventType::AIAnalysisFailed {
+                reason: reason.to_string(),
+                trigger_type,
+                error_details: details,
+                error_code: Some(code.to_string()),
+            },
+        }),
         ..Default::default()
     }
 }
@@ -555,8 +591,9 @@ fn redact_details(text: &str) -> String {
 }
 
 /// Fire the `IncidentEvent` workflows of an event that has committed.
-async fn fire_workflows(org_id: &str, incident_id: &str, event: IncidentEvent) {
-    if let Err(e) = crate::incidents::send_incident_event_trigger(org_id, incident_id, event).await
+async fn fire_workflows(org_id: &str, incident_id: &str, event: IncidentEvent, fenced: bool) {
+    if let Err(e) =
+        crate::incidents::send_rca_event_trigger(org_id, incident_id, event, fenced).await
     {
         log::error!("[RCA_RUNS] could not fire workflows for {org_id}/{incident_id}: {e}");
     }
@@ -618,6 +655,11 @@ pub(crate) mod tests {
                     schema.create_table_from_entity(incident_events::Entity),
                     schema.create_table_from_entity(run_rows::Entity),
                     schema.create_table_from_entity(infra::table::entity::rca_steering::Entity),
+                    schema.create_table_from_entity(
+                        infra::table::entity::rca_delivery_obligations::Entity,
+                    ),
+                    schema
+                        .create_table_from_entity(infra::table::entity::rca_skipped_pages::Entity),
                     schema.create_table_from_entity(oncall_responses::Entity),
                     schema.create_table_from_entity(ai_chat_sessions::Entity),
                     schema.create_table_from_entity(ai_chat_turns::Entity),
@@ -644,6 +686,22 @@ pub(crate) mod tests {
             })
             .await;
         LOCK.lock().await
+    }
+
+    pub(crate) async fn s19_meta() -> bool {
+        static READY: OnceCell<()> = OnceCell::const_new();
+        if std::env::var("ZO_META_STORE").is_err() {
+            eprintln!("skipped: set ZO_META_STORE for s19 DB tests");
+            return false;
+        }
+        READY
+            .get_or_init(|| async {
+                infra::db_init().await.unwrap();
+                infra::table::migrate().await.unwrap();
+                infra::scheduler::init().await.unwrap();
+            })
+            .await;
+        true
     }
 
     /// Turn RCA off for a test of the RCA-off guard; RCA is on by default.
@@ -693,6 +751,7 @@ pub(crate) mod tests {
             security_case: false,
             historical: false,
             last_detection_at: None,
+            ..Default::default()
         }
         .into();
         alert_incidents::Entity::insert(row.reset_all())
@@ -713,6 +772,8 @@ pub(crate) mod tests {
             skip_cooldown: trigger.is_user_started(),
             oncall_subjects: None,
             context_used: None,
+            recipients: Vec::new(),
+            page_key: None,
         }
     }
 
@@ -934,6 +995,7 @@ pub(crate) mod tests {
             reason,
             trigger_type,
             error_details,
+            ..
         } = failed[0]
         else {
             unreachable!()
@@ -948,6 +1010,30 @@ pub(crate) mod tests {
             incident_row(&org, &inc).await.rca_state.as_deref(),
             Some("failed")
         );
+    }
+
+    #[tokio::test]
+    async fn a_failed_run_event_carries_the_same_error_code_as_the_run() {
+        if !s19_meta().await {
+            return;
+        }
+        let (org, inc) = new_incident(None).await;
+        let trigger = RunTrigger::Manual;
+        let run_id = start(&org, &inc, trigger).await;
+        assert!(
+            fail_run(&org, &run_id, trigger, ERROR_TIMEOUT, TIMEOUT_REASON, None)
+                .await
+                .unwrap()
+        );
+
+        let error = stored(&org, &run_id).await.error.unwrap();
+        assert_eq!(error.code, ERROR_TIMEOUT);
+        let events = timeline(&org, &inc).await;
+        let failed = failures(&events);
+        let [IncidentEventType::AIAnalysisFailed { error_code, .. }] = failed.as_slice() else {
+            panic!("expected one failed event, got {failed:?}");
+        };
+        assert_eq!(error_code.as_deref(), Some(error.code.as_str()));
     }
 
     /// Two writers fail the same run; only the first counts.
@@ -1398,6 +1484,8 @@ pub(crate) mod tests {
             skip_cooldown: true,
             oncall_subjects: None,
             context_used: None,
+            recipients: Vec::new(),
+            page_key: None,
         };
         let StartOutcome::Started { run_id: done } = start_run(start_alert("al_1")).await.unwrap()
         else {
@@ -1615,6 +1703,7 @@ pub(crate) mod tests {
             )
             .await
             .unwrap()
+            .is_some()
         );
 
         let run = stored(&org, &run_id).await;
@@ -1639,10 +1728,11 @@ pub(crate) mod tests {
             ),
             (None, None, 0)
         );
+        assert_eq!(fresh.context_used, None);
         let context = serde_json::json!({
             "past_causes": [{"id": "past:deploy", "summary": "a bad deploy"}],
             "skills": [],
-            "toolsets": ["o2"]
+            "toolsets": ["o2"], "history_reads_allowed": true
         });
 
         let progress = RunUpdate {
@@ -1678,6 +1768,8 @@ pub(crate) mod tests {
             (Some("metrics"), Some(6), 2)
         );
         assert_eq!(run.context_used, Some(context));
+        let raw = runs_table::get_rw(&org, &run_id).await.unwrap().unwrap();
+        assert!(infra::table::rca_fence::read_history(&raw));
         let summary = infra::table::rca_runs::decode::<serde_json::Value>(
             incident_row(&org, &inc).await.rca_summary.as_deref(),
         )
@@ -1793,6 +1885,8 @@ pub(crate) mod tests {
                 pending_question_id: None,
                 questions_asked: 0,
                 deadline_closed_at: None,
+                run_number: None,
+                fenced: false,
             })
             .reset_all()
         };
@@ -1841,5 +1935,85 @@ pub(crate) mod tests {
             .await
             .unwrap();
         assert!(narrow.is_empty(), "the window is half-open at its end");
+    }
+    #[tokio::test]
+    async fn fenced_completion_vs_reclassify_i_dispatches_the_stored_failure() {
+        if !s19_meta().await {
+            return;
+        }
+        use infra::table::workflows::{WorkflowAssociation, add_workflow_association};
+        for fenced in [true, false] {
+            let (org, incident_id) = new_incident(None).await;
+            let run_id = start(&org, &incident_id, RunTrigger::Manual).await;
+            add_workflow_association(WorkflowAssociation {
+                id: 0,
+                org_id: org.clone(),
+                entity_id: incident_id.clone(),
+                entity_type: "incident".into(),
+                workflow_id: "capture_s19".into(),
+                trigger_type: "IncidentEvent".into(),
+                created_at: now_micros(),
+            })
+            .await
+            .unwrap();
+            if fenced {
+                infra::table::alert_incidents::mark_security_case(&org, &incident_id)
+                    .await
+                    .unwrap();
+            }
+            crate::workflows::CAPTURED_TRIGGERS
+                .scope(std::cell::RefCell::new(Vec::new()), async {
+                    let extra = RunUpdate {
+                        withhold_if_case: fenced,
+                        result: Some(serde_json::json!({"private": "record"})),
+                        ..Default::default()
+                    };
+                    fail_run_with(
+                        &org,
+                        &run_id,
+                        RunTrigger::Manual,
+                        "timeout",
+                        "Timed out",
+                        Some("private failure".into()),
+                        extra,
+                    )
+                    .await
+                    .unwrap()
+                    .unwrap();
+                    let events = infra::table::incident_events::get(&org, &incident_id)
+                        .await
+                        .unwrap();
+                    let event = events
+                        .iter()
+                        .find(|event| {
+                            matches!(event.event_type, IncidentEventType::AIAnalysisFailed { .. })
+                        })
+                        .unwrap();
+                    let stored = serde_json::to_value(event).unwrap();
+                    crate::workflows::CAPTURED_TRIGGERS.with(|captured| {
+                        let captured = captured.borrow();
+                        assert_eq!(
+                            captured.len(),
+                            1,
+                            "actual workflow destination must be called"
+                        );
+                        let payload = &captured[0];
+                        assert_eq!(payload["reason"], stored["data"]["reason"]);
+                        if fenced {
+                            assert_eq!(payload["error_code"], "timeout");
+                            assert_eq!(stored["data"]["error_code"], "timeout");
+                            assert!(!payload.contains_key("error_details"));
+                            assert!(
+                                !payload.contains_key("need") && !payload.contains_key("question")
+                            );
+                            assert!(stored["data"]["error_details"].is_null());
+                            assert!(!serde_json::to_string(payload).unwrap().contains("private"));
+                        } else {
+                            assert_eq!(payload["error_details"], "private failure");
+                        }
+                    });
+                })
+                .await;
+        }
     }
 }

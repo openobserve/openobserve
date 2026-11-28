@@ -41,6 +41,7 @@ pub const COMPARE_DISABLED_NO_SPAN_VERSION: &str = "no_span_version";
 pub const IMAGE_SHORT_HEX: usize = 7;
 /// Every stream the service signals processor writes, logs and metrics alike, starts with this.
 pub const SERVICE_SIGNALS_STREAM_PREFIX: &str = "_o2_service_";
+pub const SERVICE_DEPLOY_DETECTOR_COMPLETED: &str = "_o2_service_deploy_detector_completed";
 const NO_ENV_LITERALS: [&str; 3] = ["default", "none", "unknown"];
 const SERVICE_UNIT_SUFFIXES: [&str; 4] = [".service", ".socket", ".target", ".slice"];
 // An env label is cut to 253 bytes, the bound of every stored identity column.

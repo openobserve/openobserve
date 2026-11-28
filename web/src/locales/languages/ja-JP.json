@@ -12737,6 +12737,7 @@
       "statusOpen": "未解決",
       "statusAcknowledged": "確認済み",
       "statusResolved": "解決済み",
+      "pagerTotal": "{count} 件のインシデント",
       "correlationServiceDiscovery": "サービスディスカバリー",
       "correlationPrimaryMatch": "プライマリ一致",
       "correlationSecondaryMatch": "セカンダリ一致",

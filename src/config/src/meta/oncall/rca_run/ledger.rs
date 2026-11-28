@@ -30,6 +30,8 @@ pub const MAX_BLIND_SPOTS: usize = 10;
 pub const MAX_TEXT_CHARS: usize = 500;
 /// Most characters kept for a blind spot title.
 pub const MAX_TITLE_CHARS: usize = 100;
+pub const MAX_PREDICTION_CHARS: usize = 300;
+pub const MAX_DISPROOF_CHECKS: usize = 4;
 pub const MAX_QUERY_BYTES: usize = crate::meta::oncall::confidence::KEY_ARG_MAX_BYTES;
 
 /// The `tool` label of `rca_ledger_invalid_call_total` for each ledger tool.
@@ -82,6 +84,52 @@ pub enum Strength {
     Supporting,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct ClaimScope {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub service: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stream: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub region: Option<String>,
+    pub start_us: i64,
+    pub end_us: i64,
+}
+
+impl ClaimScope {
+    pub fn selectors_eq(&self, other: &Self) -> bool {
+        (&self.service, &self.stream, &self.region)
+            == (&other.service, &other.stream, &other.region)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum DisproofCheckKind {
+    TemporalPrecedence,
+    Path,
+    Amplifier,
+    Silence,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum DisproofCheckResult {
+    Pass,
+    Fail,
+    #[serde(rename = "n_a", alias = "not_applicable")]
+    NotApplicable,
+    Unchecked,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct DisproofCheck {
+    pub check: DisproofCheckKind,
+    pub result: DisproofCheckResult,
+    #[serde(default)]
+    pub evidence_ids: Vec<String>,
+}
+
 /// One evidence item of one hypothesis, as the agent cited it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct EvidenceItem {
@@ -96,6 +144,8 @@ pub struct EvidenceItem {
     pub strength: Strength,
     pub observation: String,
     pub first_cited_seq: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub claim_scope: Option<ClaimScope>,
 }
 
 /// One entry of a hypothesis' status history.
@@ -128,6 +178,12 @@ pub struct Hypothesis {
     pub onset_us: Option<i64>,
     #[serde(default)]
     pub history: Vec<StatusChange>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub prediction: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub refutation: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub checks: Option<Vec<DisproofCheck>>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -285,10 +341,12 @@ struct HypothesisInput {
     /// Microseconds; a value that is not an integer is dropped, not the call.
     #[serde(default, deserialize_with = "lenient_micros")]
     onset: Option<i64>,
-}
-
-fn lenient_micros<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Option<i64>, D::Error> {
-    Ok(serde_json::Value::deserialize(d)?.as_i64())
+    #[serde(default, deserialize_with = "lenient_text")]
+    prediction: Option<String>,
+    #[serde(default, deserialize_with = "lenient_text")]
+    refutation: Option<String>,
+    #[serde(default, deserialize_with = "lenient_checks")]
+    checks: Option<Vec<DisproofCheck>>,
 }
 
 #[derive(Deserialize)]
@@ -302,6 +360,8 @@ struct EvidenceInput {
     polarity: Polarity,
     strength: Strength,
     observation: String,
+    #[serde(default, deserialize_with = "lenient_scope")]
+    claim_scope: Option<ClaimScope>,
 }
 
 impl EvidenceInput {
@@ -452,10 +512,19 @@ impl Builder {
                     polarity: e.polarity,
                     strength: e.strength,
                     observation,
+                    claim_scope: e.claim_scope.filter(|_| {
+                        matches!(e.polarity, Polarity::RulesOut | Polarity::Contradicts)
+                    }),
                 }
             })
             .collect();
         let statement = cut_chars(input.statement, MAX_TEXT_CHARS, F_STATEMENT, &mut cuts);
+        let prediction = input
+            .prediction
+            .map(|p| cut_chars(p, MAX_PREDICTION_CHARS, F_REASON, &mut cuts));
+        let refutation = input
+            .refutation
+            .map(|r| cut_chars(r, MAX_PREDICTION_CHARS, F_REASON, &mut cuts));
         let reason = cut_chars(input.reason, MAX_TEXT_CHARS, F_REASON, &mut cuts);
         let trigger_steer_id = input.trigger_steer_id.filter(|s| !s.trim().is_empty());
         let change = StatusChange {
@@ -477,6 +546,9 @@ impl Builder {
                 h.evidence = evidence;
                 h.lead_ids = input.lead_ids;
                 h.onset_us = input.onset;
+                h.prediction = prediction;
+                h.refutation = refutation;
+                h.checks = input.checks;
                 self.hypothesis_cuts[i] = cuts;
             }
             None => {
@@ -492,6 +564,9 @@ impl Builder {
                     first_seen_seq: call.seq,
                     onset_us: input.onset,
                     history: vec![change],
+                    prediction,
+                    refutation,
+                    checks: input.checks,
                 });
                 self.hypothesis_cuts.push(cuts);
             }
@@ -677,6 +752,39 @@ pub fn leading_history(calls: &[LedgerCall]) -> Vec<LeadingEntry> {
         }
     }
     history
+}
+
+fn lenient_micros<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Option<i64>, D::Error> {
+    Ok(serde_json::Value::deserialize(d)?.as_i64())
+}
+
+fn lenient_text<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Option<String>, D::Error> {
+    Ok(serde_json::Value::deserialize(d)?
+        .as_str()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_string))
+}
+
+fn lenient_checks<'de, D: serde::Deserializer<'de>>(
+    d: D,
+) -> Result<Option<Vec<DisproofCheck>>, D::Error> {
+    let serde_json::Value::Array(items) = serde_json::Value::deserialize(d)? else {
+        return Ok(None);
+    };
+    Ok(Some(
+        items
+            .into_iter()
+            .filter_map(|v| DisproofCheck::deserialize(v).ok())
+            .take(MAX_DISPROOF_CHECKS)
+            .collect(),
+    ))
+}
+
+fn lenient_scope<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Option<ClaimScope>, D::Error> {
+    Ok(ClaimScope::deserialize(serde_json::Value::deserialize(d)?)
+        .ok()
+        .filter(|scope| scope.start_us <= scope.end_us))
 }
 
 #[cfg(test)]
@@ -1093,5 +1201,80 @@ mod tests {
         );
         // Only symptoms: no entry.
         assert_eq!(leading_history(&[hyp(1, "h1", "symptom", vec![])]), vec![]);
+    }
+
+    #[test]
+    fn legacy_ledger_json_stays_additive() {
+        let fixture: serde_json::Value =
+            serde_json::from_str(include_str!("legacy_coverage_golden.json")).unwrap();
+        let ledger: EvidenceLedger = serde_json::from_value(fixture["ledger"].clone()).unwrap();
+        assert!(
+            ledger
+                .hypotheses
+                .iter()
+                .all(|h| h.prediction.is_none() && h.refutation.is_none() && h.checks.is_none())
+        );
+        assert!(
+            ledger
+                .hypotheses
+                .iter()
+                .flat_map(|h| &h.evidence)
+                .all(|e| e.claim_scope.is_none())
+        );
+        assert_eq!(serde_json::to_value(ledger).unwrap(), fixture["ledger"]);
+    }
+
+    #[test]
+    fn raw_hypothesis_v2_fields_round_trip() {
+        let mut evidence = item(
+            "e1",
+            "SearchSQL",
+            "SELECT * FROM app",
+            "rules_out",
+            "decisive",
+        );
+        evidence["claim_scope"] = json!({"service":"checkout", "stream":"app", "region":"west", "start_us":10, "end_us":20});
+        let call = hyp_input(
+            1,
+            json!({"id":"h1", "statement":"s", "status":"ruled_out", "reason":"r",
+            "prediction":" Errors rise ", "refutation":" Errors stay flat ", "evidence":[evidence],
+            "checks":[
+                {"check":"temporal_precedence", "result":"pass", "evidence_ids":["e1"]},
+                {"check":"path", "result":"fail", "evidence_ids":["e1"]},
+                {"check":"amplifier", "result":"n_a"},
+                {"check":"silence", "result":"unchecked"}
+            ]}),
+        );
+        let original = ledger(&[call]);
+        let hypothesis = &original.hypotheses[0];
+        assert_eq!(hypothesis.prediction.as_deref(), Some("Errors rise"));
+        assert_eq!(hypothesis.refutation.as_deref(), Some("Errors stay flat"));
+        assert_eq!(hypothesis.checks.as_ref().unwrap().len(), 4);
+        assert_eq!(
+            hypothesis.evidence[0]
+                .claim_scope
+                .as_ref()
+                .unwrap()
+                .stream
+                .as_deref(),
+            Some("app")
+        );
+        let stored = serde_json::to_string(&original).unwrap();
+        assert!(stored.contains("\"result\":\"n_a\""));
+        assert_eq!(
+            serde_json::from_str::<EvidenceLedger>(&stored).unwrap(),
+            original
+        );
+    }
+
+    #[test]
+    fn an_unknown_disproof_check_never_becomes_a_pass() {
+        let value = json!({"check":"unknown", "result":"pass", "evidence_ids":["e1"]});
+        assert!(serde_json::from_value::<DisproofCheck>(value.clone()).is_err());
+        let call = hyp_input(
+            1,
+            json!({"id":"h1", "statement":"s", "status":"testing", "reason":"r", "checks":[value]}),
+        );
+        assert_eq!(ledger(&[call]).hypotheses[0].checks, Some(vec![]));
     }
 }

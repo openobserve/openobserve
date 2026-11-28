@@ -72,9 +72,16 @@ async function deleteAlertInDefaultFolder(page, id) {
 
 /** The id of the incident one of whose alert groups came from this alert, or null. */
 async function findIncidentIdForAlert(page, alertId) {
-  const list = await okJson(await api(page, 'get', `${v2()}/alerts/incidents?limit=1000`), 'Listing incidents');
-  const hit = (list.incidents || []).find((i) => (i.alert_groups || []).some((g) => g.alert_id === alertId));
-  return hit ? hit.id : null;
+  let cursor = '';
+  do {
+    const q = new URLSearchParams({ limit: '200', sort: 'first_alert_at:asc' });
+    if (cursor) q.set('cursor', cursor);
+    const list = await okJson(await api(page, 'get', `${v2()}/alerts/incidents?${q}`), 'Listing incidents');
+    const hit = (list.incidents || []).find((i) => (i.alert_groups || []).some((g) => g.alert_id === alertId));
+    if (hit) return hit.id;
+    cursor = list.next_cursor || '';
+  } while (cursor);
+  return null;
 }
 
 async function incidentStatus(page, id) {

@@ -1324,17 +1324,24 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
         alert_acks, alert_calibration, alert_incidents, alert_leases, anomaly_detection,
         autoresolve, autoresolve_corrections, autoresolve_run_connections, autoresolve_runs,
         autoresolve_steps, compactor_manual_jobs, distinct_values, external_alerts, gen_ai_agents,
-        incident_events, incident_integrations, llm_eval, llm_prompts, llm_secrets, oncall_teams,
+        incident_contexts, incident_declare_keys, incident_events, incident_integrations,
+        incident_recovery_checks, llm_eval, llm_prompts, llm_secrets, oncall_teams,
         online_eval_jobs, org_ai_toolsets, org_telephony, providers, query_history, ratelimit,
-        rca_runs, rca_steering, re_pattern, re_pattern_stream_map, rum_pa, score_configs, scorers,
-        search_queue, slack_alert_messages, slo, slo_backfill_jobs, slo_budget, slos, status_pages,
-        synthetics_agents, synthetics_checks, synthetics_environments, synthetics_locations,
-        synthetics_probe_tokens, synthetics_variables, timed_annotations, workflows,
+        rca_feedback, rca_runs, rca_steering, re_pattern, re_pattern_stream_map, rum_pa,
+        score_configs, scorers, search_queue, slack_alert_messages, slo, slo_backfill_jobs,
+        slo_budget, slos, status_pages, synthetics_agents, synthetics_checks,
+        synthetics_environments, synthetics_locations, synthetics_probe_tokens,
+        synthetics_variables, timed_annotations, workflows,
     };
 
     // FK-constrained children must be deleted before their parents.
     // Order: timed_annotations → dashboards → folders (join chain:
     // folders→dashboards→timed_annotations)
+    let conn = infra::db::get_orm_client_rw().await;
+    rca_feedback::delete_by_org(conn, org_id).await?;
+    incident_recovery_checks::delete_by_org(conn, org_id).await?;
+    incident_contexts::delete_by_org(conn, org_id).await?;
+    incident_declare_keys::delete_by_org(conn, org_id).await?;
     alert_incidents::delete_by_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/alert_incidents: {e}"))?;

@@ -18,12 +18,29 @@
 //! Types used for service discovery and telemetry correlation.
 //! These are shared between openobserve core and enterprise modules.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use crate::meta::stream::StreamType;
+
+/// `streams_cut` bits: a cap may have cut that type's list.
+pub const STREAMS_CUT_LOGS: i16 = 1;
+pub const STREAMS_CUT_TRACES: i16 = 2;
+pub const STREAMS_CUT_METRICS: i16 = 4;
+pub const STREAMS_CUT_PROFILES: i16 = 8;
+/// A cut name fell outside the org-wide grant's form, so no org-wide grant proves it readable.
+pub const STREAMS_CUT_OUTSIDE_FORM: i16 = 16;
+/// Nothing proves the row whole, such as a replicated record written before the field existed.
+pub const STREAMS_CUT_ALL: i16 = 31;
+/// Each type's cut bit, in the order of the four stream-list columns.
+pub const STREAMS_CUT_TYPES: [(StreamType, i16); 4] = [
+    (StreamType::Logs, STREAMS_CUT_LOGS),
+    (StreamType::Traces, STREAMS_CUT_TRACES),
+    (StreamType::Metrics, STREAMS_CUT_METRICS),
+    (StreamType::Profiles, STREAMS_CUT_PROFILES),
+];
 
 /// Information about a stream where a service was discovered
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema, Eq)]
@@ -473,7 +490,7 @@ pub enum CardinalityClass {
 }
 
 /// Streams organized by type
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema, Default)]
 pub struct ServiceStreams {
     /// Log stream names
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -527,6 +544,50 @@ impl CardinalityClass {
             CardinalityClass::VeryLow | CardinalityClass::Low | CardinalityClass::Medium
         )
     }
+}
+
+/// What a Correlate caller may read; `Unrestricted` is a caller RBAC does not limit.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CorrelateAccess {
+    Unrestricted,
+    Restricted {
+        readable: HashSet<(StreamType, String)>,
+        org_wide_types: HashSet<StreamType>,
+    },
+}
+
+/// A row counts for the caller only when it reads every listed name and, for a cut list, the
+/// org-wide grant of that type also covers the names the cut dropped.
+pub fn row_counts(lists: &ServiceStreams, streams_cut: i16, access: &CorrelateAccess) -> bool {
+    let CorrelateAccess::Restricted {
+        readable,
+        org_wide_types,
+    } = access
+    else {
+        return true;
+    };
+    let typed = [
+        (StreamType::Logs, &lists.logs),
+        (StreamType::Traces, &lists.traces),
+        (StreamType::Metrics, &lists.metrics),
+        (StreamType::Profiles, &lists.profiles),
+    ];
+    let all_listed_readable = typed.iter().all(|(stream_type, names)| {
+        names
+            .iter()
+            .all(|name| readable.contains(&(*stream_type, name.clone())))
+    });
+    if !all_listed_readable {
+        return false;
+    }
+    if streams_cut == 0 {
+        return true;
+    }
+    streams_cut & STREAMS_CUT_OUTSIDE_FORM == 0
+        && STREAMS_CUT_TYPES
+            .iter()
+            .filter(|(_, bit)| streams_cut & bit != 0)
+            .all(|(stream_type, _)| org_wide_types.contains(stream_type))
 }
 
 #[cfg(test)]
@@ -1018,5 +1079,62 @@ mod tests {
             serde_json::to_string(&summary).unwrap(),
             r#"{"org_id":"o","total_dimensions":0,"by_cardinality":{},"recommended_priority_dimensions":[],"dimensions":[],"generated_at":1}"#
         );
+    }
+
+    fn restricted(readable: &[(StreamType, &str)], org_wide: &[StreamType]) -> CorrelateAccess {
+        CorrelateAccess::Restricted {
+            readable: readable
+                .iter()
+                .map(|(t, n)| (*t, (*n).to_string()))
+                .collect(),
+            org_wide_types: org_wide.iter().copied().collect(),
+        }
+    }
+
+    #[test]
+    fn a_row_counts_only_when_every_listed_name_and_its_cut_are_readable() {
+        let lists = ServiceStreams {
+            logs: vec!["app_a".to_string()],
+            profiles: vec!["prof_a".to_string()],
+            ..Default::default()
+        };
+        let both = [
+            (StreamType::Logs, "app_a"),
+            (StreamType::Profiles, "prof_a"),
+        ];
+        assert!(row_counts(
+            &lists,
+            STREAMS_CUT_ALL,
+            &CorrelateAccess::Unrestricted
+        ));
+        assert!(row_counts(&lists, 0, &restricted(&both, &[])));
+        assert!(
+            !row_counts(&lists, 0, &restricted(&both[..1], &[])),
+            "an unreadable profile stream drops the row"
+        );
+        assert!(!row_counts(
+            &lists,
+            STREAMS_CUT_LOGS,
+            &restricted(&both, &[])
+        ));
+        assert!(row_counts(
+            &lists,
+            STREAMS_CUT_LOGS,
+            &restricted(&both, &[StreamType::Logs])
+        ));
+        assert!(
+            !row_counts(
+                &lists,
+                STREAMS_CUT_LOGS | STREAMS_CUT_OUTSIDE_FORM,
+                &restricted(&both, &[StreamType::Logs])
+            ),
+            "no org-wide grant covers a cut name outside its form"
+        );
+        let every_type = STREAMS_CUT_TYPES.map(|(t, _)| t);
+        assert!(!row_counts(
+            &lists,
+            STREAMS_CUT_ALL,
+            &restricted(&both, &every_type)
+        ));
     }
 }

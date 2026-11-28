@@ -12737,6 +12737,7 @@
       "statusOpen": "Open",
       "statusAcknowledged": "Erkend",
       "statusResolved": "Opgelost",
+      "pagerTotal": "{count} incident | {count} incidenten",
       "correlationServiceDiscovery": "Ontdekking van diensten",
       "correlationPrimaryMatch": "Primaire overeenkomst",
       "correlationSecondaryMatch": "Secundaire overeenkomst",

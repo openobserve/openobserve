@@ -1249,11 +1249,12 @@ import {
   onMounted,
   onBeforeUnmount,
   onUnmounted,
+  nextTick,
 } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
-import { useRouter, useRoute } from "vue-router";
+import { useRouter, useRoute, type LocationQuery } from "vue-router";
 import incidentsService, {
   Incident,
   IncidentWithAlerts,
@@ -1266,6 +1267,7 @@ import { streamSchemaQuery } from "@/services/stream.queries";
 import { queryClient } from "@/composables/query/queryClient";
 import {
   incidentEventsQuery,
+  INCIDENT_EVENTS_POLL_MS,
   updateIncidentMutation,
   updateIncidentStatusMutation,
 } from "@/services/incidents.queries";
@@ -1537,10 +1539,12 @@ export default defineComponent({
       }),
     );
     const nowMicros = useNowMicros();
-    // One read with the Alert Graph's: both use the same query key.
+    // One read with the Alert Graph's and the Activity tab's: all use the same query key.
+    // A resolved incident still polls: comments and analyses keep landing after it.
     const incidentEvents = useQuery(() =>
       Object.assign(incidentEventsQuery(incidentOrgId.value, incidentDetails.value?.id ?? ""), {
         enabled: !!incidentOrgId.value && !!incidentDetails.value?.id,
+        refetchInterval: INCIDENT_EVENTS_POLL_MS,
       }),
     );
     const rcaIncidentEvents = computed(() => incidentEvents.data.value ?? null);
@@ -1963,6 +1967,55 @@ export default defineComponent({
       timelineRefreshTrigger.value++;
     });
 
+    // `tab` and `run` mirror the view so a reload or a shared link reopens it; `replace` keeps
+    // sub-state out of the back stack.
+    // `currentRoute` lags an in-flight replace, so each write merges into the last one asked for.
+    let requestedQuery: LocationQuery | null = null;
+    const requestedQueries = new Set<LocationQuery>();
+    const shownQuery = () => requestedQuery ?? router.currentRoute.value.query;
+    const replaceQuery = (changes: Record<string, string | null>) => {
+      const query: LocationQuery = { ...shownQuery() };
+      for (const [key, value] of Object.entries(changes)) {
+        if (value === null) delete query[key];
+        else query[key] = value;
+      }
+      requestedQuery = query;
+      requestedQueries.add(query);
+      void router.replace({ query }).finally(() => {
+        requestedQueries.delete(query);
+        if (requestedQuery === query) requestedQuery = null;
+      });
+    };
+    // A linked run waits for its own incident's run history; until then the URL keeps it.
+    let pendingRun: { incidentId: string; runId: string } | null = null;
+    const applyPendingRun = (incidentId: string) => {
+      const pending = pendingRun;
+      if (pending?.incidentId !== incidentId || incidentDetails.value?.id !== incidentId) return;
+      pendingRun = null;
+      viewRcaRun(pending.runId);
+      if (rcaViewedRun.value?.run_id !== pending.runId) {
+        viewRcaRun(null);
+        replaceQuery({ run: null });
+      }
+    };
+    watch(activeTab, (tab) => {
+      const linkedTab = shownQuery().tab;
+      if (typeof router.currentRoute.value.params.id !== "string") return;
+      if (linkedTab === tab || (linkedTab === undefined && tab === tabOrder.value[0])) return;
+      replaceQuery({ tab });
+    });
+    watch(
+      () => rcaViewedRun.value?.run_id ?? null,
+      (runId) => {
+        if (
+          pendingRun !== null ||
+          incidentDetails.value?.id !== router.currentRoute.value.params.id
+        )
+          return;
+        if ((shownQuery().run ?? null) !== runId) replaceQuery({ run: runId });
+      },
+    );
+
     // Dark mode via the single sanctioned JS seam
     const { isDark: isDarkMode } = useTheme();
 
@@ -2255,7 +2308,12 @@ export default defineComponent({
       return [];
     });
 
+    let detailRequest = 0;
     const loadDetails = async (incidentId: string) => {
+      if (router.currentRoute.value.params.id !== incidentId) return;
+      const request = ++detailRequest;
+      const isCurrent = () =>
+        request === detailRequest && router.currentRoute.value.params.id === incidentId;
       loading.value = true;
       licenseDenied.value = null;
 
@@ -2266,8 +2324,13 @@ export default defineComponent({
       try {
         const org = store.state.selectedOrganization.identifier;
         const response = await incidentsService.get(org, incidentId);
+        if (!isCurrent()) return;
 
         incidentDetails.value = response.data;
+        // After the flush, so the RCA state's reset for a new incident runs first.
+        void nextTick(() => {
+          if (isCurrent()) applyPendingRun(incidentId);
+        });
         void loadOnCallResponse(org, incidentId);
         triggers.value = response.data.triggers || [];
         // Composites have no `alerts` row, so the live-definition resolver
@@ -2282,51 +2345,73 @@ export default defineComponent({
         // Load semantic groups for display name mapping
         try {
           const semanticGroupsResponse = await serviceStreamsApi.getSemanticGroups(org);
-          semanticGroups.value = semanticGroupsResponse.data || [];
+          if (isCurrent()) semanticGroups.value = semanticGroupsResponse.data || [];
         } catch (semanticError) {
+          if (!isCurrent()) return;
           console.warn("Failed to load semantic groups:", semanticError);
           semanticGroups.value = [];
         }
       } catch (error) {
+        if (!isCurrent()) return;
         console.error("Failed to load incident details:", error);
+        if (pendingRun?.incidentId === incidentId) pendingRun = null;
         licenseDenied.value = licenseDeniedFeatures(error);
         toast({
           variant: "error",
           message: t("toastMessages.alerts.failedToLoadIncidentDetails"),
         });
       } finally {
-        loading.value = false;
+        if (isCurrent()) loading.value = false;
       }
     };
 
-    // Watch for URL route parameter
     watch(
-      () => router.currentRoute.value.params.id,
-      (incidentIdFromUrl) => {
-        if (incidentIdFromUrl && typeof incidentIdFromUrl === "string") {
-          // Load incident from URL route parameter
-          // Validate incident ID format (e.g., UUID validation)
-          if (incidentIdFromUrl.trim().length > 0) {
-            // `?tab=<tab>` opens the page on that tab (`incidentAnalysis` from the list's AI analysis cell).
-            // The key is consumed once: dropping it keeps a later reload on the tab the user chose.
-            const { tab, ...restQuery } = router.currentRoute.value.query;
-            if (tab !== undefined) {
-              if (isIncidentTab(tab)) {
-                activeTab.value = tab;
-              }
-              void router.replace({ query: restQuery });
-            }
-            loadDetails(incidentIdFromUrl);
-          } else {
+      [
+        () => router.currentRoute.value.params.id,
+        () => router.currentRoute.value.query.tab,
+        () => router.currentRoute.value.query.run,
+      ],
+      ([incidentId, tab, run], [previousId, previousTab, previousRun]) => {
+        const changedIncident = incidentId !== previousId;
+        // An intermediate replace may land while a newer drawer write is still in flight.
+        if (
+          !changedIncident &&
+          [...requestedQueries].some((query) => query.tab === tab && query.run === run)
+        ) {
+          return;
+        }
+        requestedQuery = null;
+        requestedQueries.clear();
+        if (typeof incidentId !== "string" || !incidentId.trim()) {
+          if (typeof incidentId === "string" && incidentId)
             console.warn("Invalid incident ID in URL");
-            correlationData.value = null;
-            correlationError.value = null;
-          }
-        } else {
-          // Clear correlation data when drawer closes
+          pendingRun = null;
+          loading.value = false;
           correlationData.value = null;
           correlationError.value = null;
+          return;
         }
+
+        const changes: Record<string, string | null> = {};
+        if (changedIncident || tab !== previousTab) {
+          if (isIncidentTab(tab)) activeTab.value = tab;
+          else if (changedIncident && activeTab.value !== tabOrder.value[0]) {
+            changes.tab = activeTab.value;
+          } else {
+            activeTab.value = tabOrder.value[0];
+            if (tab !== undefined) changes.tab = null;
+          }
+        }
+        if (changedIncident || run !== previousRun) {
+          pendingRun = typeof run === "string" && run !== "" ? { incidentId, runId: run } : null;
+          if (pendingRun === null) {
+            if (run !== undefined) changes.run = null;
+            if (!changedIncident) viewRcaRun(null);
+          }
+        }
+        if (Object.keys(changes).length > 0) replaceQuery(changes);
+        if (changedIncident) void loadDetails(incidentId);
+        else applyPendingRun(incidentId);
       },
       { immediate: true },
     );
@@ -2361,12 +2446,12 @@ export default defineComponent({
       contextRegistry.setActive("");
       contextRegistry.unregister("incidents");
 
-      // Navigate back to incident list, carrying over this route's own query (e.g. page)
-      // instead of dropping it. `tab` never reaches here: the load consumes it.
+      // Back to the list with this route's own query (e.g. page); `tab` and `run` belong to the detail.
+      const { tab: _tab, run: _run, ...listQuery } = route.query;
       router.push({
         name: "incidentList",
         query: {
-          ...route.query,
+          ...listQuery,
           org_identifier: store.state.selectedOrganization.identifier,
         },
       });

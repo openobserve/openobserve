@@ -243,24 +243,20 @@ pub async fn range(
     grid: ArmGrid,
     local: bool,
 ) -> Result<Value, anyhow::Error> {
-    let req = request(query, grid);
-    #[cfg(not(feature = "enterprise"))]
-    let is_super_cluster = false;
-    #[cfg(feature = "enterprise")]
-    let is_super_cluster = !local
-        && o2_enterprise::enterprise::common::config::get_config()
-            .super_cluster
-            .enabled;
-    #[cfg(not(feature = "enterprise"))]
-    let _ = local;
+    let is_super_cluster = federated(local);
     let key = (org.to_string(), query.to_string(), grid, is_super_cluster);
     settled_read(key, config::utils::time::now_micros(), || async {
-        let trace_id = config::ider::generate_trace_id();
-        let resp =
-            promql_service::search::search(&trace_id, org, &req, "", 0, is_super_cluster).await?;
-        complete(resp, grid.end)
+        fetch_range(org, request(query, grid), grid, is_super_cluster).await
     })
     .await
+}
+
+#[cfg(feature = "enterprise")]
+/// Completion reads need raw samples with their original timestamps and values.
+pub(crate) async fn range_uncached(org: &str, query: &str, grid: ArmGrid) -> anyhow::Result<Value> {
+    let mut req = request(query, grid);
+    req.use_cache = Some(false);
+    fetch_range(org, req, grid, federated(false)).await
 }
 
 /// The service-signal writer refuses a window ending at or before this: past the catch-up backlog.
@@ -272,6 +268,31 @@ pub fn writable_after(now: i64) -> i64 {
 pub(super) fn settled_before(now: i64) -> i64 {
     let ingest = config::get_config().limit.grpc_ingest_timeout as i64 * SECOND_MICRO_SECS;
     writable_after(now) - SETTLE_MARGIN_MICROS - ingest
+}
+
+fn federated(local: bool) -> bool {
+    #[cfg(not(feature = "enterprise"))]
+    let is_super_cluster = false;
+    #[cfg(feature = "enterprise")]
+    let is_super_cluster = !local
+        && o2_enterprise::enterprise::common::config::get_config()
+            .super_cluster
+            .enabled;
+    #[cfg(not(feature = "enterprise"))]
+    let _ = local;
+    is_super_cluster
+}
+
+async fn fetch_range(
+    org: &str,
+    req: promql_service::MetricsQueryRequest,
+    grid: ArmGrid,
+    is_super_cluster: bool,
+) -> anyhow::Result<Value> {
+    let trace_id = config::ider::generate_trace_id();
+    let resp =
+        promql_service::search::search(&trace_id, org, &req, "", 0, is_super_cluster).await?;
+    complete(resp, grid.end)
 }
 
 /// The value of a response, trimmed to the arm; a warning means a node failed or series were cut.

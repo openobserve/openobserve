@@ -13,14 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use migration::Migrator;
-#[cfg(any(test, feature = "test-utils"))]
-pub use migration::create_fleet_collectors_for_test;
-use sea_orm::DatabaseConnection;
-use sea_orm_migration::{MigratorTrait, SchemaManager};
-
-use crate::{db::get_orm_client_ddl, dist_lock};
-
 pub mod ai_access_requests;
 pub mod ai_actions;
 pub mod ai_approvals;
@@ -74,9 +66,12 @@ pub mod fleet_tokens;
 pub mod fleets;
 pub mod folders;
 pub mod gen_ai_agents;
+pub mod incident_contexts;
+pub mod incident_declare_keys;
 pub mod incident_events;
 pub mod incident_integrations;
 pub mod incident_membership;
+pub mod incident_recovery_checks;
 pub mod kv_store;
 pub mod llm_eval;
 pub mod llm_prompts;
@@ -112,7 +107,11 @@ pub mod providers;
 pub mod public_dashboards;
 pub mod query_history;
 pub mod ratelimit;
+pub mod rca_delivery_obligations;
+pub mod rca_feedback;
+pub mod rca_fence;
 pub mod rca_runs;
+pub mod rca_skipped_pages;
 pub mod rca_steering;
 pub mod re_pattern;
 pub mod re_pattern_stream_map;
@@ -172,6 +171,26 @@ pub mod users;
 pub mod workflow_http_trigger_requests;
 pub mod workflow_http_triggers;
 pub mod workflows;
+
+use migration::Migrator;
+#[cfg(any(test, feature = "test-utils"))]
+pub use migration::{
+    create_fleet_collectors_for_test, create_incident_recovery_checks_for_test,
+    create_rca_feedback_for_test, sqlite_and_postgres_for_test,
+};
+use sea_orm::DatabaseConnection;
+use sea_orm_migration::{MigratorTrait, SchemaManager};
+
+use crate::{db::get_orm_client_ddl, dist_lock};
+
+#[macro_export]
+macro_rules! orm_err {
+    ($e:expr) => {
+        Err($crate::errors::Error::DbError(
+            $crate::errors::DbError::SeaORMError($e.to_string()),
+        ))
+    };
+}
 
 // local mode skips the dist lock, and tests in one process migrate from many threads at once
 static MIGRATION_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
@@ -345,18 +364,9 @@ pub(crate) fn convert_failing_on_unreadable<M, T, E: std::fmt::Display>(
         .collect()
 }
 
-/// `value` cut to `max_chars` characters, so a row never fails a Postgres/MySQL column width.
+/// Column limits count characters.
 pub(crate) fn fit(value: &str, max_chars: usize) -> String {
     value.chars().take(max_chars).collect()
-}
-
-#[macro_export]
-macro_rules! orm_err {
-    ($e:expr) => {
-        Err($crate::errors::Error::DbError(
-            $crate::errors::DbError::SeaORMError($e.to_string()),
-        ))
-    };
 }
 
 #[cfg(test)]

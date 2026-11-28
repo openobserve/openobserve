@@ -91,11 +91,20 @@ pub(crate) async fn process_msg(msg: IncidentMessage) -> Result<()> {
             org_id,
             incident_id,
             status,
+            resolved_by,
         } => {
             log::debug!(
                 "[SUPER_CLUSTER:incidents] Update status org={org_id} id={incident_id} status={status}"
             );
-            alert_incidents::update_status(&org_id, &incident_id, &status).await?;
+            let conn = infra::db::get_orm_client_rw().await;
+            alert_incidents::update_status_by_with(
+                conn,
+                &org_id,
+                &incident_id,
+                &status,
+                resolved_by.as_deref(),
+            )
+            .await?;
         }
         IncidentMessage::AddAlert {
             org_id,
@@ -239,6 +248,31 @@ mod tests {
             resolved_at: RECOVERED,
             onset,
         }
+    }
+
+    #[tokio::test]
+    async fn replicated_status_preserves_the_resolver_and_accepts_an_older_message() {
+        meta_store().await;
+        let org = format!("replica-resolver-{}", config::ider::uuid());
+        let id = incident_with_a_later_firing(&org).await;
+        let newer = IncidentMessage::UpdateStatus {
+            org_id: org.clone(),
+            incident_id: id.clone(),
+            status: "resolved".to_string(),
+            resolved_by: Some("ana@o2.ai".to_string()),
+        };
+        process_msg(newer).await.unwrap();
+        let actual = alert_incidents::get_rw(&org, &id).await.unwrap().unwrap();
+        assert_eq!(actual.resolved_by.as_deref(), Some("ana@o2.ai"));
+        let older: IncidentMessage = serde_json::from_value(serde_json::json!({
+            "UpdateStatus": {
+                "org_id": org, "incident_id": id, "status": "resolved"
+            }
+        }))
+        .unwrap();
+        process_msg(older).await.unwrap();
+        let actual = alert_incidents::get_rw(&org, &id).await.unwrap().unwrap();
+        assert_eq!(actual.resolved_by.as_deref(), Some("ana@o2.ai"));
     }
 
     #[tokio::test]

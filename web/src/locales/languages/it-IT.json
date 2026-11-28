@@ -12737,6 +12737,7 @@
       "statusOpen": "Aperto",
       "statusAcknowledged": "Preso in carico",
       "statusResolved": "Risolto",
+      "pagerTotal": "{count} incidente | {count} incidenti",
       "correlationServiceDiscovery": "Scoperta dei servizi",
       "correlationPrimaryMatch": "Corrispondenza primaria",
       "correlationSecondaryMatch": "Corrispondenza secondaria",

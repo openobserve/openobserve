@@ -131,6 +131,35 @@ pub async fn get<C: ConnectionTrait>(
     Ok(row)
 }
 
+pub async fn previous_image_deploy<C: ConnectionTrait>(
+    conn: &C,
+    transition: &Model,
+) -> Result<Option<Model>, errors::Error> {
+    let (Some(version_key), Some(version), Some(image)) = (
+        transition.from_version_key.as_deref(),
+        transition.from_version.as_deref(),
+        transition.from_image.as_deref(),
+    ) else {
+        return Ok(None);
+    };
+    let row = Entity::find()
+        .filter(Column::OrgId.eq(&transition.org_id))
+        .filter(Column::ScopeKey.eq(&transition.scope_key))
+        .filter(Column::Cluster.eq(&transition.cluster))
+        .filter(Column::ToVersionKey.eq(version_key))
+        .filter(Column::ToVersion.eq(version))
+        .filter(Column::ToImage.eq(image))
+        .filter(Column::At.lt(transition.at))
+        .order_by_desc(Column::At)
+        .order_by_asc(Column::DeployKey)
+        .one(conn)
+        .await?;
+    if let Some(row) = &row {
+        validate(row)?;
+    }
+    Ok(row)
+}
+
 pub async fn history<C: ConnectionTrait>(
     conn: &C,
     org_id: &str,

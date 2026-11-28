@@ -515,6 +515,8 @@ async fn init_enterprise() -> Result<(), anyhow::Error> {
         o2_enterprise::enterprise::super_cluster::kv::init().await?;
         super_cluster_queue::init().await?;
     }
+    // Read once here so a super-cluster override of the switch is logged at startup.
+    meta::incidents_v2::incidents_v2_enabled();
 
     // Initialize enterprise AI components (agent and evaluation clients).
     if let Err(e) = o2_enterprise::enterprise::ai::init_ai_components() {

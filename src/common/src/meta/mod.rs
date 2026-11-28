@@ -16,6 +16,7 @@
 pub mod authz;
 pub mod grpc;
 pub mod http;
+pub mod incidents_v2;
 pub mod ingest_rejections;
 pub mod ingestion_routes;
 pub mod loki;

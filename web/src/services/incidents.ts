@@ -751,7 +751,39 @@ export interface UpdateSeverityResponse extends Incident {
 export interface ListIncidentsResponse {
   incidents: Incident[];
   total: number;
+  /** Counted over every filter except `severity`. */
+  counts_by_severity?: Record<"P1" | "P2" | "P3" | "P4", number>;
+  /** Absent on the last page. */
+  next_cursor?: string | null;
 }
+
+/** One page of the incident list; every filter runs on the server. */
+export interface IncidentListParams {
+  /** Comma list; `active` is open and acknowledged. */
+  status?: string;
+  severity?: string[];
+  assignedTo?: "me";
+  service?: string;
+  q?: string;
+  /** Bounds on `first_alert_at`, in microseconds. */
+  startTime?: number;
+  endTime?: number;
+  /** `column:desc|asc`. */
+  sort?: string;
+  cursor?: string;
+  limit: number;
+}
+
+/** The sort a list cursor was read under, or undefined when it is not a server cursor. */
+export const cursorSort = (cursor: string): string | undefined => {
+  try {
+    const json = atob(cursor.replace(/-/g, "+").replace(/_/g, "/").replace(/\./g, "="));
+    const sort = JSON.parse(json)?.s;
+    return typeof sort === "string" ? sort : undefined;
+  } catch {
+    return undefined;
+  }
+};
 
 export interface IncidentStats {
   total_incidents: number;
@@ -861,6 +893,27 @@ const incidents = {
     return http().get<ListIncidentsResponse>(url);
   },
 
+  listPage: (org_identifier: string, params: IncidentListParams) => {
+    const query = new URLSearchParams({ limit: String(params.limit) });
+    const optional: [string, string | number | undefined][] = [
+      ["status", params.status],
+      ["severity", params.severity?.join(",") || undefined],
+      ["assigned_to", params.assignedTo],
+      ["service", params.service],
+      ["q", params.q],
+      ["start_time", params.startTime],
+      ["end_time", params.endTime],
+      ["sort", params.sort],
+      ["cursor", params.cursor],
+    ];
+    for (const [key, value] of optional) {
+      if (value !== undefined && value !== "") query.set(key, String(value));
+    }
+    return http().get<ListIncidentsResponse>(
+      `/api/v2/${org_identifier}/alerts/incidents?${query.toString()}`,
+    );
+  },
+
   /**
    * Get incident details with all correlated alerts
    */
@@ -919,7 +972,7 @@ const incidents = {
   updateIncident: (
     org_identifier: string,
     incident_id: string,
-    updates: { title?: string; severity?: string },
+    updates: { title?: string; severity?: string; assigned_to?: string },
   ) => {
     return http()
       .patch<Incident | UpdateSeverityResponse>(
@@ -1156,10 +1209,15 @@ const incidents = {
   },
 
   /**
-   * Get event timeline for an incident
+   * Get event timeline for an incident; with `seq`, an unchanged timeline answers 304 and no body.
    */
-  getEvents: (org_identifier: string, incident_id: string) => {
-    return http().get(`/api/v2/${org_identifier}/alerts/incidents/${incident_id}/events`);
+  getEvents: (org_identifier: string, incident_id: string, seq?: number) => {
+    const url = `/api/v2/${org_identifier}/alerts/incidents/${incident_id}/events`;
+    if (seq === undefined) return http().get(url);
+    return http().get(url, {
+      headers: { "If-None-Match": `"${seq}"` },
+      validateStatus: (status: number) => (status >= 200 && status < 300) || status === 304,
+    });
   },
 
   /**

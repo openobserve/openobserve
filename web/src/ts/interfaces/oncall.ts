@@ -128,7 +128,8 @@ export type ResponseEventKind =
    * "This was dampened" is the one thing a smoothed record must not hide — the
    * responder has to see that the condition came back and nobody was woken.
    */
-  | "flapped";
+  | "flapped"
+  | "promotion_owed";
 
 /**
  * Why this team was paged. The owner fixes the thing; an impacted team contains

@@ -171,6 +171,7 @@ mod tests {
                 ("service".to_string(), "service_name".to_string()),
                 ("host".to_string(), "hostname".to_string()),
             ]),
+            streams_cut: 0,
         }
     }
 

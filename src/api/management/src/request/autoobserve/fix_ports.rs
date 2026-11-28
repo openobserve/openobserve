@@ -114,7 +114,7 @@ impl FixPort for LiveFixPort {
             all_groups: true,
             ..Default::default()
         };
-        match mute::mute(&target, &req, actor, mute_source(via)).await {
+        match mute::mute(&target, &req, &ack::Caller::person(actor), mute_source(via)).await {
             Ok(done) => Ok(MuteAnswer::Done(MuteRow {
                 downtime_id: done.downtime_id,
                 version: done.version,
@@ -162,7 +162,15 @@ impl FixPort for LiveFixPort {
             claim_epoch: ev.claim_epoch,
             margin_us: UNMUTE_MARGIN_US,
         });
-        match mute::unmute(&target, downtime_id, Some(version), actor, idle).await {
+        match mute::unmute(
+            &target,
+            downtime_id,
+            Some(version),
+            &ack::Caller::person(actor),
+            idle,
+        )
+        .await
+        {
             Ok(row) => Ok(MuteAnswer::Done(mute_row(&row))),
             Err(e) => mute_answer(e),
         }
@@ -290,7 +298,10 @@ pub async fn may_snooze(org_id: &str, user_id: &str, alert_id: &str) -> Permissi
     let Ok(target) = ack::resolve_target(org_id, alert_id).await else {
         return Permission::Denied(RefusalReason::Folder);
     };
-    if ack::authorize(&target, user_id, Act::Mute).await.is_err() {
+    if ack::authorize(&target, &ack::Caller::person(user_id), Act::Mute)
+        .await
+        .is_err()
+    {
         return Permission::Denied(RefusalReason::Folder);
     }
     security_permission(org_id, user_id, alert_id).await
@@ -567,6 +578,7 @@ mod tests {
             security_case: false,
             historical: false,
             last_detection_at: None,
+            ..Default::default()
         }
     }
 

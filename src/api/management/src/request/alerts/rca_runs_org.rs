@@ -293,6 +293,8 @@ mod tests {
             pending_question_id: None,
             questions_asked: 0,
             deadline_closed_at: None,
+            run_number: Some(1),
+            fenced: false,
         }
     }
 

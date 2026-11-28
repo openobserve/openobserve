@@ -20,11 +20,11 @@ use common::infra::config::ORG_INGESTION_TOKENS;
 use config::{
     META_ORG_ID, get_config,
     meta::{
-        alerts::alert_calibration::DIGEST_STREAM,
+        alerts::{alert_calibration::DIGEST_STREAM, change_events::CHANGE_EVENTS_STREAM},
         autoobserve::AUTOOBSERVE_STREAM_PREFIX,
         autoresolve::AUTORESOLVE_RUNS_STREAM,
         service_identity::SERVICE_SIGNALS_STREAM_PREFIX,
-        stream::{SESSION_REPLAY_RESOURCES_STREAM, StreamType},
+        stream::{SESSION_REPLAY_RESOURCES_STREAM, StreamSettings, StreamType},
     },
     utils::base64,
 };
@@ -69,15 +69,17 @@ pub enum FeatureWriter {
     AutoObserve,
     ServiceSignals,
     SessionReplay,
+    ChangeEvents,
 }
 
 impl FeatureWriter {
-    pub const ALL: [Self; 5] = [
+    pub const ALL: [Self; 6] = [
         Self::AlertCalibration,
         Self::AutoResolve,
         Self::AutoObserve,
         Self::ServiceSignals,
         Self::SessionReplay,
+        Self::ChangeEvents,
     ];
 
     pub fn from_token_name(name: &str) -> Option<Self> {
@@ -91,6 +93,7 @@ impl FeatureWriter {
             Self::AutoObserve => "_o2_autoobserve",
             Self::ServiceSignals => "_o2_service_signals",
             Self::SessionReplay => "_o2_sessionreplay_resources",
+            Self::ChangeEvents => "_o2_change_events",
         }
     }
 
@@ -100,7 +103,8 @@ impl FeatureWriter {
             Self::AlertCalibration
             | Self::AutoResolve
             | Self::ServiceSignals
-            | Self::SessionReplay => org,
+            | Self::SessionReplay
+            | Self::ChangeEvents => org,
             Self::AutoObserve => META_ORG_ID,
         }
     }
@@ -112,6 +116,7 @@ impl FeatureWriter {
             Self::AutoObserve => stream.starts_with(AUTOOBSERVE_STREAM_PREFIX),
             Self::ServiceSignals => stream.starts_with(SERVICE_SIGNALS_STREAM_PREFIX),
             Self::SessionReplay => stream == SESSION_REPLAY_RESOURCES_STREAM,
+            Self::ChangeEvents => stream == CHANGE_EVENTS_STREAM,
         }
     }
 
@@ -121,7 +126,8 @@ impl FeatureWriter {
             Self::AlertCalibration
             | Self::AutoResolve
             | Self::AutoObserve
-            | Self::SessionReplay => &[StreamType::Logs],
+            | Self::SessionReplay
+            | Self::ChangeEvents => &[StreamType::Logs],
             Self::ServiceSignals => &[StreamType::Logs, StreamType::Metrics],
         }
     }
@@ -130,7 +136,9 @@ impl FeatureWriter {
     /// unbilled.
     pub fn ingestion_type(self) -> cluster_rpc::IngestionType {
         match self {
-            Self::AlertCalibration | Self::ServiceSignals => cluster_rpc::IngestionType::Json,
+            Self::AlertCalibration | Self::ServiceSignals | Self::ChangeEvents => {
+                cluster_rpc::IngestionType::Json
+            }
             Self::AutoResolve | Self::AutoObserve | Self::SessionReplay => {
                 cluster_rpc::IngestionType::Usage
             }
@@ -144,6 +152,7 @@ impl FeatureWriter {
             Self::AutoObserve => SystemJobType::AutoObserve,
             Self::ServiceSignals => SystemJobType::ServiceSignals,
             Self::SessionReplay => SystemJobType::SessionReplay,
+            Self::ChangeEvents => SystemJobType::ChangeEvents,
         }
     }
 
@@ -172,6 +181,7 @@ impl FeatureWriter {
             Self::AutoObserve => "AutoObserve",
             Self::ServiceSignals => "Service Versions",
             Self::SessionReplay => "Session Replay",
+            Self::ChangeEvents => "Change Events",
         }
     }
 
@@ -379,6 +389,16 @@ pub async fn confirm(
     Ok(live)
 }
 
+/// D239: a new stream gets its retention while the operator has not set one.
+pub fn seed_retention_settings(settings: &mut StreamSettings, days: i64, default: i64) -> bool {
+    if settings.data_retention == 0 || settings.data_retention == default {
+        let changed = settings.data_retention != days;
+        settings.data_retention = days;
+        return changed;
+    }
+    false
+}
+
 fn usable(
     writer: FeatureWriter,
     row: &OrgIngestionTokenRecord,
@@ -529,6 +549,16 @@ pub(crate) mod tests {
         assert!(AutoResolve.allows(AUTORESOLVE_RUNS_STREAM));
         assert!(!AutoResolve.allows("_o2_ai_chat_events"));
         assert_eq!(AutoResolve.stream_types(), &[StreamType::Logs]);
+        assert!(ChangeEvents.allows(CHANGE_EVENTS_STREAM));
+        assert!(!ChangeEvents.allows("_o2_change_events_x"));
+        assert!(!ChangeEvents.allows(DIGEST_STREAM));
+        assert!(!AlertCalibration.allows(CHANGE_EVENTS_STREAM));
+        assert_eq!(ChangeEvents.token_org("demo-org"), "demo-org");
+        assert_eq!(ChangeEvents.stream_types(), &[StreamType::Logs]);
+        assert_eq!(
+            ChangeEvents.ingestion_type(),
+            cluster_rpc::IngestionType::Json
+        );
         assert_eq!(SessionReplay.token_org("demo-org"), "demo-org");
         assert_eq!(SessionReplay.stream_types(), &[StreamType::Logs]);
         assert_eq!(
@@ -549,6 +579,19 @@ pub(crate) mod tests {
         }
         assert_eq!(FeatureWriter::from_token_name("ci-collector"), None);
         assert_eq!(FeatureWriter::from_token_name("_o2_x"), None);
+    }
+
+    #[test]
+    fn retention_is_seeded_only_while_the_operator_kept_the_default() {
+        let mut settings = StreamSettings::default();
+        assert!(seed_retention_settings(&mut settings, 90, 3650));
+        assert_eq!(settings.data_retention, 90);
+        settings.data_retention = 3650;
+        assert!(seed_retention_settings(&mut settings, 30, 3650));
+        assert_eq!(settings.data_retention, 30);
+        settings.data_retention = 12;
+        assert!(!seed_retention_settings(&mut settings, 30, 3650));
+        assert_eq!(settings.data_retention, 12);
     }
 
     #[tokio::test]

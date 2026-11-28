@@ -21,4 +21,6 @@ pub mod access;
 #[cfg(feature = "enterprise")]
 pub mod api;
 #[cfg(feature = "enterprise")]
+pub mod correlate_scope;
+#[cfg(feature = "enterprise")]
 pub mod display_feed;

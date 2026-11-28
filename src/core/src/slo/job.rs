@@ -1175,6 +1175,18 @@ pub fn trailing_rollup_sql(
     to: i64,
     tombstones: bool,
 ) -> String {
+    trailing_slices_sql(slo_id, generation, from, to, tombstones, false)
+}
+
+pub(crate) fn trailing_slices_sql(
+    slo_id: &str,
+    generation: i32,
+    from: i64,
+    to: i64,
+    tombstones: bool,
+    grouped: bool,
+) -> String {
+    let group_comparison = if grouped { "<>" } else { "=" };
     let (columns, measured) = if tombstones {
         (
             ", corrected_by",
@@ -1184,13 +1196,13 @@ pub fn trailing_rollup_sql(
         ("", String::new())
     };
     format!(
-        "SELECT slice_start, good, total FROM ( \
-           SELECT slice_start, good, total{columns}, \
-                  ROW_NUMBER() OVER (PARTITION BY slice_start ORDER BY rev DESC) AS zo_rn \
+        "SELECT slice_start, good, total, group_key FROM ( \
+           SELECT slice_start, good, total, group_key{columns}, \
+                  ROW_NUMBER() OVER (PARTITION BY slice_start, group_key ORDER BY rev DESC) AS zo_rn \
            FROM {SLO_SLICES_STREAM} \
            WHERE slo_id = '{slo_id}' \
              AND definition_generation = {generation} \
-             AND group_key = '' \
+             AND group_key {group_comparison} '' \
              AND slice_start >= {from} AND slice_start < {to} \
          ) WHERE zo_rn = 1{measured}"
     )

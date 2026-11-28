@@ -336,6 +336,7 @@ async fn process_org_window_body(
             db::service_versions::flush_org(org).await?;
         }
     }
+    super::writer::write_detector_completion(org, start, end, ownership).await?;
     Ok((out, ring))
 }
 

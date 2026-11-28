@@ -132,7 +132,7 @@ pub async fn get_dimension_analytics(
         ("org_id" = String, Path, description = "Organization ID")
     ),
     responses(
-        (status = 200, description = "List of discovered services. When RBAC is enforced, a non-admin caller gets only the services with a stream they can read, each listing only those streams"),
+        (status = 200, description = "List of discovered services. When RBAC is enforced, a non-admin caller gets only the services with a stream they can read, each listing only those streams. A row's streams_cut holds the lists a cap may have cut: 1 logs, 2 traces, 4 metrics, 8 profiles, 16 a cut name outside the org-wide grant form"),
         (status = 401, description = "Unauthorized"),
         (status = 403, description = "Forbidden - Enterprise feature, or no service_streams permission"),
         (status = 500, description = "Internal server error")
@@ -259,7 +259,8 @@ pub async fn list_services(
 /// - Which dimensions were used for matching (minimal set)
 /// - Which dimensions are available for additional filtering
 /// - The related streams (logs/traces/metrics/profiles) the caller can read, with their dimension
-///   requirements; with RBAC enforced, a non-admin caller may get empty lists for a matched service
+///   requirements; with RBAC enforced, a non-admin caller gets `null` unless it reads every stream
+///   of a matched row
 #[utoipa::path(
     post,
     path = "/{org_id}/service_streams/_correlate",
@@ -274,10 +275,10 @@ pub async fn list_services(
         description = "Correlation request parameters"
     ),
     responses(
-        (status = 200, description = "Correlation results", body = CorrelationResponse),
+        (status = 200, description = "Correlation results, or null when no service matches. With RBAC enforced, a row the caller cannot fully read is left out, so such a caller may get null", body = CorrelationResponse),
         (status = 400, description = "Bad request"),
         (status = 401, description = "Unauthorized - Authentication required"),
-        (status = 403, description = "Forbidden - Enterprise feature, or no service_streams permission"),
+        (status = 403, description = "Forbidden - Enterprise feature, no service_streams permission, or source_stream names a stream of the org the caller cannot read"),
         (status = 404, description = "No matching service found"),
         (status = 500, description = "Internal server error")
     ),
@@ -285,7 +286,7 @@ pub async fn list_services(
         ("Authorization" = [])
     ),
     extensions(
-        ("x-o2-mcp" = json!({"enabled": false})),
+        ("x-o2-mcp" = json!({"enabled": true, "description": "Find the logs, metrics and traces streams of one service", "category": "service_streams"})),
         ("x-o2-ratelimit" = json!({"module": "Service Streams", "operation": "create"}))
     )
 )]
@@ -306,6 +307,22 @@ pub async fn correlate_streams(
             true,
             false,
             false,
+        )
+        .await
+        {
+            return MetaHttpResponse::forbidden("Unauthorized Access");
+        }
+        // Correlate answers from the source record, so a caller who cannot read it learns nothing.
+        let checker = openobserve_core::authz::active_checker();
+        if !openobserve_core::authz::may_correlate_from(
+            checker.as_ref(),
+            &user_email.user_id,
+            &org_id,
+            &req.source_stream,
+            &req.source_type,
+            |source| async move {
+                infra::schema::exists(&source.org_id, source.stream_type, &source.name).await
+            },
         )
         .await
         {
@@ -357,7 +374,6 @@ pub async fn correlate_streams(
                 // guess which resolved stream (and field aliases) the source maps to.
                 response.source_stream = Some(req.source_stream.clone());
                 response.source_type = Some(req.source_type.clone());
-                let checker = openobserve_core::authz::active_checker();
                 let (org, user) = (org_id.as_str(), user_email.user_id.as_str());
                 let readable = move |streams: config::meta::service_streams::RelatedStreams| async move {
                     openobserve_core::authz::readable_related_streams(
@@ -809,13 +825,14 @@ async fn correlate_record(
     identity_config: &config::meta::correlation::ServiceIdentityConfig,
     semantic_groups: &[config::meta::correlation::FieldAlias],
 ) -> anyhow::Result<Option<config::meta::service_streams::CorrelationResponse>> {
-    use o2_enterprise::enterprise::service_streams::storage::correlate;
-    use openobserve_core::service_identity::signals::record_services::{
-        Reader, Spans, correlate_from_source, window,
+    use openobserve_core::service_identity::{
+        correlate_scope::correlate_for,
+        signals::record_services::{Reader, Spans, correlate_from_source, window},
     };
     let dims = &req.available_dimensions;
     if !req.resolve_from_source {
-        return correlate(org_id, dims, identity_config, semantic_groups, None).await;
+        let reader = Reader::User(user_id);
+        return correlate_for(org_id, reader, dims, identity_config, semantic_groups, None).await;
     }
     let now = config::utils::time::now_micros();
     correlate_from_source(
@@ -1242,6 +1259,7 @@ mod tests {
             profiles_streams: serde_json::json!([]),
             field_name_mapping: None,
             last_seen: 0,
+            streams_cut: 0,
         };
         let row = serde_json::to_value(ServiceRow {
             record,
@@ -1271,6 +1289,7 @@ mod tests {
                     profiles_streams: serde_json::json!([]),
                     field_name_mapping: None,
                     last_seen: 1,
+                    streams_cut: 0,
                 }
             };
         let none = serde_json::json!([]);

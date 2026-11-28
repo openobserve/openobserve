@@ -139,6 +139,18 @@ pub async fn generation_reset_time(
         .and_then(|m| m.generation_reset_time))
 }
 
+pub async fn generation_reset_time_for(
+    db: &DatabaseConnection,
+    slo: &Slo,
+) -> Result<Option<i64>, Error> {
+    Ok(slos::Entity::find_by_id(slo.id.clone())
+        .filter(slos::Column::Org.eq(&slo.org))
+        .filter(slos::Column::DefinitionGeneration.eq(slo.definition_generation))
+        .one(db)
+        .await?
+        .and_then(|m| m.generation_reset_time))
+}
+
 pub async fn count_in_org(db: &DatabaseConnection, org: &str) -> Result<u64, Error> {
     Ok(slos::Entity::find()
         .filter(slos::Column::Org.eq(org))

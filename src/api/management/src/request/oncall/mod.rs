@@ -621,6 +621,14 @@ fn internal_error(context: &str, e: &impl std::fmt::Display) -> Response {
 #[cfg(feature = "enterprise")]
 fn to_response(e: anyhow::Error) -> Response {
     use o2_enterprise::enterprise::oncall::service::OncallError;
+
+    if let Some(conflict) = e
+        .chain()
+        .find_map(|cause| cause.downcast_ref::<infra::table::oncall_responses::ResponseConflict>())
+    {
+        return MetaHttpResponse::error(StatusCode::CONFLICT.as_u16(), conflict.to_string())
+            .into_response();
+    }
     let status = match e.downcast_ref::<OncallError>() {
         Some(OncallError::TeamNotFound(_))
         | Some(OncallError::MemberNotFound { .. })
@@ -695,33 +703,17 @@ fn refusal_response(
     (status, axum::Json(body)).into_response()
 }
 
-/// The one rule on a page action (D26); the page alone once its alert is gone.
-#[cfg(feature = "enterprise")]
-async fn page_problem(
-    org_id: &str,
-    response_id: &str,
-    actor: &str,
-) -> Result<Option<openobserve_core::alerts::ack::Problem>, Response> {
-    page_problem_for(
-        org_id,
-        response_id,
-        actor,
-        openobserve_core::alerts::ack::Act::Ack,
-    )
-    .await
-}
-
-/// [`page_problem`] for an ack verb, so that a refusal names the verb refused.
+/// Route refusals use the action's verb so the caller knows which action was denied.
 #[cfg(feature = "enterprise")]
 async fn page_problem_for(
     org_id: &str,
     response_id: &str,
-    actor: &str,
+    caller: &openobserve_core::alerts::ack::Caller,
     act: openobserve_core::alerts::ack::Act,
 ) -> Result<Option<openobserve_core::alerts::ack::Problem>, Response> {
     use openobserve_core::alerts::ack::AckError;
 
-    page_problem_of(org_id, response_id, actor, act)
+    page_problem_of(org_id, response_id, caller, act)
         .await
         .map_err(|e| match e {
             AckError::NotFound => MetaHttpResponse::not_found("Response not found"),
@@ -729,24 +721,24 @@ async fn page_problem_for(
         })
 }
 
-/// [`page_problem`] with a typed error: `Refused`, `NotFound` (no such page) or `Internal`.
+/// Authorize the page on its own when its source alert is gone, per D26.
 #[cfg(feature = "enterprise")]
 async fn page_problem_of(
     org_id: &str,
     response_id: &str,
-    actor: &str,
+    caller: &openobserve_core::alerts::ack::Caller,
     act: openobserve_core::alerts::ack::Act,
 ) -> Result<Option<openobserve_core::alerts::ack::Problem>, openobserve_core::alerts::ack::AckError>
 {
     use openobserve_core::alerts::ack::{self, AckError};
 
     match ack::problem_of_page(org_id, response_id).await {
-        Ok(problem) => ack::authorize_problem(&problem, actor, act)
+        Ok(problem) => ack::authorize_problem(&problem, caller, act)
             .await
             .map(|_| Some(problem)),
         Err(AckError::NotFound) => {
             match infra::table::oncall_responses::get(org_id, response_id).await? {
-                Some(page) => ack::authorize_orphan_page(&page, actor, act)
+                Some(page) => ack::authorize_orphan_page(&page, caller, act)
                     .await
                     .map(|_| None)
                     .map_err(AckError::Refused),
@@ -795,8 +787,24 @@ fn unchanged() -> serde_json::Value {
 async fn page_with_ack(org_id: &str, response_id: &str, ack: serde_json::Value) -> Response {
     match infra::table::oncall_responses::get(org_id, response_id).await {
         Ok(Some(record)) => {
-            let mut body = serde_json::to_value(record).unwrap_or_default();
+            let mut body = serde_json::to_value(&record).unwrap_or_default();
             body["ack"] = ack;
+            let incident_id = record.incident_id.as_deref().or_else(|| {
+                (record.subject.subject_type == config::meta::oncall::SubjectType::Incident).then(
+                    || openobserve_core::alerts::ack::source_of_page(&record.subject.source_id),
+                )
+            });
+            if let Some(incident_id) = incident_id {
+                body["incident_id"] = incident_id.into();
+                match infra::table::alert_incidents::get_rw(org_id, incident_id).await {
+                    Ok(Some(incident)) => {
+                        body["acked"] = incident.acknowledged_by.or(record.acked_by.clone()).into();
+                        body["assigned_to"] = incident.assigned_to.into();
+                    }
+                    Ok(None) => {}
+                    Err(error) => return internal_error("incident acknowledgement read", &error),
+                }
+            }
             MetaHttpResponse::json(body)
         }
         Ok(None) => MetaHttpResponse::not_found("Response not found"),
@@ -820,12 +828,13 @@ async fn acknowledge_page(
     org_id: &str,
     response_id: &str,
     problem: Option<&openobserve_core::alerts::ack::Problem>,
-    actor: &str,
+    caller: &openobserve_core::alerts::ack::Caller,
     verb: openobserve_core::alerts::ack::Verb,
     source: config::meta::alerts::ack::AckSource,
 ) -> Result<serde_json::Value, Response> {
     use crate::request::alerts::ack::{act, error_response};
 
+    let actor = caller.email.as_str();
     let Some(problem) = problem else {
         use o2_enterprise::enterprise::oncall::escalation;
 
@@ -851,11 +860,29 @@ async fn acknowledge_page(
                 .map_err(to_response)?,
         };
         responded_to(&after);
+        if after
+            .acked_by
+            .as_deref()
+            .is_some_and(|holder| holder.eq_ignore_ascii_case(actor))
+            && let Some(incident_id) = after.incident_id.as_deref()
+        {
+            openobserve_core::alerts::incidents::ensure_lead(
+                org_id,
+                incident_id,
+                caller,
+                infra::table::alert_incidents::LeadAck::Page {
+                    response_id: &after.id,
+                    updated_at: after.updated_at,
+                },
+            )
+            .await
+            .map_err(|error| internal_error("incident lead after page acknowledgement", &error))?;
+        }
         let changed =
             before.is_some_and(|b| (b.acked_by, b.acked_at) != (after.acked_by, after.acked_at));
         return Ok(serde_json::json!({ "changed": changed }));
     };
-    act(problem, actor, verb, source)
+    act(problem, caller, verb, source)
         .await
         .map_err(error_response)
 }
@@ -2226,10 +2253,11 @@ pub async fn acknowledge(
         .await;
         // The one rule, then the core; a second click only shows the page as it stands.
         let just_acked = if this_click {
+            let caller = openobserve_core::alerts::ack::Caller::person(&claims.user_email);
             let problem = match page_problem_of(
                 &claims.org_id,
                 &claims.response_id,
-                &claims.user_email,
+                &caller,
                 openobserve_core::alerts::ack::Act::Ack,
             )
             .await
@@ -2243,7 +2271,7 @@ pub async fn acknowledge(
                     &claims.org_id,
                     &claims.response_id,
                     problem.as_ref(),
-                    &claims.user_email,
+                    &caller,
                     openobserve_core::alerts::ack::Verb::Acknowledge,
                     config::meta::alerts::ack::AckSource::Oncall,
                 )
@@ -2464,7 +2492,8 @@ async fn act_by_phone(
     use o2_enterprise::enterprise::oncall::{notify::PhoneAction, service};
     use openobserve_core::alerts::ack::{self, AckError};
 
-    let problem = match page_problem_of(&org_id, &response_id, &actor, ack::Act::Ack).await {
+    let caller = ack::Caller::person(&actor);
+    let problem = match page_problem_of(&org_id, &response_id, &caller, ack::Act::Ack).await {
         Ok(problem) => problem,
         Err(e) => return phone_answer_to(e),
     };
@@ -2490,15 +2519,42 @@ async fn act_by_phone(
         PhoneAction::Acknowledge => {
             let source = config::meta::alerts::ack::AckSource::Oncall;
             let acked = match problem.as_ref() {
-                Some(p) => ack::acknowledge(p, &actor, source).await.map(|_| ()),
-                None => o2_enterprise::enterprise::oncall::escalation::acknowledge_as(
+                Some(p) => ack::acknowledge_as(p, &caller, source).await.map(|_| ()),
+                None => match o2_enterprise::enterprise::oncall::escalation::acknowledge_as(
                     &org_id,
                     &response_id,
                     &actor,
                 )
                 .await
-                .map(|after| responded_to(&after))
-                .map_err(|e| AckError::Internal(e.to_string())),
+                {
+                    Ok(after) => {
+                        responded_to(&after);
+                        if after
+                            .acked_by
+                            .as_deref()
+                            .is_some_and(|holder| holder.eq_ignore_ascii_case(&actor))
+                            && let Some(incident_id) = after.incident_id.as_deref()
+                        {
+                            openobserve_core::alerts::incidents::ensure_lead(
+                                &org_id,
+                                incident_id,
+                                &caller,
+                                infra::table::alert_incidents::LeadAck::Page {
+                                    response_id: &after.id,
+                                    updated_at: after.updated_at,
+                                },
+                            )
+                            .await
+                            .map_err(|error| {
+                                anyhow::anyhow!(
+                                    "incident lead after phone acknowledgement: {error}"
+                                )
+                            })?;
+                        }
+                        Ok(())
+                    }
+                    Err(error) => Err(AckError::Internal(error.to_string())),
+                },
             };
             if let Err(e) = acked {
                 anyhow::bail!("acknowledge by phone: {e:?}");
@@ -2786,6 +2842,20 @@ fn page_row(
     value
 }
 
+/// The body of `GET .../oncall/responses/{id}`. [pure]
+#[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
+fn response_body<E: serde::Serialize>(
+    response: Option<serde_json::Value>,
+    events: &E,
+    rca_skipped: &[config::meta::alerts::rca_runs::RcaSkippedPage],
+) -> serde_json::Value {
+    serde_json::json!({
+        "response": response,
+        "events": events,
+        "rca_skipped": rca_skipped,
+    })
+}
+
 #[utoipa::path(
     get,
     path = "/{org_id}/oncall/responses/{response_id}",
@@ -2826,14 +2896,19 @@ pub async fn get_response(
                 return internal_error("get_response", &e);
             }
         };
-        match infra::table::oncall_responses::list_events(&response_id).await {
-            Ok(events) => MetaHttpResponse::json(serde_json::json!({
-                // Hoisted: "where is the runbook" must not depend on the alert still existing.
-                "response": with_page_details(&org_id, vec![record]).await.pop(),
-                "events": events,
-            })),
-            Err(e) => internal_error("get_response events", &e),
-        }
+        let events = match infra::table::oncall_responses::list_events(&response_id).await {
+            Ok(events) => events,
+            Err(e) => return internal_error("get_response events", &e),
+        };
+        // Pages this record asked for that started no run, each naming the run that covered it.
+        let rca_skipped =
+            match infra::table::rca_skipped_pages::list_for_response(&org_id, &response_id).await {
+                Ok(pages) => pages,
+                Err(e) => return internal_error("get_response skipped pages", &e),
+            };
+        // Hoisted: "where is the runbook" must not depend on the alert still existing.
+        let response = with_page_details(&org_id, vec![record]).await.pop();
+        MetaHttpResponse::json(response_body(response, &events, &rca_skipped))
     }
     #[cfg(not(feature = "enterprise"))]
     {
@@ -2877,10 +2952,25 @@ pub async fn resolve_response(
         if !allowed(&org_id, &user_email.user_id, RESPONSES, "POST").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }
+        let caller = crate::request::alerts::ack::caller_of(
+            &org_id,
+            &user_email.user_id,
+            delegated.as_deref(),
+            &headers,
+        );
+        if caller.ai {
+            return error_response(openobserve_core::alerts::ack::AckError::Refused(
+                openobserve_core::alerts::ack::ai_refusal(
+                    openobserve_core::alerts::ack::Act::Resolve,
+                    &Default::default(),
+                    &[],
+                ),
+            ));
+        }
         let problem = match page_problem_for(
             &org_id,
             &response_id,
-            &user_email.user_id,
+            &caller,
             openobserve_core::alerts::ack::Act::Resolve,
         )
         .await
@@ -2901,6 +2991,9 @@ pub async fn resolve_response(
             Ok(record) => record,
             Err(e) => return to_response(e),
         };
+        if record.subject.help_page_incident().is_some() {
+            return MetaHttpResponse::json(record);
+        }
         openobserve_core::autoobserve::incidents::respond_to_page(
             &record,
             openobserve_core::autoobserve::incidents::RespondedAs::Resolved {
@@ -2955,6 +3048,10 @@ pub async fn resolve_response(
 pub async fn add_note(
     Path((org_id, response_id)): Path<(String, String)>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+    #[cfg(feature = "enterprise")] delegated: Option<
+        axum::Extension<openobserve_api_common::auth::delegation::DelegatedCaller>,
+    >,
+    #[cfg(feature = "enterprise")] headers: axum::http::HeaderMap,
     ValidatedJson(body): ValidatedJson<AddNoteRequest>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
@@ -2962,7 +3059,20 @@ pub async fn add_note(
         if !allowed(&org_id, &user_email.user_id, RESPONSES, "POST").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }
-        if let Err(resp) = page_problem(&org_id, &response_id, &user_email.user_id).await {
+        let caller = crate::request::alerts::ack::caller_of(
+            &org_id,
+            &user_email.user_id,
+            delegated.as_deref(),
+            &headers,
+        );
+        if let Err(resp) = page_problem_for(
+            &org_id,
+            &response_id,
+            &caller,
+            openobserve_core::alerts::ack::Act::Note,
+        )
+        .await
+        {
             return resp;
         }
         match o2_enterprise::enterprise::oncall::escalation::add_note(
@@ -3263,34 +3373,67 @@ pub async fn acknowledge_response(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        use openobserve_core::alerts::ack::Verb;
+        use openobserve_core::alerts::ack::{Problem, Verb};
 
-        use crate::request::alerts::ack::{ack_source, take_over_of};
+        use crate::request::alerts::ack::{ack_request_of, ack_source, incident_ack_body};
 
         if !allowed(&org_id, &user_email.user_id, RESPONSES, "POST").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }
-        let verb = match take_over_of(&body) {
-            Ok(true) => Verb::TakeOver,
-            Ok(false) => Verb::Acknowledge,
+        let (request, v2_fields) = match ack_request_of(&body) {
+            Ok(request) => request,
+            Err(response) => return response,
+        };
+        if v2_fields && !common::meta::incidents_v2::incidents_v2_enabled() {
+            return common::meta::incidents_v2::incidents_v2_off_response();
+        }
+        let verb = if request.take_over {
+            Verb::TakeOver
+        } else {
+            Verb::Acknowledge
+        };
+        let caller = crate::request::alerts::ack::caller_of(
+            &org_id,
+            &user_email.user_id,
+            delegated.as_deref(),
+            &headers,
+        );
+        let problem = match page_problem_for(&org_id, &response_id, &caller, verb.into()).await {
+            Ok(p) => p,
             Err(resp) => return resp,
         };
-        let problem =
-            match page_problem_for(&org_id, &response_id, &user_email.user_id, verb.into()).await {
-                Ok(p) => p,
-                Err(resp) => return resp,
-            };
         match page_is_closed(&org_id, &response_id).await {
             Ok(true) => return page_with_ack(&org_id, &response_id, unchanged()).await,
             Ok(false) => {}
             Err(e) => return crate::request::alerts::ack::error_response(e),
         }
         let source = ack_source(delegated.as_deref(), &headers);
+        if v2_fields {
+            let Some(Problem::Incident { incident_id, .. }) = problem else {
+                return MetaHttpResponse::bad_request(
+                    "Ownership fields require a page linked to an incident",
+                );
+            };
+            return match incident_ack_body(
+                org_id.clone(),
+                incident_id,
+                &caller,
+                request,
+                true,
+                source,
+                false,
+            )
+            .await
+            {
+                Ok(ack) => page_with_ack(&org_id, &response_id, ack).await,
+                Err(response) => response,
+            };
+        }
         match acknowledge_page(
             &org_id,
             &response_id,
             problem.as_ref(),
-            &user_email.user_id,
+            &caller,
             verb,
             source,
         )
@@ -3346,10 +3489,16 @@ pub async fn unacknowledge_response(
         if !allowed(&org_id, &user_email.user_id, RESPONSES, "POST").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }
+        let caller = crate::request::alerts::ack::caller_of(
+            &org_id,
+            &user_email.user_id,
+            delegated.as_deref(),
+            &headers,
+        );
         let problem = match page_problem_for(
             &org_id,
             &response_id,
-            &user_email.user_id,
+            &caller,
             openobserve_core::alerts::ack::Act::Unack,
         )
         .await
@@ -3363,14 +3512,32 @@ pub async fn unacknowledge_response(
             Err(e) => return error_response(e),
         }
         let source = ack_source(delegated.as_deref(), &headers);
-        // A page whose alert is gone holds no acknowledgement but its own, so there is nothing to
-        // clear.
         let ack = match problem.as_ref() {
-            Some(p) => match act(p, &user_email.user_id, Verb::Unack, source).await {
+            Some(p) => match act(p, &caller, Verb::Unack, source).await {
                 Ok(body) => body,
                 Err(e) => return error_response(e),
             },
-            None => unchanged(),
+            None => {
+                let page = match infra::table::oncall_responses::get(&org_id, &response_id).await {
+                    Ok(Some(page)) => page,
+                    Ok(None) => return MetaHttpResponse::not_found("Response not found"),
+                    Err(error) => return internal_error("page read", &error),
+                };
+                match page.acked_by.as_deref() {
+                    Some(holder) => match o2_enterprise::enterprise::oncall::escalation::reopen(
+                        &org_id,
+                        &response_id,
+                        &caller.email,
+                        holder,
+                    )
+                    .await
+                    {
+                        Ok(after) => serde_json::json!({ "changed": after.is_some() }),
+                        Err(error) => return to_response(error),
+                    },
+                    None => unchanged(),
+                }
+            }
         };
         page_with_ack(&org_id, &response_id, ack).await
     }
@@ -3403,6 +3570,10 @@ pub async fn unacknowledge_response(
 pub async fn snooze_response(
     Path((org_id, response_id)): Path<(String, String)>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+    #[cfg(feature = "enterprise")] delegated: Option<
+        axum::Extension<openobserve_api_common::auth::delegation::DelegatedCaller>,
+    >,
+    #[cfg(feature = "enterprise")] headers: axum::http::HeaderMap,
     ValidatedJson(body): ValidatedJson<SnoozeRequest>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
@@ -3410,7 +3581,20 @@ pub async fn snooze_response(
         if !allowed(&org_id, &user_email.user_id, RESPONSES, "POST").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }
-        if let Err(resp) = page_problem(&org_id, &response_id, &user_email.user_id).await {
+        let caller = crate::request::alerts::ack::caller_of(
+            &org_id,
+            &user_email.user_id,
+            delegated.as_deref(),
+            &headers,
+        );
+        if let Err(resp) = page_problem_for(
+            &org_id,
+            &response_id,
+            &caller,
+            openobserve_core::alerts::ack::Act::Snooze,
+        )
+        .await
+        {
             return resp;
         }
         match o2_enterprise::enterprise::oncall::escalation::snooze(
@@ -3455,13 +3639,30 @@ pub async fn snooze_response(
 pub async fn unsnooze_response(
     Path((org_id, response_id)): Path<(String, String)>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+    #[cfg(feature = "enterprise")] delegated: Option<
+        axum::Extension<openobserve_api_common::auth::delegation::DelegatedCaller>,
+    >,
+    #[cfg(feature = "enterprise")] headers: axum::http::HeaderMap,
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
         if !allowed(&org_id, &user_email.user_id, RESPONSES, "POST").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }
-        if let Err(resp) = page_problem(&org_id, &response_id, &user_email.user_id).await {
+        let caller = crate::request::alerts::ack::caller_of(
+            &org_id,
+            &user_email.user_id,
+            delegated.as_deref(),
+            &headers,
+        );
+        if let Err(resp) = page_problem_for(
+            &org_id,
+            &response_id,
+            &caller,
+            openobserve_core::alerts::ack::Act::Unsnooze,
+        )
+        .await
+        {
             return resp;
         }
         match o2_enterprise::enterprise::oncall::escalation::unsnooze(
@@ -3506,6 +3707,10 @@ pub async fn unsnooze_response(
 pub async fn handoff_response(
     Path((org_id, response_id)): Path<(String, String)>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+    #[cfg(feature = "enterprise")] delegated: Option<
+        axum::Extension<openobserve_api_common::auth::delegation::DelegatedCaller>,
+    >,
+    #[cfg(feature = "enterprise")] headers: axum::http::HeaderMap,
     ValidatedJson(body): ValidatedJson<HandoffRequest>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
@@ -3515,10 +3720,16 @@ pub async fn handoff_response(
         if !allowed(&org_id, &user_email.user_id, RESPONSES, "POST").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }
+        let caller = crate::request::alerts::ack::caller_of(
+            &org_id,
+            &user_email.user_id,
+            delegated.as_deref(),
+            &headers,
+        );
         let problem = match page_problem_for(
             &org_id,
             &response_id,
-            &user_email.user_id,
+            &caller,
             openobserve_core::alerts::ack::Act::HandOff,
         )
         .await
@@ -3612,6 +3823,10 @@ pub async fn handoff_response(
 pub async fn confirm_recovery(
     Path((org_id, response_id)): Path<(String, String)>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+    #[cfg(feature = "enterprise")] delegated: Option<
+        axum::Extension<openobserve_api_common::auth::delegation::DelegatedCaller>,
+    >,
+    #[cfg(feature = "enterprise")] headers: axum::http::HeaderMap,
     ValidatedJson(body): ValidatedJson<Option<ConfirmRecoveryRequest>>,
 ) -> Response {
     // Recovery is ordered: without this verb the engine waits for a confirmation nothing sends.
@@ -3620,7 +3835,20 @@ pub async fn confirm_recovery(
         if !allowed(&org_id, &user_email.user_id, RESPONSES, "POST").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }
-        if let Err(resp) = page_problem(&org_id, &response_id, &user_email.user_id).await {
+        let caller = crate::request::alerts::ack::caller_of(
+            &org_id,
+            &user_email.user_id,
+            delegated.as_deref(),
+            &headers,
+        );
+        if let Err(resp) = page_problem_for(
+            &org_id,
+            &response_id,
+            &caller,
+            openobserve_core::alerts::ack::Act::ConfirmRecovery,
+        )
+        .await
+        {
             return resp;
         }
         // Looked up here so "no such record" stays a 404 and the wrong kind stays a 400.
@@ -3683,6 +3911,10 @@ pub async fn confirm_recovery(
 pub async fn escalate_response(
     Path((org_id, response_id)): Path<(String, String)>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+    #[cfg(feature = "enterprise")] delegated: Option<
+        axum::Extension<openobserve_api_common::auth::delegation::DelegatedCaller>,
+    >,
+    #[cfg(feature = "enterprise")] headers: axum::http::HeaderMap,
     ValidatedJson(body): ValidatedJson<Option<EscalateRequest>>,
 ) -> Response {
     // Not a handoff: a handoff gives the page away, this keeps it and adds people to it.
@@ -3693,10 +3925,16 @@ pub async fn escalate_response(
         if !allowed(&org_id, &user_email.user_id, RESPONSES, "POST").await {
             return MetaHttpResponse::forbidden("Forbidden");
         }
+        let caller = crate::request::alerts::ack::caller_of(
+            &org_id,
+            &user_email.user_id,
+            delegated.as_deref(),
+            &headers,
+        );
         if let Err(resp) = page_problem_for(
             &org_id,
             &response_id,
-            &user_email.user_id,
+            &caller,
             openobserve_core::alerts::ack::Act::Escalate,
         )
         .await
@@ -5928,6 +6166,10 @@ fn promoted_severity(
 pub async fn promote_to_incident(
     Path((org_id, response_id)): Path<(String, String)>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+    #[cfg(feature = "enterprise")] delegated: Option<
+        axum::Extension<openobserve_api_common::auth::delegation::DelegatedCaller>,
+    >,
+    #[cfg(feature = "enterprise")] headers: axum::http::HeaderMap,
     ValidatedJson(body): ValidatedJson<Option<PromoteRequest>>,
 ) -> Response {
     #[cfg(feature = "enterprise")]
@@ -5947,7 +6189,20 @@ pub async fn promote_to_incident(
             }
         };
         // Before the incident opens (D26): the same rule as every other page action.
-        if let Err(resp) = page_problem(&org_id, &response_id, &user_email.user_id).await {
+        let caller = crate::request::alerts::ack::caller_of(
+            &org_id,
+            &user_email.user_id,
+            delegated.as_deref(),
+            &headers,
+        );
+        if let Err(resp) = page_problem_for(
+            &org_id,
+            &response_id,
+            &caller,
+            openobserve_core::alerts::ack::Act::Promote,
+        )
+        .await
+        {
             return resp;
         }
         if let Some(existing) = record.incident_id.as_deref() {
@@ -5981,14 +6236,19 @@ pub async fn promote_to_incident(
             "oncall_response_id": record.id,
         });
         // Written together: as two statements a failure leaves an incident nothing points at.
+        let severity_text = severity.to_string();
+        let promoted = infra::table::alert_incidents::PromotedIncident {
+            severity: &severity_text,
+            group_values,
+            key_type: "AlertId",
+            first_alert_at: record.opened_at,
+            title,
+            owner_team_id: record.team_id.clone(),
+        };
         let incident = match infra::table::alert_incidents::create_and_attach_to_oncall_response(
             &org_id,
             &response_id,
-            &severity.to_string(),
-            group_values,
-            "AlertId",
-            record.opened_at,
-            title,
+            promoted,
         )
         .await
         {
@@ -6251,7 +6511,36 @@ pub async fn delete_telephony(
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "enterprise")]
+    mod ownership_contract {
+        include!("ownership_tests.rs");
+    }
+
     use super::*;
+
+    #[test]
+    fn get_response_lists_skipped_pages_and_an_empty_list() {
+        use config::meta::alerts::rca_runs::{RcaSkippedPage, SkipReason};
+
+        let page = RcaSkippedPage {
+            at_us: 10,
+            reason: SkipReason::CoolingDown,
+            covering_run_id: "run_1".to_string(),
+            covering_run_number: Some(1),
+            retry_after_us: Some(40),
+            cooldown_us: Some(30),
+        };
+        let events: Vec<serde_json::Value> = Vec::new();
+        let body = response_body(Some(serde_json::json!({"id": "r1"})), &events, &[page]);
+        assert_eq!(
+            body["rca_skipped"],
+            serde_json::json!([{"at_us": 10, "reason": "cooling_down", "covering_run_id": "run_1",
+                "covering_run_number": 1, "retry_after_us": 40, "cooldown_us": 30}])
+        );
+        assert_eq!(body["response"]["id"], "r1");
+        let empty = response_body(None, &events, &[]);
+        assert_eq!(empty["rca_skipped"], serde_json::json!([]));
+    }
 
     /// A typed refusal keeps its own status even when its text says "unique".
     #[cfg(feature = "enterprise")]

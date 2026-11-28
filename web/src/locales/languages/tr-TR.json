@@ -12737,6 +12737,7 @@
       "statusOpen": "Açık",
       "statusAcknowledged": "Onaylandı",
       "statusResolved": "Çözüldü",
+      "pagerTotal": "{count} olay | {count} olay",
       "correlationServiceDiscovery": "Hizmet Keşfi",
       "correlationPrimaryMatch": "Birincil Eşleşme",
       "correlationSecondaryMatch": "İkincil Eşleşme",

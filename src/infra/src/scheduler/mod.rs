@@ -30,19 +30,52 @@ use sea_orm::{ConnectionTrait, DatabaseBackend, Statement};
 
 use crate::errors::Result;
 
+#[cfg(test)]
+mod escalation_tests;
 pub mod postgres;
 #[cfg(test)]
 mod slack_sync_tests;
 pub mod sqlite;
 
+#[cfg(any(test, feature = "test-utils"))]
+tokio::task_local! {
+    static TEST_SCHEDULER_DB: TestPool;
+}
+
 static CLIENT: Lazy<Box<dyn Scheduler>> = Lazy::new(connect);
 pub const TRIGGERS_KEY: &str = "/triggers/";
+/// The escalation `data` key a tick owns (its transport-retry budget); an arm never writes it
+/// over a stored row, since every arm carries a copy read before the tick's last write.
+pub const ESCALATION_TICK_FIELD: &str = "transport";
+/// Reads an arm retries when the row's `data` changed between its read and its write.
+const ESCALATION_ARM_ATTEMPTS: usize = 8;
+const WRITE_ESCALATION_TICK_DATA_QUERY: &str = "UPDATE scheduled_jobs SET data = $1, \
+    end_time = COALESCE($2, end_time) WHERE id = $3 AND claim_epoch = $4 AND status = $5 \
+    AND data = $6";
+
+/// Holds the pool, not the connection: `DatabaseConnection` is not `Clone` under sea-orm `mock`.
+#[cfg(any(test, feature = "test-utils"))]
+pub(crate) enum TestPool {
+    Postgres(sqlx::PgPool),
+    Sqlite(sqlx::SqlitePool),
+}
 
 pub fn connect() -> Box<dyn Scheduler> {
     match config::get_config().common.meta_store.as_str().into() {
         MetaStore::PostgreSQL => Box::<postgres::PostgresScheduler>::default(),
         _ => Box::<sqlite::SqliteScheduler>::default(),
     }
+}
+
+/// How a fenced escalation finish left its row (OF-10).
+#[derive(Debug, Clone)]
+pub enum EscalationFinish {
+    /// Waiting again, at the tick's time or an arm's; the row as written.
+    Requeued(Trigger),
+    /// The ladder ended and nothing armed it during the tick.
+    Deleted,
+    /// Another claim owns the row, or it is gone; nothing was written.
+    Lost,
 }
 
 #[async_trait]
@@ -89,6 +122,23 @@ pub trait Scheduler: Sync + Send + 'static {
     /// SY-2.3: ends a claimed sync pass, or re-queues it for an arm made during it; false when
     /// the claim was lost.
     async fn finish_slack_sync(&self, claim: &Trigger, finish: &SlackSyncFinish) -> Result<bool>;
+    /// M138 (a): one upsert of the escalation row at `at` with `data`; a row a tick holds keeps
+    /// its status and time and only notes the earliest asked-for time in `armed_for`.
+    async fn arm_escalation(&self, org: &str, response_id: &str, at: i64, data: &str)
+    -> Result<()>;
+    async fn write_escalation_tick_data(
+        &self,
+        current: &Trigger,
+        data: &str,
+        renew_until: Option<i64>,
+    ) -> Result<bool>;
+    /// OF-10: ends a claimed tick at `next_run_at`, or earlier for an arm made during it; `None`
+    /// re-queues at the arm, else deletes the row.
+    async fn finish_escalation(
+        &self,
+        claim: &Trigger,
+        next_run_at: Option<i64>,
+    ) -> Result<EscalationFinish>;
     async fn pull(
         &self,
         concurrency: i64,
@@ -134,17 +184,52 @@ pub async fn init() -> Result<()> {
     Ok(())
 }
 
+#[cfg(any(test, feature = "test-utils"))]
+pub async fn create_scheduled_jobs_for_test(
+    conn: &impl ConnectionTrait,
+) -> std::result::Result<(), sea_orm::DbErr> {
+    let schema = match conn.get_database_backend() {
+        DatabaseBackend::Sqlite => sqlite::CREATE_TABLE_QUERY,
+        DatabaseBackend::Postgres => postgres::CREATE_TABLE_QUERY,
+        _ => {
+            return Err(sea_orm::DbErr::Custom(
+                "Unsupported scheduler test backend".into(),
+            ));
+        }
+    };
+    conn.execute_unprepared(schema).await?;
+    conn.execute_unprepared(
+        "CREATE UNIQUE INDEX IF NOT EXISTS scheduled_jobs_org_module_key_idx
+         ON scheduled_jobs (org, module, module_key)",
+    )
+    .await?;
+    Ok(())
+}
+
+#[cfg(any(test, feature = "test-utils"))]
+pub async fn with_scheduler_test_db<T>(
+    db: &sea_orm::DatabaseConnection,
+    future: impl std::future::Future<Output = T>,
+) -> T {
+    let pool = match db.get_database_backend() {
+        DatabaseBackend::Postgres => TestPool::Postgres(db.get_postgres_connection_pool().clone()),
+        DatabaseBackend::Sqlite => TestPool::Sqlite(db.get_sqlite_connection_pool().clone()),
+        _ => unreachable!("unsupported scheduler test backend"),
+    };
+    TEST_SCHEDULER_DB.scope(pool, future).await
+}
+
 /// Pushes a Trigger job into the queue
 #[inline]
 pub async fn push(trigger: Trigger) -> Result<()> {
-    CLIENT.push(shaped(trigger)).await
+    client().push(shaped(trigger)).await
 }
 
 /// Deletes the Trigger job matching the given parameters
 #[inline]
 pub async fn delete(org: &str, module: TriggerModule, key: &str) -> Result<()> {
     log::info!("deleting scheduled job: {key}, {module}");
-    CLIENT.delete(org, module, key).await
+    client().delete(org, module, key).await
 }
 
 /// Updates the status of the Trigger job. This method is supposed
@@ -169,7 +254,7 @@ pub async fn update_status(
 /// Use `pull()` method to set the status of the job from `Waiting` to `Processing`.
 #[inline]
 pub async fn update_trigger(trigger: Trigger, clone: bool) -> Result<()> {
-    CLIENT.update_trigger(shaped(trigger), clone).await
+    client().update_trigger(shaped(trigger), clone).await
 }
 
 /// Bulk updates multiple triggers at once for better performance
@@ -212,7 +297,7 @@ pub async fn keep_alive_claim(
 
 #[inline]
 pub async fn complete_claim(trigger: Trigger) -> Result<bool> {
-    CLIENT.complete_claim(shaped(trigger)).await
+    client().complete_claim(shaped(trigger)).await
 }
 
 /// SY-2, C10: asks for a sync pass of the page at `at`, never before the row's backoff.
@@ -233,6 +318,31 @@ pub async fn finish_slack_sync(claim: &Trigger, finish: &SlackSyncFinish) -> Res
     CLIENT.finish_slack_sync(claim, finish).await
 }
 
+/// M138 (a), M145: arms the page's ladder at `at` without taking the row from a running tick;
+/// `data` is merged over the row's ([escalation_arm_data]). [strong: compare-and-set upsert]
+pub async fn arm_escalation(org: &str, response_id: &str, at: i64, data: &str) -> Result<()> {
+    CLIENT.arm_escalation(org, response_id, at, data).await
+}
+
+/// A tick can merge data only over the row version it read.
+pub async fn write_escalation_tick_data(
+    current: &Trigger,
+    data: &str,
+    renew_until: Option<i64>,
+) -> Result<bool> {
+    client()
+        .write_escalation_tick_data(current, data, renew_until)
+        .await
+}
+
+/// OF-10: ends a claimed escalation tick, fenced on its claim epoch; the tick's `data` stays.
+pub async fn finish_escalation(
+    claim: &Trigger,
+    next_run_at: Option<i64>,
+) -> Result<EscalationFinish> {
+    CLIENT.finish_escalation(claim, next_run_at).await
+}
+
 /// The later of `at` and the `not_before` in the read sync row's `data` (no row or empty data:
 /// `at`); a failed read or unreadable data is an error. [pure]
 fn slack_sync_arm_time(at: i64, read: Result<Trigger>) -> Result<i64> {
@@ -248,6 +358,26 @@ fn slack_sync_arm_time(at: i64, read: Result<Trigger>) -> Result<i64> {
     }
     let data: OncallSlackSyncData = json::from_str(&data)?;
     Ok(at.max(data.not_before))
+}
+
+/// `data`'s top-level keys over `stored`'s, keeping the stored [ESCALATION_TICK_FIELD]; a value
+/// that is not a JSON object is replaced whole. [pure]
+fn escalation_arm_data(stored: Option<&str>, data: &str) -> String {
+    let Some(stored) = stored else {
+        return data.to_string();
+    };
+    let (Ok(json::Value::Object(mut merged)), Ok(json::Value::Object(ours))) = (
+        json::from_str::<json::Value>(stored),
+        json::from_str::<json::Value>(data),
+    ) else {
+        return data.to_string();
+    };
+    for (key, value) in ours {
+        if key != ESCALATION_TICK_FIELD && key != "claim_retries" {
+            merged.insert(key, value);
+        }
+    }
+    json::Value::Object(merged).to_string()
 }
 
 /// Acquire the scheduler row's write lock, verify the physical claim, and
@@ -432,7 +562,7 @@ pub async fn pull(
     report_timeout: i64,
     module: Option<TriggerModule>,
 ) -> Result<Vec<Trigger>> {
-    CLIENT
+    client()
         .pull(concurrency, alert_timeout, report_timeout, module)
         .await
 }
@@ -440,7 +570,7 @@ pub async fn pull(
 /// Returns the scheduled job associated with the given id in read-only fashion
 #[inline]
 pub async fn get(org: &str, module: TriggerModule, key: &str) -> Result<Trigger> {
-    CLIENT.get(org, module, key).await
+    client().get(org, module, key).await
 }
 
 /// Moves a Waiting job to `new_key`; the moved row, if any.
@@ -537,6 +667,23 @@ pub(crate) fn pull_skip_binds(module: Option<&TriggerModule>) -> (bool, bool) {
     } else {
         (true, false)
     }
+}
+
+#[cfg(any(test, feature = "test-utils"))]
+fn with_test_db<T>(f: impl FnOnce(&TestPool) -> T) -> Option<T> {
+    TEST_SCHEDULER_DB.try_with(f).ok()
+}
+
+fn client() -> &'static dyn Scheduler {
+    #[cfg(any(test, feature = "test-utils"))]
+    if let Some(is_pg) = with_test_db(|pool| matches!(pool, TestPool::Postgres(_))) {
+        return if is_pg {
+            &postgres::PostgresScheduler {}
+        } else {
+            &sqlite::SqliteScheduler {}
+        };
+    }
+    CLIENT.as_ref()
 }
 
 fn shaped(mut trigger: Trigger) -> Trigger {
@@ -702,6 +849,30 @@ mod tests {
     use super::*;
 
     const JOB_DATA: &str = r#"{"tolerance":3,"last_satisfied_at":1000,"last_notified_level":2}"#;
+
+    #[test]
+    fn test_an_escalation_arm_merges_over_the_row_and_keeps_the_ticks_budget() {
+        let stored =
+            r#"{"analysis":{"status":"pending"},"transport":{"run":1,"attempts":2},"x":1}"#;
+        let arm = r#"{"analysis":{"status":"complete"},"transport":null,"decision":"kept"}"#;
+        let merged: serde_json::Value =
+            serde_json::from_str(&escalation_arm_data(Some(stored), arm)).unwrap();
+        assert_eq!(
+            merged,
+            serde_json::json!({
+                "analysis": {"status": "complete"},
+                "transport": {"run": 1, "attempts": 2},
+                "decision": "kept",
+                "x": 1,
+            })
+        );
+        assert_eq!(
+            escalation_arm_data(None, arm),
+            arm,
+            "an insert takes data whole"
+        );
+        assert_eq!(escalation_arm_data(Some("tick"), "verdict"), "verdict");
+    }
 
     /// The job table a stamp test runs against; a PostgreSQL one drops its schema when done.
     struct JobsDb {

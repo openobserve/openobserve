@@ -39,6 +39,8 @@ const SEARCH_SQL_KEEP_FIELDS: &[&str] = &[
     "format",
     "advisory",
     "is_partial",
+    "new_start_time",
+    "new_end_time",
 ];
 
 /// Filter a tool's response body based on the requested detail level.
@@ -904,5 +906,15 @@ mod tests {
         let body = r#"{"data":"keep everything"}"#;
         let result = filter_response("UnknownTool", body, &DetailLevel::Summary);
         assert_eq!(result, body);
+    }
+
+    #[test]
+    fn test_search_sql_keeps_server_adjusted_bounds() {
+        let body = json!({"hits":[], "is_partial":false, "new_start_time":12, "new_end_time":18, "trace_id":"private"});
+        let filtered = filter_response("SearchSQL", &body.to_string(), &DetailLevel::Summary);
+        let filtered: Value = serde_json::from_str(&filtered).unwrap();
+        assert_eq!(filtered["new_start_time"], 12);
+        assert_eq!(filtered["new_end_time"], 18);
+        assert!(filtered.get("trace_id").is_none());
     }
 }

@@ -17,6 +17,20 @@
 //!
 //! Correlates fired alerts into unified incidents to reduce alert fatigue.
 
+mod auto_resolve;
+#[cfg(feature = "enterprise")]
+pub mod declare;
+pub mod feedback;
+mod first_open;
+pub mod mitigations;
+#[cfg(feature = "enterprise")]
+pub mod page_team;
+#[cfg(feature = "enterprise")]
+pub mod recovery;
+#[cfg(feature = "enterprise")]
+mod relapse_repage;
+mod v2_fields;
+
 use std::{
     collections::HashMap,
     hash::{DefaultHasher, Hash, Hasher},
@@ -38,12 +52,16 @@ use config::{
     utils::json::{Map, Value},
 };
 
+pub use self::v2_fields::{mark_opened, update_fields};
+
 /// What `extract_service_name` returns when it finds no service.
 ///
 /// Named because it is a sentinel and not a name. Routing must refuse it: an
 /// alert nobody can identify belongs in the unrouted queue, not on the pager of
 /// whichever team happens to own this string.
 const UNKNOWN_SERVICE: &str = "unknown";
+/// The user that automatic runs act and are metered as.
+pub(crate) const SYSTEM_USER_EMAIL: &str = "system@openobserve.ai";
 /// The `incident_event` of the first notification after a manual reopen.
 const FIRED_AFTER_REOPEN_EVENT: &str = "alert_fired_after_reopen";
 /// Window behind the alert in which a service-graph edge counts as a dependency.
@@ -321,6 +339,7 @@ pub(crate) struct RoutedIncident {
     pub record: Option<config::meta::oncall::Response>,
     /// Paging or linking the record failed; a record that paged is kept beside the error.
     pub error: Option<anyhow::Error>,
+    impacted_error: Option<anyhow::Error>,
 }
 
 /// The kv marker of an incident the org's page budget held back, naming the page that used it.
@@ -395,6 +414,7 @@ impl FindingPager for OncallPager {
             Err(e) => {
                 return RoutedIncident {
                     record: None,
+                    impacted_error: None,
                     error: Some(e.context(format!(
                         "reading the AutoObserve paging team for {org_id}/{incident_id}"
                     ))),
@@ -915,9 +935,6 @@ async fn collect_incident_destinations(
     incident_id: &str,
     base_destinations: &[String],
 ) -> Vec<String> {
-    let mut seen: std::collections::HashSet<String> = base_destinations.iter().cloned().collect();
-    let mut destinations: Vec<String> = base_destinations.to_vec();
-
     let incident_alerts = match infra::table::alert_incidents::get_incident_alerts(incident_id)
         .await
     {
@@ -926,11 +943,23 @@ async fn collect_incident_destinations(
             log::warn!(
                 "[incidents] Failed to fetch alert list for destination merge (incident {org_id}/{incident_id}): {e}"
             );
-            return destinations;
+            return base_destinations.to_vec();
         }
     };
 
-    for ia in &incident_alerts {
+    merge_incident_destinations(org_id, base_destinations, &incident_alerts).await
+}
+
+#[cfg(feature = "enterprise")]
+async fn merge_incident_destinations(
+    org_id: &str,
+    base_destinations: &[String],
+    incident_alerts: &[infra::table::entity::alert_incident_alerts::Model],
+) -> Vec<String> {
+    let mut seen: std::collections::HashSet<String> = base_destinations.iter().cloned().collect();
+    let mut destinations: Vec<String> = base_destinations.to_vec();
+
+    for ia in incident_alerts {
         if let Some((_folder, other_alert)) =
             crate::db::alerts::alert::get_alert_from_cache(org_id, &ia.alert_id).await
         {
@@ -1026,6 +1055,18 @@ async fn send_incident_notifications_inner(
     event: &str,
     sends: Vec<IncidentSend<'_>>,
 ) -> Option<String> {
+    send_incident_notices(org_id, incident_id, event, None, sends).await
+}
+
+/// [`send_incident_notifications_inner`] with a notice's own sentence as the subject.
+#[cfg(feature = "enterprise")]
+async fn send_incident_notices(
+    org_id: &str,
+    incident_id: &str,
+    event: &str,
+    message: Option<String>,
+    sends: Vec<IncidentSend<'_>>,
+) -> Option<String> {
     if sends.iter().all(|send| send.dest_names.is_empty()) {
         return None;
     }
@@ -1054,7 +1095,7 @@ async fn send_incident_notifications_inner(
         org_id,
         incident_id,
     );
-    let subject = format!("[{event}] {title}");
+    let subject = notice_subject(message, event, &title);
     let notice = IncidentNotice {
         org_id,
         incident_id,
@@ -1099,6 +1140,12 @@ async fn send_incident_notifications_inner(
         );
         Some(error)
     }
+}
+
+/// The caller's sentence, never a context attribute an alert author can name.
+#[cfg(feature = "enterprise")]
+fn notice_subject(message: Option<String>, event: &str, title: &str) -> String {
+    message.unwrap_or_else(|| format!("[{event}] {title}"))
 }
 
 /// Retries a temporary failure in place: later firings join as repeats and never re-send it.
@@ -1925,6 +1972,7 @@ async fn correlate_rows(
         && downtime.is_none()
     {
         if correlation.created {
+            v2_fields::spawn_onset(alert, incident_id);
             if let Err(e) =
                 start_new_incident_rca(&alert.org_id, incident_id, routed_origin.as_ref()).await
             {
@@ -2059,6 +2107,7 @@ pub async fn open_manual_incident(
     );
     if created {
         infra::table::alert_incidents::update_title(org, &id, &request.title).await?;
+        record_routed_owner(org, &id, &groups).await;
     }
     let baseline = if request.baseline_version.is_empty() {
         String::new()
@@ -2419,21 +2468,23 @@ pub async fn recover_muted_resolves(org_id: &str, alert_id: &str) -> Result<(), 
     )
     .await?;
     let mut records = HashMap::with_capacity(resolved.len());
-    for incident_id in &resolved {
+    for (incident_id, _) in &resolved {
         let held = infra::table::oncall_responses::list_for_incident(org_id, incident_id).await?;
         records.insert(incident_id.clone(), held);
     }
-    for incident_id in left_open(&resolved, &records) {
-        o2_enterprise::enterprise::oncall::escalation::recover_for_incident(org_id, incident_id)
-            .await?;
+    for (incident_id, episode) in left_open(&resolved, &records) {
+        o2_enterprise::enterprise::oncall::escalation::recover_for_resolution(
+            org_id,
+            incident_id,
+            episode,
+        )
+        .await?;
     }
     Ok(())
 }
 
-/// Auto-resolve the open incident containing `external.id`, but only once every
-/// other `External`-kind alert already linked to that incident is also resolved
-/// in `external_alerts` — a single source clearing shouldn't close an incident
-/// that other still-firing sources are correlated into.
+/// Auto-resolve the open incident containing `external.id` once every `External`-kind alert
+/// linked to it is resolved in `external_alerts`.
 pub async fn try_auto_resolve_incident_for_external_alert(
     org_id: &str,
     external_alert_id: &str,
@@ -2448,29 +2499,32 @@ pub async fn try_auto_resolve_incident_for_external_alert(
         return Ok(());
     };
 
-    let links = infra::table::alert_incidents::get_incident_alerts(&incident.id).await?;
-    let external_alert_ids: Vec<String> = links
-        .into_iter()
-        .filter(|l| l.alert_kind == "external")
-        .map(|l| l.alert_id)
-        .collect();
-
-    if external_alert_ids.is_empty() {
-        return Ok(());
+    // The other sources are read under the row lock, so a source firing meanwhile keeps it open.
+    let turn = ClusterIncidentTurns.take(org_id, &incident.id).await?;
+    let cause = infra::table::alert_incidents::CloseCaller::ExternalAlert;
+    let fence = turn.fence.as_ref();
+    let done = auto_resolve::auto_resolve_guarded(org_id, &incident.id, cause, false, fence).await;
+    turn.end().await;
+    match done? {
+        auto_resolve::AutoResolved::Closed(repairs) => {
+            log::info!(
+                "[incidents] Auto-resolved incident {}: every contributing external alert resolved",
+                incident.id
+            );
+            let unfinished = repairs.unfinished();
+            if !unfinished.is_empty() {
+                log::warn!(
+                    "[incidents] External close left repairs unfinished for {org_id}/{}: {}",
+                    incident.id,
+                    unfinished.join(", ")
+                );
+            }
+        }
+        auto_resolve::AutoResolved::Kept(reason) => {
+            log::debug!("[incidents] Kept incident {} open: {reason}", incident.id)
+        }
+        auto_resolve::AutoResolved::AlreadyResolved(_) => {}
     }
-
-    let records = infra::table::external_alerts::get_by_ids(org_id, &external_alert_ids).await?;
-    let all_resolved = records.iter().all(|r| r.state == "resolved");
-
-    if all_resolved {
-        update_status(org_id, &incident.id, "resolved", "system@openobserve.ai").await?;
-        log::info!(
-            "[incidents] Auto-resolved incident {} — all {} contributing external alert(s) resolved",
-            incident.id,
-            external_alert_ids.len()
-        );
-    }
-
     Ok(())
 }
 
@@ -2500,15 +2554,16 @@ fn siem_entity_lock(
 }
 
 /// The open security case with exactly `group_values` active within `window` of `span`.
-async fn find_open_siem_case(
+async fn find_open_siem_case_with<C: sea_orm::ConnectionTrait>(
+    client: &C,
     org_id: &str,
     group_values: &HashMap<String, String>,
     span: (i64, i64),
     window: i64,
 ) -> Result<Option<infra::table::entity::alert_incidents::Model>, anyhow::Error> {
-    let client = infra::db::get_orm_client_ro().await;
     let mut open = Vec::new();
-    for candidate in infra::table::alert_incidents::find_correlation_candidates(
+    for candidate in infra::table::alert_incidents::find_correlation_candidates_with(
+        client,
         org_id,
         infra::table::alert_incidents::CaseFilter::OnlyCases,
     )
@@ -2647,6 +2702,7 @@ async fn absorb_roll_up(
             &case.id,
             std::slice::from_ref(&roll_up.id),
             None,
+            infra::table::alert_incidents::SYSTEM_RESOLVER,
         )
         .await?;
         let why = format!(
@@ -2751,13 +2807,15 @@ async fn list_case_entity(
 }
 
 /// The open case a detection naming no entity fired into, active within `window` of `span`.
-async fn find_open_detection_case(
+async fn find_open_detection_case_with<C: sea_orm::ConnectionTrait>(
+    client: &C,
     org_id: &str,
     alert_id: &str,
     span: (i64, i64),
     window: i64,
 ) -> Result<Option<infra::table::entity::alert_incidents::Model>, anyhow::Error> {
-    let open = infra::table::alert_incidents::find_open_incidents_by_alert_id(
+    let open = infra::table::alert_incidents::find_open_incidents_by_alert_id_with(
+        client,
         org_id,
         alert_id,
         infra::table::alert_incidents::CaseFilter::OnlyCases,
@@ -3301,79 +3359,88 @@ async fn create_new_incident(
     eval_level: Option<config::meta::alerts::level::AlertLevel>,
     muted_by: Option<&str>,
 ) -> Result<IncidentCorrelationOutcome, anyhow::Error> {
+    let new = prepare_opening(
+        org_id,
+        group_values,
+        key_type,
+        subject,
+        triggered_at,
+        correlation_reason,
+        eval_level,
+        muted_by,
+    )
+    .await?;
+    let opening = first_open::insert(&new).await?;
+    settle_opening(&new, opening, service_name).await
+}
+
+/// The row a firing opens with; the title renders before any write, and the fence runs last.
+#[allow(clippy::too_many_arguments)]
+async fn prepare_opening<'a, 's>(
+    org_id: &'a str,
+    group_values: &'a HashMap<String, String>,
+    key_type: config::meta::alerts::incidents::KeyType,
+    subject: &'a CorrelationSubject<'s>,
+    triggered_at: i64,
+    correlation_reason: &'a str,
+    eval_level: Option<config::meta::alerts::level::AlertLevel>,
+    muted_by: Option<&'a str>,
+) -> Result<first_open::NewIncident<'a, 's>, anyhow::Error> {
     let severity = opening_severity(subject, eval_level);
     let title = opening_title(org_id, subject, group_values, triggered_at).await;
-
     subject.fence_at(FenceStep::Open).await?;
-    let incident = if subject.security_case {
-        let dims = serde_json::to_value(group_values)?;
-        let key = key_type.to_string();
-        infra::table::alert_incidents::create_security_case(
-            org_id,
-            &severity,
-            dims,
-            &key,
-            subject
-                .case_activity
-                .unwrap_or(infra::table::alert_incidents::CaseActivity {
-                    first_event_at: triggered_at,
-                    last_event_at: triggered_at,
-                    historical: subject.historical,
-                }),
-            Some(title.clone()),
-            muted_by.map(str::to_string),
-        )
-        .await?
-    } else {
-        // One transaction with its first firing: an incident without it no later lookup could find.
-        let opening = infra::table::alert_incidents::create_with_first_alert(
-            subject.incident_id.as_deref(),
-            org_id,
-            &severity,
-            serde_json::to_value(group_values)?,
-            &key_type.to_string(),
-            triggered_at,
-            Some(title.clone()),
-            muted_by.map(str::to_string),
-            &subject.first_alert(correlation_reason),
-        )
-        .await?;
-        match opening {
-            infra::table::alert_incidents::Opening::Opened(incident) => *incident,
-            infra::table::alert_incidents::Opening::Held(incident_id) => {
-                return Ok(IncidentCorrelationOutcome::ExistingAlertRepeated {
-                    incident_id,
-                    service_name: service_name.to_string(),
-                });
-            }
-            infra::table::alert_incidents::Opening::IdTaken => {
-                let incident_id = subject
-                    .incident_id
-                    .as_deref()
-                    .ok_or_else(|| anyhow::anyhow!("a generated incident id was already taken"))?;
-                return join_taken_incident(
-                    org_id,
-                    incident_id,
-                    subject,
-                    triggered_at,
-                    correlation_reason,
-                    service_name,
-                    muted_by,
-                )
-                .await;
-            }
+    Ok(first_open::NewIncident {
+        org_id,
+        group_values,
+        key_type,
+        subject,
+        triggered_at,
+        correlation_reason,
+        muted_by,
+        severity,
+        title,
+    })
+}
+
+/// Announces an incident the opening wrote, or joins the one that already held its firing or id.
+async fn settle_opening(
+    new: &first_open::NewIncident<'_, '_>,
+    opening: infra::table::alert_incidents::Opening,
+    service_name: &str,
+) -> Result<IncidentCorrelationOutcome, anyhow::Error> {
+    let (org_id, subject, triggered_at, muted_by) =
+        (new.org_id, new.subject, new.triggered_at, new.muted_by);
+    let incident = match opening {
+        infra::table::alert_incidents::Opening::Opened(incident) => *incident,
+        infra::table::alert_incidents::Opening::Held(incident_id) => {
+            return Ok(IncidentCorrelationOutcome::ExistingAlertRepeated {
+                incident_id,
+                service_name: service_name.to_string(),
+            });
+        }
+        infra::table::alert_incidents::Opening::IdTaken => {
+            let incident_id = subject
+                .incident_id
+                .as_deref()
+                .ok_or_else(|| anyhow::anyhow!("a generated incident id was already taken"))?;
+            return join_taken_incident(
+                org_id,
+                incident_id,
+                subject,
+                triggered_at,
+                new.correlation_reason,
+                service_name,
+                muted_by,
+            )
+            .await;
         }
     };
-
-    if subject.security_case {
-        link_firing(&incident.id, subject, triggered_at, correlation_reason).await?;
-    }
     let opened = Opened {
         incident_id: &incident.id,
-        key_type,
-        severity: &severity,
-        group_values,
-        title,
+        key_type: new.key_type,
+        severity: &new.severity,
+        group_values: new.group_values,
+        title: new.title.clone(),
         triggered_at,
         earlier_firings: &[],
         service_name,
@@ -3727,6 +3794,15 @@ impl Correlation {
             created: false,
         }
     }
+
+    /// The outcome of an opening, which can still land in an incident another write placed.
+    fn opened(outcome: IncidentCorrelationOutcome) -> Self {
+        let created = matches!(
+            outcome,
+            IncidentCorrelationOutcome::NewIncidentCreated { .. }
+        );
+        Self { outcome, created }
+    }
 }
 
 fn candidate_can_join(stored: &serde_json::Value, incoming: &HashMap<String, String>) -> bool {
@@ -3774,6 +3850,7 @@ async fn select_correlation_candidate<C: sea_orm::ConnectionTrait>(
     incoming: &HashMap<String, String>,
     (alert_id, triggered_at): (&str, i64),
     candidates: Vec<infra::table::alert_incidents::CorrelationCandidate>,
+    pairs: first_open::PairRead,
 ) -> Result<Option<infra::table::entity::alert_incidents::Model>, infra::errors::Error> {
     if candidates.is_empty() {
         return Ok(None);
@@ -3802,14 +3879,7 @@ async fn select_correlation_candidate<C: sea_orm::ConnectionTrait>(
             continue;
         }
         // The alert was moved out of incidents this one's opener started.
-        if !member
-            && o2_enterprise::enterprise::alerts::incident_membership::separated(
-                org_id,
-                &candidate.id,
-                alert_id,
-            )
-            .await
-        {
+        if !member && separated_from(client, org_id, &candidate.id, alert_id, pairs).await? {
             continue;
         }
         let Some(incident) =
@@ -3836,6 +3906,7 @@ async fn select_ops_incident<C: sea_orm::ConnectionTrait>(
     org_id: &str,
     incoming: &HashMap<String, String>,
     firing: (&str, i64),
+    pairs: first_open::PairRead,
 ) -> Result<Option<infra::table::entity::alert_incidents::Model>, infra::errors::Error> {
     // Joining would re-key a case to ops dimensions, and its detection could no longer find it.
     let candidates = infra::table::alert_incidents::find_correlation_candidates_with(
@@ -3844,7 +3915,31 @@ async fn select_ops_incident<C: sea_orm::ConnectionTrait>(
         infra::table::alert_incidents::CaseFilter::NoCases,
     )
     .await?;
-    select_correlation_candidate(client, org_id, incoming, firing, candidates).await
+    select_correlation_candidate(client, org_id, incoming, firing, candidates, pairs).await
+}
+
+/// Whether the alert was moved out of incidents `incident_id`'s opener started.
+async fn separated_from<C: sea_orm::ConnectionTrait>(
+    client: &C,
+    org_id: &str,
+    incident_id: &str,
+    alert_id: &str,
+    pairs: first_open::PairRead,
+) -> Result<bool, infra::errors::Error> {
+    Ok(match pairs {
+        first_open::PairRead::Remembered => {
+            o2_enterprise::enterprise::alerts::incident_membership::separated(
+                org_id,
+                incident_id,
+                alert_id,
+            )
+            .await
+        }
+        first_open::PairRead::OnConnection => {
+            infra::table::incident_membership::separated_with(client, org_id, incident_id, alert_id)
+                .await?
+        }
+    })
 }
 
 /// What [announce_opened] says about an incident whose row was just written.
@@ -4105,39 +4200,23 @@ async fn settle_resolution(
     repair: bool,
     fence: &dyn TurnFence,
 ) -> Result<IncidentAfter, anyhow::Error> {
-    use infra::table::alert_incidents::AutomaticResolution;
+    use auto_resolve::{AutoResolved, auto_resolve_guarded};
+    use infra::table::alert_incidents::{CloseCaller, KeptReason};
 
+    let cause = CloseCaller::AlertRecovery;
     Ok(
-        match infra::table::alert_incidents::resolve_if_recovered(
-            org_id,
-            incident_id,
-            quiet_enabled(),
-        )
-        .await?
-        {
-            AutomaticResolution::Kept => IncidentAfter::Kept,
-            AutomaticResolution::Owned => IncidentAfter::Owned,
-            AutomaticResolution::AlreadyResolved(_) if !repair => {
-                IncidentAfter::AlreadyResolved(None)
-            }
+        match auto_resolve_guarded(org_id, incident_id, cause, muted, fence).await? {
+            AutoResolved::Kept(KeptReason::Owned) if quiet_enabled() => IncidentAfter::Owned,
+            AutoResolved::Kept(_) => IncidentAfter::Kept,
+            AutoResolved::AlreadyResolved(_) if !repair => IncidentAfter::AlreadyResolved(None),
             // A cut-short attempt may have committed the status but not its follow-up steps.
-            AutomaticResolution::AlreadyResolved(snapshot) => {
+            AutoResolved::AlreadyResolved(snapshot) => {
                 let user = SYSTEM_USER_EMAIL;
                 let resent =
-                    finish_status_change(org_id, incident_id, user, muted, *snapshot, fence);
+                    finish_status_change(org_id, incident_id, user, muted, *snapshot, fence, None);
                 IncidentAfter::AlreadyResolved(Some(resent.await?.1))
             }
-            AutomaticResolution::Resolved { before, after } => {
-                let muted_before = before.muted_by_downtime_id.is_some()
-                    && o2_enterprise::enterprise::common::config::get_config()
-                        .downtimes
-                        .enabled;
-                let quiet = muted || muted_before;
-                let user = SYSTEM_USER_EMAIL;
-                let finished =
-                    finish_status_change(org_id, incident_id, user, quiet, *after, fence);
-                IncidentAfter::Resolved(finished.await?.1)
-            }
+            AutoResolved::Closed(repairs) => IncidentAfter::Resolved(repairs),
         },
     )
 }
@@ -4683,177 +4762,126 @@ async fn find_or_create_incident(
         .map_or((triggered_at, triggered_at), |a| {
             (a.first_event_at, a.last_event_at)
         });
-    let exact = match (key_type, subject.siem_case_window) {
-        (KeyType::AlertId, Some(window)) => {
-            find_open_detection_case(org_id, &subject.id, span, window).await?
-        }
-        (KeyType::AlertId, None) => {
-            // An alert switched between SIEM and ops must not keep firing into the other kind.
-            let cases = infra::table::alert_incidents::CaseFilter::of_kind(subject.security_case);
-            infra::table::alert_incidents::find_open_incident_by_alert_id(
-                org_id,
-                &subject.id,
-                cases,
-            )
-            .await?
-        }
-        (_, Some(window)) => find_open_siem_case(org_id, group_values, span, window).await?,
-        _ => None,
+    // STEP 2 (Primary/Secondary, no case window) is the Venn match against open ops incidents:
+    // Equal, NewIsSubset or NewIsSuperset join; PartialOverlap or Incompatible create.
+    let lane = first_open::Lane::of(key_type, subject, span);
+    let client = match lane {
+        // The primary: a replica behind a just-opened incident would let the next firing open
+        // another.
+        first_open::Lane::Alert => infra::db::get_orm_client_rw().await,
+        _ => infra::db::get_orm_client_ro().await,
     };
-    let exact = match (exact, subject.entity_case.as_deref()) {
+    let pairs = first_open::PairRead::Remembered;
+    let found = first_open::look(
+        client,
+        org_id,
+        group_values,
+        subject,
+        triggered_at,
+        lane,
+        pairs,
+    );
+    let found = match (found.await?, subject.entity_case.as_deref()) {
         (None, Some(id)) => infra::table::alert_incidents::get(org_id, id)
             .await?
-            .filter(|case| case.status != "resolved"),
-        (exact, _) => exact,
+            .filter(|case| case.status != "resolved")
+            .map(|case| first_open::Found::Exact(Box::new(case))),
+        (found, _) => found,
     };
-    let joined = match exact {
-        Some(incident) => match join_alert_id_incident(
+    let mut rejected = Vec::new();
+    if let Some(found) = found {
+        let id = found.id().to_string();
+        let join = join_found(
+            found,
             org_id,
-            &incident,
+            group_values,
+            key_type,
             subject,
             triggered_at,
             correlation_reason,
+            service_name,
+            eval_level,
             muted_by,
-        )
-        .await?
-        {
-            AlertIdJoin::Joined {
-                new_alert_type,
-                reopened,
-            } => Some((incident, new_alert_type, reopened)),
-            AlertIdJoin::HeldBy(incident_id) => {
-                return Ok(Correlation::existing(
-                    IncidentCorrelationOutcome::ExistingAlertRepeated {
-                        incident_id,
-                        service_name: service_name.to_string(),
-                    },
-                ));
-            }
-            AlertIdJoin::Separated => None,
-        },
-        None => None,
-    };
-    {
-        if let Some((incident, is_new_alert_type, reopened)) = joined {
-            let alert_id = subject.id.clone();
-            if is_new_alert_type && let Some(entity) = subject.case_entity.as_ref() {
-                retitle_growing_case(org_id, &incident, entity).await;
-            }
-            let another_detection = is_new_alert_type
-                && subject.detection.as_ref().is_some_and(|d| {
-                    o2_enterprise::enterprise::security::cases::joins_another_detection(
-                        &incident.group_values,
-                        &d.key,
-                    )
-                });
-
-            // The write decides under its row lock, so two firings cannot both take the reopen.
-            let after_reopen = match infra::table::incident_events::record_alert(
-                org_id,
-                &incident.id,
-                &alert_id,
-                &subject.name,
-                triggered_at,
-            )
-            .await
-            {
-                Ok(waited) => waited == Some(true) && reopen_can_send(&incident, muted_by),
-                Err(e) => {
-                    log::error!(
-                        "[Incidents] Failed to record alert event for incident {org_id}/{}: {e}",
-                        incident.id
-                    );
-                    false
-                }
-            };
-
-            if muted_by.is_none()
-                && !reopened
-                && let Err(e) = crate::incidents::send_incident_event_trigger(
-                    org_id,
-                    &incident.id,
-                    IncidentEvent::alert(&alert_id, &subject.name, triggered_at),
-                )
-                .await
-            {
-                log::error!(
-                    "error triggering workflow for alert added for {org_id} incident id {} : {e}",
-                    incident.id
-                );
-            }
-
-            spawn_topology_enrichment(
-                org_id,
-                &incident.id,
-                service_name,
-                &alert_id,
-                &subject.name,
-                triggered_at,
-            );
-            if reopened {
-                // Recomputed from the un-muting firing, so "opened" carries the right level.
-                return Ok(Correlation::existing(
-                    escalate_then_reopen(
-                        org_id,
-                        &incident.id,
-                        escalate_severity(org_id, &incident, subject, eval_level),
-                        reopened_after_mute(org_id, incident.id.clone(), service_name, &alert_id),
-                    )
-                    .await,
-                ));
-            }
-
-            let raise = escalated_severity(&incident.severity, subject.severity, eval_level);
-            // A muted firing must not raise the severity silently; the un-muting firing does it.
-            let escalated = !firing_is_muted(muted_by, &incident, reopened)
-                && escalate_severity(org_id, &incident, subject, eval_level).await?;
-            if another_detection && let Some(detection) = subject.detection.as_ref() {
-                record_detection_joined(
-                    org_id,
-                    &incident,
-                    &subject.id,
-                    &subject.name,
-                    detection,
-                    raise.filter(|_| escalated),
-                )
-                .await;
-            }
-            if escalated {
-                return Ok(Correlation::existing(
-                    IncidentCorrelationOutcome::SeverityEscalated {
-                        incident_id: incident.id,
-                        service_name: service_name.to_string(),
-                    },
-                ));
-            }
-
-            if is_new_alert_type {
-                return Ok(Correlation::existing(
-                    IncidentCorrelationOutcome::NewAlertTypeJoined {
-                        incident_id: incident.id,
-                        service_name: service_name.to_string(),
-                    },
-                ));
-            }
-            return Ok(Correlation::existing(IncidentCorrelationOutcome::repeated(
-                incident.id,
-                service_name.to_string(),
-                after_reopen,
-            )));
+        );
+        match join.await? {
+            Some(joined) => return Ok(joined),
+            None => rejected.push(id),
         }
     }
 
-    // STEP 2: Venn diagram match against open incidents (for Primary/Secondary key types)
-    //
-    // Equal or NewIsSubset → join incident; NewIsSuperset → upgrade and join.
-    // PartialOverlap or Incompatible → skip (create new incident).
-    if key_type != KeyType::AlertId && subject.siem_case_window.is_none() {
-        let client = infra::db::get_orm_client_ro().await;
-        let firing = (subject.id.as_str(), triggered_at);
-        if let Some(existing) = select_ops_incident(client, org_id, group_values, firing).await? {
-            return join_ops_incident(
+    let new = prepare_opening(
+        org_id,
+        group_values,
+        key_type,
+        subject,
+        triggered_at,
+        correlation_reason,
+        eval_level,
+        muted_by,
+    )
+    .await?;
+    // Ends: every pass that does not return adds an incident no later pass can find again.
+    loop {
+        let recheck = first_open::Recheck {
+            lane,
+            rejected: &rejected,
+        };
+        let found = match first_open::open_rechecked(&new, recheck, service_name).await? {
+            first_open::Opened::Correlated(correlation) => return Ok(correlation),
+            first_open::Opened::Found(found) => found,
+        };
+        let id = found.id().to_string();
+        let join = join_found(
+            found,
+            org_id,
+            group_values,
+            key_type,
+            subject,
+            triggered_at,
+            correlation_reason,
+            service_name,
+            eval_level,
+            muted_by,
+        );
+        match join.await? {
+            Some(joined) => return Ok(joined),
+            None => rejected.push(id),
+        }
+    }
+}
+
+/// Joins a found incident as its lane joins; `None` when it refuses the firing.
+#[allow(clippy::too_many_arguments)]
+async fn join_found(
+    found: first_open::Found,
+    org_id: &str,
+    group_values: &HashMap<String, String>,
+    key_type: config::meta::alerts::incidents::KeyType,
+    subject: &CorrelationSubject<'_>,
+    triggered_at: i64,
+    correlation_reason: &str,
+    service_name: &str,
+    eval_level: Option<config::meta::alerts::level::AlertLevel>,
+    muted_by: Option<&str>,
+) -> Result<Option<Correlation>, anyhow::Error> {
+    match found {
+        first_open::Found::Exact(incident) => {
+            join_exact_incident(
                 org_id,
-                existing,
+                *incident,
+                subject,
+                triggered_at,
+                correlation_reason,
+                service_name,
+                eval_level,
+                muted_by,
+            )
+            .await
+        }
+        first_open::Found::Ops(existing) => {
+            join_ops_incident(
+                org_id,
+                *existing,
                 group_values,
                 key_type,
                 subject,
@@ -4863,25 +4891,153 @@ async fn find_or_create_incident(
                 eval_level,
                 muted_by,
             )
-            .await;
+            .await
         }
     }
+}
 
-    open_incident(
+/// STEP 1's join of the incident its alert id or security case matched; `None` when separated.
+#[allow(clippy::too_many_arguments)]
+async fn join_exact_incident(
+    org_id: &str,
+    incident: infra::table::entity::alert_incidents::Model,
+    subject: &CorrelationSubject<'_>,
+    triggered_at: i64,
+    correlation_reason: &str,
+    service_name: &str,
+    eval_level: Option<config::meta::alerts::level::AlertLevel>,
+    muted_by: Option<&str>,
+) -> Result<Option<Correlation>, anyhow::Error> {
+    let (is_new_alert_type, reopened) = match join_alert_id_incident(
         org_id,
-        group_values,
-        key_type,
+        &incident,
         subject,
         triggered_at,
         correlation_reason,
-        service_name,
-        eval_level,
         muted_by,
     )
+    .await?
+    {
+        AlertIdJoin::Joined {
+            new_alert_type,
+            reopened,
+        } => (new_alert_type, reopened),
+        AlertIdJoin::HeldBy(incident_id) => {
+            return Ok(Some(Correlation::existing(
+                IncidentCorrelationOutcome::ExistingAlertRepeated {
+                    incident_id,
+                    service_name: service_name.to_string(),
+                },
+            )));
+        }
+        AlertIdJoin::Separated => return Ok(None),
+    };
+    let alert_id = subject.id.clone();
+    if is_new_alert_type && let Some(entity) = subject.case_entity.as_ref() {
+        retitle_growing_case(org_id, &incident, entity).await;
+    }
+    let another_detection = is_new_alert_type
+        && subject.detection.as_ref().is_some_and(|d| {
+            o2_enterprise::enterprise::security::cases::joins_another_detection(
+                &incident.group_values,
+                &d.key,
+            )
+        });
+
+    // The write decides under its row lock, so two firings cannot both take the reopen.
+    let after_reopen = match infra::table::incident_events::record_alert(
+        org_id,
+        &incident.id,
+        &alert_id,
+        &subject.name,
+        triggered_at,
+    )
     .await
+    {
+        Ok(waited) => waited == Some(true) && reopen_can_send(&incident, muted_by),
+        Err(e) => {
+            log::error!(
+                "[Incidents] Failed to record alert event for incident {org_id}/{}: {e}",
+                incident.id
+            );
+            false
+        }
+    };
+
+    if muted_by.is_none()
+        && !reopened
+        && let Err(e) = crate::incidents::send_incident_event_trigger(
+            org_id,
+            &incident.id,
+            IncidentEvent::alert(&alert_id, &subject.name, triggered_at),
+        )
+        .await
+    {
+        log::error!(
+            "error triggering workflow for alert added for {org_id} incident id {} : {e}",
+            incident.id
+        );
+    }
+
+    spawn_topology_enrichment(
+        org_id,
+        &incident.id,
+        service_name,
+        &alert_id,
+        &subject.name,
+        triggered_at,
+    );
+    if reopened {
+        // Recomputed from the un-muting firing, so "opened" carries the right level.
+        return Ok(Some(Correlation::existing(
+            escalate_then_reopen(
+                org_id,
+                &incident.id,
+                escalate_severity(org_id, &incident, subject, eval_level),
+                reopened_after_mute(org_id, incident.id.clone(), service_name, &alert_id),
+            )
+            .await,
+        )));
+    }
+
+    let raise = escalated_severity(&incident.severity, subject.severity, eval_level);
+    // A muted firing must not raise the severity silently; the un-muting firing does it.
+    let escalated = !firing_is_muted(muted_by, &incident, reopened)
+        && escalate_severity(org_id, &incident, subject, eval_level).await?;
+    if another_detection && let Some(detection) = subject.detection.as_ref() {
+        record_detection_joined(
+            org_id,
+            &incident,
+            &subject.id,
+            &subject.name,
+            detection,
+            raise.filter(|_| escalated),
+        )
+        .await;
+    }
+    if escalated {
+        return Ok(Some(Correlation::existing(
+            IncidentCorrelationOutcome::SeverityEscalated {
+                incident_id: incident.id,
+                service_name: service_name.to_string(),
+            },
+        )));
+    }
+
+    if is_new_alert_type {
+        return Ok(Some(Correlation::existing(
+            IncidentCorrelationOutcome::NewAlertTypeJoined {
+                incident_id: incident.id,
+                service_name: service_name.to_string(),
+            },
+        )));
+    }
+    Ok(Some(Correlation::existing(
+        IncidentCorrelationOutcome::repeated(incident.id, service_name.to_string(), after_reopen),
+    )))
 }
 
-/// STEP 2's join of the open ops incident the firing's dimensions matched.
+/// STEP 2's join of the open ops incident the firing's dimensions matched; `None` when separated.
 #[allow(clippy::too_many_arguments)]
 async fn join_ops_incident(
     org_id: &str,
@@ -4894,7 +5050,7 @@ async fn join_ops_incident(
     service_name: &str,
     eval_level: Option<config::meta::alerts::level::AlertLevel>,
     muted_by: Option<&str>,
-) -> Result<Correlation, anyhow::Error> {
+) -> Result<Option<Correlation>, anyhow::Error> {
     use config::meta::alerts::incidents::{DimensionRelationship, KeyType};
     use infra::table::alert_incidents::Linked;
 
@@ -4923,18 +5079,7 @@ async fn join_ops_incident(
         new_alert_type: is_new_alert_type,
     } = linked
     else {
-        return open_incident(
-            org_id,
-            group_values,
-            key_type,
-            subject,
-            triggered_at,
-            correlation_reason,
-            service_name,
-            eval_level,
-            muted_by,
-        )
-        .await;
+        return Ok(None);
     };
 
     // The write decides under its row lock, so two firings cannot both take the reopen.
@@ -4976,7 +5121,8 @@ async fn join_ops_incident(
         );
     }
 
-    let updated = infra::table::alert_incidents::get(org_id, &existing.id)
+    // The primary: an incident found under the create lock may not be on a replica yet.
+    let updated = infra::table::alert_incidents::get_rw(org_id, &existing.id)
         .await?
         .ok_or_else(|| anyhow::anyhow!("Incident not found"))?;
 
@@ -5061,7 +5207,7 @@ async fn join_ops_incident(
         if is_new_alert_type && !remembered && subject.membership_checked() {
             spawn_membership_check(org_id, &existing.id, &subject.id, false, muted_by);
         }
-        return Ok(Correlation::existing(reopen));
+        return Ok(Some(Correlation::existing(reopen)));
     }
 
     if is_new_alert_type {
@@ -5075,54 +5221,26 @@ async fn join_ops_incident(
                 config::meta::alerts::rca_runs::RunTrigger::AutoNewAlertType,
                 config::meta::alerts::rca_runs::AutoRunOpts::for_trigger(
                     config::meta::alerts::rca_runs::RunTrigger::AutoNewAlertType,
-                ),
+                )
+                .paged_by(&subject.id),
             )
             .await;
         }
-        Ok(Correlation::existing(
+        Ok(Some(Correlation::existing(
             IncidentCorrelationOutcome::NewAlertTypeJoined {
                 incident_id: existing.id,
                 service_name: service_name.to_string(),
             },
-        ))
+        )))
     } else {
-        Ok(Correlation::existing(IncidentCorrelationOutcome::repeated(
-            existing.id,
-            service_name.to_string(),
-            after_reopen,
+        Ok(Some(Correlation::existing(
+            IncidentCorrelationOutcome::repeated(
+                existing.id,
+                service_name.to_string(),
+                after_reopen,
+            ),
         )))
     }
-}
-
-#[allow(clippy::too_many_arguments)]
-async fn open_incident(
-    org_id: &str,
-    group_values: &HashMap<String, String>,
-    key_type: config::meta::alerts::incidents::KeyType,
-    subject: &CorrelationSubject<'_>,
-    triggered_at: i64,
-    correlation_reason: &str,
-    service_name: &str,
-    eval_level: Option<config::meta::alerts::level::AlertLevel>,
-    muted_by: Option<&str>,
-) -> Result<Correlation, anyhow::Error> {
-    let outcome = create_new_incident(
-        org_id,
-        group_values,
-        key_type,
-        subject,
-        triggered_at,
-        correlation_reason,
-        service_name,
-        eval_level,
-        muted_by,
-    )
-    .await?;
-    let created = matches!(
-        outcome,
-        IncidentCorrelationOutcome::NewIncidentCreated { .. }
-    );
-    Ok(Correlation { outcome, created })
 }
 
 /// Sets up a moved-out alert's own incident: a still-firing one notifies, routes and starts its
@@ -5457,7 +5575,7 @@ async fn membership_on_join(
             org_id,
             incident_id,
             RunTrigger::AutoNewAlertType,
-            AutoRunOpts::for_trigger(RunTrigger::AutoNewAlertType),
+            AutoRunOpts::for_trigger(RunTrigger::AutoNewAlertType).paged_by(alert_id),
         )
         .await;
     }
@@ -5490,7 +5608,7 @@ fn spawn_membership_check(
                     &org,
                     &incident,
                     RunTrigger::AutoNewAlertType,
-                    AutoRunOpts::for_trigger(RunTrigger::AutoNewAlertType),
+                    AutoRunOpts::for_trigger(RunTrigger::AutoNewAlertType).paged_by(&alert),
                 )
                 .await;
             }
@@ -5840,6 +5958,128 @@ pub async fn list_incidents_filtered(
     Ok((incidents_list, total))
 }
 
+/// One page of the list; `service` and `q` read `group_values`, so they match in Rust.
+pub async fn list_incidents_page(
+    org_id: &str,
+    query: &infra::table::alert_incidents::ListPageQuery,
+    service: Option<&str>,
+    q: Option<&str>,
+) -> Result<(Vec<Incident>, infra::table::alert_incidents::ListPage), anyhow::Error> {
+    let (service, needle) = list_search_terms(service, q);
+    let keep = |row: &infra::table::alert_incidents::ListCandidate| {
+        service.is_none_or(|service| {
+            row.group_values.get("service").and_then(|v| v.as_str()) == Some(service)
+        }) && needle
+            .as_deref()
+            .is_none_or(|needle| matches_list_search(row, needle))
+    };
+    let keep = (service.is_some() || needle.is_some())
+        .then_some(&keep as &infra::table::alert_incidents::ListKeep<'_>);
+    let mut page = infra::table::alert_incidents::list_page(org_id, query, keep).await?;
+    let mut incidents = incidents_with_counts(std::mem::take(&mut page.rows)).await?;
+
+    crate::service_identity::display_feed::ensure(org_id).await;
+    let identities = crate::service_identity::display_feed::identities(org_id).await;
+    for incident in &mut incidents {
+        crate::service_identity::display_feed::decorate_incident(org_id, incident, &identities);
+    }
+    Ok((incidents, page))
+}
+
+/// The trimmed `service` and lower-cased `q`; a blank one filters nothing.
+fn list_search_terms<'a>(
+    service: Option<&'a str>,
+    q: Option<&str>,
+) -> (Option<&'a str>, Option<String>) {
+    (
+        service.map(str::trim).filter(|service| !service.is_empty()),
+        q.map(|q| q.trim().to_lowercase()).filter(|q| !q.is_empty()),
+    )
+}
+
+/// The list's search box: the title (or its dimensions), the status, the severity or a `k=v`.
+fn matches_list_search(row: &infra::table::alert_incidents::ListCandidate, needle: &str) -> bool {
+    // Whole labels avoid treating partial words from another locale as a status match.
+    let status_labels: &[&str] = match row.status.as_str() {
+        "open" => &[
+            "مفتوح",
+            "offen",
+            "abierto",
+            "ouvert",
+            "aperto",
+            "未解決",
+            "미해결",
+            "otwarty",
+            "aberto",
+            "открыт",
+            "açık",
+            "đang mở",
+            "未解决",
+        ],
+        "acknowledged" => &[
+            "تم الإقرار",
+            "bestätigt",
+            "reconocido",
+            "reconnu",
+            "preso in carico",
+            "確認済み",
+            "확인됨",
+            "erkend",
+            "potwierdzone",
+            "reconhecido",
+            "подтверждено",
+            "onaylandı",
+            "đã xác nhận",
+            "已确认",
+            "已確認",
+        ],
+        "resolved" => &[
+            "تم الحل",
+            "behoben",
+            "resuelto",
+            "résolu",
+            "risolto",
+            "解決済み",
+            "해결됨",
+            "opgelost",
+            "rozwiązane",
+            "resolvido",
+            "решено",
+            "çözüldü",
+            "đã giải quyết",
+            "已解决",
+            "已解決",
+        ],
+        _ => &[],
+    };
+    if status_labels.contains(&needle) {
+        return true;
+    }
+    let pairs: Vec<String> = row
+        .group_values
+        .as_object()
+        .into_iter()
+        .flatten()
+        .map(|(key, value)| match value.as_str() {
+            Some(text) => format!("{key}={text}"),
+            None => format!("{key}={value}"),
+        })
+        .collect();
+    let title = match &row.title {
+        Some(title) if !title.is_empty() => title.clone(),
+        _ if pairs.is_empty() => "Unknown".to_string(),
+        _ => pairs.join(", "),
+    };
+    [
+        title,
+        row.status.clone(),
+        row.severity.clone(),
+        pairs.join(" "),
+    ]
+    .iter()
+    .any(|field| field.to_lowercase().contains(needle))
+}
+
 /// A merged security case counts each case one firing was split into, above its link count.
 fn keeps_stored_count(security_case: bool, stored: i32, links: i32) -> bool {
     security_case && stored > links && links > 0
@@ -6065,9 +6305,47 @@ pub fn rca_off_reason_for(analysis_on: bool, agent_available: bool) -> Option<&'
     }
 }
 
-/// The user that automatic runs act and are metered as.
+/// The incident's linked on-call records, else its latest open one: the records a run tells.
 #[cfg(feature = "enterprise")]
-pub(crate) const SYSTEM_USER_EMAIL: &str = "system@openobserve.ai";
+pub(crate) async fn incident_records(
+    org_id: &str,
+    incident_id: &str,
+) -> Vec<config::meta::oncall::Response> {
+    match infra::table::oncall_responses::list_for_incident(org_id, incident_id).await {
+        Ok(linked) if !linked.is_empty() => linked,
+        _ => infra::table::oncall_responses::latest_open_for_source(
+            org_id,
+            config::meta::oncall::SubjectType::Incident,
+            incident_id,
+        )
+        .await
+        .ok()
+        .flatten()
+        .into_iter()
+        .collect(),
+    }
+}
+
+/// The incident's on-call records still waiting on an analysis, at their current ladder run.
+#[cfg(feature = "enterprise")]
+async fn incident_recipients(
+    org_id: &str,
+    incident_id: &str,
+) -> Vec<infra::table::rca_delivery_obligations::Recipient> {
+    use o2_enterprise::enterprise::oncall::escalation::analysis_may_run;
+
+    let mut recipients = Vec::new();
+    for record in incident_records(org_id, incident_id).await {
+        if analysis_may_run(org_id, &record.subject).await {
+            recipients.push(infra::table::rca_delivery_obligations::Recipient {
+                ladder_run: record.current_run(),
+                response_id: record.id,
+                subject: record.subject,
+            });
+        }
+    }
+    recipients
+}
 
 /// The one start path of automatic runs.
 #[cfg(feature = "enterprise")]
@@ -6077,12 +6355,56 @@ pub(crate) async fn start_automatic_rca(
     trigger: config::meta::alerts::rca_runs::RunTrigger,
     opts: config::meta::alerts::rca_runs::AutoRunOpts,
 ) -> AutoStart {
+    let run_id = match admit_automatic_rca(org_id, incident_id, trigger, &opts, None).await {
+        Ok(run_id) => run_id,
+        Err(skipped) => return skipped,
+    };
+    // The turn's finalizer ends the run; this task only starts it.
+    let org_id_rca = org_id.to_string();
+    let incident_id_rca = incident_id.to_string();
+    tokio::spawn(async move {
+        // Every failure has already ended the run and released the hold.
+        if let Err(e) = trigger_rca_for_incident(
+            org_id_rca,
+            incident_id_rca.clone(),
+            run_id.clone(),
+            RcaLaunch {
+                trigger,
+                user_email: SYSTEM_USER_EMAIL.to_string(),
+                build_on_previous: opts.builds_on_previous(),
+                // Metered inside, right before the turn starts.
+                usage_permit: None,
+                guidance: None,
+                // Automatic runs start fresh.
+                resume: None,
+            },
+        )
+        .await
+        {
+            log::debug!(
+                "[INCIDENTS::RCA] {} run {run_id} for {incident_id_rca} did not start: {}",
+                trigger.as_str(),
+                e.error_code()
+            );
+        }
+    });
+    AutoStart::Started
+}
+
+#[cfg(feature = "enterprise")]
+async fn admit_automatic_rca(
+    org_id: &str,
+    incident_id: &str,
+    trigger: config::meta::alerts::rca_runs::RunTrigger,
+    opts: &config::meta::alerts::rca_runs::AutoRunOpts,
+    guidance: Option<String>,
+) -> Result<String, AutoStart> {
     use o2_enterprise::enterprise::alerts::rca_service;
 
     use super::rca_runs::{RunSubject, StartOutcome, StartRun};
 
     if !rca_will_run(org_id, incident_id).await {
-        return AutoStart::NotStarted(rca_not_run_reason());
+        return Err(AutoStart::NotStarted(rca_not_run_reason()));
     }
     match infra::table::alert_incidents::get(org_id, incident_id).await {
         Ok(Some(incident)) if incident.rca_off_reason.is_some() => {
@@ -6092,13 +6414,13 @@ pub(crate) async fn start_automatic_rca(
             );
             rca_service::skip_analysis_for_incident(org_id, incident_id).await;
             // Already recorded, so there is nothing new to say.
-            return AutoStart::NotStarted(None);
+            return Err(AutoStart::NotStarted(None));
         }
         Ok(_) => {}
         Err(e) => {
             log::error!("[INCIDENTS::RCA] Could not read incident {org_id}/{incident_id}: {e}");
             rca_service::skip_analysis_for_incident(org_id, incident_id).await;
-            return AutoStart::NotStarted(Some(RCA_OFF_START_FAILED));
+            return Err(AutoStart::NotStarted(Some(RCA_OFF_START_FAILED)));
         }
     }
 
@@ -6106,7 +6428,7 @@ pub(crate) async fn start_automatic_rca(
     if trigger == config::meta::alerts::rca_runs::RunTrigger::AutoNewIncident
         && let Some(started) = super::rca_recheck::try_recheck(org_id, incident_id).await
     {
-        return started;
+        return Err(started);
     }
 
     // A refusal starts nothing and charges nothing; the meter runs after the start.
@@ -6126,7 +6448,7 @@ pub(crate) async fn start_automatic_rca(
         );
         // No verdict is coming, so nothing may go on holding a page for one.
         rca_service::skip_analysis_for_incident(org_id, incident_id).await;
-        return AutoStart::NotStarted(Some(RCA_OFF_QUOTA));
+        return Err(AutoStart::NotStarted(Some(RCA_OFF_QUOTA)));
     }
 
     let outcome = super::rca_runs::start_run(StartRun {
@@ -6135,20 +6457,22 @@ pub(crate) async fn start_automatic_rca(
         trigger,
         mode: opts.mode,
         started_by: "system".to_string(),
-        guidance: None,
+        guidance,
         skip_cooldown: opts.skip_cooldown,
         oncall_subjects: None,
         context_used: None,
+        recipients: incident_recipients(org_id, incident_id).await,
+        page_key: opts.page_key.clone(),
     })
     .await;
-    let run_id = match outcome {
-        Ok(StartOutcome::Started { run_id }) => run_id,
+    match outcome {
+        Ok(StartOutcome::Started { run_id }) => Ok(run_id),
         Ok(StartOutcome::InFlight) => {
             log::debug!(
                 "[INCIDENTS::RCA] Analysis already in-flight for {incident_id}, skipping {} trigger",
                 trigger.as_str()
             );
-            return AutoStart::NotStarted(None);
+            Err(AutoStart::NotStarted(None))
         }
         Ok(StartOutcome::CoolingDown) => {
             log::debug!(
@@ -6156,46 +6480,14 @@ pub(crate) async fn start_automatic_rca(
                 trigger.as_str()
             );
             rca_service::skip_analysis_for_incident(org_id, incident_id).await;
-            return AutoStart::NotStarted(Some(RCA_OFF_COOLING_DOWN));
+            Err(AutoStart::NotStarted(Some(RCA_OFF_COOLING_DOWN)))
         }
         Err(e) => {
             log::error!("[INCIDENTS::RCA] Could not start a run for {org_id}/{incident_id}: {e}");
             rca_service::skip_analysis_for_incident(org_id, incident_id).await;
-            return AutoStart::NotStarted(Some(RCA_OFF_START_FAILED));
+            Err(AutoStart::NotStarted(Some(RCA_OFF_START_FAILED)))
         }
-    };
-
-    // The turn's finalizer ends the run; this task only starts it.
-    let org_id_rca = org_id.to_string();
-    let incident_id_rca = incident_id.to_string();
-    tokio::spawn(async move {
-        // Every failure has already ended the run and released the hold.
-        if let Err(e) = trigger_rca_for_incident(
-            org_id_rca,
-            incident_id_rca.clone(),
-            run_id.clone(),
-            RcaLaunch {
-                trigger,
-                user_email: SYSTEM_USER_EMAIL.to_string(),
-                build_on_previous: opts.builds_on_previous(),
-                // Metered inside, right before the turn starts.
-                usage_permit: None,
-                // Automatic runs carry no guidance.
-                guidance: None,
-                // Automatic runs start fresh.
-                resume: None,
-            },
-        )
-        .await
-        {
-            log::debug!(
-                "[INCIDENTS::RCA] {} run {run_id} for {incident_id_rca} did not start: {}",
-                trigger.as_str(),
-                e.error_code()
-            );
-        }
-    });
-    AutoStart::Started
+    }
 }
 
 /// The team the org saved for AutoObserve pages; None when unset or deleted, so routing runs as
@@ -6249,7 +6541,18 @@ async fn route_new_incident(
         dimensions,
     )
     .await;
-    routed_from(org_id, incident_id, dimensions, started).await
+    let routed = routed_from(org_id, incident_id, dimensions, started).await;
+    let record = routed.record.as_ref();
+    v2_fields::record_owner_team(org_id, incident_id, record, team, dimensions).await;
+    routed
+}
+
+/// The owner of an incident opened without paging: the team routing names for its group (I-22).
+#[cfg(feature = "enterprise")]
+async fn record_routed_owner(org_id: &str, incident_id: &str, groups: &HashMap<String, String>) {
+    if o2_enterprise::enterprise::oncall::is_enabled() {
+        v2_fields::record_owner_team(org_id, incident_id, None, None, groups).await;
+    }
 }
 
 /// An external alert's routing dimensions: its labels, else the service discovery named. [pure]
@@ -6292,30 +6595,41 @@ async fn routed_from(
         Ok(None) => {
             return RoutedIncident {
                 record: None,
+                impacted_error: None,
                 error: None,
             };
         }
         Err(e) => {
             return RoutedIncident {
                 record: None,
+                impacted_error: None,
                 error: Some(e.context(format!("on-call paging failed for {org_id}/{incident_id}"))),
             };
         }
     };
     // Without this, nothing can get from an incident to the record that paged.
-    let error = infra::table::oncall_responses::attach_incident(org_id, &origin.id, incident_id)
-        .await
-        .err()
-        .map(|e| anyhow::anyhow!("could not link on-call record for {org_id}/{incident_id}: {e}"));
+    let error = if origin.incident_id.as_deref() == Some(incident_id) {
+        None
+    } else {
+        infra::table::oncall_responses::attach_incident(org_id, &origin.id, incident_id)
+            .await
+            .err()
+            .map(|e| {
+                anyhow::anyhow!("could not link on-call record for {org_id}/{incident_id}: {e}")
+            })
+    };
     // The blast radius hangs off whichever record actually paged, which here is this one.
-    if let Err(e) =
-        crate::alerts::scheduler::handlers::page_blast_radius(org_id, &origin, dimensions).await
-    {
-        log::error!("[incidents] impacted paging failed for {org_id}/{incident_id}: {e}");
+    let impacted_error =
+        crate::alerts::scheduler::handlers::page_blast_radius(org_id, &origin, dimensions)
+            .await
+            .err();
+    if let Some(error) = &impacted_error {
+        log::error!("[incidents] impacted paging failed for {org_id}/{incident_id}: {error}");
     }
     RoutedIncident {
         record: Some(origin),
         error,
+        impacted_error,
     }
 }
 
@@ -6326,9 +6640,46 @@ async fn start_new_incident_rca(
     incident_id: &str,
     routed: Option<&config::meta::oncall::Response>,
 ) -> Result<Option<&'static str>, anyhow::Error> {
-    if let Some(record) = routed
-        && o2_enterprise::enterprise::alerts::rca_service::l0_off_for_record(org_id, record).await
-    {
+    if record_new_incident_l0_off(org_id, incident_id, routed, None).await? {
+        return Ok(None);
+    }
+    use config::meta::alerts::rca_runs::{AutoRunOpts, RunTrigger};
+    let trigger = RunTrigger::AutoNewIncident;
+    Ok(start_automatic_rca(
+        org_id,
+        incident_id,
+        trigger,
+        AutoRunOpts::for_trigger(trigger),
+    )
+    .await
+    .off_reason())
+}
+
+#[cfg(feature = "enterprise")]
+async fn record_new_incident_l0_off(
+    org_id: &str,
+    incident_id: &str,
+    routed: Option<&config::meta::oncall::Response>,
+    declared_route: Option<(&str, config::meta::alerts::priority::AlertPriority)>,
+) -> anyhow::Result<bool> {
+    let l0_off = match (routed, declared_route) {
+        (Some(record), _) => {
+            o2_enterprise::enterprise::alerts::rca_service::l0_off_for_record(org_id, record).await
+        }
+        (None, Some((team, priority))) => {
+            match infra::table::oncall_policies::get_or_create_cached(org_id, team).await {
+                Ok(policy) => policy.l0.mode_for(priority) == config::meta::oncall::L0Mode::Off,
+                Err(error) => {
+                    log::warn!(
+                        "[INCIDENTS::RCA] Could not read the L0 policy of team {org_id}/{team}: {error}"
+                    );
+                    false
+                }
+            }
+        }
+        (None, None) => false,
+    };
+    if l0_off {
         let stored =
             infra::table::alert_incidents::set_rca_off_reason(org_id, incident_id, Some("l0_off"))
                 .await;
@@ -6341,18 +6692,8 @@ async fn start_new_incident_rca(
         stored.map_err(|e| {
             anyhow::anyhow!("Could not record that L0 is off for {org_id}/{incident_id}: {e}")
         })?;
-        return Ok(None);
     }
-    Ok(start_automatic_rca(
-        org_id,
-        incident_id,
-        config::meta::alerts::rca_runs::RunTrigger::AutoNewIncident,
-        config::meta::alerts::rca_runs::AutoRunOpts::for_trigger(
-            config::meta::alerts::rca_runs::RunTrigger::AutoNewIncident,
-        ),
-    )
-    .await
-    .off_reason())
+    Ok(l0_off)
 }
 
 /// An un-muted incident's analysis.
@@ -6391,35 +6732,53 @@ async fn start_unmuted_incident_rca(
 /// Tells each of the incident's pages that a new alert joined, re-running a ladder that ran out.
 #[cfg(feature = "enterprise")]
 async fn page_again_after_new_alert(org_id: &str, incident_id: &str) {
+    let result = match infra::table::oncall_responses::list_for_incident(org_id, incident_id).await
+    {
+        Ok(pages) => page_again_after_new_alert_in_records(org_id, &pages, None).await,
+        Err(error) => Err(error.into()),
+    };
+    if let Err(error) = result {
+        log::error!("[incidents] on-call pages of {org_id}/{incident_id}: {error}");
+    }
+}
+
+#[cfg(feature = "enterprise")]
+async fn page_again_after_new_alert_in_records(
+    org_id: &str,
+    pages: &[config::meta::oncall::Response],
+    transition_at: Option<i64>,
+) -> anyhow::Result<()> {
     use config::meta::oncall::NewAlertEffect;
     use o2_enterprise::enterprise::oncall::{escalation::ENGINE_ACTOR, replicate};
 
     let now = config::utils::time::now_micros();
-    let pages = match infra::table::oncall_responses::list_for_incident(org_id, incident_id).await {
-        Ok(pages) => pages,
-        Err(e) => {
-            log::error!("[incidents] on-call pages of {org_id}/{incident_id}: {e}");
-            return;
-        }
-    };
+    let mut first_error = None;
     for page in pages {
+        if transition_at.is_some_and(|at| page.ladder_start() >= at) {
+            continue;
+        }
         let repaged = match page.on_new_alert(now) {
             NewAlertEffect::Nothing => continue,
             NewAlertEffect::NoteOnly => false,
-            // Ok(false): acked, snoozed or re-run since the read, so this alert only gets the note.
-            NewAlertEffect::PageAgain => match restart_exhausted_ladder(org_id, &page, now).await {
+            NewAlertEffect::PageAgain => match restart_exhausted_ladder(org_id, page, now).await {
                 Ok(repaged) => repaged,
-                Err(e) => {
-                    log::error!("[incidents] could not page {org_id}/{} again: {e}", page.id);
+                Err(error) => {
+                    log::error!(
+                        "[incidents] could not page {org_id}/{} again: {error}",
+                        page.id
+                    );
+                    first_error.get_or_insert(error);
                     continue;
                 }
             },
         };
         let event = page.new_alert_note(repaged, ENGINE_ACTOR, now);
-        if let Err(e) = replicate::add_event(org_id, &page.id, &event).await {
-            log::error!("[incidents] timeline of {org_id}/{}: {e}", page.id);
+        if let Err(error) = replicate::add_event(org_id, &page.id, &event).await {
+            log::error!("[incidents] timeline of {org_id}/{}: {error}", page.id);
+            first_error.get_or_insert(error.into());
         }
     }
+    first_error.map_or(Ok(()), Err)
 }
 
 /// Re-runs an exhausted page's ladder if nobody touched it since `seen`, then re-arms its timer.
@@ -6507,6 +6866,19 @@ pub async fn trigger_rca_for_incident(
     run_id: String,
     launch: RcaLaunch,
 ) -> Result<(), super::rca_turn::RcaTurnError> {
+    launch_incident_rca(org_id, incident_id, run_id, launch, None)
+        .await
+        .map(|_| ())
+}
+
+#[cfg(feature = "enterprise")]
+async fn launch_incident_rca(
+    org_id: String,
+    incident_id: String,
+    run_id: String,
+    launch: RcaLaunch,
+    saved_session: Option<String>,
+) -> Result<Option<super::rca_turn::TurnStarted>, super::rca_turn::RcaTurnError> {
     #[cfg_attr(not(feature = "cloud"), allow(unused_variables))]
     let RcaLaunch {
         trigger,
@@ -6565,7 +6937,7 @@ pub async fn trigger_rca_for_incident(
     if !incidents_enabled() || !config.incidents.rca_enabled {
         log::debug!("[INCIDENTS::RCA] RCA not enabled, ending run {run_id}");
         end_failed(ERROR_RCA_DISABLED, RCA_DISABLED_REASON, None).await;
-        return Ok(());
+        return Ok(None);
     }
 
     if !config.ai.has_agent_target() {
@@ -6576,14 +6948,14 @@ pub async fn trigger_rca_for_incident(
             None,
         )
         .await;
-        return Ok(());
+        return Ok(None);
     }
 
     // The run must be refused before the billable turn.
     if !trigger.is_user_started() && rca_service::l0_off_for_incident(&org_id, &incident_id).await {
         log::debug!("[INCIDENTS::RCA] L0 is off for {incident_id}'s priority, ending run {run_id}");
         end_failed(ERROR_L0_OFF, L0_OFF_REASON, None).await;
-        return Ok(());
+        return Ok(None);
     }
 
     // The primary, since the run just started.
@@ -6603,7 +6975,9 @@ pub async fn trigger_rca_for_incident(
         trigger.as_str()
     );
 
-    let previous_analysis = if build_on_previous && resume.is_none() {
+    let history_allowed =
+        infra::table::rca_fence::incident_history_allowed(&org_id, &incident_id).await;
+    let previous_analysis = if build_on_previous && resume.is_none() && history_allowed {
         newest_completed_report(&org_id, &incident_id)
             .await
             .unwrap_or_else(|e| {
@@ -6621,9 +6995,14 @@ pub async fn trigger_rca_for_incident(
     } else {
         None
     };
-    let context =
-        rca_service::build_incident_context(&org_id, &incident_id, previous_analysis, evidence)
-            .await;
+    let context = super::rca_context::incident_context(
+        &org_id,
+        &incident_id,
+        previous_analysis,
+        evidence,
+        None,
+    )
+    .await;
     let context = rca_service::rca_context_json(&context);
 
     #[cfg(feature = "cloud")]
@@ -6657,7 +7036,7 @@ pub async fn trigger_rca_for_incident(
                             Some(error.to_string()),
                         )
                         .await;
-                        return Ok(());
+                        return Ok(None);
                     }
                 }
             }
@@ -6688,7 +7067,7 @@ pub async fn trigger_rca_for_incident(
                         Some(format!("{e:#}")),
                     )
                     .await;
-                    return Ok(());
+                    return Ok(None);
                 }
             }
         }
@@ -6715,7 +7094,7 @@ pub async fn trigger_rca_for_incident(
         trigger,
         mode,
         context,
-        session_id: None,
+        session_id: saved_session,
     };
     let started = match fork {
         Some(fork) => start_forked_rca_turn(run, fork).await,
@@ -6747,7 +7126,7 @@ pub async fn trigger_rca_for_incident(
             if let Some(row) = guidance_row {
                 super::rca_steering::guidance_admitted(row).await;
             }
-            Ok(())
+            Ok(Some(started))
         }
         Err(e) => end_turn_failed(e).await,
     }
@@ -6814,13 +7193,13 @@ async fn model_to_incident(
 
 /// The resolved incidents whose on-call record a muted resolve left open, in scan order.
 fn left_open<'a>(
-    resolved: &'a [String],
+    resolved: &'a [(String, infra::table::alert_incidents::Episode)],
     records: &HashMap<String, Vec<config::meta::oncall::Response>>,
-) -> Vec<&'a str> {
+) -> Vec<(&'a str, &'a infra::table::alert_incidents::Episode)> {
     resolved
         .iter()
-        .filter(|id| records.get(*id).is_some_and(|held| holds_open_record(held)))
-        .map(String::as_str)
+        .filter(|(id, _)| records.get(id).is_some_and(|held| holds_open_record(held)))
+        .map(|(id, episode)| (id.as_str(), episode))
         .collect()
 }
 
@@ -6891,6 +7270,17 @@ fn model_to_incident_with_topology(
         historical: db_model.historical,
         group_values_display: None,
         last_detection_at: db_model.last_detection_at,
+        owner_team_id: db_model.owner_team_id,
+        comms_owner: db_model.comms_owner,
+        impact_start_at: db_model.impact_start_at,
+        impact_end_at: db_model.impact_end_at,
+        customer_impact: db_model.customer_impact,
+        resolution_cause: db_model
+            .resolution_cause
+            .as_deref()
+            .and_then(config::meta::oncall::ResolutionCause::from_str_opt),
+        cause_reviewed_by: db_model.cause_reviewed_by,
+        cause_reviewed_at: db_model.cause_reviewed_at,
     }
 }
 
@@ -6920,6 +7310,36 @@ async fn record_muted_auto_resolve<C: sea_orm::ConnectionTrait + sea_orm::Transa
     Ok(())
 }
 
+pub async fn ensure_lead(
+    org_id: &str,
+    incident_id: &str,
+    acker: &crate::alerts::ack::Caller,
+    source: infra::table::alert_incidents::LeadAck<'_>,
+) -> Result<bool, anyhow::Error> {
+    if acker.ai || acker.email.is_empty() || acker.email.eq_ignore_ascii_case(SYSTEM_USER_EMAIL) {
+        return Ok(false);
+    }
+    let Some(edited) = infra::table::alert_incidents::ensure_lead_for_human(
+        org_id,
+        incident_id,
+        &acker.email,
+        source,
+    )
+    .await?
+    else {
+        return Ok(false);
+    };
+    if let Some(event) = edited.event
+        && let Err(e) =
+            crate::incidents::send_incident_event_trigger(org_id, incident_id, event).await
+    {
+        log::error!(
+            "[incidents] could not dispatch the lead change of {org_id}/{incident_id}: {e}"
+        );
+    }
+    Ok(true)
+}
+
 /// The event and the super-cluster status of an ack change the one ack wrote.
 /// [weak: a lost event or publish is logged; the row change stands]
 pub async fn record_ack_change(
@@ -6927,7 +7347,21 @@ pub async fn record_ack_change(
     incident_id: &str,
     status: config::meta::alerts::incidents::IncidentStatus,
     event: IncidentEvent,
+    caller: &crate::alerts::ack::Caller,
+    acknowledged_at: Option<i64>,
 ) {
+    if status == config::meta::alerts::incidents::IncidentStatus::Acknowledged
+        && let Some(acknowledged_at) = acknowledged_at
+        && let Err(e) = ensure_lead(
+            org_id,
+            incident_id,
+            caller,
+            infra::table::alert_incidents::LeadAck::Incident { acknowledged_at },
+        )
+        .await
+    {
+        log::error!("[incidents] could not set the lead of {org_id}/{incident_id}: {e}");
+    }
     let row = match infra::table::alert_incidents::get(org_id, incident_id).await {
         Ok(m) => m,
         Err(e) => {
@@ -6941,7 +7375,13 @@ pub async fn record_ack_change(
     if let Err(e) = append_event_unless_muted(org_id, incident_id, event, muted).await {
         log::error!("[incidents] could not record the ack of {org_id}/{incident_id}: {e}");
     }
-    publish_status(org_id, incident_id, &status.to_string()).await;
+    publish_status(
+        org_id,
+        incident_id,
+        &status.to_string(),
+        row.as_ref().and_then(|m| m.resolved_by.as_deref()),
+    )
+    .await;
     #[cfg(feature = "enterprise")]
     if let Some(by) = row.and_then(|m| m.acknowledged_by.zip(m.acknowledged_at))
         && status == config::meta::alerts::incidents::IncidentStatus::Acknowledged
@@ -6971,10 +7411,28 @@ pub async fn update_status_as(
     quiet: bool,
 ) -> Result<Incident, anyhow::Error> {
     Ok(
-        change_status_as(org_id, incident_id, status, user_id, quiet)
+        change_status_as(org_id, incident_id, status, user_id, quiet, None)
             .await?
             .0,
     )
+}
+
+pub async fn resolve_with_details(
+    org_id: &str,
+    incident_id: &str,
+    user_id: &str,
+    details: &config::meta::alerts::incident_fields::ResolutionDetails,
+) -> Result<Incident, anyhow::Error> {
+    Ok(change_status_as(
+        org_id,
+        incident_id,
+        "resolved",
+        user_id,
+        false,
+        Some(details),
+    )
+    .await?
+    .0)
 }
 
 /// Runs the one rule when the status change is the one ack's (AK-2, D20). [strong] (reads)
@@ -6982,7 +7440,7 @@ pub async fn authorize_status(
     org_id: &str,
     incident_id: &str,
     status: &str,
-    user_id: &str,
+    caller: &crate::alerts::ack::Caller,
 ) -> Result<(), crate::alerts::ack::AckError> {
     use crate::alerts::ack::{self, AckError, Act, Problem};
 
@@ -6996,7 +7454,7 @@ pub async fn authorize_status(
         org_id: org_id.to_string(),
         incident_id: incident_id.to_string(),
     };
-    ack::authorize_problem(&problem, user_id, Act::Ack)
+    ack::authorize_problem(&problem, caller, Act::Ack)
         .await
         .map(|_| ())
 }
@@ -7011,7 +7469,7 @@ async fn is_the_one_ack(
         "acknowledged" => true,
         "open" => infra::table::alert_incidents::get(org_id, incident_id)
             .await?
-            .is_some_and(|m| m.status == "acknowledged"),
+            .is_some_and(|m| m.status == "acknowledged" && m.merged_into_id.is_none()),
         _ => false,
     })
 }
@@ -7055,6 +7513,7 @@ async fn change_status_as(
     status: &str,
     user_id: &str,
     quiet: bool,
+    resolution: Option<&config::meta::alerts::incident_fields::ResolutionDetails>,
 ) -> Result<(Incident, Repairs), anyhow::Error> {
     if is_the_one_ack(org_id, incident_id, status).await? {
         let incident = through_the_one_ack(org_id, incident_id, status, user_id).await?;
@@ -7062,7 +7521,16 @@ async fn change_status_as(
     }
     // A reopen waits out a resolve's follow-up steps, so none of them acts on the reopened one.
     let turn = ClusterIncidentTurns.take(org_id, incident_id).await?;
-    let changed = change_status_in(org_id, incident_id, status, user_id, quiet, &turn).await;
+    let changed = change_status_in(
+        org_id,
+        incident_id,
+        status,
+        user_id,
+        quiet,
+        &turn,
+        resolution,
+    )
+    .await;
     turn.end().await;
     changed
 }
@@ -7075,6 +7543,7 @@ async fn change_status_in(
     user_id: &str,
     quiet: bool,
     turn: &IncidentTurn,
+    resolution: Option<&config::meta::alerts::incident_fields::ResolutionDetails>,
 ) -> Result<(Incident, Repairs), anyhow::Error> {
     // Read before the resolve clears it, so resolving a muted incident still notifies nobody.
     let before = infra::table::alert_incidents::get_rw(org_id, incident_id).await?;
@@ -7088,14 +7557,52 @@ async fn change_status_in(
         .is_some_and(|m| m.muted_by_downtime_id.is_some());
     // A retry must preserve the resolution timestamp used to deduplicate its event.
     let again = status == "resolved" && before.as_ref().is_some_and(|m| m.status == "resolved");
-    let updated = match before {
-        Some(m) if again => m,
-        _ => infra::table::alert_incidents::update_status(org_id, incident_id, status).await?,
+    let by = resolver_of(user_id);
+    let (updated, reopened) = if let Some(details) = resolution {
+        let row = infra::table::alert_incidents::update_resolution_with(
+            infra::db::get_orm_client_rw().await,
+            org_id,
+            incident_id,
+            by,
+            details,
+        )
+        .await?;
+        (row, None)
+    } else {
+        match before {
+            Some(m) if again => (m, None),
+            _ if status == "open" => {
+                infra::table::alert_incidents::reopen_by(org_id, incident_id, user_id).await?
+            }
+            _ => (
+                infra::table::alert_incidents::update_status_by(org_id, incident_id, status, by)
+                    .await?,
+                None,
+            ),
+        }
     };
 
     let quiet = quiet || muted_before;
     let fence = turn.fence.as_ref();
-    finish_status_change(org_id, incident_id, user_id, quiet, updated, fence).await
+    finish_status_change(
+        org_id,
+        incident_id,
+        user_id,
+        quiet,
+        updated,
+        fence,
+        reopened,
+    )
+    .await
+}
+
+/// `resolved_by` of a status write: the person, or `system` for the system user.
+fn resolver_of(user_id: &str) -> &str {
+    if user_id == SYSTEM_USER_EMAIL {
+        infra::table::alert_incidents::SYSTEM_RESOLVER
+    } else {
+        user_id
+    }
 }
 
 async fn finish_status_change(
@@ -7105,6 +7612,7 @@ async fn finish_status_change(
     quiet: bool,
     updated: infra::table::entity::alert_incidents::Model,
     fence: &dyn TurnFence,
+    reopened: Option<IncidentEvent>,
 ) -> Result<(Incident, Repairs), anyhow::Error> {
     let status = updated.status.as_str();
     let muted = status_change_is_muted(quiet, updated.muted_by_downtime_id.as_deref());
@@ -7113,11 +7621,17 @@ async fn finish_status_change(
     let mut repairs = Repairs::default();
     if status == "resolved" {
         repairs = resolve_follow_ups(org_id, incident_id, user_id, muted, &episode, fence).await?;
-    } else if status == "open" {
-        reopen_follow_ups(org_id, incident_id, user_id, muted, fence).await;
+    } else if let Some(event) = reopened {
+        reopen_follow_ups(org_id, incident_id, event, muted, fence).await;
     }
     if !(turn_held(fence, FenceStep::StatusPublish).await
-        && publish_episode(org_id, incident_id, &episode).await)
+        && publish_episode(
+            org_id,
+            incident_id,
+            &episode,
+            updated.resolved_by.as_deref(),
+        )
+        .await)
     {
         repairs.failed.push("status publish");
     }
@@ -7182,35 +7696,58 @@ async fn resolve_follow_ups(
 async fn reopen_follow_ups(
     org_id: &str,
     incident_id: &str,
-    user_id: &str,
+    event: IncidentEvent,
     muted: bool,
     fence: &dyn TurnFence,
 ) {
+    if muted {
+        return;
+    }
+    let transition_id = match &event.event_type {
+        config::meta::alerts::incidents::IncidentEventType::Reopened { transition_id, .. } => {
+            transition_id.clone()
+        }
+        _ => None,
+    };
     if turn_held(fence, FenceStep::StatusEvent).await
-        && let Err(e) = append_event_unless_muted(
-            org_id,
-            incident_id,
-            IncidentEvent::manually_reopened(user_id),
-            muted,
-        )
-        .await
+        && let Err(e) =
+            crate::incidents::send_incident_event_trigger(org_id, incident_id, event).await
     {
-        log::error!("[Incidents] Failed to record status event: {e}");
+        log::error!("[Incidents] Failed to dispatch reopen event: {e}");
     }
 
-    // A reopened incident gets a fresh automatic run.
-    #[cfg(feature = "enterprise")]
-    if !muted && turn_held(fence, FenceStep::Analysis).await {
-        start_automatic_rca(
-            org_id,
-            incident_id,
-            config::meta::alerts::rca_runs::RunTrigger::AutoReopen,
-            config::meta::alerts::rca_runs::AutoRunOpts::for_trigger(
-                config::meta::alerts::rca_runs::RunTrigger::AutoReopen,
-            ),
-        )
-        .await;
+    if turn_held(fence, FenceStep::Analysis).await
+        && let Err(e) = reopen_analysis(org_id, incident_id, transition_id.as_deref()).await
+    {
+        log::error!("[Incidents] Failed to track reopen analysis: {e}");
     }
+}
+
+async fn reopen_analysis(
+    org: &str,
+    incident: &str,
+    transition_id: Option<&str>,
+) -> Result<(), sea_orm::DbErr> {
+    use config::meta::alerts::rca_runs::{AutoRunOpts, RunTrigger};
+    use infra::table::incident_events::{self, ReopenEffect};
+
+    if let Some(id) = transition_id
+        && incident_events::completed_reopen_effects(org, incident, id)
+            .await?
+            .contains(&ReopenEffect::AutoReopen)
+    {
+        return Ok(());
+    }
+    let trigger = RunTrigger::AutoReopen;
+    let start =
+        start_automatic_rca(org, incident, trigger, AutoRunOpts::for_trigger(trigger)).await;
+    if let Some(id) = transition_id
+        && start.off_reason() != Some(RCA_OFF_START_FAILED)
+    {
+        incident_events::complete_reopen_effect(org, incident, id, ReopenEffect::AutoReopen)
+            .await?;
+    }
+    Ok(())
 }
 
 /// False, logged, once the incident's turn is lost before `step`; a retry runs it.
@@ -7253,6 +7790,7 @@ async fn publish_episode(
     org_id: &str,
     incident_id: &str,
     episode: &infra::table::alert_incidents::Episode,
+    resolved_by: Option<&str>,
 ) -> bool {
     if !o2_enterprise::enterprise::common::config::get_config()
         .super_cluster
@@ -7261,7 +7799,7 @@ async fn publish_episode(
     {
         return true;
     }
-    let publish = publish_status(org_id, incident_id, &episode.status);
+    let publish = publish_status(org_id, incident_id, &episode.status, resolved_by);
     publish_in_episode(org_id, incident_id, episode, publish).await
 }
 
@@ -7286,7 +7824,12 @@ async fn publish_in_episode(
 }
 
 /// False when the cross-region publish failed.
-async fn publish_status(org_id: &str, incident_id: &str, status: &str) -> bool {
+async fn publish_status(
+    org_id: &str,
+    incident_id: &str,
+    status: &str,
+    resolved_by: Option<&str>,
+) -> bool {
     if o2_enterprise::enterprise::common::config::get_config()
         .super_cluster
         .enabled
@@ -7295,6 +7838,7 @@ async fn publish_status(org_id: &str, incident_id: &str, status: &str) -> bool {
             org_id,
             incident_id,
             status,
+            resolved_by,
         )
         .await
     {
@@ -7360,28 +7904,32 @@ pub async fn update_assignee(
     assigned_to: Option<&str>,
     user_id: &str,
 ) -> Result<Incident, anyhow::Error> {
-    let current = infra::table::alert_incidents::get_rw(org_id, incident_id)
-        .await?
-        .ok_or_else(|| anyhow::anyhow!("Incident not found"))?;
-    if current.assigned_to.as_deref() == assigned_to {
-        return model_to_incident(current).await;
-    }
-    let updated =
-        infra::table::alert_incidents::update_assigned_to(org_id, incident_id, assigned_to).await?;
-    if let Err(e) = crate::incidents::append_event(
-        org_id,
-        incident_id,
-        IncidentEvent::assignment_changed(
-            current.assigned_to,
-            assigned_to.map(str::to_string),
-            user_id,
-        ),
-    )
-    .await
+    let edited =
+        infra::table::alert_incidents::assign_lead(org_id, incident_id, assigned_to, user_id)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Incident not found"))?;
+    let Some(event) = edited.event else {
+        return model_to_incident(edited.row).await;
+    };
+    let before = if let config::meta::alerts::incidents::IncidentEventType::AssignmentChanged {
+        from,
+        ..
+    } = &event.event_type
     {
-        log::error!("[Incidents] Failed to record assignment event: org_id: {org_id}, error: {e}");
+        from.as_deref()
+    } else {
+        None
+    };
+    if let Err(e) =
+        crate::incidents::send_incident_event_trigger(org_id, incident_id, event.clone()).await
+    {
+        log::error!(
+            "[Incidents] Failed to dispatch assignment event: org_id: {org_id}, error: {e}"
+        );
     }
-    model_to_incident(updated).await
+    // F10: unconditional, muted the way a severity change is (D48).
+    v2_fields::notify_assignment(before, &edited.row, user_id).await;
+    model_to_incident(edited.row).await
 }
 
 /// A more severe attached firing raises the case's priority; the timeline records who attached.
@@ -7904,12 +8452,14 @@ mod tests {
                 if let Some(record) = s.records.get(incident_id).cloned() {
                     return RoutedIncident {
                         record: Some(record),
+                        impacted_error: None,
                         error: None,
                     };
                 }
                 if s.refuse_route {
                     return RoutedIncident {
                         record: None,
+                        impacted_error: None,
                         error: Some(anyhow::anyhow!("paging refused")),
                     };
                 }
@@ -7920,6 +8470,7 @@ mod tests {
                     s.records.insert(incident_id.to_string(), record.clone());
                     return RoutedIncident {
                         record: Some(record),
+                        impacted_error: None,
                         error: Some(anyhow::anyhow!("link refused")),
                     };
                 }
@@ -7927,6 +8478,7 @@ mod tests {
                 s.records.insert(incident_id.to_string(), record.clone());
                 RoutedIncident {
                     record: Some(record),
+                    impacted_error: None,
                     error: None,
                 }
             }
@@ -8834,6 +9386,7 @@ mod tests {
                     profiles_streams: serde_json::json!([]),
                     field_name_mapping: None,
                     last_seen: 1,
+                    streams_cut: 0,
                 }
             };
             let records = [
@@ -9618,6 +10171,12 @@ mod tests {
                         schema.create_table_from_entity(incident_events::Entity),
                         schema.create_table_from_entity(rca_runs::Entity),
                         schema.create_table_from_entity(rca_steering::Entity),
+                        schema.create_table_from_entity(
+                            infra::table::entity::rca_delivery_obligations::Entity,
+                        ),
+                        schema.create_table_from_entity(
+                            infra::table::entity::rca_skipped_pages::Entity,
+                        ),
                         schema.create_table_from_entity(oncall_responses::Entity),
                         schema.create_table_from_entity(infra::table::service_streams::Entity),
                         schema.create_table_from_entity(oncall_teams::Entity),
@@ -9748,6 +10307,66 @@ mod tests {
                 [Some(BACK)],
                 "first value kept"
             );
+        }
+
+        #[tokio::test]
+        async fn an_external_source_clearing_closes_its_incident_once_every_source_cleared() {
+            use infra::table::{alert_incidents as rows, entity::external_alerts};
+            use sea_orm::{ActiveModelTrait, ConnectionTrait, Schema, Set};
+
+            let _db = store().await;
+            let conn = infra::db::get_orm_client_rw().await;
+            let backend = conn.get_database_backend();
+            let mut table = Schema::new(backend).create_table_from_entity(external_alerts::Entity);
+            conn.execute(backend.build(table.if_not_exists()))
+                .await
+                .unwrap();
+            let org = new_org();
+            let id = rows::create(&org, "P2", serde_json::json!({}), "service", ONSET, None)
+                .await
+                .unwrap()
+                .id;
+            let sources = [format!("{org}-e1"), format!("{org}-e2")];
+            for (source, state) in sources.iter().zip(["resolved", "firing"]) {
+                rows::add_alert_to_incident(&id, source, source, "external", ONSET, "service")
+                    .await
+                    .unwrap();
+                external_alerts::ActiveModel {
+                    id: Set(source.clone()),
+                    org_id: Set(org.clone()),
+                    integration_id: Set("int".to_string()),
+                    detected_source: Set("generic".to_string()),
+                    dedup_key: Set(source.clone()),
+                    title: Set(source.clone()),
+                    severity: Set("P2".to_string()),
+                    state: Set(state.to_string()),
+                    labels: Set("{}".to_string()),
+                    source_url: Set(None),
+                    last_payload: Set("{}".to_string()),
+                    first_seen_at: Set(ONSET),
+                    last_seen_at: Set(ONSET),
+                    resolved_at: Set(None),
+                }
+                .insert(conn)
+                .await
+                .unwrap();
+            }
+
+            try_auto_resolve_incident_for_external_alert(&org, &sources[0])
+                .await
+                .unwrap();
+            assert_eq!(status(&org, &id).await, "open", "e2 still fires");
+            external_alerts::Entity::update_many()
+                .col_expr(external_alerts::Column::State, Expr::value("resolved"))
+                .filter(external_alerts::Column::Id.eq(&sources[1]))
+                .exec(conn)
+                .await
+                .unwrap();
+            try_auto_resolve_incident_for_external_alert(&org, &sources[1])
+                .await
+                .unwrap();
+            assert_eq!(status(&org, &id).await, "resolved");
+            assert!(resolved_by_system(&org, &id).await);
         }
 
         #[tokio::test]
@@ -10315,6 +10934,7 @@ mod tests {
                 RoutedIncident {
                     record: None,
                     error: self.refuse.then(|| anyhow::anyhow!("paging refused")),
+                    impacted_error: None,
                 }
             }
         }
@@ -10610,9 +11230,16 @@ mod tests {
                 .await
                 .unwrap();
             let firing = ("a1", 1);
-            let found = select_correlation_candidate(&db, "default", &incoming, firing, candidates)
-                .await
-                .unwrap();
+            let found = select_correlation_candidate(
+                &db,
+                "default",
+                &incoming,
+                firing,
+                candidates,
+                crate::alerts::incidents::first_open::PairRead::Remembered,
+            )
+            .await
+            .unwrap();
             assert_eq!(
                 found.as_ref().map(|row| row.id.as_str()),
                 dimensions
@@ -11281,11 +11908,17 @@ mod tests {
                     .await
                     .unwrap();
             }
-            let found =
-                select_correlation_candidate(&db, "default", &incoming, ("a1", 1), candidates)
-                    .await
-                    .unwrap()
-                    .unwrap();
+            let found = select_correlation_candidate(
+                &db,
+                "default",
+                &incoming,
+                ("a1", 1),
+                candidates,
+                crate::alerts::incidents::first_open::PairRead::Remembered,
+            )
+            .await
+            .unwrap()
+            .unwrap();
             assert_eq!(found.id, "older");
         }
     }
@@ -11309,10 +11942,17 @@ mod tests {
             ("ns".to_string(), "prod".to_string()),
             ("cluster".to_string(), "a".to_string()),
         ]);
-        let found = select_correlation_candidate(&db, "default", &incoming, ("a1", 1), candidates)
-            .await
-            .unwrap()
-            .unwrap();
+        let found = select_correlation_candidate(
+            &db,
+            "default",
+            &incoming,
+            ("a1", 1),
+            candidates,
+            crate::alerts::incidents::first_open::PairRead::Remembered,
+        )
+        .await
+        .unwrap()
+        .unwrap();
         assert_eq!(found.group_values, current);
     }
 
@@ -11326,16 +11966,31 @@ mod tests {
             first_alert_at: 1,
         }];
         assert!(matches!(
-            select_correlation_candidate(&db, "default", &incoming, ("a1", 1), candidates).await,
+            select_correlation_candidate(
+                &db,
+                "default",
+                &incoming,
+                ("a1", 1),
+                candidates,
+                crate::alerts::incidents::first_open::PairRead::Remembered
+            )
+            .await,
             Err(infra::errors::Error::DbError(
                 infra::errors::DbError::SeaORMError(_)
             ))
         ));
         assert!(
-            select_correlation_candidate(&db, "default", &incoming, ("a1", 1), Vec::new())
-                .await
-                .unwrap()
-                .is_none()
+            select_correlation_candidate(
+                &db,
+                "default",
+                &incoming,
+                ("a1", 1),
+                Vec::new(),
+                crate::alerts::incidents::first_open::PairRead::Remembered
+            )
+            .await
+            .unwrap()
+            .is_none()
         );
     }
 
@@ -11954,6 +12609,7 @@ mod tests {
             security_case: false,
             historical: false,
             last_detection_at: None,
+            ..Default::default()
         }
     }
 
@@ -12140,6 +12796,7 @@ mod tests {
             let mut model = incident(None);
             model.id = id.to_string();
             model.status = status.to_string();
+            model.resolved_at = (status == "resolved").then_some(10);
             let row: alert_incidents::ActiveModel = model.into();
             alert_incidents::Entity::insert(row.reset_all())
                 .exec(&db)
@@ -12171,7 +12828,9 @@ mod tests {
         )
         .await
         .unwrap();
-        assert_eq!(resolved, ["i1"]);
+        assert_eq!(resolved.len(), 1);
+        assert_eq!(resolved[0].0, "i1");
+        assert_eq!(resolved[0].1.resolved_at, Some(10));
 
         let records = HashMap::from([
             (
@@ -12185,7 +12844,7 @@ mod tests {
         ]);
         assert_eq!(
             left_open(&resolved, &records),
-            ["i1"],
+            [("i1", &resolved[0].1)],
             "I1's page is closed; the live I2 keeps its own"
         );
         let closed = HashMap::from([(
@@ -12349,6 +13008,11 @@ mod tests {
         )
         .await;
         assert!(failed.is_err());
+        let raw = infra::table::rca_runs::get_rw(&org, &run_id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(!infra::table::rca_fence::read_history(&raw));
         let run = stored(&org, &run_id).await;
         assert_eq!(run.state, RunState::Running);
         assert_eq!(run.session_id, None);
@@ -12402,6 +13066,7 @@ mod tests {
         assert_eq!(run.session_id.as_deref(), Some(fork_session.as_str()));
         assert_eq!(run.mode, RunMode::BuildOnPrevious);
         let used = run.context_used.unwrap();
+        assert!(used.get("history_read").is_none() && used.get("history_injected").is_none());
         assert_eq!(used["resumed_from"], seed.resumed_from());
         assert!(
             used.get("toolsets").is_some(),
@@ -12426,6 +13091,7 @@ mod tests {
             .await
             .unwrap()
             .unwrap();
+        assert!(infra::table::rca_fence::read_history(&row));
         let next = turn_run_of(&row).await.unwrap();
         assert_eq!(next.session_id.as_deref(), Some(fork_session.as_str()));
         assert_eq!(
@@ -13110,17 +13776,29 @@ mod tests {
         .unwrap();
         assert_eq!(open.len(), 1);
         assert!(
-            find_open_detection_case(&org, "det-1", (40 * HOUR, 40 * HOUR), 2 * HOUR)
-                .await
-                .unwrap()
-                .is_none(),
+            find_open_detection_case_with(
+                infra::db::get_orm_client_ro().await,
+                &org,
+                "det-1",
+                (40 * HOUR, 40 * HOUR),
+                2 * HOUR
+            )
+            .await
+            .unwrap()
+            .is_none(),
             "a firing a day later opens its own case"
         );
         assert!(
-            find_open_detection_case(&org, "det-1", (12 * HOUR, 12 * HOUR), 2 * HOUR)
-                .await
-                .unwrap()
-                .is_some()
+            find_open_detection_case_with(
+                infra::db::get_orm_client_ro().await,
+                &org,
+                "det-1",
+                (12 * HOUR, 12 * HOUR),
+                2 * HOUR
+            )
+            .await
+            .unwrap()
+            .is_some()
         );
 
         add_firing_to_case(
@@ -13686,5 +14364,78 @@ mod tests {
             3
         ));
         assert!(!retries_incident_notify(&rejected(500), 1, 0));
+    }
+
+    #[test]
+    fn a_blank_list_service_or_search_filters_nothing() {
+        assert_eq!(list_search_terms(Some(" "), Some("")), (None, None));
+        assert_eq!(list_search_terms(None, Some("  \t")), (None, None));
+        assert_eq!(
+            list_search_terms(Some(" payments "), Some(" DB ")),
+            (Some("payments"), Some("db".to_string()))
+        );
+    }
+
+    #[test]
+    fn list_search_matches_the_status_label_shown_in_spanish() {
+        let incident = infra::table::alert_incidents::ListCandidate {
+            id: "test-incident".to_string(),
+            title: Some("Checkout timeout".to_string()),
+            status: "resolved".to_string(),
+            severity: "P2".to_string(),
+            group_values: serde_json::json!({"service": "checkout"}),
+        };
+        assert!(matches_list_search(&incident, "resuelto"));
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn a_notice_subject_comes_from_its_caller_never_from_alert_attributes() {
+        assert_eq!(
+            notice_subject(None, "severity_changed", "Checkout errors"),
+            "[severity_changed] Checkout errors"
+        );
+        assert_eq!(
+            notice_subject(
+                Some("ana assigned X to raj".into()),
+                "assignee_changed",
+                "X"
+            ),
+            "ana assigned X to raj"
+        );
+    }
+
+    #[tokio::test]
+    async fn ensure_lead_never_assigns_an_ai_or_system_actor() {
+        use crate::alerts::ack::Caller;
+
+        for email in ["assistant@acme.io", "mcp@acme.io", "sre-agent@acme.io"] {
+            let caller = Caller {
+                email: email.to_string(),
+                ai: true,
+            };
+            assert!(
+                !ensure_lead(
+                    "no-db-needed",
+                    "missing",
+                    &caller,
+                    infra::table::alert_incidents::LeadAck::Incident { acknowledged_at: 1 }
+                )
+                .await
+                .unwrap()
+            );
+        }
+        for email in ["", SYSTEM_USER_EMAIL] {
+            assert!(
+                !ensure_lead(
+                    "no-db-needed",
+                    "missing",
+                    &Caller::person(email),
+                    infra::table::alert_incidents::LeadAck::Incident { acknowledged_at: 1 }
+                )
+                .await
+                .unwrap()
+            );
+        }
     }
 }

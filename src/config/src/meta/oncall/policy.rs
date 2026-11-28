@@ -241,10 +241,13 @@ pub fn fanout_capped_note(teams: usize) -> String {
 /// team up to "everybody" for an outage they cannot fix.
 pub const IMPACTED_RUNGS: usize = 2;
 
-/// The ladder an impacted record runs: the first [`IMPACTED_RUNGS`] rungs of the
-/// team's own policy, in delay order. Taken from the real ladder rather than
-/// synthesised, so the chase goes to whoever that team decided should be chased.
+/// A team without rungs still gets the opening page so a scheduler tick can recover it.
+/// A chase always uses the team's own policy.
 pub fn impacted_ladder(steps: &[LadderStep]) -> Vec<LadderStep> {
+    if steps.is_empty() {
+        return vec![LadderStep::new(0, vec![EscalationTarget::WholeTeam])];
+    }
+
     let mut ordered = steps.to_vec();
     ordered.sort_by_key(|s| s.after_micros);
     ordered.truncate(IMPACTED_RUNGS);
@@ -258,6 +261,10 @@ pub const MAX_SEND_ATTEMPTS: u32 = 3;
 
 /// The time limit on one (person, channel) send, retries included (§10).
 pub const SEND_LIMIT_MICROS: i64 = 15 * 1_000_000;
+
+/// A pending delivery claim older than this is taken again (M145): one send limit bounds the
+/// send, the second its outcome write, so a live claim never expires under its sender.
+pub const DELIVERY_CLAIM_EXPIRY_MICROS: i64 = 2 * SEND_LIMIT_MICROS;
 
 /// How long to wait before trying the same channel again, or `None` when the
 /// channel is spent. §9's 1 s → 2 s → 4 s. Pure and in microseconds so the
@@ -763,7 +770,7 @@ pub enum AfterRung {
 /// How long to wait before sending a lost rung again: 30 s → 1 m → 2 m → 4 m.
 /// Doubling, because the fourth failure means something the first did not — the
 /// first is a blip, the fourth is an outage.
-fn transport_backoff_micros(attempts_made: u32) -> i64 {
+pub fn transport_backoff_micros(attempts_made: u32) -> i64 {
     TRANSPORT_BACKOFF_MICROS
         .saturating_mul(1i64 << attempts_made.min(16))
         .min(MAX_TRANSPORT_BACKOFF_MICROS)
@@ -1950,12 +1957,15 @@ mod tests {
     /// A team whose ladder has only one rung gets one rung. Inventing a second
     /// would page somebody their own policy never names.
     #[test]
-    fn test_a_one_rung_policy_gives_an_impacted_team_one_rung() {
+    fn test_an_impacted_team_has_one_opening_without_a_chase() {
         let one = vec![LadderStep::new(
             0,
             vec![EscalationTarget::rotation("rot_primary")],
         )];
         assert_eq!(impacted_ladder(&one).len(), 1);
-        assert!(impacted_ladder(&[]).is_empty());
+        assert_eq!(
+            impacted_ladder(&[]),
+            vec![LadderStep::new(0, vec![EscalationTarget::WholeTeam])]
+        );
     }
 }

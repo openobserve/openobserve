@@ -21,6 +21,9 @@ use axum::{
     extract::{Path, Query},
     response::Response,
 };
+#[cfg(feature = "enterprise")]
+use config::meta::alerts::incident_fields::ResolutionDetails;
+use config::meta::{alerts::incident_fields::CustomerImpact, oncall::response::ResolutionCause};
 use openobserve_api_common::extractors::Headers;
 use openobserve_core::auth::UserEmail;
 use serde::{Deserialize, Serialize};
@@ -30,16 +33,45 @@ use crate::common::meta::http::HttpResponse as MetaHttpResponse;
 #[cfg(feature = "enterprise")]
 use crate::request::security;
 
+const MAX_LIST_LIMIT: u64 = 200;
+
 /// Query parameters for listing incidents
 #[derive(Debug, Deserialize, IntoParams, ToSchema)]
 pub struct ListIncidentsQuery {
-    /// Filter by status (open, acknowledged, resolved)
+    /// Comma list of open, acknowledged, resolved; `active` is open and acknowledged
     #[serde(default)]
     pub status: Option<String>,
-    /// Maximum number of results
+    /// Comma list of P1, P2, P3, P4
+    #[serde(default)]
+    pub severity: Option<String>,
+    /// Only `me`: incidents assigned to the caller
+    #[serde(default)]
+    pub assigned_to: Option<String>,
+    /// Only incidents owned by this on-call team id
+    #[serde(default)]
+    pub owner_team: Option<String>,
+    /// Exact `service` dimension
+    #[serde(default)]
+    pub service: Option<String>,
+    /// Text in the title, dimensions, status or severity
+    #[serde(default)]
+    pub q: Option<String>,
+    /// Earliest `first_alert_at`, in microseconds
+    #[serde(default)]
+    pub start_time: Option<i64>,
+    /// Latest `first_alert_at`, in microseconds
+    #[serde(default)]
+    pub end_time: Option<i64>,
+    /// `column:desc|asc` on last_alert_at, first_alert_at, severity, alert_count or title
+    #[serde(default)]
+    pub sort: Option<String>,
+    /// `next_cursor` of the previous page, read under the same sort
+    #[serde(default)]
+    pub cursor: Option<String>,
+    /// Maximum number of results; values above 200 are served as 200
     #[serde(default = "default_limit")]
     pub limit: u64,
-    /// Offset for pagination
+    /// Rows skipped after the cursor; kept for clients that page by offset
     #[serde(default)]
     pub offset: u64,
     /// Only incidents that contain at least one SIEM detection
@@ -106,16 +138,116 @@ pub enum UpdatePayload {
         verdict: Option<config::meta::alerts::incidents::CaseVerdict>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         reason: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        resolution_cause: Option<ResolutionCause>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        resolution_note: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        customer_impact: Option<CustomerImpact>,
     },
     /// Assign the incident to an org member's email; an empty string unassigns it
     Assignee { assigned_to: String },
+    /// Move the incident to an on-call team of the org; `null` clears it
+    OwnerTeam {
+        #[serde(deserialize_with = "present_or_null")]
+        owner_team_id: Option<String>,
+    },
+    /// Name the comms owner by an org member's email; an empty string clears it
+    CommsOwner { comms_owner: String },
+    /// Set the impact window in microseconds; the end may be `null` while impact lasts
+    ImpactWindow {
+        impact_start_at: i64,
+        #[serde(default)]
+        impact_end_at: Option<i64>,
+    },
+    /// State whether customers were affected
+    CustomerImpact {
+        customer_impact: config::meta::alerts::incident_fields::CustomerImpact,
+    },
+}
+
+impl UpdatePayload {
+    /// The variants Incidents v2 added; they answer 409 while v2 is off.
+    pub fn is_v2_field(&self) -> bool {
+        matches!(
+            self,
+            Self::OwnerTeam { .. }
+                | Self::CommsOwner { .. }
+                | Self::ImpactWindow { .. }
+                | Self::CustomerImpact { .. }
+                | Self::Status {
+                    resolution_cause: Some(_),
+                    ..
+                }
+                | Self::Status {
+                    resolution_note: Some(_),
+                    ..
+                }
+                | Self::Status {
+                    customer_impact: Some(_),
+                    ..
+                }
+        )
+    }
+
+    pub fn requires_human(&self) -> bool {
+        matches!(
+            self,
+            Self::Status { .. } | Self::Severity { .. } | Self::Assignee { .. }
+        )
+    }
+
+    fn off_response(&self, v2_enabled: bool) -> Option<Response> {
+        (!v2_enabled && self.is_v2_field())
+            .then(common::meta::incidents_v2::incidents_v2_off_response)
+    }
+}
+
+/// Who asks for an owner-block or impact edit, as only this layer can tell.
+#[cfg(feature = "enterprise")]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct V2Caller {
+    /// Any delegated token, the Slack action token included (design 6.7).
+    delegated: bool,
+    ai: bool,
+}
+
+/// Response of `POST …/opened`.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct OpenedResponse {
+    /// The first qualifying open, in microseconds; `null` until one happens
+    pub first_opened_at: Option<i64>,
 }
 
 /// Response for list incidents
 #[derive(Debug, Serialize, ToSchema)]
 pub struct ListIncidentsResponse {
     pub incidents: Vec<config::meta::alerts::incidents::Incident>,
+    /// Counted over every filter except `severity`
+    pub counts_by_severity: SeverityCounts,
+    /// Incidents every filter keeps, on any page
     pub total: u64,
+    /// Absent on the last page
+    pub next_cursor: Option<String>,
+}
+
+/// Incidents per severity
+#[derive(Debug, Default, PartialEq, Eq, Serialize, ToSchema)]
+pub struct SeverityCounts {
+    #[serde(rename = "P1")]
+    pub p1: u64,
+    #[serde(rename = "P2")]
+    pub p2: u64,
+    #[serde(rename = "P3")]
+    pub p3: u64,
+    #[serde(rename = "P4")]
+    pub p4: u64,
+}
+
+impl From<[u64; 4]> for SeverityCounts {
+    fn from([p1, p2, p3, p4]: [u64; 4]) -> Self {
+        Self { p1, p2, p3, p4 }
+    }
 }
 
 #[utoipa::path(post, path = "/v2/{org_id}/alerts/incidents", context_path = "/api", tag = "Incidents", operation_id = "CreateServiceIncident", summary = "Open or attach to a service version incident", params(("org_id" = String, Path)), request_body = config::meta::alerts::incidents::ManualIncidentRequest, responses((status = 201, description = "Incident created", content_type = "application/json", body = Object), (status = 200, description = "Attached to incident", content_type = "application/json", body = Object), (status = 403, description = "Forbidden")), security(("Authorization" = [])), extensions(("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "create"})), ("x-o2-mcp" = json!({"enabled": false}))))]
@@ -209,28 +341,61 @@ pub async fn list_incidents(
     Path(org_id): Path<String>,
     Query(query): Query<ListIncidentsQuery>,
     Headers(user_email): Headers<UserEmail>,
+    headers: axum::http::HeaderMap,
 ) -> Response {
-    let cases = if query.siem {
+    let rca = security::rca_scope::rca_caller(&org_id, &user_email.user_id, &headers).await;
+    let empty_page = || {
+        MetaHttpResponse::json(ListIncidentsResponse {
+            incidents: Vec::new(),
+            counts_by_severity: SeverityCounts::default(),
+            total: 0,
+            next_cursor: None,
+        })
+    };
+    if !rca.history_allowed() {
+        return empty_page();
+    }
+    let mut page_query = match list_page_query(&query, &user_email.user_id) {
+        Ok(page_query) => page_query,
+        Err(message) => return MetaHttpResponse::bad_request(message),
+    };
+    page_query.cases = if query.siem {
         if let Err(resp) =
             security::guard_siem_case(&org_id, &user_email.user_id, "GET", true).await
         {
             return resp;
         }
+        if rca.is_rca() {
+            return empty_page();
+        }
         infra::table::alert_incidents::CaseFilter::OnlyCases
     } else {
         security::visible_cases(&org_id, &user_email.user_id).await
     };
-    match openobserve_core::alerts::incidents::list_incidents_filtered(
+    if rca.is_rca() {
+        page_query.cases = infra::table::alert_incidents::CaseFilter::NoCases;
+    }
+    match openobserve_core::alerts::incidents::list_incidents_page(
         &org_id,
-        query.status.as_deref(),
-        cases,
-        query.limit,
-        query.offset,
+        &page_query,
+        query.service.as_deref(),
+        query.q.as_deref(),
     )
     .await
     {
-        Ok((incidents, total)) => {
-            MetaHttpResponse::json(ListIncidentsResponse { incidents, total })
+        Ok((incidents, page)) => {
+            let has_history = incidents
+                .iter()
+                .any(|incident| security::rca_scope::incident_has_history(&rca, incident));
+            if !security::rca_scope::record_history_response(&org_id, &rca, has_history).await {
+                return empty_page();
+            }
+            MetaHttpResponse::json(ListIncidentsResponse {
+                incidents,
+                counts_by_severity: page.counts_by_severity.into(),
+                total: page.total,
+                next_cursor: page.next.map(|cursor| cursor.encode()),
+            })
         }
         Err(e) => MetaHttpResponse::internal_error(e),
     }
@@ -263,7 +428,12 @@ pub async fn list_incidents(
 pub async fn get_incident(
     Path((org_id, incident_id)): Path<(String, String)>,
     Headers(user_email): Headers<UserEmail>,
+    headers: axum::http::HeaderMap,
 ) -> Response {
+    let rca = security::rca_scope::rca_caller(&org_id, &user_email.user_id, &headers).await;
+    if !security::rca_scope::may_read_incident(&org_id, &rca, &incident_id).await {
+        return MetaHttpResponse::forbidden("This analysis cannot read that incident");
+    }
     match openobserve_core::alerts::incidents::get_incident_with_alerts(
         &org_id,
         &incident_id,
@@ -281,6 +451,23 @@ pub async fn get_incident(
                 security::guard_siem_case(&org_id, &user_email.user_id, "GET", touches_siem).await
             {
                 return resp;
+            }
+            let history_allowed =
+                security::rca_scope::may_read_run_history(&org_id, &rca, &incident_id).await;
+            let has_history = security::rca_scope::incident_has_history(&rca, &incident.incident);
+            let history_allowed = history_allowed
+                && security::rca_scope::record_history_response(&org_id, &rca, has_history).await;
+            if rca.is_rca() && !history_allowed {
+                if rca.own_incident() != Some(incident_id.as_str()) {
+                    return MetaHttpResponse::forbidden("This analysis cannot read that incident");
+                }
+                return match serde_json::to_value(incident) {
+                    Ok(mut incident) => {
+                        security::rca_scope::strip_rca(&mut incident);
+                        MetaHttpResponse::json(incident)
+                    }
+                    Err(error) => MetaHttpResponse::internal_error(error),
+                };
             }
             MetaHttpResponse::json(incident)
         }
@@ -307,19 +494,32 @@ pub async fn get_incident(
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = config::meta::alerts::incidents::Incident),
         (status = 403, description = "Enterprise feature", content_type = "application/json", body = ()),
+        (status = 409, description = "Incidents v2 is off"),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
-        ("x-o2-mcp" = json!({"description": "Update an incident's title or severity. Status changes (resolve, acknowledge, reopen) are NOT supported via this tool — they must be performed by a human in the UI.", "category": "alerts"}))
+        ("x-o2-mcp" = json!({"description": "Update an incident's title.", "category": "alerts"}))
     )
 )]
 pub async fn update_incident(
     path: Path<(String, String)>,
     Headers(user_email): Headers<UserEmail>,
+    delegated: Option<axum::Extension<openobserve_api_common::auth::delegation::DelegatedCaller>>,
+    headers: axum::http::HeaderMap,
     Json(body): Json<UpdatePayload>,
 ) -> Response {
+    if let Some(response) = body.off_response(common::meta::incidents_v2::incidents_v2_enabled()) {
+        return response;
+    }
     let (org_id, incident_id) = path.0;
     let user_id = user_email.user_id;
+    let caller =
+        crate::request::alerts::ack::caller_of(&org_id, &user_id, delegated.as_deref(), &headers);
+    if caller.ai && body.requires_human() {
+        return MetaHttpResponse::forbidden(
+            "Only a person can change an incident's status, severity or assignee",
+        );
+    }
     let is_case = security::incident_touches_siem(&org_id, &incident_id).await;
     if let Err(resp) = security::guard_siem_case(&org_id, &user_id, "PUT", is_case).await {
         return resp;
@@ -402,11 +602,42 @@ pub async fn update_incident(
                 Err(e) => MetaHttpResponse::internal_error(e),
             }
         }
+        edit @ (UpdatePayload::OwnerTeam { .. }
+        | UpdatePayload::CommsOwner { .. }
+        | UpdatePayload::ImpactWindow { .. }
+        | UpdatePayload::CustomerImpact { .. }) => {
+            let caller = V2Caller {
+                delegated: delegated.is_some(),
+                ai: crate::request::alerts::ack::is_ai_principal(
+                    &org_id,
+                    &user_id,
+                    delegated.as_deref(),
+                    &headers,
+                ),
+            };
+            update_v2_field(&org_id, &incident_id, &user_id, caller, edit).await
+        }
         UpdatePayload::Status {
             status,
             verdict,
             reason,
+            resolution_cause,
+            resolution_note,
+            customer_impact,
         } => {
+            let details = ResolutionDetails {
+                resolution_cause,
+                resolution_note,
+                customer_impact,
+            };
+            if let Some(response) = validate_resolution(status, &details) {
+                return response;
+            }
+            if !details.is_empty() && delegated.is_some() {
+                return MetaHttpResponse::forbidden(
+                    "Delegated callers cannot record resolution details",
+                );
+            }
             let verdict = match o2_enterprise::enterprise::security::cases::closing_verdict(
                 is_case,
                 status == IncidentStatus::Resolved,
@@ -420,20 +651,30 @@ pub async fn update_incident(
                 &org_id,
                 &incident_id,
                 status.as_str(),
-                &user_id,
+                &caller,
             )
             .await
             {
                 return crate::request::alerts::ack::error_response(e);
             }
-            match openobserve_core::alerts::incidents::update_status(
-                &org_id,
-                &incident_id,
-                status.as_str(),
-                &user_id,
-            )
-            .await
-            {
+            let updated = if details.is_empty() {
+                openobserve_core::alerts::incidents::update_status(
+                    &org_id,
+                    &incident_id,
+                    status.as_str(),
+                    &user_id,
+                )
+                .await
+            } else {
+                openobserve_core::alerts::incidents::resolve_with_details(
+                    &org_id,
+                    &incident_id,
+                    &user_id,
+                    &details,
+                )
+                .await
+            };
+            match updated {
                 Ok(incident) if status == IncidentStatus::Resolved => {
                     if let Some((verdict, reason)) = verdict
                         && let Err(e) = openobserve_core::incidents::append_event(
@@ -452,6 +693,16 @@ pub async fn update_incident(
                     end_ack_after_resolve(org_id, incident_id, &user_id, incident).await
                 }
                 Ok(incident) => MetaHttpResponse::json(incident),
+                Err(e)
+                    if e.downcast_ref::<infra::errors::Error>()
+                        .is_some_and(|error| {
+                            matches!(error, infra::errors::Error::OtherError(inner)
+                        if inner.is::<infra::table::incident_recovery_checks::ClosedIncident>()
+                            || inner.is::<infra::table::alert_incidents::ResolutionConflict>())
+                        }) =>
+                {
+                    MetaHttpResponse::conflict(e)
+                }
                 Err(e) => {
                     if e.to_string().contains("not found") {
                         MetaHttpResponse::not_found("Incident not found")
@@ -461,6 +712,49 @@ pub async fn update_incident(
                 }
             }
         }
+    }
+}
+
+#[cfg(feature = "enterprise")]
+#[utoipa::path(
+    post,
+    path = "/v2/{org_id}/alerts/incidents/{incident_id}/opened",
+    context_path = "/api",
+    tag = "Incidents",
+    operation_id = "MarkIncidentOpened",
+    summary = "Record that a responder opened the incident",
+    description = "Idempotent. Stamps the first open only for a responder paged by the incident's on-call record, its lead or a member of its owner team; every other call returns the stored value.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("incident_id" = String, Path, description = "Incident ID"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = OpenedResponse),
+        (status = 404, description = "Not found", content_type = "application/json", body = ()),
+        (status = 409, description = "Incidents v2 is off", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+pub async fn mark_incident_opened(
+    Path((org_id, incident_id)): Path<(String, String)>,
+    Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    if !common::meta::incidents_v2::incidents_v2_enabled() {
+        return common::meta::incidents_v2::incidents_v2_off_response();
+    }
+    let user_id = user_email.user_id;
+    let is_case = security::incident_touches_siem(&org_id, &incident_id).await;
+    if let Err(resp) = security::guard_siem_case(&org_id, &user_id, "GET", is_case).await {
+        return resp;
+    }
+    match openobserve_core::alerts::incidents::mark_opened(&org_id, &incident_id, &user_id).await {
+        Ok(Some(first_opened_at)) => MetaHttpResponse::json(OpenedResponse { first_opened_at }),
+        Ok(None) => MetaHttpResponse::not_found("Incident not found"),
+        Err(e) => MetaHttpResponse::internal_error(e),
     }
 }
 
@@ -609,6 +903,8 @@ pub struct CancelRcaResponse {
 pub const RCA_RUNS_DEFAULT_LIMIT: u64 = 25;
 /// Largest page size of the incident's run list.
 pub const RCA_RUNS_MAX_LIMIT: u64 = 100;
+/// Skipped pages returned with one page of the run list.
+pub const RCA_SKIPPED_PAGES_MAX: u64 = 100;
 
 /// Query parameters for listing an incident's analysis runs
 #[derive(Debug, Deserialize, IntoParams, ToSchema)]
@@ -799,6 +1095,8 @@ pub async fn trigger_incident_rca(
         skip_cooldown: true,
         oncall_subjects: None,
         context_used: None,
+        recipients: Vec::new(),
+        page_key: None,
     })
     .await
     {
@@ -961,25 +1259,147 @@ fn json_status_response(status: axum::http::StatusCode, body: serde_json::Value)
         .unwrap()
 }
 
+/// Refuses an owner-block or impact edit while v2 is off (409) or for a delegated or AI caller.
+#[cfg(feature = "enterprise")]
+fn refuse_v2_field(v2_enabled: bool, caller: V2Caller) -> Option<Response> {
+    if !v2_enabled {
+        return Some(common::meta::incidents_v2::incidents_v2_off_response());
+    }
+    (caller.delegated || caller.ai)
+        .then(|| MetaHttpResponse::forbidden("Only a person can change the owner or impact"))
+}
+
+/// Writes one Incidents v2 field edit after its refusals and its checks.
+#[cfg(feature = "enterprise")]
+async fn update_v2_field(
+    org_id: &str,
+    incident_id: &str,
+    user_id: &str,
+    caller: V2Caller,
+    edit: UpdatePayload,
+) -> Response {
+    let v2_enabled = common::meta::incidents_v2::incidents_v2_enabled();
+    if let Some(refused) = refuse_v2_field(v2_enabled, caller) {
+        return refused;
+    }
+    let edit = match v2_field_edit(org_id, edit).await {
+        Ok(edit) => edit,
+        Err(message) => return MetaHttpResponse::bad_request(message),
+    };
+    match openobserve_core::alerts::incidents::update_fields(org_id, incident_id, edit, user_id)
+        .await
+    {
+        Ok(Some(incident)) => MetaHttpResponse::json(incident),
+        Ok(None) => MetaHttpResponse::not_found("Incident not found"),
+        Err(e) => MetaHttpResponse::internal_error(e),
+    }
+}
+
+/// The checked edit; the error is the 400's message.
+#[cfg(feature = "enterprise")]
+async fn v2_field_edit(
+    org_id: &str,
+    payload: UpdatePayload,
+) -> Result<infra::table::alert_incidents::FieldEdit, String> {
+    use infra::table::alert_incidents::FieldEdit;
+
+    let trimmed = |value: &str| Some(value.trim().to_string()).filter(|v| !v.is_empty());
+    match payload {
+        UpdatePayload::OwnerTeam { owner_team_id } => {
+            let team = owner_team_id.as_deref().and_then(trimmed);
+            if let Some(team) = &team
+                && !matches!(
+                    infra::table::oncall_teams::get(org_id, team).await,
+                    Ok(Some(_))
+                )
+            {
+                return Err("The owner team is not a team of this org".to_string());
+            }
+            Ok(FieldEdit::OwnerTeam(team))
+        }
+        UpdatePayload::CommsOwner { comms_owner } => {
+            let owner = trimmed(&comms_owner);
+            if let Some(owner) = &owner
+                && !matches!(db::user::get(Some(org_id), owner).await, Ok(Some(_)))
+            {
+                return Err("The comms owner is not a member of this org".to_string());
+            }
+            Ok(FieldEdit::CommsOwner(owner))
+        }
+        UpdatePayload::ImpactWindow {
+            impact_start_at,
+            impact_end_at,
+        } => impact_window(impact_start_at, impact_end_at),
+        UpdatePayload::CustomerImpact { customer_impact } => Ok(FieldEdit::CustomerImpact(
+            customer_impact.as_str().to_string(),
+        )),
+        _ => Err("Not an owner or impact field".to_string()),
+    }
+}
+
+/// Start at or before the end; an open end means the impact still lasts.
+#[cfg(any(feature = "enterprise", test))]
+fn impact_window(
+    start: i64,
+    end: Option<i64>,
+) -> Result<infra::table::alert_incidents::FieldEdit, String> {
+    if start <= 0 {
+        return Err("impact_start_at must be a time in microseconds".to_string());
+    }
+    if end.is_some_and(|end| end < start) {
+        return Err("impact_start_at must not be after impact_end_at".to_string());
+    }
+    Ok(infra::table::alert_incidents::FieldEdit::ImpactWindow { start, end })
+}
+
+/// Requires the field to be present, while still accepting `null`.
+fn present_or_null<'de, D, T>(deserializer: D) -> Result<Option<T>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    Option::<T>::deserialize(deserializer)
+}
+
+#[cfg(feature = "enterprise")]
+fn validate_resolution(status: IncidentStatus, details: &ResolutionDetails) -> Option<Response> {
+    if details.is_empty() {
+        return None;
+    }
+    if status != IncidentStatus::Resolved {
+        return Some(MetaHttpResponse::bad_request(
+            "Resolution details require resolved status",
+        ));
+    }
+    if details
+        .resolution_note
+        .as_ref()
+        .is_some_and(|note| note.chars().count() > 2000)
+    {
+        return Some(MetaHttpResponse::bad_request(
+            "Resolution note cannot exceed 2000 characters",
+        ));
+    }
+    None
+}
+
 /// A person resolved the incident: end the ack its alerts carry, then answer with the incident.
 #[cfg(feature = "enterprise")]
 async fn end_ack_after_resolve(
     org_id: String,
     incident_id: String,
     actor: &str,
-    incident: impl Serialize,
+    incident: config::meta::alerts::incidents::Incident,
 ) -> Response {
-    use openobserve_core::alerts::ack::{self, Problem};
-
-    let problem = Problem::Incident {
-        org_id,
-        incident_id,
+    let episode = infra::table::alert_incidents::Episode {
+        status: incident.status.to_string(),
+        resolved_at: incident.resolved_at,
     };
-    match ack::resolve(
-        &problem,
+    match openobserve_core::alerts::ack::resolve_incident_episode(
+        &org_id,
+        &incident_id,
         actor,
-        config::meta::alerts::ack::AckSource::Incident,
-        None,
+        &episode,
     )
     .await
     {
@@ -1069,7 +1489,16 @@ pub async fn list_incident_rca_runs(
     Path((org_id, incident_id)): Path<(String, String)>,
     Headers(user_email): Headers<UserEmail>,
     Query(query): Query<ListRcaRunsQuery>,
+    headers: axum::http::HeaderMap,
 ) -> Response {
+    let rca = security::rca_scope::rca_caller(&org_id, &user_email.user_id, &headers).await;
+    if !security::rca_scope::may_read_run_history(&org_id, &rca, &incident_id).await {
+        return MetaHttpResponse::json(config::meta::alerts::rca_runs::ListRcaRunsResponse {
+            runs: Vec::new(),
+            has_more: false,
+            skipped_pages: Vec::new(),
+        });
+    }
     if let Err(resp) = security::guard_case(&org_id, &user_email.user_id, "GET", &incident_id).await
     {
         return resp;
@@ -1099,11 +1528,17 @@ pub async fn list_incident_rca_runs(
             Err(e) => return MetaHttpResponse::internal_error(e),
         }
     };
+    let mut v1_cursor_at = None;
     if !has_more {
         let v1 = match openobserve_core::alerts::rca_runs::v1_reports_of(&org_id, &incident).await {
             Ok(v1) => v1,
             Err(e) => return MetaHttpResponse::internal_error(e),
         };
+        v1_cursor_at = v1_cursor.and_then(|id| {
+            v1.iter()
+                .find(|report| report.run_id == id)
+                .map(|report| report.at)
+        });
         // A v1 cursor continues among the v1 reports, which are already newest first.
         let mut rest = v1
             .iter()
@@ -1115,7 +1550,72 @@ pub async fn list_incident_rca_runs(
         runs.extend(rest.by_ref().take(room).map(|report| report.item()));
         has_more = rest.next().is_some();
     }
-    MetaHttpResponse::json(config::meta::alerts::rca_runs::ListRcaRunsResponse { runs, has_more })
+    let skipped_pages = match skipped_pages_of(
+        &org_id,
+        &incident_id,
+        &runs,
+        has_more,
+        before,
+        v1_cursor_at,
+    )
+    .await
+    {
+        Ok(pages) => pages,
+        Err(e) => return MetaHttpResponse::internal_error(e),
+    };
+    if !security::rca_scope::record_history_response(
+        &org_id,
+        &rca,
+        !runs.is_empty() || !skipped_pages.is_empty(),
+    )
+    .await
+    {
+        return MetaHttpResponse::json(config::meta::alerts::rca_runs::ListRcaRunsResponse {
+            runs: Vec::new(),
+            has_more: false,
+            skipped_pages: Vec::new(),
+        });
+    }
+    MetaHttpResponse::json(config::meta::alerts::rca_runs::ListRcaRunsResponse {
+        runs,
+        has_more,
+        skipped_pages,
+    })
+}
+
+/// The incident's skipped pages from below `before` down to the page's oldest run while more
+/// follow, at most [RCA_SKIPPED_PAGES_MAX]; a cursor with no known time lists none.
+#[cfg(feature = "enterprise")]
+async fn skipped_pages_of(
+    org_id: &str,
+    incident_id: &str,
+    runs: &[config::meta::alerts::rca_runs::RcaRunItem],
+    has_more: bool,
+    before: Option<&str>,
+    v1_cursor_at: Option<i64>,
+) -> Result<Vec<config::meta::alerts::rca_runs::RcaSkippedPage>, sea_orm::DbErr> {
+    use infra::table::rca_skipped_pages::{PageStart, list_for_incident};
+
+    let cursor_at = match before {
+        Some(cursor) if config::meta::alerts::rca_runs::is_v1_run_id(cursor) => v1_cursor_at,
+        Some(cursor) => infra::table::rca_runs::get(org_id, cursor)
+            .await?
+            .map(|run| run.started_at),
+        None => None,
+    };
+    let oldest_shown = if has_more {
+        runs.last().map(|run| run.started_at)
+    } else {
+        None
+    };
+    list_for_incident(
+        org_id,
+        incident_id,
+        PageStart::of(before, cursor_at),
+        oldest_shown,
+        RCA_SKIPPED_PAGES_MAX,
+    )
+    .await
 }
 
 #[cfg(feature = "enterprise")]
@@ -1147,7 +1647,12 @@ pub async fn list_incident_rca_runs(
 pub async fn get_incident_rca_run(
     Path((org_id, incident_id, run_id)): Path<(String, String, String)>,
     Headers(user_email): Headers<UserEmail>,
+    headers: axum::http::HeaderMap,
 ) -> Response {
+    let rca = security::rca_scope::rca_caller(&org_id, &user_email.user_id, &headers).await;
+    if !security::rca_scope::may_read_run_history(&org_id, &rca, &incident_id).await {
+        return MetaHttpResponse::forbidden("This analysis cannot read past runs");
+    }
     if let Err(resp) = security::guard_case(&org_id, &user_email.user_id, "GET", &incident_id).await
     {
         return resp;
@@ -1156,14 +1661,35 @@ pub async fn get_incident_rca_run(
         return match openobserve_core::alerts::rca_runs::v1_run(&org_id, &incident_id, &run_id)
             .await
         {
-            Ok(Some(run)) => MetaHttpResponse::json(run),
+            Ok(Some(run)) => {
+                if !security::rca_scope::record_history_response(&org_id, &rca, true).await {
+                    return MetaHttpResponse::forbidden("This analysis cannot read past runs");
+                }
+                MetaHttpResponse::json(run)
+            }
             Ok(None) => MetaHttpResponse::not_found("Run not found"),
             Err(e) => MetaHttpResponse::internal_error(e),
         };
     }
     match infra::table::rca_runs::get(&org_id, &run_id).await {
         Ok(Some(run)) if run.incident_id.as_deref() == Some(incident_id.as_str()) => {
-            MetaHttpResponse::json(infra::table::rca_runs::to_run(run))
+            if !security::rca_scope::record_history_response(&org_id, &rca, true).await {
+                return MetaHttpResponse::forbidden("This analysis cannot read past runs");
+            }
+            let fenced = match infra::table::rca_fence::is_fenced(&run).await {
+                Ok(fenced) => fenced,
+                Err(error) => return MetaHttpResponse::internal_error(error),
+            };
+            let mut run = infra::table::rca_runs::to_run(run);
+            if fenced
+                && let Some(used) = run
+                    .context_used
+                    .as_mut()
+                    .and_then(serde_json::Value::as_object_mut)
+            {
+                used.remove("past_causes");
+            }
+            MetaHttpResponse::json(run)
         }
         Ok(_) => MetaHttpResponse::not_found("Run not found"),
         Err(e) => MetaHttpResponse::internal_error(e),
@@ -1575,6 +2101,13 @@ async fn resume_run(
     };
     use openobserve_core::alerts::rca_resume;
 
+    match infra::table::alert_incidents::get_rw(&org_id, &incident_id).await {
+        Ok(Some(incident)) if incident.security_case => {
+            return resume_error_response(&run_id, &rca_resume::ResumeError::SecurityCase);
+        }
+        Ok(_) => {}
+        Err(error) => return MetaHttpResponse::internal_error(error),
+    }
     let o2_cfg = get_o2_config();
     if !o2_cfg.incidents.enabled || !o2_cfg.incidents.rca_enabled {
         return MetaHttpResponse::bad_request("RCA is not enabled");
@@ -1621,6 +2154,12 @@ fn resume_error_response(
     use openobserve_core::alerts::rca_resume::ResumeError;
 
     match error {
+        ResumeError::SecurityCase => rca_error_response(
+            StatusCode::CONFLICT,
+            "Security-case analyses cannot be resumed",
+            Some("security_case_resume_blocked"),
+            None,
+        ),
         ResumeError::NotFound => {
             rca_error_response(StatusCode::NOT_FOUND, "Run not found", None, None)
         }
@@ -1694,6 +2233,8 @@ async fn start_resumed_run(
             skip_cooldown: true,
             oncall_subjects: None,
             context_used: Some(serde_json::json!({ "resumed_from": seed.resumed_from() })),
+            recipients: Vec::new(),
+            page_key: None,
         },
         &seed.latest_run_id,
     )
@@ -1944,6 +2485,17 @@ pub async fn get_incident_rca_live_stream(
         .unwrap_or_else(|_| Response::new(axum::body::Body::empty()))
 }
 
+/// Query of `GET …/events`.
+#[derive(Debug, Deserialize, IntoParams, ToSchema)]
+#[into_params(parameter_in = Query)]
+pub struct IncidentEventsQuery {
+    /// A `delta: true` page holds only `seq > since`; merge alerts by ID and `first_at`, others by
+    /// type and timestamp. Other pages are whole; refetch whole for deletions or a repeat key.
+    #[serde(default)]
+    #[param(nullable)]
+    pub since: Option<i64>,
+}
+
 /// Get incident events timeline
 #[cfg(feature = "enterprise")]
 #[utoipa::path(
@@ -1957,27 +2509,43 @@ pub async fn get_incident_rca_live_stream(
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("incident_id" = String, Path, description = "Incident id"),
+        IncidentEventsQuery,
+        ("If-None-Match" = Option<String>, Header, description = "The `ETag` of the caller's copy; a current one answers 304"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "`{events, seq, delta?}`; the `ETag` header is `\"<seq>\"`", content_type = "application/json", body = Object),
+        (status = 304, description = "The timeline's `seq` equals `If-None-Match` and every event is stamped; no body"),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"})),
-        ("x-o2-mcp" = json!({"enabled": false}))
+        ("x-o2-mcp" = json!({"enabled": true, "description": "Get the event timeline of an incident; with since, the events added or changed after that seq", "category": "alerts"}))
     )
 )]
 pub async fn get_incident_events(
     Path((org_id, incident_id)): Path<(String, String)>,
+    Query(query): Query<IncidentEventsQuery>,
     Headers(user_email): Headers<UserEmail>,
+    headers: axum::http::HeaderMap,
 ) -> Response {
+    let rca = security::rca_scope::rca_caller(&org_id, &user_email.user_id, &headers).await;
+    if !security::rca_scope::may_read_incident(&org_id, &rca, &incident_id).await {
+        return MetaHttpResponse::forbidden("This analysis cannot read that incident");
+    }
     if let Err(resp) = security::guard_case(&org_id, &user_email.user_id, "GET", &incident_id).await
     {
         return resp;
     }
-    let events = match infra::table::incident_events::get(&org_id, &incident_id).await {
-        Ok(events) => events,
+    let project_timeline = rca.projects_timeline();
+    let if_none_match = headers
+        .get(axum::http::header::IF_NONE_MATCH)
+        .and_then(|v| v.to_str().ok());
+    let (events, seq) = match infra::table::incident_events::get_page(&org_id, &incident_id).await {
+        Ok(page) => page,
         Err(e) => return MetaHttpResponse::internal_error(format!("Failed to get events: {e}")),
     };
+    if seq_complete(&events) && events_etag_matches(if_none_match, seq) {
+        return events_not_modified(seq);
+    }
 
     // Self-heal timelines emptied by the pre-fix read/write cycle (releases up to v0.91.x).
     // Repairing lazily on read avoids a migration that would rewrite every incident row;
@@ -1985,15 +2553,37 @@ pub async fn get_incident_events(
     // that reconstruct_if_empty leaves alone once there is nothing to rebuild.
     if events.is_empty() {
         match infra::table::incident_events::reconstruct_if_empty(&org_id, &incident_id).await {
-            Ok(Some(_)) => match infra::table::incident_events::get(&org_id, &incident_id).await {
-                Ok(rebuilt) => {
-                    return MetaHttpResponse::json(serde_json::json!({
-                        "events": rebuilt,
-                        // Flags that the timeline was rebuilt from incident/alert rows and is
-                        // missing anything that lived only in the lost blob (comments,
-                        // acknowledgements, RCA activity).
-                        "partial_reconstruction": true,
-                    }));
+            Ok(Some(_)) => match infra::table::incident_events::get_page(&org_id, &incident_id)
+                .await
+            {
+                Ok((rebuilt, seq)) => {
+                    let since = query.since.filter(|_| seq_complete(&rebuilt));
+                    // Flags that the timeline was rebuilt from incident/alert rows and is
+                    // missing anything that lived only in the lost blob (comments,
+                    // acknowledgements, RCA activity).
+                    let mut rebuilt = if project_timeline {
+                        security::rca_scope::project_timeline(rebuilt)
+                    } else {
+                        rebuilt
+                    };
+                    if !project_timeline
+                        && !security::rca_scope::record_timeline_response(
+                            &org_id,
+                            &rca,
+                            &incident_id,
+                            &rebuilt,
+                            since,
+                        )
+                        .await
+                    {
+                        if rca.own_incident() != Some(incident_id.as_str()) {
+                            return MetaHttpResponse::forbidden(
+                                "This analysis cannot read that incident",
+                            );
+                        }
+                        rebuilt = security::rca_scope::project_timeline(rebuilt);
+                    }
+                    return events_page(rebuilt, seq, since, true);
                 }
                 Err(e) => {
                     return MetaHttpResponse::internal_error(format!("Failed to get events: {e}"));
@@ -2007,7 +2597,28 @@ pub async fn get_incident_events(
         }
     }
 
-    MetaHttpResponse::json(serde_json::json!({ "events": events }))
+    let since = query.since.filter(|_| seq_complete(&events));
+    let mut events = if project_timeline {
+        security::rca_scope::project_timeline(events)
+    } else {
+        events
+    };
+    if !project_timeline
+        && !security::rca_scope::record_timeline_response(
+            &org_id,
+            &rca,
+            &incident_id,
+            &events,
+            since,
+        )
+        .await
+    {
+        if rca.own_incident() != Some(incident_id.as_str()) {
+            return MetaHttpResponse::forbidden("This analysis cannot read that incident");
+        }
+        events = security::rca_scope::project_timeline(events);
+    }
+    events_page(events, seq, since, false)
 }
 
 /// Get incident events timeline (OSS)
@@ -2023,9 +2634,12 @@ pub async fn get_incident_events(
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("incident_id" = String, Path, description = "Incident id"),
+        IncidentEventsQuery,
+        ("If-None-Match" = Option<String>, Header, description = "The `ETag` of the caller's copy; a current one answers 304"),
     ),
     responses(
-        (status = 200, description = "Success", content_type = "application/json", body = Object),
+        (status = 200, description = "`{events, seq, delta?}`; the `ETag` header is `\"<seq>\"`", content_type = "application/json", body = Object),
+        (status = 304, description = "The timeline's `seq` equals `If-None-Match` and every event is stamped; no body"),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"})),
@@ -2034,6 +2648,65 @@ pub async fn get_incident_events(
 )]
 pub async fn get_incident_events(_path: Path<(String, String)>) -> Response {
     MetaHttpResponse::forbidden("Not Supported")
+}
+
+/// The timeline's `seq` as a strong validator.
+#[cfg(any(feature = "enterprise", test))]
+fn events_etag(seq: i64) -> String {
+    format!("\"{seq}\"")
+}
+
+/// True when any entity tag in `If-None-Match` names `seq`; a weak `W/` prefix still matches.
+#[cfg(any(feature = "enterprise", test))]
+fn events_etag_matches(if_none_match: Option<&str>, seq: i64) -> bool {
+    let current = events_etag(seq);
+    if_none_match.is_some_and(|value| {
+        value
+            .split(',')
+            .map(|tag| tag.trim().trim_start_matches("W/"))
+            .any(|tag| tag == current)
+    })
+}
+
+/// Whether every event carries a seq stamp; an older writer drops them all and keeps the row seq,
+/// so its write is invisible to a seq validator or delta.
+#[cfg(any(feature = "enterprise", test))]
+fn seq_complete(events: &[config::meta::alerts::incidents::IncidentEvent]) -> bool {
+    !events.is_empty() && events.iter().all(|event| event.seq > 0)
+}
+
+#[cfg(any(feature = "enterprise", test))]
+fn events_not_modified(seq: i64) -> Response {
+    axum::http::Response::builder()
+        .status(axum::http::StatusCode::NOT_MODIFIED)
+        .header(axum::http::header::ETAG, events_etag(seq))
+        .body(axum::body::Body::empty())
+        .unwrap_or_else(|_| Response::new(axum::body::Body::empty()))
+}
+
+/// `{events, seq}` with the `ETag`; `since` keeps only the events later writes added or changed.
+#[cfg(any(feature = "enterprise", test))]
+fn events_page(
+    mut events: Vec<config::meta::alerts::incidents::IncidentEvent>,
+    seq: i64,
+    since: Option<i64>,
+    partial_reconstruction: bool,
+) -> Response {
+    if let Some(since) = since {
+        events.retain(|event| event.seq > since);
+    }
+    let mut body = serde_json::json!({ "events": events, "seq": seq });
+    if since.is_some() {
+        body["delta"] = serde_json::Value::Bool(true);
+    }
+    if partial_reconstruction {
+        body["partial_reconstruction"] = serde_json::Value::Bool(true);
+    }
+    let mut resp = MetaHttpResponse::json(body);
+    if let Ok(etag) = axum::http::HeaderValue::from_str(&events_etag(seq)) {
+        resp.headers_mut().insert(axum::http::header::ETAG, etag);
+    }
+    resp
 }
 
 /// Post a comment on an incident
@@ -2172,11 +2845,19 @@ pub async fn trigger_incident_rca(_path: Path<(String, String)>) -> Response {
         ("x-o2-mcp" = json!({"description": "List all incidents", "category": "alerts"}))
     )
 )]
-pub async fn list_incidents(_path: Path<String>, _query: Query<ListIncidentsQuery>) -> Response {
-    // Only supported with enterprise features enabled
+pub async fn list_incidents(
+    _path: Path<String>,
+    Query(query): Query<ListIncidentsQuery>,
+    Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    if let Err(message) = list_page_query(&query, &user_email.user_id) {
+        return MetaHttpResponse::bad_request(message);
+    }
     MetaHttpResponse::json(ListIncidentsResponse {
         incidents: vec![],
+        counts_by_severity: SeverityCounts::default(),
         total: 0,
+        next_cursor: None,
     })
 }
 
@@ -2278,13 +2959,49 @@ pub async fn get_incident_stats(_path: Path<String>) -> Response {
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = config::meta::alerts::incidents::Incident),
         (status = 403, description = "Enterprise feature", content_type = "application/json", body = ()),
+        (status = 409, description = "Incidents v2 is off"),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
         ("x-o2-mcp" = json!({"description": "Update an incident's title, severity, or status", "category": "alerts"}))
     )
 )]
-pub async fn update_incident(_path: Path<(String, String)>) -> Response {
+pub async fn update_incident(
+    _path: Path<(String, String)>,
+    body: Result<axum::Json<UpdatePayload>, axum::extract::rejection::JsonRejection>,
+) -> Response {
+    if let Ok(axum::Json(payload)) = body
+        && let Some(response) = payload.off_response(false)
+    {
+        return response;
+    }
+    MetaHttpResponse::forbidden("Not Supported")
+}
+
+#[cfg(not(feature = "enterprise"))]
+#[utoipa::path(
+    post,
+    path = "/v2/{org_id}/alerts/incidents/{incident_id}/opened",
+    context_path = "/api",
+    tag = "Incidents",
+    operation_id = "MarkIncidentOpened",
+    summary = "Record that a responder opened the incident",
+    description = "This endpoint is only available with enterprise features enabled.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("incident_id" = String, Path, description = "Incident ID"),
+    ),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = OpenedResponse),
+        (status = 403, description = "Enterprise feature", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "get"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+pub async fn mark_incident_opened(_path: Path<(String, String)>) -> Response {
     MetaHttpResponse::forbidden("Not Supported")
 }
 
@@ -2548,6 +3265,85 @@ pub async fn resume_incident_rca_run(
     MetaHttpResponse::forbidden("Resuming an analysis is only available in enterprise")
 }
 
+/// The list's SQL filters from its query string; the error is the 400's message.
+fn list_page_query(
+    query: &ListIncidentsQuery,
+    caller: &str,
+) -> Result<infra::table::alert_incidents::ListPageQuery, String> {
+    use infra::table::alert_incidents::{ListCursor, ListPageQuery, ListSort};
+
+    let mut statuses = Vec::new();
+    for status in comma_list(query.status.as_deref()) {
+        match status.as_str() {
+            "active" => statuses.extend(["open".to_string(), "acknowledged".to_string()]),
+            "open" | "acknowledged" | "resolved" => statuses.push(status),
+            _ => return Err(format!("unknown status `{status}`")),
+        }
+    }
+    let severities: Vec<String> = comma_list(query.severity.as_deref())
+        .into_iter()
+        .map(|severity| severity.to_uppercase())
+        .collect();
+    if let Some(bad) = severities
+        .iter()
+        .find(|severity| !matches!(severity.as_str(), "P1" | "P2" | "P3" | "P4"))
+    {
+        return Err(format!("unknown severity `{bad}`"));
+    }
+    let assigned_to = match query.assigned_to.as_deref().map(str::trim) {
+        None | Some("") => None,
+        Some("me") => Some(caller.to_string()),
+        Some(_) => return Err("assigned_to accepts only `me`".to_string()),
+    };
+    if let (Some(start), Some(end)) = (query.start_time, query.end_time)
+        && start > end
+    {
+        return Err("start_time must not be after end_time".to_string());
+    }
+    let sort = match query.sort.as_deref().map(str::trim) {
+        None | Some("") => ListSort::default(),
+        Some(sort) => ListSort::parse(sort).ok_or_else(|| format!("unknown sort `{sort}`"))?,
+    };
+    let after = match query.cursor.as_deref().map(str::trim) {
+        None | Some("") => None,
+        Some(raw) => {
+            let cursor = ListCursor::decode(raw).ok_or("invalid cursor")?;
+            if cursor.sort != sort.as_param() {
+                return Err("the cursor belongs to another sort".to_string());
+            }
+            Some(cursor)
+        }
+    };
+    Ok(ListPageQuery {
+        statuses,
+        severities,
+        assigned_to,
+        owner_team_id: query
+            .owner_team
+            .as_deref()
+            .map(str::trim)
+            .filter(|team| !team.is_empty())
+            .map(str::to_string),
+        start_time: query.start_time,
+        end_time: query.end_time,
+        sort,
+        after,
+        offset: query.offset,
+        // Clamped, not refused: callers written before the cap still send larger pages.
+        limit: query.limit.clamp(1, MAX_LIST_LIMIT),
+        ..Default::default()
+    })
+}
+
+fn comma_list(raw: Option<&str>) -> Vec<String> {
+    raw.into_iter()
+        .flat_map(|raw| raw.split(','))
+        .map(str::trim)
+        .filter(|item| !item.is_empty())
+        .map(str::to_string)
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2557,44 +3353,193 @@ mod tests {
         assert_eq!(default_limit(), 50);
     }
 
-    #[test]
-    fn test_list_incidents_query_defaults() {
-        let query = ListIncidentsQuery {
-            status: None,
-            limit: default_limit(),
-            offset: 0,
-            #[cfg(feature = "enterprise")]
-            siem: false,
-        };
-        assert_eq!(query.limit, 50);
-        assert_eq!(query.offset, 0);
-        assert!(query.status.is_none());
+    fn payload(body: serde_json::Value) -> Result<UpdatePayload, serde_json::Error> {
+        serde_json::from_value(body)
     }
 
     #[test]
-    fn test_list_incidents_query_with_status() {
-        let query = ListIncidentsQuery {
-            status: Some("open".to_string()),
-            limit: 100,
-            offset: 25,
-            #[cfg(feature = "enterprise")]
-            siem: true,
+    fn the_v2_variants_parse_one_field_each_and_need_their_field_present() {
+        use config::meta::alerts::incident_fields::CustomerImpact;
+
+        assert!(matches!(
+            payload(serde_json::json!({"owner_team_id": null})).unwrap(),
+            UpdatePayload::OwnerTeam {
+                owner_team_id: None
+            }
+        ));
+        assert!(
+            payload(serde_json::json!({})).is_err(),
+            "no field clears nothing"
+        );
+        assert!(matches!(
+            payload(serde_json::json!({"impact_start_at": 5})).unwrap(),
+            UpdatePayload::ImpactWindow {
+                impact_start_at: 5,
+                impact_end_at: None
+            }
+        ));
+        assert!(matches!(
+            payload(serde_json::json!({"customer_impact": "none"})).unwrap(),
+            UpdatePayload::CustomerImpact {
+                customer_impact: CustomerImpact::None
+            }
+        ));
+        assert!(payload(serde_json::json!({"customer_impact": "maybe"})).is_err());
+        assert!(payload(serde_json::json!({"owner_team_id": "t", "title": "x"})).is_err());
+        assert!(
+            payload(serde_json::json!({"comms_owner": ""}))
+                .unwrap()
+                .is_v2_field()
+        );
+        assert!(
+            !payload(serde_json::json!({"title": "x"}))
+                .unwrap()
+                .is_v2_field()
+        );
+    }
+
+    #[test]
+    fn an_impact_window_starts_at_or_before_its_end() {
+        assert!(impact_window(10, Some(10)).is_ok());
+        assert!(impact_window(10, None).is_ok());
+        assert_eq!(
+            impact_window(20, Some(10)).unwrap_err(),
+            "impact_start_at must not be after impact_end_at"
+        );
+        assert!(impact_window(0, None).is_err());
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn only_a_person_edits_the_v2_fields_and_only_while_v2_is_on() {
+        let person = V2Caller {
+            delegated: false,
+            ai: false,
         };
-        assert_eq!(query.status.unwrap(), "open");
-        assert_eq!(query.limit, 100);
-        assert_eq!(query.offset, 25);
-        #[cfg(feature = "enterprise")]
-        assert!(query.siem);
+        let off = refuse_v2_field(false, person).unwrap();
+        assert_eq!(off.status(), axum::http::StatusCode::CONFLICT);
+        for caller in [
+            V2Caller {
+                delegated: true,
+                ai: false,
+            },
+            V2Caller {
+                delegated: false,
+                ai: true,
+            },
+            V2Caller {
+                delegated: true,
+                ai: true,
+            },
+        ] {
+            let refused = refuse_v2_field(true, caller).unwrap();
+            assert_eq!(
+                refused.status(),
+                axum::http::StatusCode::FORBIDDEN,
+                "{caller:?}"
+            );
+        }
+        assert!(refuse_v2_field(true, person).is_none());
+    }
+
+    fn list_query(params: serde_json::Value) -> ListIncidentsQuery {
+        serde_json::from_value(params).unwrap()
+    }
+
+    #[test]
+    fn test_list_incidents_query_defaults() {
+        let query = list_query(serde_json::json!({}));
+        assert_eq!(query.limit, 50);
+        assert_eq!(query.offset, 0);
+        assert!(query.status.is_none());
+        let page = list_page_query(&query, "me@acme.io").unwrap();
+        assert_eq!(page.sort.as_param(), "last_alert_at:desc");
+        assert!(page.statuses.is_empty() && page.severities.is_empty());
+    }
+
+    #[test]
+    fn list_filters_parse_into_the_sql_query() {
+        let query = list_query(serde_json::json!({
+            "status": "active,resolved",
+            "severity": "p1, P3",
+            "assigned_to": "me",
+            "start_time": 10,
+            "end_time": 20,
+            "sort": "title:asc",
+            "limit": 200,
+            "offset": 4,
+            "owner_team": " team-9 ",
+        }));
+        let page = list_page_query(&query, "me@acme.io").unwrap();
+        assert_eq!(page.statuses, ["open", "acknowledged", "resolved"]);
+        assert_eq!(page.severities, ["P1", "P3"]);
+        assert_eq!(
+            page.assigned_to.as_deref(),
+            Some("me@acme.io"),
+            "`me` is the caller"
+        );
+        assert_eq!((page.start_time, page.end_time), (Some(10), Some(20)));
+        assert_eq!(page.sort.as_param(), "title:asc");
+        assert_eq!((page.limit, page.offset), (200, 4));
+        assert_eq!(page.owner_team_id.as_deref(), Some("team-9"));
+    }
+
+    #[test]
+    fn list_clamps_the_page_size_instead_of_refusing_it() {
+        let limit = |n: u64| {
+            list_page_query(&list_query(serde_json::json!({"limit": n})), "me@acme.io")
+                .unwrap()
+                .limit
+        };
+        assert_eq!((limit(1000), limit(201), limit(0)), (200, 200, 1));
+    }
+
+    #[test]
+    fn list_refuses_what_it_cannot_serve() {
+        use infra::table::alert_incidents::{ListCursor, SortKey};
+
+        let refused = |params: serde_json::Value| {
+            list_page_query(&list_query(params), "me@acme.io").unwrap_err()
+        };
+        refused(serde_json::json!({"status": "closed"}));
+        refused(serde_json::json!({"severity": "P5"}));
+        refused(serde_json::json!({"assigned_to": "someone@acme.io"}));
+        refused(serde_json::json!({"start_time": 2, "end_time": 1}));
+        refused(serde_json::json!({"sort": "phase:desc"}));
+        refused(serde_json::json!({"cursor": "garbage"}));
+        let cursor = ListCursor {
+            sort: "last_alert_at:desc".into(),
+            key: SortKey::Int(5),
+            id: "x".into(),
+        }
+        .encode();
+        assert_eq!(
+            refused(serde_json::json!({"cursor": cursor, "sort": "last_alert_at:asc"})),
+            "the cursor belongs to another sort"
+        );
+        let same = list_query(serde_json::json!({"cursor": cursor}));
+        assert!(
+            list_page_query(&same, "me@acme.io")
+                .unwrap()
+                .after
+                .is_some()
+        );
     }
 
     #[test]
     fn test_list_incidents_response_structure() {
         let response = ListIncidentsResponse {
             incidents: vec![],
+            counts_by_severity: [1, 0, 2, 0].into(),
             total: 0,
+            next_cursor: None,
         };
-        assert_eq!(response.incidents.len(), 0);
-        assert_eq!(response.total, 0);
+        let json = serde_json::to_value(&response).unwrap();
+        assert_eq!(
+            json["counts_by_severity"],
+            serde_json::json!({"P1": 1, "P2": 0, "P3": 2, "P4": 0})
+        );
+        assert_eq!(json["next_cursor"], serde_json::Value::Null);
     }
 
     #[test]
@@ -2624,11 +3569,21 @@ mod tests {
             historical: false,
             group_values_display: None,
             last_detection_at: None,
+            owner_team_id: None,
+            comms_owner: None,
+            impact_start_at: None,
+            impact_end_at: None,
+            customer_impact: None,
+            resolution_cause: None,
+            cause_reviewed_by: None,
+            cause_reviewed_at: None,
         };
 
         let response = ListIncidentsResponse {
             incidents: vec![incident],
+            counts_by_severity: SeverityCounts::default(),
             total: 1,
+            next_cursor: None,
         };
         assert_eq!(response.incidents.len(), 1);
         assert_eq!(response.total, 1);
@@ -2677,10 +3632,84 @@ mod tests {
             status: IncidentStatus::Acknowledged,
             verdict: None,
             reason: None,
+            resolution_cause: None,
+            resolution_note: None,
+            customer_impact: None,
         };
         let json = serde_json::to_string(&payload).unwrap();
         assert!(json.contains("acknowledged"));
         assert!(json.contains("status"));
+    }
+
+    #[test]
+    fn resolution_details_parse_as_v2_status_fields() {
+        let payload: UpdatePayload = serde_json::from_value(serde_json::json!({
+            "status": "resolved",
+            "resolution_cause": "dependency_failure",
+            "resolution_note": "Upstream timeouts",
+            "customer_impact": "confirmed",
+        }))
+        .unwrap();
+        assert!(payload.is_v2_field());
+        assert!(matches!(
+            payload,
+            UpdatePayload::Status {
+                status: IncidentStatus::Resolved,
+                resolution_cause: Some(ResolutionCause::DependencyFailure),
+                resolution_note: Some(note),
+                customer_impact: Some(CustomerImpact::Confirmed),
+                ..
+            } if note == "Upstream timeouts"
+        ));
+    }
+
+    #[tokio::test]
+    async fn resolution_fields_return_conflict_while_incidents_v2_is_off() {
+        use axum::http::StatusCode;
+
+        for (key, value) in [
+            ("resolution_cause", "still_unknown"),
+            ("resolution_note", "Investigation continues"),
+            ("customer_impact", "unknown"),
+        ] {
+            let mut json = serde_json::json!({"status": "resolved"});
+            json[key] = serde_json::json!(value);
+            let payload: UpdatePayload = serde_json::from_value(json).unwrap();
+            assert!(payload.off_response(true).is_none());
+            assert_eq!(
+                payload.off_response(false).unwrap().status(),
+                StatusCode::CONFLICT
+            );
+            #[cfg(not(feature = "enterprise"))]
+            assert_eq!(
+                update_incident(
+                    Path(("org".to_owned(), "incident".to_owned())),
+                    Ok(axum::Json(payload)),
+                )
+                .await
+                .status(),
+                StatusCode::CONFLICT,
+            );
+        }
+        let legacy: UpdatePayload = serde_json::from_str(r#"{"status":"resolved"}"#).unwrap();
+        assert!(legacy.off_response(false).is_none());
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn resolution_note_limit_counts_characters() {
+        let mut details = ResolutionDetails {
+            resolution_note: Some("é".repeat(2000)),
+            ..Default::default()
+        };
+        assert!(validate_resolution(IncidentStatus::Resolved, &details).is_none());
+        details.resolution_note.as_mut().unwrap().push('é');
+        assert_eq!(
+            validate_resolution(IncidentStatus::Resolved, &details)
+                .unwrap()
+                .status(),
+            axum::http::StatusCode::BAD_REQUEST,
+        );
     }
 
     #[test]
@@ -2746,6 +3775,7 @@ mod tests {
                 status: IncidentStatus::Resolved,
                 verdict: Some(config::meta::alerts::incidents::CaseVerdict::FalsePositive),
                 reason: Some(_),
+                ..
             }
         ));
         let assign: UpdatePayload = serde_json::from_str(r#"{"assigned_to":"a@acme.io"}"#).unwrap();
@@ -2887,12 +3917,19 @@ mod tests {
                 cancelled_by: Some("a.rao@acme.io".to_string()),
                 error_reason: None,
                 has_record: true,
+                run_number: Some(3),
             }],
             has_more: true,
+            skipped_pages: Vec::new(),
         })
         .unwrap();
         assert_eq!(json["has_more"], true);
+        assert!(
+            json.get("skipped_pages").is_none(),
+            "empty skipped pages are omitted"
+        );
         let run = &json["runs"][0];
+        assert_eq!(run["run_number"], 3);
         assert_eq!(run["run_id"], "2abc");
         assert_eq!(run["subject_type"], "incident");
         assert_eq!(run["trigger"], "reanalyze");
@@ -2901,6 +3938,43 @@ mod tests {
         assert_eq!(run["cancelled_by"], "a.rao@acme.io");
         assert_eq!(run["has_record"], true);
         assert!(run.get("report").is_none());
+    }
+
+    #[test]
+    fn skipped_pages_list_each_refusal_with_its_covering_run() {
+        use config::meta::alerts::rca_runs::{ListRcaRunsResponse, RcaSkippedPage, SkipReason};
+
+        let json = serde_json::to_value(ListRcaRunsResponse {
+            runs: Vec::new(),
+            has_more: false,
+            skipped_pages: vec![
+                RcaSkippedPage {
+                    at_us: 20,
+                    reason: SkipReason::CoolingDown,
+                    covering_run_id: "run_2".to_string(),
+                    covering_run_number: Some(2),
+                    retry_after_us: Some(30),
+                    cooldown_us: Some(10),
+                },
+                RcaSkippedPage {
+                    at_us: 10,
+                    reason: SkipReason::InFlight,
+                    covering_run_id: "run_1".to_string(),
+                    covering_run_number: None,
+                    retry_after_us: None,
+                    cooldown_us: None,
+                },
+            ],
+        })
+        .unwrap();
+        assert_eq!(
+            json["skipped_pages"],
+            serde_json::json!([
+                {"at_us": 20, "reason": "cooling_down", "covering_run_id": "run_2",
+                 "covering_run_number": 2, "retry_after_us": 30, "cooldown_us": 10},
+                {"at_us": 10, "reason": "in_flight", "covering_run_id": "run_1"},
+            ])
+        );
     }
 
     #[test]
@@ -2930,6 +4004,14 @@ mod tests {
             historical: false,
             group_values_display: None,
             last_detection_at: None,
+            owner_team_id: None,
+            comms_owner: None,
+            impact_start_at: None,
+            impact_end_at: None,
+            customer_impact: None,
+            resolution_cause: None,
+            cause_reviewed_by: None,
+            cause_reviewed_at: None,
         };
         let json = serde_json::to_value(&incident).unwrap();
         assert!(json.as_object().unwrap().contains_key("rca"));
@@ -3030,6 +4112,8 @@ mod tests {
         let schema = Schema::new(backend);
         for mut table in [
             schema.create_table_from_entity(rca_runs::Entity),
+            schema.create_table_from_entity(infra::table::entity::rca_delivery_obligations::Entity),
+            schema.create_table_from_entity(infra::table::entity::rca_skipped_pages::Entity),
             schema.create_table_from_entity(ai_chat_sessions::Entity),
             schema.create_table_from_entity(alert_incidents::Entity),
         ] {
@@ -3071,13 +4155,15 @@ mod tests {
             stats: None,
             stage: None,
             stage_index: None,
-            context_used: None,
+            context_used: Some(serde_json::json!({"history_read": false}).to_string()),
             continuations: 0,
             oncall_subjects: None,
             input_deadline_at: None,
             pending_question_id: None,
             questions_asked: 0,
             deadline_closed_at: None,
+            run_number: None,
+            fenced: false,
         }
     }
 
@@ -3285,6 +4371,7 @@ mod tests {
             target: evidence_target("SearchSQL", &input),
             observed: None,
             change_rows: None,
+            coverage: None,
             result_summary,
         }];
         let submit = parse_submit(&json!({
@@ -3768,6 +4855,8 @@ mod tests {
                 skip_cooldown: true,
                 oncall_subjects: None,
                 context_used: None,
+                recipients: Vec::new(),
+                page_key: None,
             })
             .await
             .unwrap();
@@ -3858,7 +4947,14 @@ mod tests {
     /// Incident and run ids are primary keys across orgs: each test's names are scoped to its org.
     #[cfg(feature = "enterprise")]
     fn sid(org_id: &str, name: &str) -> String {
-        format!("{name}.{org_id}")
+        static IDS: std::sync::LazyLock<
+            std::sync::Mutex<std::collections::HashMap<(String, String), String>>,
+        > = std::sync::LazyLock::new(Default::default);
+        IDS.lock()
+            .unwrap()
+            .entry((org_id.to_string(), name.to_string()))
+            .or_insert_with(infra::table::rca_runs::new_run_id)
+            .clone()
     }
 
     /// An open incident whose latest run is `rca_run_id`.
@@ -3903,6 +4999,7 @@ mod tests {
             security_case: false,
             historical: false,
             last_detection_at: None,
+            ..Default::default()
         };
         alert_incidents::Entity::insert(alert_incidents::ActiveModel::from(row).reset_all())
             .exec(conn)
@@ -5296,6 +6393,7 @@ mod tests {
             Some("resume_failed".to_string())
         );
         assert!(new_run.session_id.is_none());
+        assert!(!infra::table::rca_fence::read_history(new_run));
         assert_eq!(
             infra::table::rca_runs::decode::<serde_json::Value>(new_run.context_used.as_deref())
                 .map(|used| used["resumed_from"].clone()),
@@ -5490,12 +6588,19 @@ mod tests {
         };
 
         let refused = [
-            get_incident_events(case(), stranger()).await,
-            list_incident_rca_runs(case(), stranger(), runs()).await,
+            get_incident_events(
+                case(),
+                Query(IncidentEventsQuery { since: None }),
+                stranger(),
+                axum::http::HeaderMap::new(),
+            )
+            .await,
+            list_incident_rca_runs(case(), stranger(), runs(), axum::http::HeaderMap::new()).await,
             cancel_incident_rca(case(), stranger()).await,
             get_incident_rca_run(
                 Path((org.clone(), sid(&org, "case"), "run".to_string())),
                 stranger(),
+                axum::http::HeaderMap::new(),
             )
             .await,
         ];
@@ -5503,14 +6608,22 @@ mod tests {
             assert_eq!(resp.status(), StatusCode::FORBIDDEN);
         }
 
-        let ops = get_incident_events(Path((org.clone(), sid(&org, "ops"))), stranger()).await;
+        let ops = get_incident_events(
+            Path((org.clone(), sid(&org, "ops"))),
+            Query(IncidentEventsQuery { since: None }),
+            stranger(),
+            axum::http::HeaderMap::new(),
+        )
+        .await;
         assert_eq!(ops.status(), StatusCode::OK);
     }
+
     #[cfg(feature = "enterprise")]
     #[tokio::test]
     async fn test_the_org_run_list_hides_a_case_run_without_the_security_grant() {
         use super::super::rca_runs_org::{OrgRcaRunsQuery, list_org_rca_runs};
 
+        const READER: &str = "runs-reader@steering.incidents.test";
         const ANALYST: &str = "analyst@steering.incidents.test";
         let conn = steering_tables().await;
         let org = steering_org("caseruns");
@@ -5521,7 +6634,7 @@ mod tests {
             .unwrap();
         steering_run(conn, &org, "case_run", "case", "completed").await;
         steering_run(conn, &org, "ops_run", "ops", "completed").await;
-        for member in [STEER_READER, ANALYST] {
+        for member in [READER, ANALYST] {
             common::infra::config::USERS.insert(
                 member.to_string(),
                 infra::table::users::UserRecord {
@@ -5552,7 +6665,7 @@ mod tests {
                 ),
             );
         }
-        crate::request::security::tests::grant(STEER_READER, &[]);
+        crate::request::security::tests::grant(READER, &[]);
         crate::request::security::tests::grant(ANALYST, &["GET"]);
         let listed = |user: &'static str| {
             let org = org.clone();
@@ -5578,9 +6691,505 @@ mod tests {
                     .collect::<Vec<_>>()
             }
         };
-        assert_eq!(listed(STEER_READER).await, [sid(&org, "ops")]);
+        assert_eq!(listed(READER).await, [sid(&org, "ops")]);
         let mut seen = listed(ANALYST).await;
         seen.sort();
         assert_eq!(seen, [sid(&org, "case"), sid(&org, "ops")]);
+    }
+
+    fn stamped(seq: i64) -> config::meta::alerts::incidents::IncidentEvent {
+        let mut event = config::meta::alerts::incidents::IncidentEvent::created();
+        event.seq = seq;
+        event
+    }
+
+    async fn events_body(resp: Response) -> serde_json::Value {
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        serde_json::from_slice(&body).unwrap()
+    }
+
+    #[tokio::test]
+    async fn a_matching_if_none_match_is_not_modified() {
+        assert!(events_etag_matches(Some("\"7\""), 7));
+        assert!(events_etag_matches(Some("W/\"7\""), 7));
+        assert!(events_etag_matches(Some("\"3\", \"7\""), 7));
+        assert!(!events_etag_matches(Some("\"6\""), 7));
+        assert!(
+            !events_etag_matches(Some("7"), 7),
+            "an unquoted tag is not an entity tag"
+        );
+        assert!(!events_etag_matches(None, 7));
+        let resp = events_not_modified(7);
+        assert_eq!(resp.status(), axum::http::StatusCode::NOT_MODIFIED);
+        assert_eq!(resp.headers()[axum::http::header::ETAG], "\"7\"");
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        assert!(body.is_empty());
+    }
+
+    #[tokio::test]
+    async fn since_keeps_only_later_events_and_every_page_carries_its_etag() {
+        let all = events_page(vec![stamped(1), stamped(2), stamped(5)], 5, None, false);
+        assert_eq!(all.headers()[axum::http::header::ETAG], "\"5\"");
+        let body = events_body(all).await;
+        assert_eq!(body["seq"], 5);
+        assert_eq!(body["events"].as_array().unwrap().len(), 3);
+        assert!(body.get("partial_reconstruction").is_none());
+        assert!(body.get("delta").is_none());
+
+        let newer = events_body(events_page(
+            vec![stamped(1), stamped(2), stamped(5)],
+            5,
+            Some(2),
+            false,
+        ))
+        .await;
+        assert_eq!(newer["delta"], true);
+        let seqs: Vec<_> = newer["events"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|e| e["seq"].as_i64().unwrap())
+            .collect();
+        assert_eq!(seqs, vec![5]);
+
+        let rebuilt = events_body(events_page(vec![stamped(1)], 1, None, true)).await;
+        assert_eq!(rebuilt["partial_reconstruction"], true);
+        assert_eq!(rebuilt["seq"], 1);
+    }
+
+    #[test]
+    fn an_unstamped_event_forces_a_full_timeline_read() {
+        // An older node rewrites the row without seq stamps and leaves the row seq unchanged.
+        let mixed = vec![stamped(0), stamped(0), stamped(0)];
+        assert!(!seq_complete(&mixed));
+        assert!(!seq_complete(&[stamped(3), stamped(0)]));
+        assert!(
+            !seq_complete(&[]),
+            "an empty page must reach the reconstruction path"
+        );
+        assert!(seq_complete(&[stamped(1), stamped(3)]));
+    }
+
+    #[tokio::test]
+    async fn a_page_without_since_is_whole_even_with_unstamped_events() {
+        let body = events_body(events_page(vec![stamped(0), stamped(4)], 4, None, false)).await;
+        assert_eq!(body["events"].as_array().unwrap().len(), 2);
+        assert!(body.get("delta").is_none());
+    }
+    #[cfg(feature = "enterprise")]
+    async fn s19_guard_fixture() -> Option<(String, String)> {
+        s19_history_fixture(true).await
+    }
+
+    #[cfg(feature = "enterprise")]
+    async fn s19_history_fixture(read_history: bool) -> Option<(String, String)> {
+        if std::env::var("ZO_META_STORE").is_err() {
+            return None;
+        }
+        security::tests::meta_store().await;
+        let db = infra::db::get_orm_client_rw().await;
+        let org = steering_org("s19_guards");
+        steering_incident(db, &org, "incident", Some("run")).await;
+        steering_run(db, &org, "run", "incident", "running").await;
+        let agent = format!("o2-sre-agent.org-{org}@openobserve.internal");
+        security::tests::grant(&agent, &["GET", "PUT", "POST"]);
+        infra::table::rca_runs::update_run(
+            &org,
+            &sid(&org, "run"),
+            infra::table::rca_runs::RunUpdate {
+                state: Some(config::meta::alerts::rca_runs::RunState::Running),
+                session_id: Some(sid(&org, "session")),
+                context_used: Some(serde_json::json!({"history_read": read_history})),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+        Some((org, agent))
+    }
+
+    #[cfg(feature = "enterprise")]
+    fn s19_headers(org: &str) -> axum::http::HeaderMap {
+        let mut headers = axum::http::HeaderMap::new();
+        headers.insert(
+            security::rca_scope::ASSISTANT_SESSION_HEADER,
+            sid(org, "session").parse().unwrap(),
+        );
+        headers
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn recovery_check_get_applies_rca_scope_before_not_modified() {
+        use axum::http::{HeaderMap, StatusCode, header};
+
+        use crate::request::alerts::incident_recovery_checks;
+
+        let Some((org, agent)) = s19_guard_fixture().await else {
+            return;
+        };
+        let own = sid(&org, "incident");
+        infra::table::alert_incidents::mark_security_case(&org, &own)
+            .await
+            .unwrap();
+        let other = infra::table::alert_incidents::create(
+            &org,
+            "P3",
+            serde_json::json!({}),
+            "AlertId",
+            config::utils::time::now_micros(),
+            None,
+        )
+        .await
+        .unwrap();
+        let get = |id: &str, user: &str, headers| {
+            incident_recovery_checks::get(
+                Path((org.clone(), id.to_owned())),
+                Headers(UserEmail {
+                    user_id: user.to_owned(),
+                }),
+                headers,
+            )
+        };
+        let response = get(&other.id, "human", HeaderMap::new()).await;
+        assert_eq!(response.status(), StatusCode::OK);
+        let etag = response.headers()[header::ETAG].clone();
+        for mut headers in [HeaderMap::new(), s19_headers(&org)] {
+            headers.insert(header::IF_NONE_MATCH, etag.clone());
+            let refused = get(&other.id, &agent, headers).await;
+            assert_eq!(refused.status(), StatusCode::FORBIDDEN);
+            assert!(!refused.headers().contains_key(header::ETAG));
+        }
+        let allowed = get(&own, &agent, s19_headers(&org)).await;
+        assert_eq!(allowed.status(), StatusCode::OK);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn s19_case_guards_and_ordinary_history() {
+        use config::meta::alerts::incidents::IncidentEvent;
+        let Some((org, agent)) = s19_guard_fixture().await else {
+            return;
+        };
+        let incident_id = sid(&org, "incident");
+        let user = || {
+            Headers(UserEmail {
+                user_id: agent.clone(),
+            })
+        };
+        let path = || Path((org.clone(), incident_id.clone()));
+        let query = || {
+            Query(ListRcaRunsQuery {
+                limit: None,
+                before: None,
+            })
+        };
+        let response = get_incident(path(), user(), s19_headers(&org)).await;
+        let (_, body) = status_and_body(response).await;
+        assert!(body.get("rca").is_some_and(|rca| !rca.is_null()));
+        let (_, list) = status_and_body(
+            list_incidents(
+                Path(org.clone()),
+                Query(serde_json::from_value(serde_json::json!({})).unwrap()),
+                user(),
+                s19_headers(&org),
+            )
+            .await,
+        )
+        .await;
+        assert_eq!(list["incidents"].as_array().unwrap().len(), 1);
+        assert!(!list["incidents"][0]["rca"].is_null());
+        let (status, cases) = status_and_body(
+            list_incidents(
+                Path(org.clone()),
+                Query(serde_json::from_value(serde_json::json!({"siem": true})).unwrap()),
+                user(),
+                s19_headers(&org),
+            )
+            .await,
+        )
+        .await;
+        assert_eq!(status, axum::http::StatusCode::OK);
+        assert_eq!(
+            cases,
+            serde_json::json!({
+                "incidents": [],
+                "counts_by_severity": {"P1": 0, "P2": 0, "P3": 0, "P4": 0},
+                "total": 0,
+                "next_cursor": null,
+            })
+        );
+        let (status, unbound_detail) =
+            status_and_body(get_incident(path(), user(), axum::http::HeaderMap::new()).await).await;
+        assert_eq!(status, axum::http::StatusCode::FORBIDDEN);
+        assert!(unbound_detail.get("rca").is_none());
+        let (_, history) = status_and_body(
+            list_incident_rca_runs(path(), user(), query(), s19_headers(&org)).await,
+        )
+        .await;
+        assert_eq!(history["runs"].as_array().unwrap().len(), 1);
+        let (_, unbound) = status_and_body(
+            list_incident_rca_runs(path(), user(), query(), axum::http::HeaderMap::new()).await,
+        )
+        .await;
+        assert!(unbound["runs"].as_array().unwrap().is_empty());
+        infra::table::incident_events::append(&org, &incident_id, IncidentEvent::created())
+            .await
+            .unwrap();
+        infra::table::incident_events::append(
+            &org,
+            &incident_id,
+            IncidentEvent::ai_analysis_complete(),
+        )
+        .await
+        .unwrap();
+        infra::table::alert_incidents::mark_security_case(&org, &incident_id)
+            .await
+            .unwrap();
+        let (_, detail) =
+            status_and_body(get_incident(path(), user(), s19_headers(&org)).await).await;
+        assert!(detail.get("rca").is_none());
+        for headers in [s19_headers(&org), axum::http::HeaderMap::new()] {
+            let (_, list) = status_and_body(
+                list_incidents(
+                    Path(org.clone()),
+                    Query(serde_json::from_value(serde_json::json!({})).unwrap()),
+                    user(),
+                    headers,
+                )
+                .await,
+            )
+            .await;
+            assert!(list["incidents"].as_array().unwrap().is_empty());
+        }
+        let (_, timeline) = status_and_body(
+            get_incident_events(
+                path(),
+                Query(IncidentEventsQuery { since: None }),
+                user(),
+                s19_headers(&org),
+            )
+            .await,
+        )
+        .await;
+        assert!(
+            timeline["events"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .all(|event| event["type"] == "Created")
+        );
+        let (_, history) = status_and_body(
+            list_incident_rca_runs(path(), user(), query(), s19_headers(&org)).await,
+        )
+        .await;
+        assert!(history["runs"].as_array().unwrap().is_empty());
+        let error = openobserve_core::alerts::rca_resume::prepare_resume(
+            &org,
+            &incident_id,
+            &sid(&org, "run"),
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(
+            error,
+            openobserve_core::alerts::rca_resume::ResumeError::SecurityCase
+        );
+        let (status, refusal) = status_and_body(resume_error_response("run", &error)).await;
+        assert_eq!(status, axum::http::StatusCode::CONFLICT);
+        assert_eq!(refusal["error_code"], "security_case_resume_blocked");
+        let human = Headers(UserEmail {
+            user_id: "s19_person".into(),
+        });
+        security::tests::grant("s19_person", &["GET"]);
+        let (_, human_detail) =
+            status_and_body(get_incident(path(), human, axum::http::HeaderMap::new()).await).await;
+        assert!(human_detail.get("rca").is_some());
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn fenced_run_detail_drops_past_causes_before_and_after_end() {
+        let Some((org, _)) = s19_guard_fixture().await else {
+            return;
+        };
+        let incident_id = sid(&org, "incident");
+        let run_id = sid(&org, "run");
+        security::tests::grant("s19_reader", &["GET"]);
+        infra::table::rca_runs::update_run(
+            &org,
+            &run_id,
+            infra::table::rca_runs::RunUpdate {
+                result: Some(serde_json::json!({
+                    "ledger":{"hypotheses":[{"prediction":"private-prediction", "checks":[{"check":"silence", "result":"unchecked"}]}]},
+                    "evidence":[{"coverage":{"observed_from_us":123}}],
+                    "cited_calls":[{"coverage":{"is_partial":false}}]
+                })),
+                ..Default::default()
+            },
+        ).await.unwrap();
+        infra::table::alert_incidents::mark_security_case(&org, &incident_id)
+            .await
+            .unwrap();
+        for ended in [false, true] {
+            if ended {
+                openobserve_core::alerts::rca_runs::fail_run(
+                    &org,
+                    &run_id,
+                    config::meta::alerts::rca_runs::RunTrigger::Manual,
+                    "timeout",
+                    "Timed out",
+                    None,
+                )
+                .await
+                .unwrap();
+            }
+            let response = get_incident_rca_run(
+                Path((org.clone(), incident_id.clone(), run_id.clone())),
+                Headers(UserEmail {
+                    user_id: "s19_reader".into(),
+                }),
+                axum::http::HeaderMap::new(),
+            )
+            .await;
+            let (status, run) = status_and_body(response).await;
+            assert_eq!(status, axum::http::StatusCode::OK);
+            assert!(run["context_used"].get("past_causes").is_none());
+            assert!(run["context_used"].get("history_read").is_none());
+            assert!(run["context_used"].get("history_injected").is_none());
+            assert!(run["result"].is_null());
+            let (_, summary) = status_and_body(
+                get_incident_rca_summary(
+                    Path((org.clone(), incident_id.clone(), run_id.clone())),
+                    Headers(UserEmail {
+                        user_id: "s19_reader".into(),
+                    }),
+                    Query(RcaThreadQuery {
+                        known_version: None,
+                    }),
+                )
+                .await,
+            )
+            .await;
+            assert!(summary["evidence"].as_array().unwrap().is_empty());
+            assert!(summary["hypotheses"].as_array().unwrap().is_empty());
+            let wire = serde_json::to_string(&summary).unwrap();
+            assert!(!wire.contains("coverage"));
+            assert!(!wire.contains("private-prediction"));
+        }
+    }
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn history_responses_record_consumption_only_when_data_is_returned() {
+        use config::meta::alerts::rca_runs::RunState;
+        use infra::table::rca_runs::{self as table, RunUpdate};
+        for attempt in ["failed", "blocked", "empty", "own_case", "consumed"] {
+            let Some((org, agent)) = s19_history_fixture(false).await else {
+                return;
+            };
+            let incident_id = sid(&org, "incident");
+            let run_id = sid(&org, "run");
+            let user = || {
+                Headers(UserEmail {
+                    user_id: agent.clone(),
+                })
+            };
+            let response = match attempt {
+                "failed" => {
+                    get_incident_rca_run(
+                        Path((org.clone(), incident_id.clone(), "missing".into())),
+                        user(),
+                        s19_headers(&org),
+                    )
+                    .await
+                }
+                "blocked" => {
+                    steering_incident(infra::db::get_orm_client_rw().await, &org, "blocked", None)
+                        .await;
+                    let blocked = sid(&org, "blocked");
+                    infra::table::alert_incidents::mark_security_case(&org, &blocked)
+                        .await
+                        .unwrap();
+                    get_incident_rca_run(
+                        Path((org.clone(), blocked, "missing".into())),
+                        user(),
+                        s19_headers(&org),
+                    )
+                    .await
+                }
+                "own_case" => {
+                    infra::table::alert_incidents::mark_security_case(&org, &incident_id)
+                        .await
+                        .unwrap();
+                    get_incident(
+                        Path((org.clone(), incident_id.clone())),
+                        user(),
+                        s19_headers(&org),
+                    )
+                    .await
+                }
+                _ => {
+                    list_incident_rca_runs(
+                        Path((org.clone(), incident_id.clone())),
+                        user(),
+                        Query(ListRcaRunsQuery {
+                            limit: None,
+                            before: (attempt == "empty").then(|| run_id.clone()),
+                        }),
+                        s19_headers(&org),
+                    )
+                    .await
+                }
+            };
+            let (status, body) = status_and_body(response).await;
+            match attempt {
+                "failed" => assert_eq!(status, axum::http::StatusCode::NOT_FOUND),
+                "blocked" => assert_eq!(status, axum::http::StatusCode::FORBIDDEN),
+                "empty" => assert!(body["runs"].as_array().unwrap().is_empty()),
+                "own_case" => assert!(body.get("rca").is_none()),
+                _ => assert_eq!(body["runs"].as_array().unwrap().len(), 1),
+            }
+            let consumed = attempt == "consumed";
+            let row = table::get_rw(&org, &run_id).await.unwrap().unwrap();
+            assert_eq!(
+                infra::table::rca_fence::read_history(&row),
+                consumed,
+                "{attempt}"
+            );
+            infra::table::alert_incidents::mark_security_case(&org, &incident_id)
+                .await
+                .unwrap();
+            assert!(
+                openobserve_core::alerts::rca_runs::complete_run(
+                    &org,
+                    &run_id,
+                    "safe report",
+                    RunUpdate {
+                        result: Some(serde_json::json!({"safe": true})),
+                        ..Default::default()
+                    },
+                )
+                .await
+                .unwrap()
+            );
+            let row = table::get_rw(&org, &run_id).await.unwrap().unwrap();
+            assert_eq!(
+                row.state,
+                if consumed {
+                    RunState::Failed.as_str()
+                } else {
+                    RunState::Completed.as_str()
+                }
+            );
+            assert_eq!(
+                row.report.is_some() && row.result.is_some(),
+                !consumed,
+                "{attempt}"
+            );
+        }
     }
 }

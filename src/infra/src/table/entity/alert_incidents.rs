@@ -2,7 +2,7 @@
 
 use sea_orm::entity::prelude::*;
 
-#[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, DeriveEntityModel, Eq)]
 #[sea_orm(table_name = "alert_incidents")]
 pub struct Model {
     /// KSUID (27 chars)
@@ -58,6 +58,35 @@ pub struct Model {
     pub historical: bool,
     /// When a different detection last joined the case while someone was working it.
     pub last_detection_at: Option<i64>,
+
+    // Incidents v2 Phase 1 columns (design 6.1); times are microseconds.
+    pub owner_team_id: Option<String>,
+    pub comms_owner: Option<String>,
+    /// First open by a qualifying responder; never shown on the page or the timeline.
+    pub first_opened_at: Option<i64>,
+    pub fix_applied_at: Option<i64>,
+    pub fix_applied_by: Option<String>,
+    pub fix_attempt_id: Option<String>,
+    pub not_recovering_at: Option<i64>,
+    pub recovery_due_at: Option<i64>,
+    pub mitigated_at: Option<i64>,
+    pub recovered_at: Option<i64>,
+    pub impact_start_at: Option<i64>,
+    pub impact_end_at: Option<i64>,
+    /// `confirmed`, `none` or `unknown`.
+    pub customer_impact: Option<String>,
+    pub resolution_cause: Option<String>,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub resolution_note: Option<String>,
+    pub resolved_by: Option<String>,
+    pub cause_reviewed_by: Option<String>,
+    pub cause_reviewed_at: Option<i64>,
+    pub impact_headline: Option<String>,
+    pub cause_line: Option<String>,
+    pub group_fingerprint: Option<String>,
+    pub merged_into_id: Option<String>,
+    #[sea_orm(default_value = 0)]
+    pub reopen_count: i32,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
@@ -110,6 +139,7 @@ mod tests {
             security_case: false,
             historical: false,
             last_detection_at: None,
+            ..Default::default()
         };
         assert_eq!(m.id, "inc-1");
         assert_eq!(m.status, "open");
@@ -153,6 +183,7 @@ mod tests {
             security_case: false,
             historical: false,
             last_detection_at: None,
+            ..Default::default()
         };
         assert_eq!(m.acknowledged_by.as_deref(), Some("user@example.com"));
         assert_eq!(m.acknowledged_at, Some(1500));

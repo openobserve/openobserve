@@ -66,6 +66,21 @@ const TELEMETRY_PREFIXES: [&str; 4] = ["_search", "_around", "_values", "_correl
 /// The one POST tool that only reads: SearchSQL runs on this streaming search route.
 const STREAM_SEARCH_PATH: &str = "/api/{org_id}/_search_stream";
 
+// The cache and search index share tool schemas through Arc.
+static TOOLS_CACHE: OnceCell<Vec<Arc<MCPTool>>> = OnceCell::const_new();
+static PINNED_TOOLS_CACHE: OnceCell<Vec<MCPTool>> = OnceCell::const_new();
+/// Store only ToolMetadata instead of full Tool to avoid creating 200+ HTTP clients
+static TOOL_METADATA_CACHE: OnceCell<HashMap<String, rmcp_openapi::ToolMetadata>> =
+    OnceCell::const_new();
+/// Single shared HTTP client for all tool executions
+static SHARED_HTTP_CLIENT: OnceCell<rmcp_openapi::HttpClient> = OnceCell::const_new();
+/// Full-text search index for tool discovery
+static TOOL_SEARCH_INDEX: OnceCell<ToolSearchIndex> = OnceCell::const_new();
+/// Summary field configurations extracted from x-o2-mcp extensions, keyed by tool name
+static SUMMARY_CONFIG_CACHE: OnceCell<HashMap<String, SummaryFieldsConfig>> = OnceCell::const_new();
+/// Each tool's class and whether it needs approval, by name.
+static TOOL_CLASS_CACHE: OnceCell<HashMap<String, (ToolClass, bool)>> = OnceCell::const_new();
+
 /// MCP extension configuration from x-o2-mcp OpenAPI extension
 ///
 /// Example usage in utoipa::path:
@@ -149,6 +164,19 @@ impl ToolClass {
     pub fn meta(self) -> Value {
         json!({"o2/operation": self.operation, "o2/telemetry": self.telemetry})
     }
+}
+
+/// In-memory tantivy search index for tool discovery
+struct ToolSearchIndex {
+    index: Index,
+    reader: tantivy::IndexReader,
+    name_field: Field,
+    description_field: Field,
+    category_field: Field,
+    tool_name_field: Field,
+    /// Pre-built name→tool map to avoid rebuilding on every search; shares the
+    /// tools in `TOOLS_CACHE` rather than holding a second copy of every schema
+    tools_by_name: HashMap<String, Arc<MCPTool>>,
 }
 
 fn default_enabled() -> bool {
@@ -237,36 +265,6 @@ fn extract_mcp_extensions(api: &OpenApi) -> HashMap<String, McpExtension> {
 /// Only a parsable `x-o2-mcp` with `enabled: false` hides a tool; anything else leaves it on.
 fn is_tool_enabled(extension: Option<&McpExtension>) -> bool {
     extension.is_none_or(|extension| extension.enabled)
-}
-
-/// All MCP tools, each behind an `Arc` so the tool -- most of its weight is
-/// its JSON input schema -- is stored once and shared with the search index
-/// instead of being cloned per lookup structure.
-static TOOLS_CACHE: OnceCell<Vec<Arc<MCPTool>>> = OnceCell::const_new();
-static PINNED_TOOLS_CACHE: OnceCell<Vec<MCPTool>> = OnceCell::const_new();
-/// Store only ToolMetadata instead of full Tool to avoid creating 200+ HTTP clients
-static TOOL_METADATA_CACHE: OnceCell<HashMap<String, rmcp_openapi::ToolMetadata>> =
-    OnceCell::const_new();
-/// Single shared HTTP client for all tool executions
-static SHARED_HTTP_CLIENT: OnceCell<rmcp_openapi::HttpClient> = OnceCell::const_new();
-/// Full-text search index for tool discovery
-static TOOL_SEARCH_INDEX: OnceCell<ToolSearchIndex> = OnceCell::const_new();
-/// Summary field configurations extracted from x-o2-mcp extensions, keyed by tool name
-static SUMMARY_CONFIG_CACHE: OnceCell<HashMap<String, SummaryFieldsConfig>> = OnceCell::const_new();
-/// Each tool's class and whether it needs approval, by name.
-static TOOL_CLASS_CACHE: OnceCell<HashMap<String, (ToolClass, bool)>> = OnceCell::const_new();
-
-/// In-memory tantivy search index for tool discovery
-struct ToolSearchIndex {
-    index: Index,
-    reader: tantivy::IndexReader,
-    name_field: Field,
-    description_field: Field,
-    category_field: Field,
-    tool_name_field: Field,
-    /// Pre-built name→tool map to avoid rebuilding on every search; shares the
-    /// tools in `TOOLS_CACHE` rather than holding a second copy of every schema
-    tools_by_name: HashMap<String, Arc<MCPTool>>,
 }
 
 fn name_analyzer(collect_type: CollectType) -> TextAnalyzer {
@@ -779,22 +777,24 @@ pub(crate) fn loopback_client_builder() -> Result<(reqwest::ClientBuilder, url::
         &zo_config.common.base_uri,
     )?;
 
-    let mut mcp_marker =
-        reqwest::header::HeaderValue::from_str(&config::cluster::MCP_LOOPBACK_SECRET)?;
-    mcp_marker.set_sensitive(true);
-    let mut default_headers = reqwest::header::HeaderMap::new();
-    default_headers.insert("x-o2-mcp", mcp_marker);
-
     let mut client_builder = reqwest::Client::builder()
         .user_agent(format!("openobserve/{}", config::VERSION))
         .timeout(std::time::Duration::from_secs(30))
         .redirect(reqwest::redirect::Policy::none())
-        .default_headers(default_headers);
+        .default_headers(loopback_headers()?);
     if zo_config.http.tls_enabled {
         // Loopback to our own listener, whose cert is issued for the service name, not localhost
         client_builder = client_builder.danger_accept_invalid_certs(true);
     }
     Ok((client_builder, base_url))
+}
+
+pub(crate) fn loopback_headers() -> Result<reqwest::header::HeaderMap> {
+    let mut marker = reqwest::header::HeaderValue::from_str(&config::cluster::MCP_LOOPBACK_SECRET)?;
+    marker.set_sensitive(true);
+    let mut headers = reqwest::header::HeaderMap::new();
+    headers.insert("x-o2-mcp", marker);
+    Ok(headers)
 }
 
 /// Get the shared HTTP client for tool execution

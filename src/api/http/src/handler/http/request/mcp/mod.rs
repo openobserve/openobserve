@@ -23,8 +23,8 @@ use axum::{
 use futures_util::StreamExt;
 use openobserve_api_common::auth::delegation::DelegatedCaller;
 use openobserve_mcp::{
-    MCP_PROTOCOL_VERSION_MODERN, MCP_SUPPORTED_PROTOCOL_VERSIONS, MCPRequest, ToolAccess,
-    decode_mcp_header_value, handle_mcp_request, handle_mcp_request_stream,
+    MCP_PROTOCOL_VERSION_MODERN, MCP_SUPPORTED_PROTOCOL_VERSIONS, MCPRequest, McpCaller,
+    ToolAccess, decode_mcp_header_value, handle_mcp_request_as, handle_mcp_request_stream_as,
     is_supported_protocol_version, ledger::Origin,
 };
 #[cfg(feature = "enterprise")]
@@ -246,7 +246,6 @@ pub async fn handle_mcp_post(
         .get(header::AUTHORIZATION)
         .and_then(|v| v.to_str().ok())
         .map(|s| s.to_string());
-
     // Validate protocol version and (for 2026-07-28 requests) the mirrored
     // request metadata headers before doing any work.
     if let Some(error_response) = validate_mcp_headers(&headers, &mcp_request) {
@@ -258,12 +257,17 @@ pub async fn handle_mcp_post(
         Ok(origin) => origin,
         Err(problem) => return refused_origin(mcp_request.id.as_ref(), problem),
     };
+    let mcp_caller = McpCaller {
+        auth_token,
+        origin: origin.as_ref(),
+        access,
+    };
 
     // JSON-RPC notifications (no `id`) require HTTP 202, no response body.
     // Process the notification but return 202.
     if mcp_request.id.is_none() && mcp_request.method != "initialize" {
         // Fire-and-forget: process notification asynchronously, don't wait
-        let _ = handle_mcp_request(&org_id, mcp_request, auth_token, origin.as_ref(), access).await;
+        let _ = handle_mcp_request_as(&org_id, mcp_request, mcp_caller).await;
         return Response::builder()
             .status(StatusCode::ACCEPTED)
             .body(Body::empty())
@@ -279,18 +283,17 @@ pub async fn handle_mcp_post(
     // Determine if client wants SSE streaming
     let wants_sse = accept_header.contains("text/event-stream");
 
-    let response =
-        match handle_mcp_request(&org_id, mcp_request, auth_token, origin.as_ref(), access).await {
-            Ok(r) => r,
-            Err(e) => {
-                log::error!("MCP handle_mcp_request error: {e}");
-                return Response::builder()
-                    .status(StatusCode::INTERNAL_SERVER_ERROR)
-                    .header(header::CONTENT_TYPE, "application/json")
-                    .body(Body::from(format!("{{\"error\": \"MCP error: {}\"}}", e)))
-                    .unwrap();
-            }
-        };
+    let response = match handle_mcp_request_as(&org_id, mcp_request, mcp_caller).await {
+        Ok(r) => r,
+        Err(e) => {
+            log::error!("MCP handle_mcp_request error: {e}");
+            return Response::builder()
+                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(format!("{{\"error\": \"MCP error: {}\"}}", e)))
+                .unwrap();
+        }
+    };
 
     // Per 2026-07-28, some JSON-RPC errors carry a non-200 HTTP status so
     // dual-era clients can distinguish a modern server from a legacy one.
@@ -388,7 +391,6 @@ pub async fn handle_mcp_get(
         .get(header::AUTHORIZATION)
         .and_then(|v| v.to_str().ok())
         .map(|s| s.to_string());
-
     // MCP Streamable HTTP: a GET with empty body opens the server->client SSE
     // channel for server-initiated notifications. O2 never pushes
     // notifications, but per spec this channel MUST stay open — returning a
@@ -437,20 +439,21 @@ pub async fn handle_mcp_get(
         Ok(origin) => origin,
         Err(problem) => return refused_origin(mcp_request.id.as_ref(), problem),
     };
-    let access = tool_access(caller.as_ref());
-    let stream =
-        match handle_mcp_request_stream(&org_id, mcp_request, auth_token, origin.as_ref(), access)
-            .await
-        {
-            Ok(s) => s,
-            Err(e) => {
-                return Response::builder()
-                    .status(StatusCode::INTERNAL_SERVER_ERROR)
-                    .header(header::CONTENT_TYPE, "application/json")
-                    .body(Body::from(format!("{{\"error\": \"MCP error: {}\"}}", e)))
-                    .unwrap();
-            }
-        };
+    let mcp_caller = McpCaller {
+        auth_token,
+        origin: origin.as_ref(),
+        access: tool_access(caller.as_ref()),
+    };
+    let stream = match handle_mcp_request_stream_as(&org_id, mcp_request, mcp_caller).await {
+        Ok(s) => s,
+        Err(e) => {
+            return Response::builder()
+                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(format!("{{\"error\": \"MCP error: {}\"}}", e)))
+                .unwrap();
+        }
+    };
 
     let body_stream = stream.map(|result| result.map_err(|e| std::io::Error::other(e.to_string())));
 
@@ -711,6 +714,14 @@ mod tests {
         headers
     }
 
+    fn init_mcp_test_tools() {
+        static INIT: std::sync::Once = std::sync::Once::new();
+        INIT.call_once(|| {
+            let api = crate::handler::http::router::openapi::ApiDoc::openapi();
+            openobserve_mcp::tools::init_mcp_tools(&api).unwrap();
+        });
+    }
+
     #[tokio::test]
     async fn post_ping_is_available() {
         let response = handle_mcp_post(
@@ -849,12 +860,30 @@ mod tests {
 
     #[tokio::test]
     async fn oss_openapi_initializes_mcp_tools() {
-        let api = crate::handler::http::router::openapi::ApiDoc::openapi();
-
-        openobserve_mcp::tools::init_mcp_tools(&api).unwrap();
+        init_mcp_test_tools();
 
         let tools = openobserve_mcp::tools::get_mcp_tools();
         assert!(!tools.is_empty());
+        let response = handle_mcp_post(
+            Path("default".to_string()),
+            modern_headers("tools/list", None),
+            None,
+            Json(modern_request("tools/list", None)),
+        )
+        .await;
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let list: Value = serde_json::from_slice(&body).unwrap();
+        assert!(
+            list["result"]["tools"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|tool| tool["name"] == "GetIncidentBrief"),
+            "{list}"
+        );
         // stream-scoped time range stays an MCP tool; the org-level one opted out
         assert!(tools.iter().any(|tool| tool.name == "GetTraceTimeRange"));
         assert!(tools.iter().all(|tool| tool.name != "GetOrgTraceTimeRange"));
@@ -1098,5 +1127,201 @@ mod tests {
                 "grace active: {active}"
             );
         }
+    }
+    #[cfg(feature = "enterprise")]
+    async fn mcp_binding_run(org: &str, subject: &str, session: &str) {
+        use config::meta::alerts::rca_runs::{RunMode, RunSubjectType, RunTrigger};
+        use infra::table::rca_runs::{NewRun, RunUpdate, StartGuards, StartResult};
+        let run_id = infra::table::rca_runs::new_run_id();
+        let now = config::utils::time::now_micros();
+        use sea_orm::{ActiveModelTrait, Set};
+        infra::table::entity::alert_incidents::ActiveModel {
+            id: Set(subject.into()),
+            org_id: Set(org.into()),
+            status: Set("open".into()),
+            severity: Set("P2".into()),
+            group_values: Set(json!({})),
+            key_type: Set("alert_id".into()),
+            first_alert_at: Set(now),
+            last_alert_at: Set(now),
+            alert_count: Set(1),
+            created_at: Set(now),
+            updated_at: Set(now),
+            security_case: Set(false),
+            historical: Set(false),
+            reopen_count: Set(0),
+            ..Default::default()
+        }
+        .insert(infra::db::get_orm_client_rw().await)
+        .await
+        .unwrap();
+        let started = infra::table::rca_runs::start_run(
+            NewRun {
+                run_id: run_id.clone(),
+                org_id: org.into(),
+                subject_type: RunSubjectType::Incident,
+                subject_id: subject.into(),
+                incident_id: Some(subject.into()),
+                trigger: RunTrigger::Manual,
+                mode: RunMode::Fresh,
+                started_by: "system".into(),
+                guidance: None,
+                oncall_subjects: None,
+                context_used: Some(json!({"history_read": false})),
+                recipients: Vec::new(),
+                page_key: None,
+            },
+            StartGuards {
+                now_us: now,
+                rca_timeout_secs: 600,
+                cooldown_us: None,
+                history_limit: 25,
+                latest_run_id: None,
+                first_run: false,
+            },
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+        assert!(matches!(started, StartResult::Started { .. }));
+        infra::table::rca_runs::update_run(
+            org,
+            &run_id,
+            RunUpdate {
+                session_id: Some(session.into()),
+                now_us: now,
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+    }
+
+    #[cfg(feature = "enterprise")]
+    async fn mcp_binding_response(org: &str, target: &str, request: &str) -> String {
+        use openobserve_api_management::request::security::rca_scope::{self, RcaCaller};
+        let mut headers = HeaderMap::new();
+        for line in request.lines().skip(1) {
+            if let Some((name, value)) = line.split_once(':') {
+                headers.insert(
+                    axum::http::HeaderName::from_bytes(name.as_bytes()).unwrap(),
+                    value.trim().parse().unwrap(),
+                );
+            }
+        }
+        assert_eq!(headers[header::AUTHORIZATION], "Bearer s19-binding");
+        assert!(!headers.contains_key("x-unrelated-secret"));
+        let agent = format!("o2-sre-agent.org-{org}@openobserve.internal");
+        let caller = rca_scope::rca_caller(org, &agent, &headers).await;
+        let subject = match &caller {
+            RcaCaller::Bound { subject_id, .. } => Some(subject_id.as_str()),
+            _ => None,
+        };
+        let allowed_target = rca_scope::may_read_incident(org, &caller, target).await;
+        json!({"subject": subject, "history_allowed": caller.history_allowed(), "bound_to_claimed_subject": subject == Some(target), "allowed_target": allowed_target}).to_string()
+    }
+
+    #[cfg(feature = "enterprise")]
+    async fn mcp_binding_tool_call(org: &str, target: &str, session: Option<&str>) -> Value {
+        let mut headers = HeaderMap::new();
+        headers.insert(header::AUTHORIZATION, "Bearer s19-binding".parse().unwrap());
+        let user_id = format!("o2-sre-agent.org-{org}@openobserve.internal");
+        headers.insert("user_id", user_id.parse().unwrap());
+        headers.insert("x-unrelated-secret", "do-not-forward".parse().unwrap());
+        if let Some(session) = session {
+            headers.insert(
+                openobserve_mcp::ASSISTANT_SESSION_HEADER,
+                session.parse().unwrap(),
+            );
+        }
+        let request = MCPRequest {
+            jsonrpc: "2.0".into(),
+            id: Some(json!(1)),
+            method: "tools/call".into(),
+            params: json!({"name": "tools_call", "arguments": {"tool": "GetIncident", "args": {"incident_id": target}, "detail": "full"}}),
+        };
+        let response = handle_mcp_post(Path(org.into()), headers, None, Json(request)).await;
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let rpc: Value = serde_json::from_slice(&body).unwrap();
+        assert!(rpc.get("error").is_none(), "{rpc}");
+        assert_ne!(rpc["result"]["isError"], true, "{rpc}");
+        serde_json::from_str(rpc["result"]["content"][0]["text"].as_str().unwrap()).unwrap()
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn mcp_rca_session_binding_end_to_end() {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        if std::env::var("ZO_META_STORE").is_err() {
+            return;
+        }
+        infra::db_init().await.unwrap();
+        infra::table::migrate().await.unwrap();
+        let org = format!(
+            "mcp_binding_{}",
+            infra::table::rca_runs::new_run_id().to_lowercase()
+        );
+        let first_id = infra::table::rca_runs::new_run_id();
+        let second_id = infra::table::rca_runs::new_run_id();
+        let first_session = sea_orm::prelude::Uuid::new_v4().to_string();
+        let second_session = sea_orm::prelude::Uuid::new_v4().to_string();
+        mcp_binding_run(&org, &first_id, &first_session).await;
+        mcp_binding_run(&org, &second_id, &second_session).await;
+        infra::table::alert_incidents::mark_security_case(&org, &second_id)
+            .await
+            .unwrap();
+        let listener = tokio::net::TcpListener::bind(("127.0.0.1", 0))
+            .await
+            .unwrap();
+        let base_url =
+            url::Url::parse(&format!("http://{}", listener.local_addr().unwrap())).unwrap();
+        let server = {
+            let org = org.clone();
+            let target = first_id.clone();
+            tokio::spawn(async move {
+                for _ in 0..3 {
+                    let (mut socket, _) = listener.accept().await.unwrap();
+                    let mut request = Vec::new();
+                    while !request.ends_with(b"\r\n\r\n") {
+                        let mut byte = [0];
+                        assert_eq!(socket.read(&mut byte).await.unwrap(), 1);
+                        request.push(byte[0]);
+                    }
+                    let request = String::from_utf8(request).unwrap();
+                    assert!(request.lines().next().unwrap().contains(&target));
+                    let body = mcp_binding_response(&org, &target, &request).await;
+                    let response = format!(
+                        "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                        body.len()
+                    );
+                    socket.write_all(response.as_bytes()).await.unwrap();
+                }
+            })
+        };
+        init_mcp_test_tools();
+        openobserve_mcp::protocol::TEST_LOOPBACK_BASE_URL
+            .scope(base_url, async {
+                let first = mcp_binding_tool_call(&org, &first_id, Some(&first_session)).await;
+                assert_eq!(first["subject"], first_id);
+                assert_eq!(first["allowed_target"], true);
+                assert_eq!(first["bound_to_claimed_subject"], true);
+                let missing = mcp_binding_tool_call(&org, &first_id, None).await;
+                assert!(missing["subject"].is_null());
+                assert_eq!(missing["history_allowed"], false);
+                let other = mcp_binding_tool_call(&org, &first_id, Some(&second_session)).await;
+                assert_eq!(other["subject"], second_id);
+                assert_eq!(other["allowed_target"], false);
+                assert_eq!(other["history_allowed"], false);
+                assert_eq!(other["bound_to_claimed_subject"], false);
+            })
+            .await;
+        tokio::time::timeout(std::time::Duration::from_secs(10), server)
+            .await
+            .unwrap()
+            .unwrap();
     }
 }

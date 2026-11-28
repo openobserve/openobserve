@@ -171,6 +171,21 @@ fn capped_search_text(text: &str) -> String {
     lower.chars().skip(skip).collect()
 }
 
+fn epoch_update(
+    org_id: &str,
+    session_id: &str,
+    expected_epoch: i64,
+    now: i64,
+) -> sea_orm::UpdateMany<Entity> {
+    Entity::update_many()
+        .col_expr(Column::SessionEpoch, Expr::value(expected_epoch + 1))
+        .col_expr(Column::UpdatedAt, Expr::value(now))
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::SessionId.eq(session_id))
+        .filter(Column::SessionEpoch.eq(expected_epoch))
+        .filter(Column::Status.eq(STATUS_ACTIVE))
+}
+
 pub(crate) fn escape_like(text: &str) -> String {
     let mut out = String::with_capacity(text.len());
     for c in text.chars() {
@@ -610,14 +625,24 @@ pub async fn bump_epoch_with<C: ConnectionTrait>(
     expected_epoch: i64,
     now: i64,
 ) -> Result<Option<i64>, errors::Error> {
-    let result = Entity::update_many()
-        .col_expr(Column::SessionEpoch, Expr::value(expected_epoch + 1))
-        .col_expr(Column::UpdatedAt, Expr::value(now))
-        .filter(Column::OrgId.eq(org_id))
-        .filter(Column::SessionId.eq(session_id))
-        .filter(Column::SessionEpoch.eq(expected_epoch))
-        .filter(Column::Status.eq(STATUS_ACTIVE))
+    let result = epoch_update(org_id, session_id, expected_epoch, now)
         .exec(conn)
+        .await
+        .map_err(db_err)?;
+    Ok((result.rows_affected == 1).then_some(expected_epoch + 1))
+}
+
+/// A turn is launchable only after its ID and epoch commit together.
+pub async fn bump_epoch_for_turn(
+    org_id: &str,
+    session_id: &str,
+    turn_id: &str,
+    expected_epoch: i64,
+    now: i64,
+) -> Result<Option<i64>, errors::Error> {
+    let result = epoch_update(org_id, session_id, expected_epoch, now)
+        .col_expr(Column::LastTurnId, Expr::value(turn_id))
+        .exec(get_orm_client_rw().await)
         .await
         .map_err(db_err)?;
     Ok((result.rows_affected == 1).then_some(expected_epoch + 1))

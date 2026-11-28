@@ -485,14 +485,116 @@ const BODYLESS_ROUTES: &[(&str, &str, &str)] = &[
     ("all", "DELETE", "/api/{org_id}/synthetics/locations/{id}"),
 ];
 
-/// Stubs that answer 403 in every build outside cloud, so they document no success response.
-const ALWAYS_FORBIDDEN: &[(&str, &str, &str)] = &[
-    ("noncloud", "GET", "/api/invites"),
-    ("noncloud", "DELETE", "/api/invites/{token}"),
-    ("oss", "POST", "/api/{org_id}/settings/logo"),
-    ("oss", "DELETE", "/api/{org_id}/settings/logo"),
-    ("oss", "POST", "/api/{org_id}/settings/logo/text"),
-    ("oss", "DELETE", "/api/{org_id}/settings/logo/text"),
+/// Edition-specific stubs document the failure they always return.
+const UNAVAILABLE_STUBS: &[(&str, &str, &str, &str)] = &[
+    ("noncloud", "GET", "/api/invites", "403"),
+    ("noncloud", "DELETE", "/api/invites/{token}", "403"),
+    ("oss", "POST", "/api/{org_id}/settings/logo", "403"),
+    ("oss", "DELETE", "/api/{org_id}/settings/logo", "403"),
+    ("oss", "POST", "/api/{org_id}/settings/logo/text", "403"),
+    ("oss", "DELETE", "/api/{org_id}/settings/logo/text", "403"),
+    (
+        "oss",
+        "POST",
+        "/api/v2/{org_id}/alerts/incidents/declare/preview",
+        "403",
+    ),
+    (
+        "oss",
+        "POST",
+        "/api/v2/{org_id}/alerts/incidents/declare",
+        "403",
+    ),
+    (
+        "oss",
+        "POST",
+        "/api/v2/{org_id}/alerts/incidents/changes",
+        "403",
+    ),
+    (
+        "oss",
+        "POST",
+        "/api/v2/{org_id}/incidents/changes/{token}",
+        "403",
+    ),
+    (
+        "oss",
+        "POST",
+        "/api/v2/{org_id}/alerts/incidents/{incident_id}/contexts",
+        "403",
+    ),
+    (
+        "oss",
+        "GET",
+        "/api/v2/{org_id}/alerts/incidents/{incident_id}/contexts",
+        "403",
+    ),
+    (
+        "oss",
+        "GET",
+        "/api/v2/{org_id}/alerts/incidents/{incident_id}/contexts/{context_id}",
+        "403",
+    ),
+    (
+        "oss",
+        "POST",
+        "/api/v2/{org_id}/alerts/incidents/{incident_id}/page_team",
+        "409",
+    ),
+    (
+        "oss",
+        "POST",
+        "/api/v2/{org_id}/alerts/incidents/{incident_id}/mitigations",
+        "409",
+    ),
+    (
+        "oss",
+        "DELETE",
+        "/api/v2/{org_id}/alerts/incidents/{incident_id}/mitigations/{attempt_id}",
+        "409",
+    ),
+    (
+        "oss",
+        "POST",
+        "/api/v2/{org_id}/alerts/incidents/{incident_id}/mitigations/claims",
+        "409",
+    ),
+    (
+        "oss",
+        "GET",
+        "/api/v2/{org_id}/alerts/incidents/{incident_id}/recovery_checks",
+        "409",
+    ),
+    (
+        "oss",
+        "PATCH",
+        "/api/v2/{org_id}/alerts/incidents/{incident_id}/recovery_checks/{check_id}",
+        "409",
+    ),
+    (
+        "oss",
+        "DELETE",
+        "/api/v2/{org_id}/alerts/incidents/{incident_id}/recovery_checks/{check_id}",
+        "409",
+    ),
+    (
+        "oss",
+        "GET",
+        "/api/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/feedback",
+        "403",
+    ),
+    (
+        "oss",
+        "POST",
+        "/api/v2/{org_id}/alerts/incidents/{incident_id}/rca/runs/{run_id}/feedback",
+        "409",
+    ),
+    (
+        "oss",
+        "POST",
+        "/api/v2/{org_id}/alerts/incidents/{incident_id}/cause/confirm",
+        "409",
+    ),
 ];
 
 /// `Option<Json<T>>` bodies and their schema: leaving the body out works, a JSON `null` is a 422.
@@ -1579,17 +1681,17 @@ fn published_operations_keep_their_contract() {
             .push(route);
     }
     let exempt = reasoned_entries(RATELIMIT_EXEMPT);
-    let forbidden: BTreeSet<String> = ALWAYS_FORBIDDEN
+    let unavailable: BTreeSet<String> = UNAVAILABLE_STUBS
         .iter()
         .filter(|(edition, ..)| edition_applies(edition))
-        .map(|(_, method, path)| format!("{method} {path}"))
+        .map(|(_, method, path, _)| format!("{method} {path}"))
         .collect();
     let mut found = BTreeSet::new();
     for published in published_ops(&spec) {
         let route = format!("{} {}", published.method, published.path);
         let is_exempt = exempt.contains(route.as_str());
         for rule in broken_rules(&published, &declared, &routes, is_exempt) {
-            if !(rule == "response" && forbidden.contains(&route)) {
+            if !(rule == "response" && unavailable.contains(&route)) {
                 found.insert(format!("{rule} {route}"));
             }
         }
@@ -1821,17 +1923,20 @@ fn bodyless_handlers_document_no_body() {
 }
 
 #[test]
-fn unsupported_stubs_document_their_403() {
+fn unsupported_stubs_document_their_error_status() {
     let spec = published_spec();
     let ops = published_ops(&spec);
     let mut checked = 0;
-    for (edition, method, path) in ALWAYS_FORBIDDEN {
+    for (edition, method, path, status) in UNAVAILABLE_STUBS {
         let Some(op) = row_op(&ops, edition, method, path) else {
             continue;
         };
         checked += 1;
         let responses = op["responses"].as_object().unwrap();
-        assert!(responses.contains_key("403"), "{method} {path}: no 403");
+        assert!(
+            responses.contains_key(*status),
+            "{method} {path}: no {status}"
+        );
         assert!(
             !responses.keys().any(|status| status.starts_with('2')),
             "{method} {path}: the stub never succeeds"
@@ -1841,6 +1946,41 @@ fn unsupported_stubs_document_their_403() {
         checked >= build_floor(6, 2, 0),
         "only {checked} stubs checked"
     );
+}
+
+#[cfg(not(feature = "enterprise"))]
+#[test]
+fn oss_change_intake_documents_its_forbidden_response() {
+    let spec = published_spec();
+    let mut mismatches = Vec::new();
+    for path in [
+        "/api/v2/{org_id}/alerts/incidents/changes",
+        "/api/v2/{org_id}/incidents/changes/{token}",
+    ] {
+        let responses = spec["paths"][path]["post"]["responses"]
+            .as_object()
+            .unwrap();
+        if !responses.contains_key("403") || responses.keys().any(|status| status.starts_with('2'))
+        {
+            mismatches.push(path);
+        }
+    }
+    assert!(
+        mismatches.is_empty(),
+        "bad OSS stub contract: {mismatches:?}"
+    );
+}
+
+#[cfg(feature = "enterprise")]
+#[test]
+fn mcp_incident_update_help_does_not_promise_severity_writes() {
+    let spec = published_spec();
+    let description = spec["paths"]["/api/v2/{org_id}/alerts/incidents/{incident_id}/update"]
+        ["patch"]["x-o2-mcp"]["description"]
+        .as_str()
+        .unwrap();
+    assert!(description.contains("title"));
+    assert!(!description.contains("title or severity"), "{description}");
 }
 
 #[test]

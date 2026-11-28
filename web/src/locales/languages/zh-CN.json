@@ -12737,6 +12737,7 @@
       "statusOpen": "未解决",
       "statusAcknowledged": "已确认",
       "statusResolved": "已解决",
+      "pagerTotal": "{count} 个事件",
       "correlationServiceDiscovery": "服务发现",
       "correlationPrimaryMatch": "主要匹配",
       "correlationSecondaryMatch": "次要匹配",

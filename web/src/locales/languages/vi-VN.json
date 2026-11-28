@@ -12737,6 +12737,7 @@
       "statusOpen": "Đang mở",
       "statusAcknowledged": "Đã xác nhận",
       "statusResolved": "Đã giải quyết",
+      "pagerTotal": "{count} sự cố",
       "correlationServiceDiscovery": "Khám phá dịch vụ",
       "correlationPrimaryMatch": "Khớp chính",
       "correlationSecondaryMatch": "Khớp phụ",

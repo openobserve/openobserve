@@ -262,6 +262,7 @@ mod tests {
             profiles_streams: Set(json!([])),
             field_name_mapping: Set(mapping.map(|field| json!({ SERVICE_GROUP: field }))),
             last_seen: Set(1),
+            streams_cut: Set(0),
         }
         .insert(db)
         .await

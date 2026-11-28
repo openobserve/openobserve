@@ -31,7 +31,7 @@ use cron::Schedule;
 
 use crate::{
     alerts::{
-        QueryConditionExt,
+        QueryConditionExt, ScheduledEvaluation,
         alert::{SCHEDULE_FIELD_MAX_SECS, TZ_OFFSET_RANGE_MINUTES},
     },
     db,
@@ -333,18 +333,21 @@ impl DerivedStreamExt for DerivedStream {
         trace_id: Option<String>,
     ) -> Result<TriggerEvalResults, anyhow::Error> {
         self.query_condition
-            .evaluate_scheduled(
-                &self.org_id,
-                None,
-                self.stream_type,
-                &self.trigger_condition,
-                (start_time, end_time),
-                Some(SearchEventType::DerivedStream),
-                Some(SearchEventContext::with_derived_stream(Some(
+            .evaluate_scheduled(ScheduledEvaluation {
+                org_id: &self.org_id,
+                stream_name: None,
+                stream_type: self.stream_type,
+                trigger_condition: &self.trigger_condition,
+                range: (start_time, end_time),
+                search_type: Some(SearchEventType::DerivedStream),
+                search_event_context: Some(SearchEventContext::with_derived_stream(Some(
                     module_key.to_string(),
                 ))),
                 trace_id,
-            )
+                user_id: None,
+                timeout_secs: 0,
+                raw_promql_step: None,
+            })
             .await
     }
 }

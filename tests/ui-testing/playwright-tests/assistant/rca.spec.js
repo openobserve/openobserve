@@ -258,7 +258,7 @@ test.describe("assistant incident chat", () => {
     await expect(
       page.locator('[data-test="rca-analysis-container"]'),
     ).toBeVisible({ timeout: 30_000 });
-    await expect.poll(() => page.url()).not.toContain("tab=incidentAnalysis");
+    await expect.poll(() => page.url()).toContain("tab=incidentAnalysis");
     expect(reads.some((r) => r.startsWith("POST"))).toBe(false);
   });
 });

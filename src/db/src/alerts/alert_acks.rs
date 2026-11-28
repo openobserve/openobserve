@@ -16,12 +16,12 @@
 //! Ack writes that replicate (R-125); receivers apply through `infra`, so nothing re-broadcasts.
 
 use config::meta::alerts::ack::AlertAck;
-use infra::errors::Result;
+use infra::{db::get_orm_client_rw, errors::Result, table::alert_incidents::Episode};
 
 /// Writes the ack with its outbox bump, then replicates the row.
 pub async fn put(ack: &AlertAck) -> Result<u64> {
     let bumped = infra::table::alert_acks::put_with_outbox(ack).await?;
-    publish(ack).await;
+    publish_local_write(ack).await;
     Ok(bumped)
 }
 
@@ -31,7 +31,7 @@ pub async fn claim(ack: &AlertAck) -> Result<bool> {
         .await?
         .is_some();
     if won {
-        publish(ack).await;
+        publish_local_write(ack).await;
     }
     Ok(won)
 }
@@ -42,7 +42,7 @@ pub async fn take_over(ack: &AlertAck, from: &str) -> Result<bool> {
         .await?
         .is_some();
     if moved {
-        publish(ack).await;
+        publish_local_write(ack).await;
     }
     Ok(moved)
 }
@@ -83,18 +83,60 @@ pub async fn unack_held(
     publish_current(&held.org_id, &held.alert_id, &held.group_key).await
 }
 
+pub async fn unack_for_resolved_incident(
+    incident_id: &str,
+    episode: &Episode,
+    held: &AlertAck,
+    unacked_by: &str,
+    unacked_at: i64,
+) -> Result<Option<AlertAck>> {
+    if !infra::table::alert_acks::unack_for_resolved_incident(
+        get_orm_client_rw().await,
+        incident_id,
+        episode,
+        held,
+        unacked_by,
+        unacked_at,
+    )
+    .await?
+    {
+        return Ok(None);
+    }
+    publish_current(&held.org_id, &held.alert_id, &held.group_key).await
+}
+
 /// Replicates the row as it now stands, and returns it.
 async fn publish_current(
     org_id: &str,
     alert_id: &str,
     group_key: &str,
 ) -> Result<Option<AlertAck>> {
-    let row = infra::table::alert_acks::get(org_id, alert_id, group_key).await?;
+    let row =
+        infra::table::alert_acks::get_with(get_orm_client_rw().await, org_id, alert_id, group_key)
+            .await?;
     if let Some(row) = row.as_ref() {
         publish(row).await;
     }
     Ok(row)
 }
+
+#[cfg(feature = "enterprise")]
+async fn publish_local_write(ack: &AlertAck) {
+    if o2_enterprise::enterprise::common::config::get_config()
+        .super_cluster
+        .enabled
+        && let Err(e) = publish_current(&ack.org_id, &ack.alert_id, &ack.group_key).await
+    {
+        log::error!(
+            "[SUPER_CLUSTER:sync] Failed to read the ack of {}/{} for publication: {e}",
+            ack.alert_id,
+            ack.group_key
+        );
+    }
+}
+
+#[cfg(not(feature = "enterprise"))]
+async fn publish_local_write(_ack: &AlertAck) {}
 
 #[cfg(feature = "enterprise")]
 async fn publish(ack: &AlertAck) {

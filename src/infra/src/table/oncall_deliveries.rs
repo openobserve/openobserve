@@ -157,7 +157,9 @@ fn inbox_select(
         // Without this the ledger has no tenant: the event row carries a response id, not an org.
         .filter(oncall_responses::Column::OrgId.eq(org_id))
         .filter(oncall_response_events::Column::Kind.eq(ResponseEventKind::Delivery.to_i32()))
-        .filter(oncall_response_events::Column::Recipient.eq(user_email));
+        .filter(oncall_response_events::Column::Recipient.eq(user_email))
+        // A pending claim is not a page anyone received yet (M150).
+        .filter(oncall_response_events::Column::Delivered.is_not_null());
 
     if q.unread_only {
         select = select.filter(oncall_delivery_reads::Column::ReadAt.is_null());
