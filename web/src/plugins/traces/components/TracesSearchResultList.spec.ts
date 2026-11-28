@@ -68,7 +68,7 @@ const sharedSearchObj = {
     },
   },
   data: {
-    stream: { selectedStreamFields: [] as string[], addToFilter: "" },
+    stream: { selectedStreamFields: [] as string[], addToFilter: "", addToFilterMode: "replace" },
     resultGrid: { columns: [] as any[], pageRequest: null as any, pageLoad: null as any },
   },
 };
@@ -213,6 +213,7 @@ describe("TracesSearchResultList", () => {
     vi.clearAllMocks();
     // Reset shared searchObj state between tests
     sharedSearchObj.data.stream.addToFilter = "";
+    sharedSearchObj.data.stream.addToFilterMode = "replace";
     sharedSearchObj.data.stream.selectedStreamFields = [];
     sharedSearchObj.data.resultGrid.columns = [];
     // Reset the column ref so copy tests don't bleed into each other
@@ -894,6 +895,17 @@ describe("TracesSearchResultList", () => {
       } finally {
         (sharedSearchObj.meta as any).sqlMode = false;
       }
+    });
+
+    it.each([
+      ["include", "my-svc"],
+      ["exclude", "my-svc"],
+      ["exclude", ""],
+    ])("writes %s of %j in append mode, so it adds to the filter", async (action, value) => {
+      wrapper = mount_({ hits: [hit], loading: false });
+      const cellActions = wrapper.findComponent({ name: "CellActions" });
+      await cellActions.vm.$emit("add-search-term", "service_name", value, action);
+      expect(sharedSearchObj.data.stream.addToFilterMode).toBe("append");
     });
 
     it("should use != operator for exclude action", async () => {

@@ -233,6 +233,13 @@ describe("replaceExistingFieldCondition", () => {
 // ---------------------------------------------------------------------------
 
 describe("applyFilterTerm", () => {
+  it("appends without replacing the field's condition in append mode", () => {
+    expect(applyFilterTerm("svc != 'b'", "svc != 'a'", "append")).toBe("svc != 'a' and svc != 'b'");
+    expect(applyFilterTerm("svc='null'", "svc != 'a'", "append")).toBe(
+      "svc != 'a' and svc is null",
+    );
+  });
+
   describe("null value normalisation", () => {
     it("should convert ='null' to IS NULL before applying", () => {
       const result = applyFilterTerm("error_code='null'", "");

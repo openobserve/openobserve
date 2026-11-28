@@ -1262,6 +1262,29 @@ describe("Traces page load states", () => {
         expect(searchObj.data.errorMsg).toContain("boom");
         expect((searchObj.meta as any).refreshFailedAt ?? null).toBeNull();
       });
+
+      it("shows the error page when the failing run asked for another scope", async () => {
+        await loadRows();
+        searchObj.meta.scope = "root";
+        searchObj.data.stream.hasParentColumn = true;
+        wrapper!.vm.getQueryData();
+        await waitFor(() => expect(callsOfType("main")).toHaveLength(2));
+        lastCall("main")[1].error(null, { content: { message: "scope failed", code: 400 } });
+        await flushPromises();
+
+        expect(searchObj.data.queryResults.hits ?? []).toEqual([]);
+        expect(searchObj.data.errorMsg).toContain("scope failed");
+        expect((searchObj.meta as any).refreshFailedAt ?? null).toBeNull();
+      });
+
+      it("counts a run with another Group by as another view", async () => {
+        await loadRows();
+        const ungrouped = wrapper!.vm.resultsViewKey();
+        searchObj.meta.groupBy = "service_name";
+        expect(wrapper!.vm.resultsViewKey()).not.toBe(ungrouped);
+        searchObj.meta.groupBy = "";
+        expect(wrapper!.vm.resultsViewKey()).toBe(ungrouped);
+      });
     });
   });
 });

@@ -2185,6 +2185,28 @@ describe("useTraces", () => {
       expect(searchObj.data.stream.selectedFields).toEqual(["service_name", "http.method"]);
     });
 
+    it("keeps the SQL that ran in the URL while SQL that has not run is in the editor", async () => {
+      const { searchObj, patchUrlViewState } = freshState();
+      searchObj.meta.searchMode = "spans";
+      searchObj.data.stream.selectedStream = { label: "s", value: "s" };
+      searchObj.data.stream.selectedFields = [...DEFAULT_TRACE_COLUMNS.spans];
+      mockCurrentRoute.value = {
+        name: "traces",
+        query: { stream: "s", tab: "spans", query: "b64uni:a = 1" },
+      };
+      searchObj.data.appliedEditorValue = "a = 1";
+      searchObj.meta.sqlMode = true;
+      searchObj.data.editorValue = `SELECT * FROM "s"`;
+      await patchUrlViewState();
+      expect(mockRouterReplace).not.toHaveBeenCalled();
+
+      searchObj.data.appliedEditorValue = `SELECT * FROM "s"`;
+      await patchUrlViewState();
+      expect(mockRouterReplace).toHaveBeenLastCalledWith({
+        query: { stream: "s", tab: "spans", query: `b64uni:SELECT * FROM "s"`, sql_mode: "true" },
+      });
+    });
+
     it("never writes the one-shot run-query flag back into the URL", async () => {
       const { searchObj, patchUrlViewState } = freshState();
       searchObj.data.stream.selectedStream = { label: "s", value: "s" };
@@ -2346,6 +2368,7 @@ describe("useTraces", () => {
 
     it("adds and drops sql_mode as the URL follows the mode", async () => {
       const { searchObj, patchUrlViewState } = sqlState(true, `SELECT * FROM "a"`);
+      searchObj.data.appliedEditorValue = `SELECT * FROM "a"`;
       mockCurrentRoute.value = { name: "traces", query: { stream: "a", tab: "spans" } };
       await patchUrlViewState();
       expect(mockRouterReplace).toHaveBeenLastCalledWith({

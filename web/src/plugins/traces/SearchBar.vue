@@ -919,6 +919,7 @@ import useBreakpoint from "@/composables/useBreakpoint";
 import useSqlSuggestions from "@/composables/useSuggestions";
 import { pageValuesSetting, pageValuesWindow } from "@/composables/fieldValueStore";
 import { applyFilterTerm, removeFieldCondition } from "@/utils/traces/filterUtils";
+import { SPAN_KIND_LABEL_TO_KEY } from "@/utils/traces/constants";
 import {
   isDatetimeChanged,
   tracesEditorIsStaged,
@@ -1300,6 +1301,8 @@ export default defineComponent({
         action: {
           label: t("traces.sqlMode.undo"),
           handler: () => {
+            if (!searchObj.meta.sqlMode || String(searchObj.data.editorValue ?? "") !== after)
+              return;
             onUndo?.();
             write(before);
           },
@@ -1324,7 +1327,12 @@ export default defineComponent({
       const ref = allFieldRefs().get(field);
       const owned = searchObj.data.stream.sqlFieldConditions;
       const previous = owned[field];
-      const next = fieldValuesCondition(ref ?? field, values, exclude);
+      // The SQL needs stored span_kind values; the owned values stay labels so the ticks match.
+      const written =
+        field === "span_kind"
+          ? values.map((v) => SPAN_KIND_LABEL_TO_KEY[v.toLowerCase()] ?? v)
+          : values;
+      const next = fieldValuesCondition(ref ?? field, written, exclude);
       let after = previous ? replaceOwnCondition(before, previous.text, next) : null;
       if (after === null && next) after = insertWhereCondition(before, next);
       if (after === null) {
@@ -1701,6 +1709,11 @@ export default defineComponent({
       resetSqlTexts();
       searchObj.meta.sqlMode = false;
       searchObj.meta.scope = "all";
+      // A Groups run has a count but no rows, so its count must not stay over the empty span list.
+      if (searchObj.data.groupsRequest) {
+        searchObj.data.queryResults = {};
+        searchObj.searchApplied = false;
+      }
       searchObj.meta.groupBy = "";
       searchObj.data.groupsRequest = null;
       searchObj.data.editorValue = "";
@@ -2209,23 +2222,25 @@ export default defineComponent({
   },
   watch: {
     addSearchTerm() {
-      if (this.searchObj.data.stream.addToFilter !== "" && this.searchObj.meta.sqlMode) {
+      if (this.searchObj.data.stream.addToFilter === "") return;
+      const mode = this.searchObj.data.stream.addToFilterMode;
+      this.searchObj.data.stream.addToFilterMode = "replace";
+      if (this.searchObj.meta.sqlMode) {
         const term = this.searchObj.data.stream.addToFilter;
         this.searchObj.data.stream.addToFilter = "";
         this.insertSqlCondition(term);
         return;
       }
-      if (this.searchObj.data.stream.addToFilter !== "") {
-        const newValue = applyFilterTerm(
-          this.searchObj.data.stream.addToFilter,
-          this.searchObj.data.editorValue,
-        );
-        this.searchObj.data.editorValue = newValue;
-        this.searchObj.data.stream.addToFilter = "";
-        if (this.queryEditorRef?.setValue) this.queryEditorRef.setValue(newValue);
-        if (this.store.state.zoConfig.auto_query_enabled && this.searchObj.meta.liveMode) {
-          this.searchData();
-        }
+      const newValue = applyFilterTerm(
+        this.searchObj.data.stream.addToFilter,
+        this.searchObj.data.editorValue,
+        mode,
+      );
+      this.searchObj.data.editorValue = newValue;
+      this.searchObj.data.stream.addToFilter = "";
+      if (this.queryEditorRef?.setValue) this.queryEditorRef.setValue(newValue);
+      if (this.store.state.zoConfig.auto_query_enabled && this.searchObj.meta.liveMode) {
+        this.searchData();
       }
     },
     removeFieldTerm(fieldName: string) {

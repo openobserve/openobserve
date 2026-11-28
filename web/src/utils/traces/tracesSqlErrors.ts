@@ -103,7 +103,9 @@ export function tracesSqlErrorFix(input: {
   if (code === 20002) return MISSING_STREAM.test(input.text) ? { kind: "missingStream" } : null;
   if (code === 20004) {
     const field = unknownFieldName(input.text);
-    const suggestion = input.suggestions[0] ?? (field ? closestField(field, input.fields) : null);
+    // The server can suggest the unknown name itself when a CTE or subquery does not project it.
+    const offered = input.suggestions.find((name) => name.toLowerCase() !== field?.toLowerCase());
+    const suggestion = offered ?? (field ? closestField(field, input.fields) : null);
     return field && suggestion ? { kind: "suggestion", field, suggestion } : null;
   }
   if (code === 20008 && OUT_OF_MEMORY.test(input.text) && input.rangeUs > ONE_HOUR_US) {

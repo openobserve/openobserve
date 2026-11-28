@@ -256,10 +256,10 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import useFieldValuesStream from "@/composables/useFieldValuesStream";
 import useDurationPercentiles from "@/composables/useDurationPercentiles";
-import { SPAN_KIND_MAP } from "@/utils/traces/constants";
+import { SPAN_KIND_LABEL_TO_KEY, SPAN_KIND_MAP } from "@/utils/traces/constants";
 import { resolveTracesFilter } from "@/utils/traces/resolveTracesFilter";
 import { activeScopePredicate, withScope } from "@/utils/traces/tracesScope";
-import { analyzeTracesSql } from "@/utils/traces/tracesSql";
+import { analyzeTracesSql, fieldValuesSource } from "@/utils/traces/tracesSql";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { escapeSingleQuotes } from "@/utils/queryUtils";
 import { removeConditions } from "@/utils/query/sqlFilterBuilder";
@@ -530,7 +530,8 @@ export default defineComponent({
       const analyzed = searchObj.meta.sqlMode
         ? analyzeTracesSql(searchObj.data.editorValue ?? "", tracesParser.value)
         : null;
-      const typed = analyzed?.join || analyzed?.withClause ? null : analyzed;
+      const typedInfo = analyzed?.join || analyzed?.withClause ? null : analyzed;
+      const typed = typedInfo ? fieldValuesSource(typedInfo) : null;
       // The whole editor value is the where clause — never split it on "|", the
       // split is quote-unaware and would truncate match_all('text | error').
       const whereClause = typed
@@ -539,7 +540,7 @@ export default defineComponent({
           ? ""
           : resolveTracesFilter(searchObj.data.editorValue, tracesParser.value, streamName);
 
-      let sql = `SELECT * FROM ${typed?.fromClause || `"${streamName}"`}`;
+      let sql = `SELECT * FROM ${typed?.from || `"${streamName}"`}`;
 
       // Added last, so neither the field's removal nor the span_kind rewrite touches it.
       const filteredWhere = withScope(
@@ -648,7 +649,12 @@ export default defineComponent({
       fetchFieldValuesData(fieldName, newFrom, fieldValuesCurrentKeyword.value[fieldName] ?? "");
     };
 
-    const handleAddSearchTerm = (fieldName: string, value: string, action: string) => {
+    const handleAddSearchTerm = (fieldName: string, label: string, action: string) => {
+      // Typed SQL is sent as written, so it needs the stored span_kind value, not the label.
+      const value =
+        searchObj.meta.sqlMode && fieldName === "span_kind"
+          ? (SPAN_KIND_LABEL_TO_KEY[label.toLowerCase()] ?? label)
+          : label;
       if (action === "include") {
         addSearchTerm(
           fieldName === "duration"

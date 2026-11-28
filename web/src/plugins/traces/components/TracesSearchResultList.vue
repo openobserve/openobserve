@@ -413,6 +413,8 @@ const addSearchTerm = (
   row?: Record<string, any>,
 ) => {
   const operator = action === "include" ? "=" : "!=";
+  // Row actions add a condition; only field-list ticks replace the field's whole condition.
+  searchObj.data.stream.addToFilterMode = "append";
   if (fieldValue === null || fieldValue === "" || fieldValue === "null") {
     const isOp = action === "include" ? "is" : "is not";
     searchObj.data.stream.addToFilter = `${field} ${isOp} null`;

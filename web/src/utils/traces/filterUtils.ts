@@ -86,7 +86,11 @@ export const removeFieldCondition = (queryStr: string, fieldName: string): strin
  * Applies a single filter term to a base editor value using replace-or-append logic.
  * Returns the new editor value.
  */
-export const applyFilterTerm = (filterTerm: string, baseValue: string): string => {
+export const applyFilterTerm = (
+  filterTerm: string,
+  baseValue: string,
+  mode: "replace" | "append" = "replace",
+): string => {
   let filter = filterTerm;
 
   const isFilterValueNull = filter.split(/=|!=/)[1] === "'null'";
@@ -105,7 +109,7 @@ export const applyFilterTerm = (filterTerm: string, baseValue: string): string =
   // The whole base value is the where clause — never split it on "|". The split
   // is quote-unaware, so a pipe inside a term such as match_all('text | error')
   // would be rejoined as "| " and silently alter the search term.
-  const fieldName = getFieldFromExpression(filter);
+  const fieldName = mode === "append" ? null : getFieldFromExpression(filter);
   const replaced = fieldName ? replaceExistingFieldCondition(baseValue, fieldName, filter) : null;
 
   if (replaced !== null) return replaced;

@@ -15,6 +15,7 @@
 
 import { beforeAll, describe, expect, it } from "vitest";
 import { resolveTracesFilter } from "./resolveTracesFilter";
+import { ROOT_SPAN_PREDICATE, withScope } from "./tracesScope";
 
 describe("resolveTracesFilter", () => {
   let parser: unknown;
@@ -54,6 +55,17 @@ describe("resolveTracesFilter", () => {
   it("passes the text through untouched without a parser", () => {
     expect(resolveTracesFilter(" service_name = 'api' ", null, "default")).toBe(
       "service_name = 'api'",
+    );
+  });
+
+  it("removes comments, so a scope added after the filter is not commented out", () => {
+    const resolved = resolveTracesFilter("service_name = 'api' -- note", null, "default");
+    expect(resolved).toBe("service_name = 'api'");
+    expect(withScope(resolved, ROOT_SPAN_PREDICATE)).toBe(
+      `(service_name = 'api') AND ${ROOT_SPAN_PREDICATE}`,
+    );
+    expect(resolveTracesFilter("a = 1 /* x */ AND b = '--y'", null, "default")).toBe(
+      "a = 1   AND b = '--y'",
     );
   });
 });

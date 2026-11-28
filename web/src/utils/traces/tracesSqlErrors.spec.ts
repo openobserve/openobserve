@@ -84,6 +84,22 @@ describe("tracesSqlErrorFix", () => {
     ).toEqual({ kind: "suggestion", field: "servce_name", suggestion: "service_name" });
   });
 
+  it("drops a server suggestion that is the unknown field itself", () => {
+    const fix = (suggestions: string[]) =>
+      tracesSqlErrorFix({
+        ...base,
+        code: 20004,
+        text: "Search field not found: Schema error: No field named service_name.",
+        suggestions,
+      });
+    expect(fix(["Service_Name"])).toBeNull();
+    expect(fix(["service_name", "span_name"])).toEqual({
+      kind: "suggestion",
+      field: "service_name",
+      suggestion: "span_name",
+    });
+  });
+
   it("falls back to the closest stream field when the stream error has no suggestions", () => {
     expect(tracesSqlErrorFix({ ...base, code: 400, text: STREAM_FIELD_ERROR })).toEqual({
       kind: "suggestion",

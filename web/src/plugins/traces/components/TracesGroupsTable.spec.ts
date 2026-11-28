@@ -20,6 +20,7 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import { gt } from "@/types/i18n";
 import { buildGroupsColumns } from "@/plugins/traces/composables/tracesGroupsColumns";
+import { applyFilterTerm } from "@/utils/traces/filterUtils";
 import TracesGroupsTable from "./TracesGroupsTable.vue";
 
 const { mockSearch, mockCancelAll, mockCopy, sharedSearchObj } = vi.hoisted(() => ({
@@ -28,7 +29,7 @@ const { mockSearch, mockCancelAll, mockCopy, sharedSearchObj } = vi.hoisted(() =
   mockCopy: vi.fn(),
   sharedSearchObj: {
     meta: { groupBy: "service_name" },
-    data: { stream: { addToFilter: "" } },
+    data: { stream: { addToFilter: "", addToFilterMode: "replace" } },
   },
 }));
 
@@ -133,6 +134,7 @@ describe("TracesGroupsTable", () => {
     mockSearch.mockReset();
     sharedSearchObj.meta.groupBy = "service_name";
     sharedSearchObj.data.stream.addToFilter = "";
+    sharedSearchObj.data.stream.addToFilterMode = "replace";
     hoveredColumn.value = null;
   });
 
@@ -349,6 +351,28 @@ describe("TracesGroupsTable", () => {
     await wrapper.find('[data-test="traces-groups-context-include-term"]').trigger("click");
     expect(sharedSearchObj.data.stream.addToFilter).toBe("service_name = 'cart'");
     expect(sharedSearchObj.meta.groupBy).toBe("service_name");
+  });
+
+  it("writes Include and Exclude in append mode, so they add to the filter", async () => {
+    for (const term of ["include", "exclude"]) {
+      sharedSearchObj.data.stream.addToFilterMode = "replace";
+      const wrapper = await openMenu("cart");
+      await wrapper.find(`[data-test="traces-groups-context-${term}-term"]`).trigger("click");
+      expect(sharedSearchObj.data.stream.addToFilterMode).toBe("append");
+      wrapper.unmount();
+    }
+  });
+
+  it("a second Exclude on the grouped field keeps the first", async () => {
+    let editor = "";
+    for (const value of ["batch-export", "mail-worker"]) {
+      const wrapper = await openMenu(value);
+      await wrapper.find('[data-test="traces-groups-context-exclude-term"]').trigger("click");
+      const { addToFilter, addToFilterMode } = sharedSearchObj.data.stream;
+      editor = applyFilterTerm(addToFilter, editor, addToFilterMode as "replace" | "append");
+      wrapper.unmount();
+    }
+    expect(editor).toBe("service_name != 'batch-export' and service_name != 'mail-worker'");
   });
 
   it("right-click Exclude term filters the value out and stays in Groups", async () => {
