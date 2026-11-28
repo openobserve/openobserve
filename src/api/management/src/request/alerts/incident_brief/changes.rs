@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::collections::BTreeSet;
+
 use config::meta::alerts::what_changed::WhatChanged;
 use openobserve_core::alerts::what_changed::{
     self, CHANGE_LOOKBACK_US, ChangeScope, ChangeWindow, PreparedRead,
@@ -37,8 +39,12 @@ pub(super) async fn prepare(
     what_changed::prepare(org, viewer, window, services, scope).await
 }
 
-pub(super) async fn read(prepared: PreparedRead, hidden: &mut Vec<HiddenSection>) -> WhatChanged {
-    let changes = prepared.read().await;
+pub(super) async fn read(
+    prepared: PreparedRead,
+    hidden: &mut Vec<HiddenSection>,
+    raw_limit: &BTreeSet<String>,
+) -> WhatChanged {
+    let changes = prepared.read_with_raw_limit(Some(raw_limit)).await;
     hidden.extend(
         changes
             .coverage

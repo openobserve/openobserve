@@ -86,13 +86,18 @@ pub(super) struct ImpactPlan {
 }
 
 impl ImpactPlan {
-    pub(super) async fn read(&self, now: i64) -> (Impact, Vec<EvidenceAgainstImpact>) {
+    pub(super) async fn read(
+        &self,
+        now: i64,
+        raw_limit: &BTreeSet<String>,
+    ) -> (Impact, Vec<EvidenceAgainstImpact>) {
         let window = ReadingWindow::new(self.onset.at, now);
         let input = ReadInput {
             org: &self.org,
             principal: &self.principal,
             scope: &self.scope,
             window,
+            raw_limit,
         };
         let mut sources = self.sources.iter();
         let mut impact = read_primary(&input, sources.next(), self.headline).await;
@@ -178,6 +183,7 @@ struct ReadInput<'a> {
     principal: &'a str,
     scope: &'a ImpactScope,
     window: ReadingWindow,
+    raw_limit: &'a BTreeSet<String>,
 }
 
 struct Reading {
@@ -968,7 +974,7 @@ async fn search_sql(
     if input.window.start >= input.window.end {
         return Ok(Vec::new());
     }
-    let request = Request {
+    let mut request = Request {
         query: Query {
             sql,
             start_time: input.window.start,
@@ -991,8 +997,18 @@ async fn search_sql(
         fixture.requests.push(request);
         return Ok(fixture.rows.clone());
     }
+    let trace_id = config::ider::generate_trace_id();
+    search_service::raw_streams::resolve_request_with_raw_limit(
+        &trace_id,
+        input.org,
+        stream_type,
+        Some(input.principal),
+        &mut request,
+        input.raw_limit,
+    )
+    .await;
     let response = search_service::search(
-        &config::ider::generate_trace_id(),
+        &trace_id,
         input.org,
         stream_type,
         Some(input.principal.to_string()),
@@ -1146,7 +1162,9 @@ mod tests {
                 .await
                 .unwrap();
                 assert!(plan.hidden.iter().any(|item| item.stream == "private_app"));
-                let (impact, evidence) = plan.read(onset + 2 * 60 * MICROS_PER_SEC).await;
+                let (impact, evidence) = plan
+                    .read(onset + 2 * 60 * MICROS_PER_SEC, &BTreeSet::new())
+                    .await;
                 assert_eq!(impact.value, published.map(|_| 7.0));
                 assert!(impact.series.is_none());
                 assert!(impact.source.is_none());
@@ -1234,6 +1252,7 @@ mod tests {
             principal: "viewer",
             scope: &scope,
             window: ReadingWindow::new(onset, onset + 2 * minute + 10),
+            raw_limit: &BTreeSet::new(),
         };
         let series = custom_series(&opening, &input).await.unwrap();
         assert_eq!(Reading::from_series(series, onset).value, Some(0.0));
@@ -1266,6 +1285,7 @@ mod tests {
                 principal: "viewer",
                 scope: &scope,
                 window: ReadingWindow::new(onset, now),
+                raw_limit: &BTreeSet::new(),
             };
             assert_eq!(input.window.bucket_secs, 420);
             custom_series(&opening, &input).await.unwrap();
@@ -1289,6 +1309,7 @@ mod tests {
             principal: "viewer",
             scope: &scope,
             window: ReadingWindow::new(onset, onset + 120 * MICROS_PER_SEC),
+            raw_limit: &BTreeSet::new(),
         };
         for pod in [format!("{}💡", "p".repeat(253)), "p".repeat(257)] {
             let observed = json!({"pod": pod});
@@ -1361,7 +1382,9 @@ mod tests {
             regions: vec!["east".into()],
         };
         let plan = plan(&incident, None, None, scope, &viewer).await.unwrap();
-        let (impact, _) = plan.read(onset + 60 * MICROS_PER_SEC).await;
+        let (impact, _) = plan
+            .read(onset + 60 * MICROS_PER_SEC, &BTreeSet::new())
+            .await;
         assert!(
             matches!(impact.source, Some(ImpactSource::TracesRed { stream, .. }) if stream == "d_current")
         );
@@ -1426,7 +1449,7 @@ mod tests {
 
         assert!(plan.readable_slos.is_empty());
         assert!(plan.hidden.iter().any(|item| item.stream_type == "slo"));
-        let (impact, evidence) = plan.read(60_000_000).await;
+        let (impact, evidence) = plan.read(60_000_000, &BTreeSet::new()).await;
         assert!(impact.source.is_none());
         assert!(evidence.is_empty());
         assert!(slos::delete(db, &org, &slo.id).await.unwrap());

@@ -16,7 +16,8 @@
 //! Skipped automatic pages, run numbers and the run fence, and the stored Correlate cut of each
 //! service row, recomputed once for the rows written before the column existed.
 
-use config::utils::str::org_wide_grant_covers;
+#[cfg(test)]
+use config::meta::service_streams::STREAMS_CUT_OUTSIDE_FORM;
 use sea_orm::{
     ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect,
     sea_query::Expr as OrmExpr,
@@ -30,9 +31,6 @@ const PAGE: u64 = 1000;
 const CAP_ENV: &str = "O2_SERVICE_STREAMS_MAX_STREAMS_PER_SERVICE";
 /// The cap every deployment started with, so a cap raised later still marks rows cut at 50.
 const DEFAULT_CAP: usize = 50;
-/// Cut bits per stream type, then the bit for a name outside the org-wide grant's form.
-const TYPE_BITS: [i16; 4] = [1, 2, 4, 8];
-const OUTSIDE_FORM_BIT: i16 = 16;
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;
@@ -306,7 +304,6 @@ async fn recompute_streams_cut<C: ConnectionTrait>(db: &C, threshold: usize) -> 
     Ok(())
 }
 
-/// A list at the threshold may have cut a name; a value that is not a list of names fails closed.
 fn legacy_cut(row: &service_streams::Model, threshold: usize) -> i16 {
     let lists = [
         &row.logs_streams,
@@ -314,27 +311,9 @@ fn legacy_cut(row: &service_streams::Model, threshold: usize) -> i16 {
         &row.metrics_streams,
         &row.profiles_streams,
     ];
-    let mut cut = 0;
-    for (bit, list) in TYPE_BITS.into_iter().zip(lists) {
-        let names = match list {
-            None | Some(serde_json::Value::Null) => continue,
-            Some(serde_json::Value::Array(names)) => names,
-            Some(_) => {
-                cut |= bit | OUTSIDE_FORM_BIT;
-                continue;
-            }
-        };
-        if names.len() >= threshold {
-            cut |= bit;
-        }
-        if names.iter().any(|name| {
-            name.as_str()
-                .is_none_or(|name| !org_wide_grant_covers(name))
-        }) {
-            cut |= OUTSIDE_FORM_BIT;
-        }
-    }
-    cut
+    // The historical schema used NULL for absent lists.
+    let lists = lists.map(|list| list.as_ref().filter(|value| !value.is_null()));
+    crate::table::service_streams::legacy_cut(lists, threshold)
 }
 
 // Frozen view of the service_streams table, so later schema changes do not alter this migration.
@@ -476,7 +455,7 @@ mod tests {
             let expected = vec![
                 ("l1".to_string(), 0),
                 ("l2".to_string(), 1),
-                ("l3".to_string(), OUTSIDE_FORM_BIT),
+                ("l3".to_string(), STREAMS_CUT_OUTSIDE_FORM),
             ];
             let manager = SchemaManager::new(&db);
             for _ in 0..2 {
@@ -497,7 +476,7 @@ mod tests {
             profiles_streams: Some(json!(["p1", "p2"])),
             streams_cut: 0,
         };
-        assert_eq!(legacy_cut(&row, 2), 1 | 8 | OUTSIDE_FORM_BIT);
+        assert_eq!(legacy_cut(&row, 2), 1 | 8 | STREAMS_CUT_OUTSIDE_FORM);
     }
 
     #[tokio::test]

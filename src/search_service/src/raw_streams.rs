@@ -15,6 +15,8 @@
 
 //! Which protected streams a search may read unredacted, resolved once where the request arrives.
 
+use std::collections::BTreeSet;
+
 use config::meta::{search, stream::StreamType};
 
 /// The audit `http_path` of an unredacted read; `target` names the stream.
@@ -96,6 +98,30 @@ pub async fn resolve_request(
         return;
     }
     let raw = resolve_and_audit(trace_id, org_id, stream_type, user_id, &req.query.sql).await;
+    req.raw_streams = Some(raw);
+}
+
+/// A brief filling a shared cache entry may only use raw grants represented in its key.
+pub async fn resolve_request_with_raw_limit(
+    trace_id: &str,
+    org_id: &str,
+    stream_type: StreamType,
+    user_id: Option<&str>,
+    req: &mut search::Request,
+    raw_limit: &BTreeSet<String>,
+) {
+    if raw_limit.is_empty() {
+        req.raw_streams = Some(search::RawStreams::default());
+        return;
+    }
+    let raw = resolve(org_id, stream_type, &req.query.sql, user_id).await;
+    let raw = raw
+        .iter()
+        .filter(|stream| raw_limit.contains(*stream))
+        .cloned()
+        .collect::<Vec<_>>()
+        .into();
+    audit_raw_read(trace_id, org_id, user_id, &raw, &req.query.sql);
     req.raw_streams = Some(raw);
 }
 

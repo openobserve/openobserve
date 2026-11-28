@@ -99,6 +99,11 @@ pub struct ChangeAccess {
 }
 
 impl ChangeAccess {
+    pub fn reads_change_events(&self) -> bool {
+        self.readable_streams
+            .contains(&format!("logs/{CHANGE_EVENTS_STREAM}"))
+    }
+
     async fn load_deploy_streams(
         &mut self,
         org: &str,
@@ -189,17 +194,25 @@ impl PreparedRead {
         &self.sources
     }
 
-    pub async fn read(mut self) -> WhatChanged {
-        load_regional_coverage(&self.input, &self.access, &mut self.coverage).await;
-        self.read_changes().await
+    pub async fn read(self) -> WhatChanged {
+        self.read_with_raw_limit(None).await
     }
 
-    async fn read_changes(mut self) -> WhatChanged {
+    pub async fn read_with_raw_limit(
+        mut self,
+        raw_limit: Option<&BTreeSet<String>>,
+    ) -> WhatChanged {
+        load_regional_coverage(&self.input, &self.access, &mut self.coverage).await;
+        self.read_changes(raw_limit).await
+    }
+
+    async fn read_changes(mut self, raw_limit: Option<&BTreeSet<String>>) -> WhatChanged {
         let events = if self.events_readable {
             load_events(
                 &self.input,
                 &mut self.coverage,
                 Some(self.input.principal.clone()),
+                raw_limit,
             )
             .await
         } else {
@@ -353,7 +366,11 @@ pub(crate) async fn confirm_rollout(
     let mut coverage = ChangeCoverage::default();
     let sources = load_rollout_sources(conn, &input, &mut coverage).await?;
     let latest = latest_brief_rollout(sources, &input, &mut coverage);
-    let visible = prepare_with(conn, input).await.read_changes().await.changes;
+    let visible = prepare_with(conn, input)
+        .await
+        .read_changes(None)
+        .await
+        .changes;
     let latest_visible = newest_rollout(&visible, onset);
     let option_matches = target.is_none_or(|(_, expected)| expected == reference);
     if let (Some(current), Some(row)) = (latest, latest_visible)
@@ -455,7 +472,7 @@ async fn load_rollout_sources(
             (deploy, env)
         })
         .collect();
-    let ci = load_events(input, coverage, None).await;
+    let ci = load_events(input, coverage, None, None).await;
     Ok(RolloutSources { detected, ci })
 }
 
@@ -993,6 +1010,7 @@ async fn load_events(
     input: &ReadContext,
     coverage: &mut ChangeCoverage,
     principal: Option<String>,
+    raw_limit: Option<&BTreeSet<String>>,
 ) -> Vec<Value> {
     let schema = match infra::schema::get(&input.org, CHANGE_EVENTS_STREAM, StreamType::Logs).await
     {
@@ -1026,7 +1044,7 @@ async fn load_events(
         .collect::<Vec<_>>()
         .join(", ");
     let order = if principal.is_some() { "ASC" } else { "DESC" };
-    let request = search::Request {
+    let mut request = search::Request {
         query: search::Query {
             sql: format!(
                 "SELECT * FROM \"{CHANGE_EVENTS_STREAM}\" WHERE service IN ({services}) ORDER BY _timestamp {order}"
@@ -1039,14 +1057,19 @@ async fn load_events(
         use_cache: false,
         ..Default::default()
     };
-    match crate::search::search(
-        &config::ider::generate(),
-        &input.org,
-        StreamType::Logs,
-        principal,
-        &request,
-    )
-    .await
+    let trace_id = config::ider::generate();
+    if let Some(raw_limit) = raw_limit {
+        crate::search::raw_streams::resolve_request_with_raw_limit(
+            &trace_id,
+            &input.org,
+            StreamType::Logs,
+            principal.as_deref(),
+            &mut request,
+            raw_limit,
+        )
+        .await;
+    }
+    match crate::search::search(&trace_id, &input.org, StreamType::Logs, principal, &request).await
     {
         Ok(mut response) => {
             coverage.change_events = !response.is_partial;

@@ -32,6 +32,12 @@ use crate::{
     errors::{self, DbError, Error},
 };
 
+/// Default cap on streams tracked per telemetry type, matching the enterprise
+/// `StreamMergePolicy` default. Used by callers that have no config access.
+pub const DEFAULT_MAX_STREAMS_PER_TYPE: usize = 50;
+// Every cut bit stays set until a writer can infer the legacy record's actual cut.
+const UNKNOWN_STREAMS_CUT: i16 = -1;
+
 /// Service Streams Table — v2 ORM entity
 #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel, Serialize, Deserialize)]
 #[sea_orm(table_name = "service_streams")]
@@ -129,23 +135,8 @@ pub struct ServiceRecord {
     /// None for records written before this column was added.
     pub field_name_mapping: Option<serde_json::Value>,
     pub last_seen: i64,
-    /// A record without the field cannot prove its lists whole, so it reads as all cut.
-    #[serde(default = "all_cut")]
+    #[serde(default = "unknown_cut", serialize_with = "serialize_cut")]
     pub streams_cut: i16,
-}
-
-/// Outcome of a [`put`]; a named struct so call sites cannot positionally confuse the two facts.
-#[must_use]
-#[derive(Debug, Clone)]
-pub struct PutOutcome {
-    /// `disambiguation` JSON of each orphaned lower-specificity row this put deleted (F19).
-    pub orphans: Vec<serde_json::Value>,
-    /// True iff a data column changed, a row inserted, or an orphan deleted; not last_seen alone.
-    pub changed: bool,
-    /// The row as stored after this put, so callers can cache it without re-reading.
-    pub stored: ServiceRecord,
-    /// The stored row's previous `disambiguation` when the upgrade branch rewrote it.
-    pub replaced_disambiguation: Option<serde_json::Value>,
 }
 
 impl ServiceRecord {
@@ -171,6 +162,36 @@ impl ServiceRecord {
             streams_cut: 0,
         }
     }
+
+    fn cut_for_write(&self, threshold: usize) -> i16 {
+        if self.streams_cut != UNKNOWN_STREAMS_CUT {
+            return self.streams_cut;
+        }
+        legacy_cut(
+            [
+                &self.logs_streams,
+                &self.traces_streams,
+                &self.metrics_streams,
+                &self.profiles_streams,
+            ]
+            .map(Some),
+            threshold,
+        )
+    }
+}
+
+/// Outcome of a [`put`]; a named struct so call sites cannot positionally confuse the two facts.
+#[must_use]
+#[derive(Debug, Clone)]
+pub struct PutOutcome {
+    /// `disambiguation` JSON of each orphaned lower-specificity row this put deleted (F19).
+    pub orphans: Vec<serde_json::Value>,
+    /// True iff a data column changed, a row inserted, or an orphan deleted; not last_seen alone.
+    pub changed: bool,
+    /// The row as stored after this put, so callers can cache it without re-reading.
+    pub stored: ServiceRecord,
+    /// The stored row's previous `disambiguation` when the upgrade branch rewrote it.
+    pub replaced_disambiguation: Option<serde_json::Value>,
 }
 
 /// Upsert a service record.
@@ -211,6 +232,28 @@ pub async fn put_with<C: TransactionTrait>(
     Ok(outcome)
 }
 
+pub(super) fn legacy_cut(lists: [Option<&serde_json::Value>; 4], threshold: usize) -> i16 {
+    let mut cut = 0;
+    for ((_, bit), list) in STREAMS_CUT_TYPES.into_iter().zip(lists) {
+        let Some(list) = list else { continue };
+        let Some(names) = list.as_array() else {
+            cut |= bit | STREAMS_CUT_OUTSIDE_FORM;
+            continue;
+        };
+        // A legacy list at the cap cannot prove that no name was dropped.
+        if names.len() >= threshold {
+            cut |= bit;
+        }
+        if names.iter().any(|name| {
+            name.as_str()
+                .is_none_or(|name| !config::utils::str::org_wide_grant_covers(name))
+        }) {
+            cut |= STREAMS_CUT_OUTSIDE_FORM;
+        }
+    }
+    cut
+}
+
 /// One transaction reads, merges and writes the row, so a concurrent writer cannot drop the
 /// lists or dimensions this one merged (OF-1).
 async fn put_in(
@@ -219,6 +262,7 @@ async fn put_in(
     mut record: ServiceRecord,
     max_streams_per_type: usize,
 ) -> Result<PutOutcome, errors::Error> {
+    record.streams_cut = record.cut_for_write(max_streams_per_type);
     crate::race_point!("service_streams.before_row_read");
     // Normalize disambiguation to sorted-key JSON so that text comparisons in SQLite
     // are stable regardless of insertion order of the original object.
@@ -496,10 +540,6 @@ async fn delete_subset_orphans<C: sea_orm::ConnectionTrait>(
     Ok(deleted)
 }
 
-/// Default cap on streams tracked per telemetry type, matching the enterprise
-/// `StreamMergePolicy` default. Used by callers that have no config access.
-pub const DEFAULT_MAX_STREAMS_PER_TYPE: usize = 50;
-
 /// Compares typed values, never serialized text: preserve_order builds would spuriously differ.
 fn set_if_dirty<T: Into<sea_orm::Value> + PartialEq>(
     slot: &mut sea_orm::ActiveValue<T>,
@@ -653,8 +693,17 @@ fn db_error(e: sea_orm::DbErr) -> Error {
     Error::DbError(DbError::SeaORMError(e.to_string()))
 }
 
-fn all_cut() -> i16 {
-    STREAMS_CUT_ALL
+fn unknown_cut() -> i16 {
+    UNKNOWN_STREAMS_CUT
+}
+
+fn serialize_cut<S: serde::Serializer>(cut: &i16, serializer: S) -> Result<S::Ok, S::Error> {
+    let cut = if *cut == UNKNOWN_STREAMS_CUT {
+        STREAMS_CUT_ALL
+    } else {
+        *cut
+    };
+    serializer.serialize_i16(cut)
 }
 
 /// List all services for an organization
@@ -739,7 +788,7 @@ pub async fn insert_for_tests<C: ConnectionTrait>(
             profiles_streams: Set(record.profiles_streams.clone()),
             field_name_mapping: Set(record.field_name_mapping.clone()),
             last_seen: Set(record.last_seen),
-            streams_cut: Set(record.streams_cut),
+            streams_cut: Set(record.cut_for_write(DEFAULT_MAX_STREAMS_PER_TYPE)),
         }
         .insert(conn)
         .await?;
@@ -2308,23 +2357,54 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn a_replicated_record_without_the_field_stores_31() {
-        let mut wire = serde_json::to_value(checkout(&["app_a"])).unwrap();
+    fn legacy_checkout(logs: &[&str]) -> ServiceRecord {
+        let mut wire = serde_json::to_value(checkout(logs)).unwrap();
         wire.as_object_mut().unwrap().remove("streams_cut");
-        let record: ServiceRecord = serde_json::from_value(wire).unwrap();
-        assert_eq!(record.streams_cut, STREAMS_CUT_ALL);
+        serde_json::from_value(wire).unwrap()
+    }
+
+    #[test]
+    fn a_legacy_record_fails_closed_before_put() {
+        use config::meta::service_streams::{CorrelateAccess, ServiceStreams, row_counts};
+
+        let record = legacy_checkout(&["app_a"]);
+        assert_eq!(record.streams_cut, UNKNOWN_STREAMS_CUT);
+        let logs = config::meta::stream::StreamType::Logs;
+        let lists = ServiceStreams {
+            logs: vec!["app_a".to_string()],
+            ..Default::default()
+        };
+        let access = CorrelateAccess::Restricted {
+            readable: [(logs, "app_a".to_string())].into(),
+            org_wide_types: STREAMS_CUT_TYPES
+                .into_iter()
+                .map(|(kind, _)| kind)
+                .collect(),
+        };
+        assert!(!row_counts(&lists, record.streams_cut, &access));
+        assert_eq!(
+            serde_json::to_value(record).unwrap()["streams_cut"],
+            STREAMS_CUT_ALL
+        );
+    }
+
+    #[tokio::test]
+    async fn a_legacy_record_only_marks_lists_that_may_have_been_cut() {
+        use config::meta::service_streams::STREAMS_CUT_LOGS;
         for db in backends_for_tests("cut_wire").await {
-            let _ = put_with(&db, "org1", record.clone(), 50).await.unwrap();
-            assert_eq!(stored(&db).await.streams_cut, STREAMS_CUT_ALL);
-            let _ = put_with(&db, "org1", checkout(&["app_a"]), 50)
+            let _ = put_with(&db, "org1", checkout(&["app_a"]), 3)
                 .await
                 .unwrap();
-            assert_eq!(
-                stored(&db).await.streams_cut,
-                STREAMS_CUT_ALL,
-                "never cleared"
-            );
+            let _ = put_with(&db, "org1", legacy_checkout(&["app_b"]), 3)
+                .await
+                .unwrap();
+            let row = stored(&db).await;
+            assert_eq!(logs_of(&row), ["app_a", "app_b"]);
+            assert_eq!(row.streams_cut, 0);
+
+            let record = legacy_checkout(&["app_a", "app_b", "app_c"]);
+            let _ = put_with(&db, "org1", record, 3).await.unwrap();
+            assert_eq!(stored(&db).await.streams_cut, STREAMS_CUT_LOGS);
         }
     }
 

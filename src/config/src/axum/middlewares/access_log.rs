@@ -40,8 +40,9 @@ const REDACTED_REQUEST_HEADERS: [&str; 7] = [
     "webhook-signature",
     "dd-api-key",
 ];
-/// Workflow hook credentials; a URL value starting with one, in any case or encoding, is cut.
-const HOOK_CREDENTIAL_PREFIXES: [&str; 2] = ["o2wh_", "whsec_"];
+/// Hook and incident integration credentials; a URL value starting with one, in any case or
+/// encoding, is cut.
+const HOOK_CREDENTIAL_PREFIXES: [&str; 3] = ["o2wh_", "whsec_", "o2iat_"];
 
 // Handle generic %{Header}i patterns for request headers
 static RE_REQ_HEADER: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"%\{([^}]+)\}i").unwrap());
@@ -560,6 +561,10 @@ mod tests {
                 "/api/v2/acme/workflows/hooks/t1/runs/r1?s=whsec_…#x".to_string(),
             ),
             (format!("/x/{secret}/y"), "/x/whsec_…/y".to_string()),
+            (
+                "/api/v2/acme/incidents/changes/o2iat_AbCdEf0123".to_string(),
+                "/api/v2/acme/incidents/changes/o2iat_…".to_string(),
+            ),
         ] {
             assert_eq!(mask_log_url(&url), masked);
             assert_eq!(mask_share_tokens(&url), masked);

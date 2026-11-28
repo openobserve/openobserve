@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
-    collections::{HashMap, hash_map::Entry},
+    collections::{BTreeSet, HashMap, hash_map::Entry},
     str::FromStr,
     sync::{
         Arc, LazyLock, Mutex,
@@ -29,14 +29,19 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use config::{
-    meta::alerts::{
-        alert::Alert,
-        incidents::{
-            AlertKind, CorrelationReason, IncidentEventType, IncidentTopology, affected_services,
+    meta::{
+        alerts::{
+            alert::Alert,
+            change_events::CHANGE_EVENTS_STREAM,
+            incidents::{
+                AlertKind, CorrelationReason, IncidentEventType, IncidentTopology,
+                affected_services,
+            },
+            what_changed::WhatChanged,
         },
-        what_changed::WhatChanged,
+        stream::StreamType,
     },
-    utils::time::now_micros,
+    utils::{sql::quote_identifier, time::now_micros},
 };
 use infra::{
     db::get_orm_client_rw,
@@ -51,7 +56,7 @@ use openobserve_core::alerts::what_changed::{
     ChangeAccess, ChangeScope, ChangeSources, PreparedRead,
 };
 use serde::Deserialize;
-use serde_json::json;
+use serde_json::{Value, json};
 use svix_ksuid::Ksuid;
 
 use super::{
@@ -104,17 +109,25 @@ struct BriefAccess {
 }
 
 impl BriefAccess {
-    fn fingerprint(&self, impact: &ImpactPlan, changes: &ChangeAccess) -> String {
-        canonical_sha256(&json!({
-            "streams": impact.readable_streams,
-            "slos": impact.readable_slos,
-            "impact_query_access": impact.query_access,
-            "impact_denials": impact.hidden,
-            "changes": changes,
-            "case_read": self.case_read,
-            "security_case": self.security_case,
-            "history_read": self.history_read,
-        }))
+    fn fingerprint(
+        &self,
+        impact: &ImpactPlan,
+        changes: &ChangeAccess,
+        raw_streams: &BTreeSet<String>,
+    ) -> String {
+        authorization_fingerprint(
+            json!({
+                "streams": impact.readable_streams,
+                "slos": impact.readable_slos,
+                "impact_query_access": impact.query_access,
+                "impact_denials": impact.hidden,
+                "changes": changes,
+                "case_read": self.case_read,
+                "security_case": self.security_case,
+                "history_read": self.history_read,
+            }),
+            raw_streams,
+        )
     }
 }
 
@@ -319,11 +332,50 @@ fn cache_slot(key: CacheKey) -> CacheSlot {
     cache.entry(key).or_default().clone()
 }
 
+fn authorization_fingerprint(mut access: Value, raw_streams: &BTreeSet<String>) -> String {
+    if !raw_streams.is_empty() {
+        access["raw_streams"] = json!(raw_streams);
+    }
+    canonical_sha256(&access)
+}
+
+async fn resolve_impact_raw(impact: &ImpactPlan, viewer: &str) -> BTreeSet<String> {
+    let mut raw_streams = BTreeSet::new();
+    for (org, stream_type, stream) in &impact.readable_streams {
+        let sql = format!("SELECT * FROM {}", quote_identifier(stream));
+        let raw = search_service::raw_streams::resolve(
+            org,
+            stream_type.as_str().into(),
+            &sql,
+            Some(viewer),
+        )
+        .await;
+        raw_streams.extend(raw.to_vec());
+    }
+    raw_streams
+}
+
+async fn include_change_events_raw(
+    mut raw_streams: BTreeSet<String>,
+    org: &str,
+    viewer: &str,
+    changes: &ChangeAccess,
+) -> BTreeSet<String> {
+    if changes.reads_change_events() {
+        let sql = format!("SELECT * FROM \"{CHANGE_EVENTS_STREAM}\"");
+        let raw =
+            search_service::raw_streams::resolve(org, StreamType::Logs, &sql, Some(viewer)).await;
+        raw_streams.extend(raw.to_vec());
+    }
+    raw_streams
+}
+
 async fn cached_brief(
     plan: &BriefPlan,
     access: &BriefAccess,
     viewer: &str,
     seq: i64,
+    impact_raw: &BTreeSet<String>,
 ) -> Option<Arc<Brief>> {
     let candidates = {
         let cache = BRIEF_CACHE
@@ -344,8 +396,11 @@ async fn cached_brief(
             continue;
         }
         let changes = cached.sources.access(&plan.incident.org_id, viewer).await;
+        let raw_streams =
+            include_change_events_raw(impact_raw.clone(), &plan.incident.org_id, viewer, &changes)
+                .await;
         if cached.expires > Instant::now()
-            && key.authorization == access.fingerprint(&plan.impact, &changes)
+            && key.authorization == access.fingerprint(&plan.impact, &changes, &raw_streams)
         {
             return Some(Arc::clone(&cached.body));
         }
@@ -360,8 +415,9 @@ async fn cache_brief(
     seq: i64,
     query: BriefQuery,
 ) -> anyhow::Result<Arc<Brief>> {
+    let impact_raw = resolve_impact_raw(&plan.impact, viewer).await;
     if !query.refresh
-        && let Some(cached) = cached_brief(&plan, access, viewer, seq).await
+        && let Some(cached) = cached_brief(&plan, access, viewer, seq, &impact_raw).await
     {
         return Ok(cached);
     }
@@ -374,11 +430,14 @@ async fn cache_brief(
         now_micros(),
     )
     .await;
+    let raw_streams =
+        include_change_events_raw(impact_raw, &plan.incident.org_id, viewer, changes.access())
+            .await;
     let slot = cache_slot(CacheKey {
         incident_id: plan.incident.id.clone(),
         seq,
         declared_no_alert: plan.declared_no_alert,
-        authorization: access.fingerprint(&plan.impact, changes.access()),
+        authorization: access.fingerprint(&plan.impact, changes.access(), &raw_streams),
     });
     let mut entry = slot.lock().await;
     if !query.refresh
@@ -390,7 +449,7 @@ async fn cache_brief(
     }
 
     let sources = changes.sources().clone();
-    let body = Arc::new(compute(plan, changes).await?);
+    let body = Arc::new(compute(plan, changes, &raw_streams).await?);
     *entry = Some(Arc::new(CacheEntry {
         expires: Instant::now() + BRIEF_TTL,
         body: Arc::clone(&body),
@@ -399,7 +458,11 @@ async fn cache_brief(
     Ok(body)
 }
 
-async fn compute(plan: BriefPlan, changes: PreparedRead) -> anyhow::Result<Brief> {
+async fn compute(
+    plan: BriefPlan,
+    changes: PreparedRead,
+    raw_streams: &BTreeSet<String>,
+) -> anyhow::Result<Brief> {
     let BriefPlan {
         incident,
         grouping,
@@ -409,9 +472,9 @@ async fn compute(plan: BriefPlan, changes: PreparedRead) -> anyhow::Result<Brief
     } = plan;
     let computed_at = next_computed_at();
     let onset = impact.onset;
-    let (result, evidence_against_impact) = impact.read(computed_at).await;
+    let (result, evidence_against_impact) = impact.read(computed_at, raw_streams).await;
     let mut hidden = impact.hidden;
-    let WhatChanged { changes, coverage } = changes::read(changes, &mut hidden).await;
+    let WhatChanged { changes, coverage } = changes::read(changes, &mut hidden, raw_streams).await;
     let responders = read_responders(&incident.org_id, &incident.id).await?;
     let owner = Owner {
         team_id: incident.owner_team_id,
@@ -483,4 +546,18 @@ fn next_computed_at() -> i64 {
         })
         .unwrap_or_else(|last| last);
     advance(last)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_brief_fingerprint_distinguishes_raw_access() {
+        let access = json!({"streams": [["org", "logs", "app"]]});
+        let redacted = authorization_fingerprint(access.clone(), &BTreeSet::new());
+        assert_eq!(redacted, canonical_sha256(&access));
+        let raw = BTreeSet::from(["logs/app".to_string()]);
+        assert_ne!(redacted, authorization_fingerprint(access, &raw));
+    }
 }

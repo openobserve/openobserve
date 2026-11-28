@@ -16,16 +16,30 @@
 //! The create branch of correlation: a firing that found no incident takes its lane's lock,
 //! looks again under it, and opens an incident only if the second look also finds none.
 
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    hash::{DefaultHasher, Hash, Hasher},
+    time::Duration,
+};
 
 use config::meta::alerts::incidents::KeyType;
-use infra::table::{
-    alert_incidents::{self as table, CaseActivity, CaseFilter, Opening},
-    entity::alert_incidents::Model,
+use infra::{
+    errors::{DbError, Error},
+    table::{
+        alert_incidents::{
+            self as table, CORRELATION_LOCK_TIMEOUT_SECS, CaseActivity, CaseFilter, Opening,
+        },
+        entity::alert_incidents::Model,
+    },
 };
-use sea_orm::TransactionTrait;
+use sea_orm::{ConnectionTrait, DbBackend, TransactionTrait};
+use tokio::sync::{Mutex, MutexGuard};
 
 use super::{Correlation, CorrelationSubject};
+
+const CORRELATION_LOCK_STRIPES: usize = 1024;
+static CORRELATION_LOCKS: [Mutex<()>; CORRELATION_LOCK_STRIPES] =
+    [const { Mutex::const_new(()) }; CORRELATION_LOCK_STRIPES];
 
 /// The lookup a firing missed, which its create re-runs under the lock.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -127,8 +141,14 @@ pub(super) async fn open_rechecked(
     service_name: &str,
 ) -> Result<Opened, anyhow::Error> {
     let db = infra::db::get_orm_client_rw().await;
-    let txn = db.begin().await?;
     let key = recheck.lane.lock_key(new.org_id, &new.subject.id);
+    // Wait before checkout so a hot key cannot fill the pool with advisory-lock waiters.
+    let local_lock = if db.get_database_backend() == DbBackend::Postgres {
+        Some(lock_local(&key).await?)
+    } else {
+        None
+    };
+    let txn = db.begin().await?;
     table::lock_correlation(&txn, &key).await?;
     let (subject, pairs) = (new.subject, PairRead::OnConnection);
     let found = look(
@@ -150,6 +170,7 @@ pub(super) async fn open_rechecked(
         Opening::Opened(_) => txn.commit().await?,
         _ => txn.rollback().await?,
     }
+    drop(local_lock);
     let outcome = super::settle_opening(new, opening, service_name).await?;
     Ok(Opened::Correlated(Correlation::opened(outcome)))
 }
@@ -196,6 +217,22 @@ pub(super) async fn look<C: sea_orm::ConnectionTrait>(
         }
     };
     Ok(exact.map(|incident| Found::Exact(Box::new(incident))))
+}
+
+async fn lock_local(key: &str) -> Result<MutexGuard<'static, ()>, Error> {
+    let mut hasher = DefaultHasher::new();
+    key.hash(&mut hasher);
+    let stripe = (hasher.finish() % CORRELATION_LOCK_STRIPES as u64) as usize;
+    tokio::time::timeout(
+        Duration::from_secs(CORRELATION_LOCK_TIMEOUT_SECS),
+        CORRELATION_LOCKS[stripe].lock(),
+    )
+    .await
+    .map_err(|_| {
+        Error::DbError(DbError::SeaORMError(
+            "incident correlation lock timeout".to_string(),
+        ))
+    })
 }
 
 /// The incident row, its empty events row and its first firing, written in `txn`.
@@ -302,6 +339,20 @@ mod tests {
         Together,
         FirstThenSecond,
         SecondThenFirst,
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn local_ops_lock_serializes_the_org_and_times_out() {
+        let key = Lane::Ops.lock_key("local-lock-test", "first");
+        let turn = lock_local(&key).await.unwrap();
+        let start = tokio::time::Instant::now();
+        let other_key = Lane::Ops.lock_key("local-lock-test", "second");
+        let error = lock_local(&other_key).await.unwrap_err();
+        assert!(matches!(error, Error::DbError(DbError::SeaORMError(_))));
+        let timeout = Duration::from_secs(CORRELATION_LOCK_TIMEOUT_SECS);
+        assert!((timeout..timeout + Duration::from_secs(1)).contains(&start.elapsed()));
+        drop(turn);
+        assert!(lock_local(&other_key).await.is_ok());
     }
 
     /// The global meta store CI configures through `ZO_META_STORE`, migrated once per binary.

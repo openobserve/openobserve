@@ -32,10 +32,11 @@ use config::meta::alerts::{
     rca_runs::{V1_PREVIOUS_REPORTS_KEY, V1_REPORT_KEY},
     recovery::transitions::RecoveryEvent,
 };
+use futures::TryStreamExt;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait,
     PaginatorTrait, QueryFilter, QueryOrder, QuerySelect, QueryTrait, RelationTrait, Set,
-    TransactionTrait, TryIntoModel,
+    StreamTrait, TransactionTrait, TryIntoModel,
     sea_query::{Expr, JoinType, LockType, Query, SimpleExpr},
 };
 use svix_ksuid::KsuidLike;
@@ -66,7 +67,7 @@ use crate::{
 };
 
 /// A stalled lock holder must fail the create instead of tying up waiters' connections.
-const CORRELATION_LOCK_TIMEOUT_SECS: u64 = 30;
+pub const CORRELATION_LOCK_TIMEOUT_SECS: u64 = 30;
 
 #[derive(Debug, sea_orm::FromQueryResult)]
 pub struct CorrelationCandidate {
@@ -2090,7 +2091,7 @@ pub async fn list_page(
 
 /// [`list_page`] on a given connection. Without `keep` the page, `total` and the counts are
 /// read in SQL; with it every SQL-kept row is read once, so all three come from one pass.
-pub async fn list_page_with<C: ConnectionTrait>(
+pub async fn list_page_with<C: ConnectionTrait + StreamTrait>(
     client: &C,
     org_id: &str,
     query: &ListPageQuery,
@@ -3573,21 +3574,25 @@ async fn list_page_sql<C: ConnectionTrait>(
     Ok(page)
 }
 
-async fn list_page_kept<C: ConnectionTrait>(
+async fn list_page_kept<C: ConnectionTrait + StreamTrait>(
     client: &C,
     org_id: &str,
     query: &ListPageQuery,
     keep: &ListKeep<'_>,
 ) -> Result<ListPage, errors::Error> {
-    let candidates = list_page_candidates(query, org_id)
+    let mut candidates = list_page_candidates(query, org_id)
         .into_model::<CandidateRow>()
-        .all(client)
+        .stream(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
     let mut page = ListPage::default();
     let mut picked = Vec::new();
     let mut skipped = 0;
-    for row in candidates {
+    while let Some(row) = candidates
+        .try_next()
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?
+    {
         let key = query.sort.column.key(
             (row.last_alert_at, row.first_alert_at, row.alert_count),
             &row.severity,
@@ -3619,6 +3624,9 @@ async fn list_page_kept<C: ConnectionTrait>(
         }
         picked.push((candidate.id, key));
     }
+    drop(candidates);
+    crate::race_point!("alert_incidents.list_before_reread");
+    crate::race_point!("alert_incidents.list_resume_reread");
     let more = picked.len() as u64 > query.limit;
     picked.truncate(query.limit as usize);
     // The cursor keeps the key the pass ordered by; the re-read below may see a newer one.
@@ -5082,36 +5090,35 @@ mod tests {
         }
     }
 
-    // The keep closure runs between the pass and the re-read, so it can move a picked row.
-    #[tokio::test(flavor = "multi_thread")]
+    #[tokio::test]
     async fn a_list_cursor_keeps_the_key_its_page_was_picked_by() {
         for (backend, db, schema) in list_backends().await {
             let a = listed(&db, "P2", "open", 60, |_| {}).await;
             let b = listed(&db, "P2", "open", 50, |_| {}).await;
             let c = listed(&db, "P2", "open", 40, |_| {}).await;
             let d = listed(&db, "P2", "open", 30, |_| {}).await;
-            let bumped = std::sync::atomic::AtomicBool::new(false);
-            let bump_b = |_: &ListCandidate| {
-                if !bumped.swap(true, std::sync::atomic::Ordering::SeqCst) {
-                    tokio::task::block_in_place(|| {
-                        tokio::runtime::Handle::current().block_on(async {
-                            alert_incidents::Entity::update_many()
-                                .col_expr(alert_incidents::Column::LastAlertAt, Expr::value(90))
-                                .filter(alert_incidents::Column::Id.eq(b.as_str()))
-                                .exec(&db)
-                                .await
-                                .unwrap();
-                        })
-                    });
-                }
-                true
-            };
             let mut query = ListPageQuery {
                 limit: 2,
                 ..Default::default()
             };
-            let (first, page) = page_of(&db, &query, Some(&bump_b)).await;
+            let race = crate::race::Barriers::new();
+            race.arm("alert_incidents.list_before_reread", 2)
+                .arm("alert_incidents.list_resume_reread", 2);
+            let read = race.run(page_of(&db, &query, Some(&|_: &ListCandidate| true)));
+            let bump = async {
+                race.wait("alert_incidents.list_before_reread").await;
+                alert_incidents::Entity::update_many()
+                    .col_expr(alert_incidents::Column::LastAlertAt, Expr::value(90))
+                    .filter(alert_incidents::Column::Id.eq(b.as_str()))
+                    .exec(&db)
+                    .await
+                    .unwrap();
+                race.wait("alert_incidents.list_resume_reread").await;
+            };
+            let ((first, page), ()) = tokio::join!(read, bump);
+            race.assert_all_met();
             assert_eq!(first, [a.clone(), b.clone()], "{backend}");
+            assert_eq!(page.rows[1].last_alert_at, 90, "{backend}");
             let next = page.next.unwrap();
             assert_eq!(
                 (next.key.clone(), next.id.clone()),
@@ -5121,7 +5128,17 @@ mod tests {
 
             query.after = Some(next);
             let (second, _) = page_of(&db, &query, None).await;
-            assert_eq!(second, [c, d], "{backend}: page 1's rows are not repeated");
+            assert_eq!(
+                second,
+                [c, d.clone()],
+                "{backend}: page 1's rows are not repeated"
+            );
+            query.offset = 1;
+            let (offset, page) = page_of(&db, &query, Some(&|_: &ListCandidate| true)).await;
+            assert_eq!(offset, [d], "{backend}");
+            assert_eq!(page.total, 4, "{backend}");
+            assert_eq!(page.counts_by_severity, [0, 4, 0, 0], "{backend}");
+            assert_eq!(page.next, None, "{backend}");
             drop_list_schema(schema).await;
         }
     }
