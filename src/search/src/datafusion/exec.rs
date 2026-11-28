@@ -602,7 +602,7 @@ impl TableBuilder {
         self
     }
 
-    /// apply timestamp filter to the table
+    /// Filters rows to `[start, end)` in the files whose time range reaches outside it.
     pub fn timestamp_filter(mut self, timestamp_filter: (i64, i64)) -> Self {
         self.timestamp_filter = Some(timestamp_filter);
         self
@@ -631,65 +631,66 @@ impl TableBuilder {
         )
         .await?;
 
-        // Group files by format
-        let mut parquet_files = Vec::new();
-        let mut vortex_files = Vec::new();
-
-        for file in files {
-            match FileFormat::from_extension(&file.key) {
-                Some(FileFormat::Vortex) => vortex_files.push(file),
-                _ => parquet_files.push(file), // Default to parquet
-            }
-        }
-
-        log::info!(
-            "[trace_id: {}] parquet_files numbers: {}, vortex_files numbers: {}",
-            session.id,
-            parquet_files.len(),
-            vortex_files.len()
-        );
-
-        // Build table providers for each format
-        let mut tables: Vec<Arc<dyn TableProvider>> = Vec::new();
-
-        if !parquet_files.is_empty() {
+        let total_files = files.len();
+        let parts = self.split_files(files);
+        let mut tables: Vec<Arc<dyn TableProvider>> = Vec::with_capacity(parts.len());
+        for part in parts {
+            let part_partitions =
+                part_target_partitions(target_partitions, part.files.len(), total_files);
+            log::info!(
+                "[trace_id: {}] scan part format: {:?}, timestamp_filter: {}, files: {}, target_partitions: {part_partitions}",
+                session.id,
+                part.format,
+                part.timestamp_filter.is_some(),
+                part.files.len(),
+            );
             let table = self
-                .build_table_for_format(
-                    session.clone(),
-                    parquet_files,
-                    schema.clone(),
-                    FileFormat::Parquet,
-                    target_partitions,
-                )
+                .build_part_table(&session, part, schema.clone(), part_partitions)
                 .await?;
             tables.push(table);
         }
-
-        if !vortex_files.is_empty() {
-            let table = self
-                .build_table_for_format(
-                    session.clone(),
-                    vortex_files,
-                    schema.clone(),
-                    FileFormat::Vortex,
-                    target_partitions,
-                )
-                .await?;
-            tables.push(table);
-        }
-
         Ok(tables)
     }
 
-    async fn build_table_for_format(
+    /// Groups the files by how they are read: by format, and by whether rows
+    /// outside the time range must be filtered.
+    fn split_files(&self, files: Vec<FileKey>) -> Vec<ScanPart> {
+        let mut parts: Vec<ScanPart> = Vec::new();
+        for file in files {
+            let format = match FileFormat::from_extension(&file.key) {
+                Some(FileFormat::Vortex) => FileFormat::Vortex,
+                _ => FileFormat::Parquet,
+            };
+            let timestamp_filter = self
+                .timestamp_filter
+                .filter(|(start, end)| file.meta.min_ts < *start || file.meta.max_ts >= *end);
+            match parts
+                .iter_mut()
+                .find(|p| p.format == format && p.timestamp_filter == timestamp_filter)
+            {
+                Some(part) => part.files.push(file),
+                None => parts.push(ScanPart {
+                    format,
+                    timestamp_filter,
+                    files: vec![file],
+                }),
+            }
+        }
+        parts
+    }
+
+    async fn build_part_table(
         &self,
-        session: SearchSession,
-        files: Vec<FileKey>,
+        session: &SearchSession,
+        part: ScanPart,
         schema: Arc<Schema>,
-        format: FileFormat,
         target_partitions: usize,
     ) -> Result<Arc<dyn TableProvider>> {
-        // Configure listing options with the appropriate file format
+        let ScanPart {
+            format,
+            timestamp_filter,
+            files,
+        } = part;
         let file_format: Arc<dyn DataFusionFileFormat> = match format {
             FileFormat::Parquet => Arc::new(ParquetFormat::default()),
             FileFormat::Vortex => {
@@ -715,7 +716,12 @@ impl TableBuilder {
 
         let schema_key = schema.hash_key();
         let format = format.extension();
-        let trace_id = &session.id;
+        // file_list keys files by trace id, schema and format, so two parts of one
+        // format need different trace ids
+        let trace_id = &match timestamp_filter {
+            Some(_) => format!("{}-ts", session.id),
+            None => session.id.clone(),
+        };
         let prefix = match session.storage_type {
             StorageType::Memory => {
                 file_list::set(trace_id, &schema_key, format, files).await;
@@ -761,11 +767,11 @@ impl TableBuilder {
         config = config.with_expr_adapter_factory(Arc::new(DefaultPhysicalExprAdapterFactory {}));
         let mut table = ListingTableAdapter::try_new(
             config,
-            session.id.clone(),
+            trace_id.clone(),
             self.sort_order,
             self.index_condition.clone(),
             self.fst_fields.clone(),
-            self.timestamp_filter,
+            timestamp_filter,
             target_partitions,
         )?;
         if self.file_stat_cache.is_some() {
@@ -773,6 +779,13 @@ impl TableBuilder {
         }
         Ok(Arc::new(table))
     }
+}
+
+/// Files that are read the same way: one format and one set of filters.
+struct ScanPart {
+    format: FileFormat,
+    timestamp_filter: Option<(i64, i64)>,
+    files: Vec<FileKey>,
 }
 
 #[cfg(feature = "enterprise")]
@@ -803,6 +816,17 @@ async fn get_cpu_and_mem_limit(
     );
 
     Ok((target_partitions, memory_size))
+}
+
+/// Gives a part its share of the scan partitions by file count, at least one.
+fn part_target_partitions(
+    target_partitions: usize,
+    part_files: usize,
+    total_files: usize,
+) -> usize {
+    (target_partitions * part_files)
+        .div_ceil(total_files.max(1))
+        .max(1)
 }
 
 #[cfg(test)]
@@ -1388,6 +1412,120 @@ mod tests {
     fn test_table_builder_timestamp_filter() {
         let builder = TableBuilder::new().timestamp_filter((100, 200));
         assert_eq!(builder.timestamp_filter, Some((100, 200)));
+    }
+
+    fn file_in(key: &str, min_ts: i64, max_ts: i64) -> FileKey {
+        let mut file = FileKey::from_file_name(key);
+        file.meta.min_ts = min_ts;
+        file.meta.max_ts = max_ts;
+        file
+    }
+
+    fn part_summary(parts: &[ScanPart]) -> Vec<(FileFormat, bool, Vec<&str>)> {
+        parts
+            .iter()
+            .map(|p| {
+                (
+                    p.format,
+                    p.timestamp_filter.is_some(),
+                    p.files.iter().map(|f| f.key.as_str()).collect(),
+                )
+            })
+            .collect()
+    }
+
+    #[test]
+    fn test_split_files_by_format_and_time_range() {
+        let files = vec![
+            file_in("inside.parquet", 100, 199),
+            file_in("starts_early.parquet", 99, 150),
+            file_in("inside.vortex", 120, 180),
+            file_in("ends_late.vortex", 150, 200),
+            file_in("inside2.parquet", 150, 160),
+        ];
+        let builder = TableBuilder::new().timestamp_filter((100, 200));
+        let parts = builder.split_files(files.clone());
+        assert_eq!(
+            part_summary(&parts),
+            vec![
+                (
+                    FileFormat::Parquet,
+                    false,
+                    vec!["inside.parquet", "inside2.parquet"]
+                ),
+                (FileFormat::Parquet, true, vec!["starts_early.parquet"]),
+                (FileFormat::Vortex, false, vec!["inside.vortex"]),
+                (FileFormat::Vortex, true, vec!["ends_late.vortex"]),
+            ]
+        );
+        assert!(
+            parts
+                .iter()
+                .filter_map(|p| p.timestamp_filter)
+                .all(|range| range == (100, 200))
+        );
+
+        let parts = TableBuilder::new().split_files(files);
+        assert_eq!(
+            part_summary(&parts),
+            vec![
+                (
+                    FileFormat::Parquet,
+                    false,
+                    vec!["inside.parquet", "starts_early.parquet", "inside2.parquet"]
+                ),
+                (
+                    FileFormat::Vortex,
+                    false,
+                    vec!["inside.vortex", "ends_late.vortex"]
+                ),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_part_target_partitions() {
+        assert_eq!(part_target_partitions(16, 100, 100), 16);
+        assert_eq!(part_target_partitions(16, 98, 100), 16);
+        assert_eq!(part_target_partitions(16, 2, 100), 1);
+        assert_eq!(part_target_partitions(16, 50, 100), 8);
+        assert_eq!(part_target_partitions(4, 1, 3), 2);
+        assert_eq!(part_target_partitions(4, 0, 0), 1);
+    }
+
+    #[tokio::test]
+    async fn test_build_registers_each_part_under_its_own_key() -> Result<()> {
+        let session = SearchSession {
+            id: "test-build-parts".to_string(),
+            storage_type: StorageType::Memory,
+            target_partitions: 8,
+            work_group: None,
+        };
+        let schema = create_test_schema();
+        let files = vec![
+            file_in("a.parquet", 100, 199),
+            file_in("b.parquet", 50, 150),
+            file_in("c.parquet", 120, 130),
+        ];
+        let tables = TableBuilder::new()
+            .timestamp_filter((100, 200))
+            .build(session, files, schema.clone())
+            .await?;
+        assert_eq!(tables.len(), 2);
+
+        let schema_key = schema.hash_key();
+        let listed = |trace_id: &str| {
+            file_list::get(&format!(
+                "{trace_id}/schema={schema_key}/format={}",
+                FileFormat::Parquet.extension()
+            ))
+            .unwrap()
+            .len()
+        };
+        assert_eq!(listed("test-build-parts"), 2);
+        assert_eq!(listed("test-build-parts-ts"), 1);
+        file_list::clear("test-build-parts");
+        Ok(())
     }
 
     #[tokio::test]
