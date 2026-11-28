@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+#[cfg(all(test, feature = "enterprise"))]
+mod authz_calls_tests;
 pub mod decompression;
 pub mod middlewares;
 #[cfg(all(test, feature = "enterprise"))]
@@ -1045,6 +1047,17 @@ pub async fn assistant_approval_middleware(request: Request, next: Next) -> Resp
             common::meta::http::HttpResponse::forbidden(refused.to_string())
         }
     }
+}
+
+/// Counts the OpenFGA calls of one request under its matched route template.
+#[cfg(feature = "enterprise")]
+pub async fn authz_calls_middleware(request: Request, next: Next) -> Response {
+    let route = request
+        .extensions()
+        .get::<MatchedPath>()
+        .map_or("unmatched", MatchedPath::as_str)
+        .to_string();
+    openobserve_core::authz::accounting::count_request(&route, next.run(request)).await
 }
 
 /// Handler for /metrics endpoint
@@ -3423,6 +3436,11 @@ pub fn create_app_router(ui_routes: fn(&str) -> Router) -> Router {
     app = app
         .layer(cors_layer())
         .layer(DefaultBodyLimit::max(cfg.limit.req_payload_limit));
+    // Outside every `auth_middleware`, so the route Check is counted with the handler's calls.
+    #[cfg(feature = "enterprise")]
+    {
+        app = app.layer(middleware::from_fn(authz_calls_middleware));
+    }
 
     // Apply base_uri if configured
     let mut outer = if cfg.common.base_uri.is_empty() || cfg.common.base_uri == "/" {

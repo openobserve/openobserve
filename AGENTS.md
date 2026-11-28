@@ -77,6 +77,8 @@ Item order inside a file/module, top to bottom (clippy's default grouping):
   lint with the `source-item-ordering = ["module"]` config in clippy.toml. The
   lint is opt-in (too much pre-existing debt to enable repo-wide); hold the code
   you add to this order even though nothing enforces it yet.
+- Authorize multiple streams or objects through `openobserve_core::authz::list` (`authorize_objects`, `readable_streams`).
+  Never loop per-object permission checks over a collection that grows with the org.
 
 ## Comments
 

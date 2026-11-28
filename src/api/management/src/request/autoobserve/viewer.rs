@@ -26,13 +26,13 @@ use o2_enterprise::enterprise::autoobserve::{
 };
 use openobserve_core::{
     auth::check_permissions,
-    authz::{StreamReadMemo, active_checker, readable_service_records},
+    authz::{StreamReadMemo, active_checker, legacy_readable_service_records},
     autoobserve::causes::deploy::{EVIDENCE, EVIDENCE_OVERFLOW},
     background_access::rbac_enforced,
     service_identity::access,
 };
 
-use super::{PERMISSION_CHECK_CONCURRENCY, readable_streams, readable_subjects};
+use super::{PERMISSION_CHECK_CONCURRENCY, raw_readable_streams, readable_subjects};
 use crate::request::{organization::require_credential_access, security::security_allowed};
 
 /// The read check each subject kind's own GET route makes.
@@ -79,7 +79,7 @@ struct LiveRights<'a> {
 #[async_trait]
 impl ReadRights for LiveRights<'_> {
     async fn streams(&self, ids: Vec<(String, String)>) -> Vec<bool> {
-        readable_streams(self.org_id, self.user_id, ids).await
+        raw_readable_streams(self.org_id, self.user_id, ids).await
     }
 
     async fn alerts(&self, subjects: Vec<EntityRef>) -> Vec<bool> {
@@ -145,7 +145,7 @@ impl ReadRights for LiveRights<'_> {
             .collect();
         let checker = active_checker();
         let readable: BTreeSet<String> =
-            readable_service_records(checker.as_ref(), self.user_id, self.org_id, wanted)
+            legacy_readable_service_records(checker.as_ref(), self.user_id, self.org_id, wanted)
                 .await
                 .into_iter()
                 .map(|r| r.service_name)

@@ -18,6 +18,15 @@
 //! and the server-vantage prologue every feature module builds on.
 
 use config::utils::time::validate_time_range;
+#[cfg(feature = "enterprise")]
+use openobserve_core::authz::{
+    StreamAccessChecker,
+    list::{
+        AuthzUnavailable, LegacyChecks, ObjectRef, ObjectsQuery, OrgWideCheck, Scope, StreamSet,
+        TodayChecks, authz_unavailable_response, db_monitoring_query, legacy_readable_streams,
+        objects_in_mode,
+    },
+};
 use openobserve_core::http::map_error_to_http_response;
 
 // The models these pull in are named only from enterprise-gated bodies, so the
@@ -25,6 +34,15 @@ use openobserve_core::http::map_error_to_http_response;
 // silence the OSS-only lint rather than splitting it behind a cfg.
 #[cfg_attr(not(feature = "enterprise"), allow(unused_imports))]
 use super::{super::models::*, *};
+
+#[cfg(feature = "enterprise")]
+const DBM_MODULE_READ_CHECK: OrgWideCheck<'static> = OrgWideCheck {
+    resource: "db_monitoring",
+    permission: "GET",
+    use_all_org: true,
+    use_self_context: false,
+    use_self_parent: false,
+};
 
 /// Runs before any auth or read: the module grant would cover whatever stream name it is given.
 pub(super) fn validate_server_stream(
@@ -1048,13 +1066,13 @@ pub(super) async fn involved_streams(
     user_id: &str,
     stream_param: Option<&String>,
     rollup_rows: &[&[Value]],
-) -> Option<Vec<String>> {
+) -> Result<Option<Vec<String>>, HttpResponse> {
     if let Some(s) = stream_param {
         return if can_read_stream(org_id, user_id, s, required_stream_for(DbmVantage::Client)).await
         {
-            Some(vec![s.clone()])
+            Ok(Some(vec![s.clone()]))
         } else {
-            None
+            Ok(None)
         };
     }
     let mut set: BTreeSet<String> = BTreeSet::new();
@@ -1077,35 +1095,24 @@ pub(super) async fn involved_streams(
     }
 
     let streams: Vec<String> = set.into_iter().collect();
-    Some(
-        readable_among(
-            org_id,
-            user_id,
-            streams,
-            required_stream_for(DbmVantage::Client),
-        )
-        .await,
-    )
-}
-
-/// [`can_read_stream`] over many streams, with the module grant asked once.
-async fn readable_among(
-    org_id: &str,
-    user_id: &str,
-    streams: Vec<String>,
-    stream_type: StreamType,
-) -> Vec<String> {
     #[cfg(feature = "enterprise")]
     {
-        if !get_openfga_config().enabled || module_grant(org_id, user_id).await {
-            return streams;
-        }
-        stream_grants(org_id, user_id, streams, stream_type).await
+        let checker = openobserve_core::authz::active_checker();
+        let stream_types = [required_stream_for(DbmVantage::Client)];
+        involved_readable(
+            checker.as_ref(),
+            &TodayChecks,
+            &db_monitoring_query(org_id, user_id, &stream_types),
+            streams,
+            get_openfga_config().enabled,
+        )
+        .await
+        .map(Some)
+        .map_err(authz_unavailable_response)
     }
     #[cfg(not(feature = "enterprise"))]
     {
-        let _ = (org_id, user_id, stream_type);
-        streams
+        Ok(Some(streams))
     }
 }
 
@@ -2200,6 +2207,13 @@ pub(super) fn is_forbidden(resp: &HttpResponse) -> bool {
     resp.status() == axum::http::StatusCode::FORBIDDEN
 }
 
+#[cfg(feature = "enterprise")]
+pub(super) fn is_authz_unavailable(resp: &HttpResponse) -> bool {
+    resp.headers()
+        .get("x-o2-authz")
+        .is_some_and(|value| value == "unavailable")
+}
+
 /// The `(stream, schema)` prologue the deadlocks / blocking / activity bodies
 /// each compute for the shared server-vantage stream: read permission plus the
 /// present-column set. Under the badges fan-in all three ask about the SAME
@@ -2236,6 +2250,58 @@ pub(super) async fn server_prologue(org_id: &str, user_id: &str) -> Option<DbmSe
     }
 }
 
+#[cfg(feature = "enterprise")]
+pub(crate) async fn involved_readable(
+    checker: &dyn StreamAccessChecker,
+    checks: &dyn LegacyChecks,
+    query: &ObjectsQuery<'_>,
+    streams: Vec<String>,
+    openfga_enabled: bool,
+) -> Result<Vec<String>, AuthzUnavailable> {
+    if streams.is_empty() {
+        return Ok(streams);
+    }
+    let stream_type = required_stream_for(DbmVantage::Client);
+    let objects: Vec<_> = streams
+        .iter()
+        .map(|name| ObjectRef::stream(stream_type, name))
+        .collect();
+    let readable = objects_in_mode(checker, query, &objects, &Scope::every(), |objects| {
+        legacy_involved_readable(checker, checks, query, objects, openfga_enabled)
+    })
+    .await?;
+    Ok(streams
+        .into_iter()
+        .filter(|name| {
+            readable
+                .as_ref()
+                .is_none_or(|set| set.contains(&(stream_type, name.clone())))
+        })
+        .collect())
+}
+
+#[cfg(feature = "enterprise")]
+async fn legacy_involved_readable(
+    checker: &dyn StreamAccessChecker,
+    checks: &dyn LegacyChecks,
+    query: &ObjectsQuery<'_>,
+    objects: Vec<ObjectRef<'_>>,
+    openfga_enabled: bool,
+) -> Option<StreamSet> {
+    if !openfga_enabled
+        || checks
+            .org_wide(query.org_id, query.user_id, &DBM_MODULE_READ_CHECK)
+            .await
+    {
+        return None;
+    }
+    let wanted = objects
+        .into_iter()
+        .map(|object| (object.stream_type, object.id.to_string()))
+        .collect();
+    legacy_readable_streams(checker, query.user_id, query.org_id, wanted).await
+}
+
 // ─── Badges (`/badges`) — the tab strip's one fan-in ─────────────────────────
 //
 // Every DBM route renders the SAME seven-tab strip, and the strip's badges
@@ -2257,6 +2323,350 @@ pub(super) async fn server_prologue(org_id: &str, user_id: &str) -> Option<DbmSe
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "enterprise")]
+    mod involved_streams_authz {
+        use openobserve_core::authz::{
+            FakeStreamChecker, TypedStream, fake_checker,
+            list::{
+                Bypass, CheckerChecks, Identity, ListMode, SITE_DB_MONITORING, UnavailableReason,
+            },
+            within_budget,
+        };
+
+        use super::*;
+        use crate::request::service_streams::tests::{
+            SHADOW_TESTS, assert_authz_unavailable, shadow_list_counts,
+        };
+
+        const ORG: &str = "dbm-list-org";
+        const TYPES: [StreamType; 1] = [required_stream_for(DbmVantage::Client)];
+        const DBM_PRELUDE_CALLS: u32 = 1;
+        const SHARED_C_PROBE: u32 = 1;
+        const B_PROBES_AND_LIST: u32 = 2 + 1;
+        const LIST_CALL_CAP: u32 = DBM_PRELUDE_CALLS + SHARED_C_PROBE + B_PROBES_AND_LIST;
+
+        fn streams() -> Vec<String> {
+            ["allowed", "denied"].map(String::from).to_vec()
+        }
+
+        fn grant(fake: &FakeStreamChecker, user: &str) {
+            fake.grant_read(
+                user,
+                &TypedStream {
+                    org_id: ORG.to_string(),
+                    stream_type: StreamType::Traces,
+                    name: "allowed".to_string(),
+                },
+            );
+        }
+
+        async fn readable(
+            fake: &FakeStreamChecker,
+            user: &str,
+            streams: Vec<String>,
+        ) -> Result<Vec<String>, AuthzUnavailable> {
+            involved_readable(
+                fake,
+                &CheckerChecks(fake),
+                &db_monitoring_query(ORG, user, &TYPES),
+                streams,
+                true,
+            )
+            .await
+        }
+
+        #[test]
+        fn involved_query_matches_the_live_stream_check() {
+            let query = db_monitoring_query(ORG, "user", &TYPES);
+            assert_eq!(query.permission, "GET");
+            assert_eq!(query.identity, Identity::StoredEmail);
+            assert_eq!(query.bypass, Bypass::RbacOffRootOrOrgAdmin);
+            assert!(query.use_self_parent);
+            assert!(!query.use_self_context);
+            assert!(!query.use_all_org);
+            assert!(query.parent_id.is_empty());
+        }
+
+        #[tokio::test]
+        async fn empty_stream_set_sends_no_call_in_any_mode() {
+            let _slot = SHADOW_TESTS.lock().await;
+            for (user, mode) in [
+                ("dbm-empty-off", ListMode::Off),
+                ("dbm-empty-shadow", ListMode::Shadow),
+                ("dbm-empty-on", ListMode::On),
+            ] {
+                let fake = FakeStreamChecker::default();
+                fake.set_list_mode(user, mode);
+                if mode == ListMode::Shadow {
+                    fake.set_shadow_sample(user, 1.0);
+                }
+                fake.fail_org_wide_check_once(user, UnavailableReason::Timeout);
+                assert_eq!(
+                    within_budget(0, readable(&fake, user, vec![])).await,
+                    Ok(vec![])
+                );
+                assert_eq!(fake.calls(user).total(), 0);
+                assert!(fake.calls(user).org_wide.is_empty());
+                assert_eq!(fake.calls(user).streams, 0);
+            }
+        }
+
+        #[tokio::test]
+        async fn on_matches_off_for_each_role() {
+            for (user, role, expected) in [
+                ("dbm-user", "user", vec!["allowed"]),
+                ("dbm-custom", "custom", vec!["allowed"]),
+                ("dbm-editor", "editor", vec!["allowed", "denied"]),
+                (ORG, "admin", vec!["allowed", "denied"]),
+            ] {
+                let fake = FakeStreamChecker::default();
+                fake.set_role(ORG, user, role);
+                if role == "admin" {
+                    fake.grant_admin(ORG, user);
+                }
+                grant(&fake, user);
+                let off = within_budget(4, readable(&fake, user, streams())).await;
+                fake.set_list_mode(user, ListMode::On);
+                let on = within_budget(5, readable(&fake, user, streams())).await;
+                assert_eq!(on, off, "{role}");
+                assert_eq!(on.unwrap(), expected, "{role}");
+            }
+        }
+
+        #[tokio::test]
+        async fn off_keeps_stream_denials_on_check_errors() {
+            for failed in [false, true] {
+                let fake = FakeStreamChecker::default();
+                let user = "dbm-off";
+                grant(&fake, user);
+                fake.set_list_mode(user, ListMode::Off);
+                if failed {
+                    fake.fail_stream_read_once(user, "allowed");
+                }
+                let actual = within_budget(4, readable(&fake, user, streams()))
+                    .await
+                    .unwrap();
+                assert_eq!(actual.is_empty(), failed);
+                if !failed {
+                    assert_eq!(actual, vec!["allowed"]);
+                }
+                let calls = fake.calls(user);
+                assert_eq!(calls.org_wide_checks, 1);
+                assert_eq!(calls.org_wide, vec![vec![StreamType::Traces]]);
+                assert_eq!(calls.streams, 2);
+                assert_eq!(
+                    (calls.types_access, calls.lists, calls.object_checks),
+                    (0, 0, 0)
+                );
+            }
+        }
+
+        #[tokio::test]
+        async fn shadow_keeps_legacy_when_new_path_disagrees_or_fails() {
+            let _slot = SHADOW_TESTS.lock().await;
+            for failed in [false, true] {
+                let (compared, mismatches) =
+                    shadow_list_counts(SITE_DB_MONITORING, StreamType::Traces);
+                let fake = FakeStreamChecker::default();
+                let user = "dbm-shadow";
+                grant(&fake, user);
+                fake.set_list_mode(user, ListMode::Shadow);
+                fake.set_shadow_sample(user, 1.0);
+                if failed {
+                    fake.fail_list_once(user, UnavailableReason::Timeout);
+                } else {
+                    fake.list_extra_once(user, StreamType::Traces, "denied");
+                }
+                let actual = within_budget(9, readable(&fake, user, streams()))
+                    .await
+                    .unwrap();
+                assert_eq!(actual, vec!["allowed"]);
+                let expected_delta = u64::from(!failed);
+                assert_eq!(
+                    shadow_list_counts(SITE_DB_MONITORING, StreamType::Traces),
+                    (compared + expected_delta, mismatches + expected_delta),
+                );
+            }
+        }
+
+        #[tokio::test]
+        async fn legacy_openfga_disabled_keeps_every_stream_without_checks() {
+            let fake = FakeStreamChecker::default();
+            let user = "dbm-disabled";
+            let names = streams();
+            let actual = within_budget(
+                0,
+                involved_readable(
+                    &fake,
+                    &CheckerChecks(&fake),
+                    &db_monitoring_query(ORG, user, &TYPES),
+                    names.clone(),
+                    false,
+                ),
+            )
+            .await
+            .unwrap();
+            assert_eq!(actual, names);
+            assert_eq!(fake.calls(user).total(), 0);
+        }
+
+        #[tokio::test]
+        async fn traces_all_without_module_grant_keeps_every_requested_stream() {
+            let fake = FakeStreamChecker::default();
+            let user = "dbm-traces-all";
+            fake.set_role(ORG, user, "custom");
+            fake.grant_read_all(user, ORG, StreamType::Traces);
+            let names = streams();
+            let off = within_budget(2, readable(&fake, user, names.clone()))
+                .await
+                .unwrap();
+            assert_eq!(off, names);
+            assert_eq!(fake.calls(user).streams, 0);
+            fake.set_list_mode(user, ListMode::On);
+            let on = within_budget(4, readable(&fake, user, names))
+                .await
+                .unwrap();
+            assert_eq!(on, off);
+            assert_eq!(fake.calls(user).lists, 0);
+        }
+
+        #[tokio::test]
+        async fn module_grant_keeps_every_stream_with_one_check() {
+            for mode in [ListMode::Off, ListMode::On] {
+                let fake = FakeStreamChecker::default();
+                let user = "dbm-module";
+                fake.set_role(ORG, user, "custom");
+                fake.set_list_mode(user, mode);
+                fake.grant_org_wide_check(user, ORG, "db_monitoring");
+                let names = vec!["allowed".to_string(), "x".repeat(300)];
+                let actual = within_budget(1, readable(&fake, user, names.clone()))
+                    .await
+                    .unwrap();
+                assert_eq!(actual, names);
+                let calls = fake.calls(user);
+                assert_eq!((calls.org_wide_checks, calls.total()), (1, 1));
+                assert!(calls.org_wide.is_empty());
+                assert_eq!(calls.streams, 0);
+            }
+        }
+
+        #[tokio::test]
+        async fn on_uses_at_most_five_calls_for_many_streams() {
+            let fake = FakeStreamChecker::default();
+            let user = "dbm-budget";
+            fake.set_role(ORG, user, "custom");
+            fake.set_list_mode(user, ListMode::On);
+            grant(&fake, user);
+            let mut names = vec!["allowed".to_string()];
+            names.extend((0..2000).map(|i| format!("denied_{i}")));
+            let actual = within_budget(LIST_CALL_CAP, readable(&fake, user, names))
+                .await
+                .unwrap();
+            assert_eq!(actual, vec!["allowed"]);
+            let calls = fake.calls(user);
+            assert_eq!(
+                (
+                    calls.org_wide_checks,
+                    calls.probe_c,
+                    calls.probe_b,
+                    calls.lists
+                ),
+                (1, 1, 2, 1)
+            );
+            assert_eq!(calls.object_checks, 0);
+            assert_eq!(calls.stored_email_types, 1);
+        }
+
+        #[tokio::test]
+        async fn on_failure_returns_unavailable_instead_of_a_partial_list() {
+            for failure in ["prelude", "probe", "list", "object"] {
+                let fake = FakeStreamChecker::default();
+                let user = "dbm-unavailable";
+                fake.set_list_mode(user, ListMode::On);
+                grant(&fake, user);
+                let reason = UnavailableReason::Timeout;
+                let mut names = streams();
+                let budget = match failure {
+                    "prelude" => {
+                        fake.fail_org_wide_check_once(user, reason);
+                        1
+                    }
+                    "probe" => {
+                        fake.fail_types_access_once(user, reason);
+                        2
+                    }
+                    "list" => {
+                        fake.fail_list_once(user, reason);
+                        LIST_CALL_CAP
+                    }
+                    "object" => {
+                        fake.fail_object_check_once(user, reason);
+                        names.push("x".repeat(300));
+                        LIST_CALL_CAP + 1
+                    }
+                    _ => unreachable!(),
+                };
+                let err = within_budget(budget, readable(&fake, user, names))
+                    .await
+                    .unwrap_err();
+                assert_eq!(err.reason, reason, "{failure}");
+            }
+        }
+
+        #[tokio::test]
+        async fn databases_handler_returns_typed_503_on_inferred_stream_list_failure() {
+            use axum::extract::{Path, Query};
+            use infra::schema::{STREAM_SCHEMAS_LATEST, SchemaCache, insert_latest, remove_latest};
+            use openobserve_api_common::extractors::Headers;
+            use openobserve_core::auth::UserEmail;
+
+            use crate::request::{
+                db_monitoring::handler::get_dbm_databases, security::tests::meta_store,
+            };
+
+            meta_store().await;
+            let org = format!("dbm-outage-{}", config::ider::uuid());
+            let user = format!("{org}@example.com");
+            let schema_key = format!("{org}/traces/inferred");
+            {
+                let mut w = STREAM_SCHEMAS_LATEST.write().await;
+                insert_latest(
+                    &mut w,
+                    schema_key.clone(),
+                    SchemaCache::new(arrow_schema::Schema::empty()),
+                );
+            }
+
+            let fake = fake_checker();
+            fake.set_list_mode(&user, ListMode::On);
+            fake.fail_list_once(&user, UnavailableReason::Timeout);
+            let response = get_dbm_databases(
+                Path(org),
+                Headers(UserEmail {
+                    user_id: user.clone(),
+                }),
+                Query(DatabasesQuery {
+                    start_time: None,
+                    end_time: None,
+                    stream: None,
+                    system: None,
+                    service: None,
+                    baseline_start_time: None,
+                    baseline_end_time: None,
+                    include_breakdown: None,
+                }),
+            )
+            .await;
+
+            {
+                let mut w = STREAM_SCHEMAS_LATEST.write().await;
+                remove_latest(&mut w, &schema_key);
+            }
+            assert_eq!(fake.calls(&user).lists, 1);
+            assert_authz_unavailable(response).await;
+        }
+    }
+
     use serde_json::json;
 
     use super::{super::testutil::*, *};
@@ -2659,22 +3069,14 @@ mod tests {
             .expect("can_read_stream must keep its non-enterprise arm");
         let body = &src[start..end];
 
-        // The module check runs first in both gates, or a stream grant would be asked before it.
-        for (gate, fallback) in [
-            ("async fn can_read_stream(", "stream_grants("),
-            ("async fn readable_among(", "stream_grants("),
-        ] {
-            let at = src.find(gate).expect("gate must exist");
-            let gate_body = &src[at..];
-            let module = gate_body
-                .find("module_grant(")
-                .expect("gate asks the module");
-            let stream = gate_body
-                .find(fallback)
-                .expect("gate falls back to streams");
-            assert!(module < stream, "{gate} must ask the module grant first");
-        }
-        assert!(body.contains("module_grant("));
+        let module = body.find("module_grant(").expect("gate asks the module");
+        let stream = body
+            .find("stream_grants(")
+            .expect("gate falls back to streams");
+        assert!(
+            module < stream,
+            "the single-stream gate must ask the module grant first"
+        );
 
         let at = src
             .find("async fn module_grant(")

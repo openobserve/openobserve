@@ -143,6 +143,7 @@ pub async fn get_dimension_analytics(
         ("x-o2-ratelimit" = json!({"module": "Service Streams", "operation": "list"}))
     )
 )]
+#[tracing::instrument(name = "service_streams.list", skip_all)]
 pub async fn list_services(
     Path(org_id): Path<String>,
     Headers(user_email): Headers<UserEmail>,
@@ -151,6 +152,8 @@ pub async fn list_services(
     let _ = &user_email;
     #[cfg(feature = "enterprise")]
     {
+        use tracing::Instrument;
+
         if !check_permissions(
             &org_id,
             &org_id,
@@ -166,13 +169,19 @@ pub async fn list_services(
         {
             return MetaHttpResponse::forbidden("Unauthorized Access");
         }
-        let records = match infra::table::service_streams::list(&org_id).await {
+        let load = tracing::info_span!("db.load");
+        let records = match infra::table::service_streams::list(&org_id)
+            .instrument(load.clone())
+            .await
+        {
             Ok(r) => r.into_iter().filter_map(without_o2_streams).collect(),
             Err(e) => {
                 return MetaHttpResponse::internal_error(format!("Failed to list services: {e}"));
             }
         };
-        let identity_config = db::system_settings::get_service_identity_config(&org_id).await;
+        let identity_config = db::system_settings::get_service_identity_config(&org_id)
+            .instrument(load)
+            .await;
         let records = if identity_config.service_optional {
             o2_enterprise::enterprise::service_streams::storage::merge_by_disambiguation(records)
         } else {
@@ -180,16 +189,23 @@ pub async fn list_services(
         };
         // after the merge, which needs every record's streams to spot a stream-name fallback
         let checker = openobserve_core::authz::active_checker();
-        let records = openobserve_core::authz::readable_service_records(
+        let records = match openobserve_core::authz::readable_service_records(
             checker.as_ref(),
+            openobserve_core::authz::list::SITE_SERVICE_STREAMS,
             &user_email.user_id,
             &org_id,
             records,
         )
-        .await;
+        .instrument(tracing::info_span!("authz.filter"))
+        .await
+        {
+            Ok(records) => records,
+            Err(e) => return openobserve_core::authz::list::authz_unavailable_response(e),
+        };
         openobserve_core::service_identity::display_feed::ensure(&org_id).await;
         // The ids ingest names a service from, set `distinguish_by` included.
         let tracked = &identity_config.naming_alias_ids();
+        let _enrich = tracing::info_span!("enrich").entered();
         let rows: Vec<ServiceRow> = records
             .into_iter()
             .map(|record| {
@@ -362,6 +378,7 @@ pub async fn correlate_streams(
                 let readable = move |streams: config::meta::service_streams::RelatedStreams| async move {
                     openobserve_core::authz::readable_related_streams(
                         checker.as_ref(),
+                        openobserve_core::authz::list::SITE_SERVICE_STREAMS_CORRELATE,
                         user,
                         org,
                         streams,
@@ -372,7 +389,7 @@ pub async fn correlate_streams(
                     org_id: org,
                     user_id: user,
                 };
-                has_data::filter_then_annotate(
+                if let Err(e) = has_data::filter_then_annotate(
                     &req,
                     &mut response,
                     &semantic_groups,
@@ -381,7 +398,10 @@ pub async fn correlate_streams(
                     config::utils::time::now_micros(),
                     has_data::BUDGET,
                 )
-                .await;
+                .await
+                {
+                    return openobserve_core::authz::list::authz_unavailable_response(e);
+                }
                 // all_streams is a flattened copy, so it would still list the dropped streams
                 response.build_all_streams();
                 MetaHttpResponse::json(response)
@@ -831,7 +851,7 @@ async fn correlate_record(
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use std::collections::HashMap;
 
     use config::meta::{
@@ -843,6 +863,46 @@ mod tests {
     };
 
     use super::{CorrelationRequest, ServiceRow};
+
+    #[cfg(feature = "enterprise")]
+    // Shadow tests share the core slot even when each test uses a separate checker.
+    pub(crate) static SHADOW_TESTS: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
+    #[cfg(feature = "enterprise")]
+    pub(crate) fn shadow_list_counts(site: &str, stream_type: StreamType) -> (u64, u64) {
+        use config::metrics::authz::{
+            AUTHZ_LIST_SHADOW_COMPARED_TOTAL, AUTHZ_LIST_SHADOW_MISMATCH_TOTAL,
+        };
+
+        let compared = AUTHZ_LIST_SHADOW_COMPARED_TOTAL.with_label_values(&[site, "list"]);
+        let mismatch = AUTHZ_LIST_SHADOW_MISMATCH_TOTAL.with_label_values(&[
+            site,
+            stream_type.as_str(),
+            "new_allows_more",
+        ]);
+        (compared.get(), mismatch.get())
+    }
+
+    #[cfg(feature = "enterprise")]
+    pub(crate) async fn assert_authz_unavailable(response: axum::response::Response) {
+        assert_eq!(
+            response.status(),
+            axum::http::StatusCode::SERVICE_UNAVAILABLE
+        );
+        assert_eq!(response.headers()["retry-after"], "3");
+        assert_eq!(response.headers()["x-o2-authz"], "unavailable");
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        assert_eq!(
+            serde_json::from_slice::<serde_json::Value>(&body).unwrap(),
+            serde_json::json!({
+                "code": 503,
+                "error_code": "authz_unavailable",
+                "message": "Permission service unavailable, try again",
+            })
+        );
+    }
 
     // -----------------------------------------------------------------------
     // Group A: CorrelationRequest serialization / deserialization

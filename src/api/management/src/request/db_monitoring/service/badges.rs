@@ -82,6 +82,44 @@ impl BadgeSliceResults {
         }
         body
     }
+
+    /// A list-authz outage in any slice answers the typed 503, as the Databases and Queries tabs
+    /// do.
+    pub(crate) fn into_response(self) -> HttpResponse {
+        #[cfg(feature = "enterprise")]
+        let mut slices = self;
+        #[cfg(not(feature = "enterprise"))]
+        let slices = self;
+
+        #[cfg(feature = "enterprise")]
+        if let Some(response) = slices.take_authz_unavailable() {
+            return response;
+        }
+        if slices.all_forbidden() {
+            return unauthorized_response();
+        }
+        MetaHttpResponse::json(slices.into_envelope())
+    }
+
+    #[cfg(feature = "enterprise")]
+    fn take_authz_unavailable(&mut self) -> Option<HttpResponse> {
+        let members = [
+            Some(&mut self.databases),
+            Some(&mut self.queries),
+            Some(&mut self.activity),
+            Some(&mut self.deadlocks),
+            Some(&mut self.blocking),
+            Some(&mut self.table_health),
+            self.server_queries.as_mut(),
+            self.server_samples.as_mut(),
+        ];
+        for member in members.into_iter().flatten() {
+            if member.as_ref().is_err_and(is_authz_unavailable) {
+                return std::mem::replace(member, Ok(Value::Null)).err();
+            }
+        }
+        None
+    }
 }
 
 /// Whether the client-vantage databases slice summed EXACTLY zero finished
@@ -226,10 +264,7 @@ pub(crate) async fn read_badges_response(
     let prologue = prologue.as_ref();
 
     #[cfg(feature = "enterprise")]
-    let (databases, queries, activity, deadlocks, blocking, table_health) = tokio::join!(
-        read_databases_body(org, user, &databases_q),
-        read_queries_body(org, user, &queries_q),
-        read_activity_body(org, user, &activity_q, true, prologue),
+    let (deadlocks, blocking, table_health) = (
         read_deadlocks_body(org, user, &deadlocks_q, true, prologue),
         read_blocking_body(org, user, &blocking_q, true, prologue),
         read_table_health_body(org, user, &table_health_q),
@@ -238,36 +273,23 @@ pub(crate) async fn read_badges_response(
     // envelope already maps `Err` to `null` per member, so their badges render
     // blank rather than as a misleading 0.
     #[cfg(not(feature = "enterprise"))]
-    let (databases, queries, activity, deadlocks, blocking, table_health) = {
-        let (databases, queries, activity) = tokio::join!(
-            read_databases_body(org, user, &databases_q),
-            read_queries_body(org, user, &queries_q),
-            read_activity_body(org, user, &activity_q, true, prologue),
-        );
-        (
-            databases,
-            queries,
-            activity,
-            Err(unauthorized_response()),
-            Err(unauthorized_response()),
-            Err(unauthorized_response()),
-        )
-    };
-
-    // ── The zero-trace fallback, folded server-side ──────────────────────
-    //
-    // A client-vantage zero is truthful about TRACES and false about the ORG
-    // when the databases themselves are reporting: the Top-queries and
-    // Slowest-calls tabs render database-reported lists there, and the strip
-    // must count what those tabs show. Armed only by an EXACT zero — a null
-    // (failed) slice must not fire it, because unknown is not zero.
-    let wants_server_queries = queries_slice_reports_zero(&queries);
-    let wants_server_samples = databases_slice_reports_zero_calls(&databases);
-    let (server_queries, server_samples) = tokio::join!(
+    let (deadlocks, blocking, table_health) = (
+        async { Err(unauthorized_response()) },
+        async { Err(unauthorized_response()) },
+        async { Err(unauthorized_response()) },
+    );
+    let slices = join_badge_slices(
+        read_databases_body(org, user, &databases_q),
+        read_queries_body(org, user, &queries_q),
+        read_activity_body(org, user, &activity_q, true, prologue),
+        deadlocks,
+        blocking,
+        table_health,
+    )
+    .await;
+    complete_badges(
+        slices,
         async {
-            if !wants_server_queries {
-                return None;
-            }
             let sq = ServerQueriesQuery {
                 start_time: q.start_time,
                 end_time: q.end_time,
@@ -281,12 +303,9 @@ pub(crate) async fn read_badges_response(
                 fingerprint: None,
                 limit: None,
             };
-            Some(read_server_queries_body(org, user, &sq).await)
+            read_server_queries_body(org, user, &sq).await
         },
         async {
-            if !wants_server_samples {
-                return None;
-            }
             let ss = ServerSamplesQuery {
                 start_time: q.start_time,
                 end_time: q.end_time,
@@ -297,24 +316,84 @@ pub(crate) async fn read_badges_response(
                 namespace: q.namespace.clone(),
                 limit: None,
             };
-            Some(read_server_samples_body(org, user, &ss).await)
+            read_server_samples_body(org, user, &ss).await
         },
-    );
+    )
+    .await
+}
 
-    let slices = BadgeSliceResults {
+async fn join_badge_slices(
+    databases: impl Future<Output = Result<Value, HttpResponse>>,
+    queries: impl Future<Output = Result<Value, HttpResponse>>,
+    activity: impl Future<Output = Result<Value, HttpResponse>>,
+    deadlocks: impl Future<Output = Result<Value, HttpResponse>>,
+    blocking: impl Future<Output = Result<Value, HttpResponse>>,
+    table_health: impl Future<Output = Result<Value, HttpResponse>>,
+) -> Result<BadgeSliceResults, HttpResponse> {
+    let (databases, queries, activity, deadlocks, blocking, table_health) = tokio::try_join!(
+        capture_authz_failure(databases),
+        capture_authz_failure(queries),
+        capture_authz_failure(activity),
+        capture_authz_failure(deadlocks),
+        capture_authz_failure(blocking),
+        capture_authz_failure(table_health),
+    )?;
+    Ok(BadgeSliceResults {
         databases,
         queries,
         activity,
         deadlocks,
         blocking,
         table_health,
-        server_queries,
-        server_samples,
-    };
-    if slices.all_forbidden() {
-        return unauthorized_response();
+        server_queries: None,
+        server_samples: None,
+    })
+}
+
+async fn capture_authz_failure(
+    slice: impl Future<Output = Result<Value, HttpResponse>>,
+) -> Result<Result<Value, HttpResponse>, HttpResponse> {
+    let result = slice.await;
+    #[cfg(feature = "enterprise")]
+    {
+        match result {
+            Err(response) if is_authz_unavailable(&response) => Err(response),
+            result => Ok(result),
+        }
     }
-    MetaHttpResponse::json(slices.into_envelope())
+    #[cfg(not(feature = "enterprise"))]
+    Ok(result)
+}
+
+async fn complete_badges(
+    slices: Result<BadgeSliceResults, HttpResponse>,
+    read_server_queries: impl Future<Output = Result<Value, HttpResponse>>,
+    read_server_samples: impl Future<Output = Result<Value, HttpResponse>>,
+) -> HttpResponse {
+    let mut slices = match slices {
+        Ok(slices) => slices,
+        Err(response) => return response,
+    };
+    // A failed slice cannot establish the zero that arms its fallback.
+    let wants_server_queries = queries_slice_reports_zero(&slices.queries);
+    let wants_server_samples = databases_slice_reports_zero_calls(&slices.databases);
+    (slices.server_queries, slices.server_samples) = tokio::join!(
+        async {
+            if wants_server_queries {
+                Some(read_server_queries.await)
+            } else {
+                None
+            }
+        },
+        async {
+            if wants_server_samples {
+                Some(read_server_samples.await)
+            } else {
+                None
+            }
+        },
+    );
+    slices.into_response()
 }
 
 // ─── FR-1 instance health · the receiver-vantage metric sweep ────────────────
@@ -338,9 +417,13 @@ pub(crate) async fn read_badges_response(
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "enterprise")]
+    use openobserve_core::authz::list::{UnavailableReason, authz_unavailable_response};
     use serde_json::json;
 
     use super::{super::testutil::*, *};
+    #[cfg(feature = "enterprise")]
+    use crate::request::service_streams::tests::assert_authz_unavailable;
 
     /// A slice set where everything answered, and no fallback fired.
     fn all_ok_slices() -> BadgeSliceResults {
@@ -354,6 +437,153 @@ mod tests {
             server_queries: None,
             server_samples: None,
         }
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn badges_answer_an_authz_outage_while_a_slice_is_pending() {
+        use std::{future::pending, time::Duration};
+
+        let response = tokio::time::timeout(Duration::from_millis(250), async {
+            let slices = join_badge_slices(
+                pending(),
+                async {
+                    Err(authz_unavailable_response(
+                        UnavailableReason::Timeout.into(),
+                    ))
+                },
+                pending(),
+                pending(),
+                pending(),
+                pending(),
+            )
+            .await;
+            complete_badges(slices, pending(), pending()).await
+        })
+        .await
+        .expect("an authz outage must not wait for the other slices");
+        assert_authz_unavailable(response).await;
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn badges_skip_both_zero_triggered_fallbacks_on_authz_outage() {
+        use std::future::ready;
+
+        let slices = join_badge_slices(
+            ready(Ok(json!({"hits": []}))),
+            ready(Ok(json!({"total": 0}))),
+            async {
+                Err(authz_unavailable_response(
+                    UnavailableReason::Timeout.into(),
+                ))
+            },
+            ready(Ok(Value::Null)),
+            ready(Ok(Value::Null)),
+            ready(Ok(Value::Null)),
+        )
+        .await;
+        let response = complete_badges(
+            slices,
+            async { panic!("server queries must not run after an authz outage") },
+            async { panic!("server samples must not run after an authz outage") },
+        )
+        .await;
+        assert_authz_unavailable(response).await;
+    }
+
+    #[tokio::test]
+    async fn badges_keep_an_untyped_503_local_to_its_slice() {
+        use std::future::ready;
+
+        let slices = join_badge_slices(
+            ready(Ok(json!({"hits": [{"calls": 1}]}))),
+            ready(Ok(json!({"total": 1}))),
+            ready(Err(MetaHttpResponse::service_unavailable(
+                "slice unavailable",
+            ))),
+            ready(Ok(Value::Null)),
+            ready(Ok(Value::Null)),
+            ready(Ok(Value::Null)),
+        )
+        .await;
+        let response = complete_badges(
+            slices,
+            async { panic!("queries reported a nonzero total") },
+            async { panic!("databases reported nonzero calls") },
+        )
+        .await;
+        assert_eq!(response.status(), axum::http::StatusCode::OK);
+        let bytes = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let body: Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(body["activity"], Value::Null);
+        assert_eq!(body["queries"]["total"], 1);
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_badges_authz_unavailable_slice_answers_the_typed_503() {
+        for fallback in [false, true] {
+            let mut slices = all_ok_slices();
+            let unavailable = Err(authz_unavailable_response(
+                UnavailableReason::Timeout.into(),
+            ));
+            if fallback {
+                slices.server_samples = Some(unavailable);
+            } else {
+                slices.queries = unavailable;
+            }
+            let resp = slices.into_response();
+            assert_eq!(resp.status(), axum::http::StatusCode::SERVICE_UNAVAILABLE);
+            assert_eq!(resp.headers()["retry-after"], "3");
+            assert_eq!(resp.headers()["x-o2-authz"], "unavailable");
+            let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+                .await
+                .unwrap();
+            assert_eq!(
+                serde_json::from_slice::<Value>(&body).unwrap(),
+                json!({
+                    "code": 503,
+                    "error_code": "authz_unavailable",
+                    "message": "Permission service unavailable, try again",
+                })
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn test_badges_into_response_keeps_today_answers() {
+        let resp = all_ok_slices().into_response();
+        assert_eq!(resp.status(), axum::http::StatusCode::OK);
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        assert_eq!(
+            serde_json::from_slice::<Value>(&body).unwrap(),
+            all_ok_slices().into_envelope()
+        );
+
+        let mut slices = all_ok_slices();
+        slices.queries = Err(MetaHttpResponse::internal_error("search failed"));
+        assert_eq!(slices.into_response().status(), axum::http::StatusCode::OK);
+
+        let denied = || -> Result<Value, HttpResponse> { Err(unauthorized_response()) };
+        let slices = BadgeSliceResults {
+            databases: denied(),
+            queries: denied(),
+            activity: denied(),
+            deadlocks: denied(),
+            blocking: denied(),
+            table_health: denied(),
+            server_queries: None,
+            server_samples: None,
+        };
+        assert_eq!(
+            slices.into_response().status(),
+            axum::http::StatusCode::FORBIDDEN
+        );
     }
 
     /// The envelope carries each endpoint's body UNDER ITS OWN KEY, unchanged

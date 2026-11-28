@@ -28,6 +28,7 @@ pub mod announcements;
 #[cfg(feature = "enterprise")]
 pub mod anomaly_detection;
 pub mod authz;
+mod authz_error_table;
 #[cfg(feature = "enterprise")]
 pub mod autoobserve;
 #[cfg(feature = "enterprise")]

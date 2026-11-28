@@ -24,7 +24,10 @@ use axum::{
 use openobserve_api_common::extractors::Headers;
 use openobserve_core::auth::UserEmail;
 #[cfg(feature = "enterprise")]
-use openobserve_core::service_identity::api::{self, Context};
+use openobserve_core::service_identity::{
+    access::RumReads,
+    api::{self, Context},
+};
 
 use crate::{
     common::meta::http::HttpResponse,
@@ -71,7 +74,7 @@ pub async fn list(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        let ctx = match Context::load(&org, &user.user_id, "LIST").await {
+        let ctx = match Context::load(&org, &user.user_id, "LIST", RumReads::Summaries).await {
             Ok(ctx) => ctx,
             Err(response) => return response,
         };
@@ -126,7 +129,7 @@ pub async fn services(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        let ctx = match Context::load(&org, &user.user_id, "LIST").await {
+        let ctx = match Context::load(&org, &user.user_id, "LIST", RumReads::Summaries).await {
             Ok(ctx) => ctx,
             Err(response) => return response,
         };
@@ -178,7 +181,7 @@ pub async fn deploys(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        let ctx = match Context::load(&org, &user.user_id, "LIST").await {
+        let ctx = match Context::load(&org, &user.user_id, "LIST", RumReads::Summaries).await {
             Ok(ctx) => ctx,
             Err(response) => return response,
         };
@@ -230,7 +233,7 @@ pub async fn verdicts(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        let ctx = match Context::load(&org, &user.user_id, "LIST").await {
+        let ctx = match Context::load(&org, &user.user_id, "LIST", RumReads::Summaries).await {
             Ok(ctx) => ctx,
             Err(response) => return response,
         };
@@ -275,7 +278,7 @@ pub async fn delete(
 ) -> Response {
     #[cfg(feature = "enterprise")]
     {
-        let ctx = match Context::load(&org, &user.user_id, "PUT").await {
+        let ctx = match Context::load(&org, &user.user_id, "PUT", RumReads::Summaries).await {
             Ok(ctx) => ctx,
             Err(response) => return response,
         };
@@ -331,11 +334,11 @@ pub async fn compare(
     };
     #[cfg(feature = "enterprise")]
     {
-        let _ = signals;
-        let ctx = match Context::load(&org, &user.user_id, "GET").await {
-            Ok(ctx) => ctx,
-            Err(response) => return response,
-        };
+        let ctx =
+            match Context::load(&org, &user.user_id, "GET", RumReads::for_compare(signals)).await {
+                Ok(ctx) => ctx,
+                Err(response) => return response,
+            };
         match openobserve_core::service_identity::signals::api::compare(&ctx, request).await {
             Ok(value) => HttpResponse::json(value),
             Err(response) => response,

@@ -191,7 +191,7 @@ impl Probe for LiveProbe<'_> {
 
 /// Drops the streams the caller cannot read, then answers `has_data` on what is left, so
 /// an unreadable stream is never queried.
-pub(crate) async fn filter_then_annotate<F, Fut>(
+pub(crate) async fn filter_then_annotate<F, Fut, E>(
     req: &CorrelationRequest,
     response: &mut CorrelationResponse,
     groups: &[FieldAlias],
@@ -199,9 +199,10 @@ pub(crate) async fn filter_then_annotate<F, Fut>(
     probe: &dyn Probe,
     now: i64,
     budget: Duration,
-) where
+) -> Result<(), E>
+where
     F: FnOnce(RelatedStreams) -> Fut,
-    Fut: Future<Output = RelatedStreams>,
+    Fut: Future<Output = Result<RelatedStreams, E>>,
 {
     let all = std::mem::replace(
         &mut response.related_streams,
@@ -212,9 +213,9 @@ pub(crate) async fn filter_then_annotate<F, Fut>(
             profiles: vec![],
         },
     );
-    response.related_streams = readable(all).await;
+    response.related_streams = readable(all).await?;
     if !req.check_data {
-        return;
+        return Ok(());
     }
     let scope = Scope::of(response, groups);
     let window = window(req.start_time, req.end_time, now);
@@ -226,6 +227,7 @@ pub(crate) async fn filter_then_annotate<F, Fut>(
         budget,
     )
     .await;
+    Ok(())
 }
 
 /// Sets `has_data` only from a query that finished; errors and timeouts leave it `None`.
@@ -487,8 +489,8 @@ mod tests {
         .unwrap()
     }
 
-    async fn keep_all(streams: RelatedStreams) -> RelatedStreams {
-        streams
+    async fn keep_all(streams: RelatedStreams) -> Result<RelatedStreams, ()> {
+        Ok(streams)
     }
 
     // useMetricsCorrelationDashboard.spec.ts:54 "should create panels with correct query structure"
@@ -709,7 +711,9 @@ mod tests {
     async fn check_data_false_runs_no_query_and_sets_no_field() {
         let probe = FakeProbe::default().with("cpu", &["service"], Some(true));
         let mut r = response(vec![metric("cpu", &[("service", "api")])]);
-        filter_then_annotate(&request(false), &mut r, &[], keep_all, &probe, 0, BUDGET).await;
+        filter_then_annotate(&request(false), &mut r, &[], keep_all, &probe, 0, BUDGET)
+            .await
+            .unwrap();
         assert!(probe.queried().is_empty());
         assert_eq!(r.related_streams.metrics[0].has_data, None);
         assert!(!serde_json::to_string(&r).unwrap().contains("has_data"));
@@ -730,7 +734,9 @@ mod tests {
             metric("missing_field", &[("pod", "p1")]),
         ]);
         r.related_streams.logs = vec![StreamInfo::new("logs1".into())];
-        filter_then_annotate(&request(true), &mut r, &[], keep_all, &probe, 0, BUDGET).await;
+        filter_then_annotate(&request(true), &mut r, &[], keep_all, &probe, 0, BUDGET)
+            .await
+            .unwrap();
         let got: Vec<_> = r
             .related_streams
             .metrics
@@ -764,9 +770,11 @@ mod tests {
         let readable = |mut streams: RelatedStreams| async move {
             assert!(probe_ref.queried().is_empty(), "the read filter runs first");
             streams.metrics.retain(|s| s.stream_name != "secret");
-            streams
+            Ok::<_, ()>(streams)
         };
-        filter_then_annotate(&request(true), &mut r, &[], readable, &probe, 0, BUDGET).await;
+        filter_then_annotate(&request(true), &mut r, &[], readable, &probe, 0, BUDGET)
+            .await
+            .unwrap();
         let queried = probe.queried();
         assert_eq!(queried.len(), 1);
         assert!(queried[0].starts_with("readable|"));

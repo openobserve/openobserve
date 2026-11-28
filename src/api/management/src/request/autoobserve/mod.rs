@@ -39,6 +39,7 @@ use config::{
     meta::{
         autoobserve::marks::ENTITY_TYPE_ALERT,
         folder::{DEFAULT_FOLDER, FolderType},
+        stream::StreamType,
     },
     utils::time::now_micros,
 };
@@ -56,7 +57,18 @@ use o2_enterprise::enterprise::autoobserve::{
     names::{dims, kinds},
 };
 use openobserve_api_common::extractors::Headers;
-use openobserve_core::{alerts::alert, auth::check_permissions, background_access::rbac_enforced};
+use openobserve_core::{
+    alerts::alert,
+    auth::check_permissions,
+    authz::{
+        StreamAccessChecker,
+        list::{
+            self, AuthzLatch, ListMode, SITE_AUTOOBSERVE_STREAMS, Scope, StreamSet,
+            authz_unavailable_response,
+        },
+    },
+    background_access::rbac_enforced,
+};
 use serde::{Deserialize, Serialize};
 use svix_ksuid::Ksuid;
 use utoipa::{IntoParams, ToSchema};
@@ -74,6 +86,16 @@ use crate::{
 const MAX_DELETE_BODY: usize = 64 * 1024;
 const PERMISSION_CHECK_CONCURRENCY: usize = 16;
 const DISABLED_MESSAGE: &str = "AutoObserve is disabled (O2_AUTOOBSERVE_ENABLED=false)";
+
+#[derive(ToSchema)]
+pub struct AutoObserveUnavailableBody {
+    #[schema(example = 503)]
+    pub code: u16,
+    #[schema(example = "Permission service unavailable, try again")]
+    pub message: String,
+    #[schema(example = "authz_unavailable")]
+    pub error_code: Option<String>,
+}
 
 #[derive(Debug, Default, Deserialize, IntoParams)]
 #[into_params(parameter_in = Query)]
@@ -189,6 +211,7 @@ impl<'a> Subject<'a> {
 struct LiveReader<'a> {
     org_id: &'a str,
     user_id: &'a str,
+    latch: &'a AuthzLatch,
 }
 
 #[async_trait]
@@ -206,7 +229,8 @@ impl CoverageReader for LiveReader<'_> {
     }
 
     async fn streams(&self, ids: Vec<(String, String)>) -> Vec<bool> {
-        readable_streams(self.org_id, self.user_id, ids).await
+        let checker = openobserve_core::authz::active_checker();
+        readable_streams(checker.as_ref(), self.org_id, self.user_id, ids, self.latch).await
     }
 
     async fn monitors(&self, subjects: Vec<EntityRef>) -> Vec<bool> {
@@ -223,6 +247,43 @@ impl CoverageReader for LiveReader<'_> {
             }
         }
         true
+    }
+}
+
+/// A latched failure determines the 503 response, so later Checks can be skipped.
+struct LatchedReader<'a, R> {
+    inner: R,
+    latch: &'a AuthzLatch,
+}
+
+#[async_trait]
+impl<R: CoverageReader> CoverageReader for LatchedReader<'_, R> {
+    async fn all_streams(&self, types: Vec<String>) -> bool {
+        if self.latch.failure().is_some() {
+            return false;
+        }
+        self.inner.all_streams(types).await
+    }
+
+    async fn streams(&self, ids: Vec<(String, String)>) -> Vec<bool> {
+        if self.latch.failure().is_some() {
+            return vec![false; ids.len()];
+        }
+        self.inner.streams(ids).await
+    }
+
+    async fn monitors(&self, subjects: Vec<EntityRef>) -> Vec<bool> {
+        if self.latch.failure().is_some() {
+            return vec![false; subjects.len()];
+        }
+        self.inner.monitors(subjects).await
+    }
+
+    async fn all_monitors(&self) -> bool {
+        if self.latch.failure().is_some() {
+            return false;
+        }
+        self.inner.all_monitors().await
     }
 }
 
@@ -362,7 +423,8 @@ pub async fn entity_types(Path(_org_id): Path<String>) -> Response {
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
         (status = 404, description = "AutoObserve is disabled for this deployment", content_type = "application/json", body = Object),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = Object),
-        (status = 503, description = "The engine is not running on this node", content_type = "application/json", body = Object),
+        (status = 503, description = "The engine or permission service is unavailable", body = inline(AutoObserveUnavailableBody),
+            headers(("Retry-After" = u32, description = "3 seconds for authorization failures"), ("X-O2-Authz" = String, description = "unavailable for authorization failures"))),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "AutoObserve", "operation": "get"})),
@@ -385,13 +447,13 @@ pub async fn coverage(
         Ok(view) => view,
         Err(e) => return failed(&e),
     };
-    serve(|deps| async move {
-        let service = query.service.as_deref().filter(|s| !s.is_empty());
-        let reader = LiveReader {
-            org_id: &org_id,
-            user_id: &user.user_id,
-        };
-        api::coverage_for(&deps, &org_id, view, service, now_micros(), &reader).await
+    let latch = AuthzLatch::default();
+    read_with_latch(&latch, &org_id, &user.user_id, |reader| {
+        let org_id = &org_id;
+        serve(move |deps| async move {
+            let service = query.service.as_deref().filter(|s| !s.is_empty());
+            api::coverage_for(&deps, org_id, view, service, now_micros(), &reader).await
+        })
     })
     .await
 }
@@ -412,7 +474,8 @@ pub async fn coverage(
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
         (status = 404, description = "AutoObserve is disabled for this deployment", content_type = "application/json", body = Object),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = Object),
-        (status = 503, description = "The engine is not running on this node", content_type = "application/json", body = Object),
+        (status = 503, description = "The engine or permission service is unavailable", body = inline(AutoObserveUnavailableBody),
+            headers(("Retry-After" = u32, description = "3 seconds for authorization failures"), ("X-O2-Authz" = String, description = "unavailable for authorization failures"))),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "AutoObserve", "operation": "list"})),
@@ -431,12 +494,12 @@ pub async fn coverage_history(
         Ok(query) => query,
         Err(refused) => return refused,
     };
-    serve(|deps| async move {
-        let reader = LiveReader {
-            org_id: &org_id,
-            user_id: &user.user_id,
-        };
-        api::coverage_history_for(&deps, &org_id, query.from, query.to, &reader).await
+    let latch = AuthzLatch::default();
+    read_with_latch(&latch, &org_id, &user.user_id, |reader| {
+        let org_id = &org_id;
+        serve(move |deps| async move {
+            api::coverage_history_for(&deps, org_id, query.from, query.to, &reader).await
+        })
     })
     .await
 }
@@ -506,7 +569,8 @@ pub async fn writable_folders(
         (status = 403, description = "Forbidden", content_type = "application/json", body = Object),
         (status = 404, description = "AutoObserve is disabled for this deployment", content_type = "application/json", body = Object),
         (status = 500, description = "Internal Server Error", content_type = "application/json", body = Object),
-        (status = 503, description = "The engine is not running on this node", content_type = "application/json", body = Object),
+        (status = 503, description = "The engine or permission service is unavailable", body = inline(AutoObserveUnavailableBody),
+            headers(("Retry-After" = u32, description = "3 seconds for authorization failures"), ("X-O2-Authz" = String, description = "unavailable for authorization failures"))),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "AutoObserve", "operation": "get"})),
@@ -528,16 +592,20 @@ pub async fn stream_volume(
     if let Err(e) = api::check_series_request(&query.ids, query.from, query.to) {
         return failed(&e);
     }
-    serve(|deps| async move {
-        let readable = |ids| readable_streams(&org_id, &user.user_id, ids);
-        api::stream_volume_series(
-            &deps,
-            &org_id,
-            (&query.ids, query.from, query.to),
-            now_micros(),
-            readable,
-        )
-        .await
+    let latch = AuthzLatch::default();
+    read_with_latch(&latch, &org_id, &user.user_id, |reader| {
+        let org_id = &org_id;
+        serve(move |deps| async move {
+            let readable = |ids| reader.streams(ids);
+            api::stream_volume_series(
+                &deps,
+                org_id,
+                (&query.ids, query.from, query.to),
+                now_micros(),
+                readable,
+            )
+            .await
+        })
     })
     .await
 }
@@ -778,6 +846,53 @@ pub async fn delete_mark(
     .await
 }
 
+pub(crate) async fn readable_streams(
+    checker: &dyn StreamAccessChecker,
+    org_id: &str,
+    user_id: &str,
+    ids: Vec<(String, String)>,
+    latch: &AuthzLatch,
+) -> Vec<bool> {
+    if latch.failure().is_some() {
+        return vec![false; ids.len()];
+    }
+    let typed = known_stream_ids(ids);
+    let wanted = typed.iter().flatten().cloned().collect();
+    // A type the list path cannot answer keeps today's Checks, whose errors deny as in `off`.
+    if checker.list_settings(user_id).mode == ListMode::Off
+        || typed
+            .iter()
+            .flatten()
+            .any(|(stream_type, _)| list::listable_stream_type(stream_type.as_str()).is_none())
+    {
+        let readable = list::legacy_readable_streams(checker, user_id, org_id, wanted).await;
+        return readable_mask_of(&typed, readable);
+    }
+    match list::answer_in_mode(
+        checker,
+        SITE_AUTOOBSERVE_STREAMS,
+        user_id,
+        &wanted,
+        &Scope::every(),
+        |wanted| list::legacy_readable_streams(checker, user_id, org_id, wanted),
+        |wanted| async move {
+            let mut types: Vec<_> = wanted.iter().map(|(stream_type, _)| *stream_type).collect();
+            types.sort_unstable_by_key(|stream_type| stream_type.as_str());
+            types.dedup();
+            let query = list::autoobserve_streams_query(org_id, user_id, &types);
+            list::stream_answers_for_query(checker, &query, &wanted).await
+        },
+    )
+    .await
+    {
+        Ok((readable, _)) => readable_mask_of(&typed, readable),
+        Err(err) => {
+            latch.record(err);
+            vec![false; typed.len()]
+        }
+    }
+}
+
 fn page(limit: Option<usize>, offset: Option<usize>) -> Page {
     Page {
         limit: limit.unwrap_or(DEFAULT_LIMIT),
@@ -820,6 +935,43 @@ fn respond<T: Serialize>(result: Result<T, ApiError>) -> Response {
 
 fn failed(e: &ApiError) -> Response {
     error_response(e.status(), e)
+}
+
+fn with_authz_failure(latch: &AuthzLatch, response: Response) -> Response {
+    match latch.failure() {
+        Some(err) => authz_unavailable_response(err),
+        None => response,
+    }
+}
+
+/// Keeping the reader and failure response together prevents handlers from dropping either.
+async fn read_with_latch<'a, F, Fut>(
+    latch: &'a AuthzLatch,
+    org_id: &'a str,
+    user_id: &'a str,
+    read: F,
+) -> Response
+where
+    F: FnOnce(LatchedReader<'a, LiveReader<'a>>) -> Fut,
+    Fut: Future<Output = Response>,
+{
+    let inner = LiveReader {
+        org_id,
+        user_id,
+        latch,
+    };
+    read_latched(latch, inner, read).await
+}
+
+async fn read_latched<'a, R, F, Fut>(latch: &'a AuthzLatch, inner: R, read: F) -> Response
+where
+    R: CoverageReader + 'a,
+    F: FnOnce(LatchedReader<'a, R>) -> Fut,
+    Fut: Future<Output = Response>,
+{
+    let reader = LatchedReader { inner, latch };
+    let response = read(reader).await;
+    with_authz_failure(latch, response)
 }
 
 fn error_response(status: u16, message: impl ToString) -> Response {
@@ -882,20 +1034,33 @@ async fn readable_subjects(org_id: &str, user_id: &str, subjects: Vec<EntityRef>
 }
 
 /// Each stream needs the read right a search of it needs, decided by `readable_org_streams`.
-async fn readable_streams(org_id: &str, user_id: &str, ids: Vec<(String, String)>) -> Vec<bool> {
-    use config::meta::stream::StreamType;
+async fn raw_readable_streams(
+    org_id: &str,
+    user_id: &str,
+    ids: Vec<(String, String)>,
+) -> Vec<bool> {
+    let typed = known_stream_ids(ids);
+    let wanted = typed.iter().flatten().cloned().collect();
+    let readable = openobserve_core::authz::readable_org_streams(user_id, org_id, wanted).await;
+    readable_mask_of(&typed, readable)
+}
 
+fn known_stream_ids(ids: Vec<(String, String)>) -> Vec<Option<(StreamType, String)>> {
     // An unknown type name is refused, never read as the default type `from` falls back to.
-    let typed: Vec<Option<(StreamType, String)>> = ids
-        .into_iter()
+    ids.into_iter()
         .map(|(stream_type, name)| {
             let parsed = StreamType::from(stream_type.as_str());
             let known = parsed != StreamType::default() || stream_type.eq_ignore_ascii_case("logs");
             known.then_some((parsed, name))
         })
-        .collect();
-    let wanted = typed.iter().flatten().cloned().collect();
-    match openobserve_core::authz::readable_org_streams(user_id, org_id, wanted).await {
+        .collect()
+}
+
+fn readable_mask_of(
+    typed: &[Option<(StreamType, String)>],
+    readable: Option<StreamSet>,
+) -> Vec<bool> {
+    match readable {
         None => vec![true; typed.len()],
         Some(readable) => typed
             .iter()
@@ -1027,55 +1192,90 @@ mod tests {
         http::{Request, StatusCode, Uri},
         routing,
     };
+    use openobserve_core::authz::{
+        FakeStreamChecker, TypedStream, fake_checker, list::UnavailableReason, within_budget,
+    };
     use tower::ServiceExt;
 
     use super::*;
-    use crate::request::alert_grants::tests::CountingAuthority;
-
-    // o2-enterprise#3642: an org-wide grant costs one question; single grants check each stream.
-    #[tokio::test]
-    async fn readable_streams_asks_org_wide_once_and_refuses_unknown_types() {
-        use config::meta::stream::StreamType;
-        use openobserve_core::authz::{TypedStream, fake_checker};
-
-        let checker = fake_checker();
-        let org = format!("ao_{}", config::ider::uuid());
-        let wide = format!("wide_{}", config::ider::uuid());
-        checker.grant_read_all(&wide, &org, StreamType::Logs);
-        let ids: Vec<(String, String)> = (0..20)
-            .map(|i| ("logs".to_string(), format!("s{i}")))
-            .chain([
-                ("nonsense".to_string(), "s0".to_string()),
-                ("LOGS".to_string(), "s1".to_string()),
-            ])
-            .collect();
-        let mut expected = vec![true; 20];
-        expected.extend([false, true]);
-        assert_eq!(readable_streams(&org, &wide, ids.clone()).await, expected);
-        let calls = checker.calls(&wide);
-        assert_eq!(calls.streams, 0);
-        assert_eq!(calls.org_wide, vec![vec![StreamType::Logs]]);
-
-        let single = format!("single_{}", config::ider::uuid());
-        checker.grant_read(
-            &single,
-            &TypedStream {
-                org_id: org.clone(),
-                stream_type: StreamType::Logs,
-                name: "s3".to_string(),
-            },
-        );
-        let got = readable_streams(&org, &single, ids).await;
-        assert_eq!(got.iter().filter(|r| **r).count(), 1);
-        assert!(got[3]);
-        assert_eq!(checker.calls(&single).streams, 20);
-    }
+    use crate::request::{
+        alert_grants::tests::CountingAuthority,
+        service_streams::tests::{SHADOW_TESTS, shadow_list_counts},
+    };
 
     thread_local! {
         /// The deployment switch as this test's thread sees it; None reads the config.
         pub(super) static ENGINE_ON: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
         /// The RBAC answer for a mark change on this test's thread; None asks RBAC.
         pub(super) static MAY_CHANGE: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
+    }
+
+    struct HangingReader<'a> {
+        latch: &'a AuthzLatch,
+    }
+
+    #[async_trait]
+    impl CoverageReader for HangingReader<'_> {
+        async fn all_streams(&self, _types: Vec<String>) -> bool {
+            std::future::pending().await
+        }
+
+        async fn streams(&self, ids: Vec<(String, String)>) -> Vec<bool> {
+            self.latch.record(UnavailableReason::Timeout.into());
+            vec![false; ids.len()]
+        }
+
+        async fn monitors(&self, _subjects: Vec<EntityRef>) -> Vec<bool> {
+            std::future::pending().await
+        }
+
+        async fn all_monitors(&self) -> bool {
+            std::future::pending().await
+        }
+    }
+
+    fn stream_ids(ids: &[(&str, &str)]) -> Vec<(String, String)> {
+        ids.iter()
+            .map(|(kind, name)| (kind.to_string(), name.to_string()))
+            .collect()
+    }
+
+    fn grant_stream(fake: &FakeStreamChecker, user: &str, kind: StreamType, name: &str) {
+        fake.grant_read(
+            user,
+            &TypedStream {
+                org_id: "o".into(),
+                stream_type: kind,
+                name: name.into(),
+            },
+        );
+    }
+
+    async fn assert_authz_unavailable(response: Response) {
+        assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(response.headers()["retry-after"], "3");
+        assert_eq!(response.headers()["x-o2-authz"], "unavailable");
+        assert_eq!(response.headers()["content-type"], "application/json");
+        let body = axum::body::to_bytes(response.into_body(), MAX_DELETE_BODY)
+            .await
+            .unwrap();
+        assert_eq!(
+            serde_json::from_slice::<serde_json::Value>(&body).unwrap(),
+            serde_json::json!({
+                "code": 503,
+                "error_code": "authz_unavailable",
+                "message": "Permission service unavailable, try again",
+            })
+        );
+    }
+
+    async fn checked_streams(
+        fake: &FakeStreamChecker,
+        user: &str,
+        ids: &[(String, String)],
+        latch: &AuthzLatch,
+    ) -> Vec<bool> {
+        readable_streams(fake, "o", user, ids.to_vec(), latch).await
     }
 
     fn app() -> Router {
@@ -1133,6 +1333,46 @@ mod tests {
             .map_err(|e| e.to_string())
     }
 
+    // o2-enterprise#3642: an org-wide grant costs one question; single grants check each stream.
+    #[tokio::test]
+    async fn readable_streams_asks_org_wide_once_and_refuses_unknown_types() {
+        let checker = FakeStreamChecker::default();
+        let latch = AuthzLatch::default();
+        let org = format!("ao_{}", config::ider::uuid());
+        let wide = format!("wide_{}", config::ider::uuid());
+        checker.grant_read_all(&wide, &org, StreamType::Logs);
+        let ids: Vec<(String, String)> = (0..20)
+            .map(|i| ("logs".to_string(), format!("s{i}")))
+            .chain([
+                ("nonsense".to_string(), "s0".to_string()),
+                ("LOGS".to_string(), "s1".to_string()),
+            ])
+            .collect();
+        let mut expected = vec![true; 20];
+        expected.extend([false, true]);
+        assert_eq!(
+            readable_streams(&checker, &org, &wide, ids.clone(), &latch).await,
+            expected
+        );
+        let calls = checker.calls(&wide);
+        assert_eq!(calls.streams, 0);
+        assert_eq!(calls.org_wide, vec![vec![StreamType::Logs]]);
+
+        let single = format!("single_{}", config::ider::uuid());
+        checker.grant_read(
+            &single,
+            &TypedStream {
+                org_id: org.clone(),
+                stream_type: StreamType::Logs,
+                name: "s3".to_string(),
+            },
+        );
+        let got = readable_streams(&checker, &org, &single, ids, &latch).await;
+        assert_eq!(got.iter().filter(|r| **r).count(), 1);
+        assert!(got[3]);
+        assert_eq!(checker.calls(&single).streams, 20);
+    }
+
     #[test]
     fn each_service_error_status_gets_its_own_response() {
         for (code, want) in [
@@ -1141,6 +1381,29 @@ mod tests {
             (500, StatusCode::INTERNAL_SERVER_ERROR),
         ] {
             assert_eq!(error_response(code, "x").status(), want, "{code}");
+        }
+    }
+
+    #[test]
+    fn coverage_routes_document_authz_unavailable_bodies_and_headers() {
+        use utoipa::Path;
+
+        for operation in [
+            __path_coverage::operation(),
+            __path_coverage_history::operation(),
+            __path_stream_volume::operation(),
+        ] {
+            let docs = serde_json::to_value(operation).unwrap();
+            let unavailable = &docs["responses"]["503"];
+            assert!(unavailable["headers"]["Retry-After"].is_object());
+            assert!(unavailable["headers"]["X-O2-Authz"].is_object());
+            let schema = &unavailable["content"]["application/json"]["schema"];
+            assert_eq!(
+                schema["properties"]["error_code"]["example"],
+                "authz_unavailable"
+            );
+            let required = schema["required"].as_array().unwrap();
+            assert!(!required.contains(&serde_json::json!("error_code")));
         }
     }
 
@@ -1665,5 +1928,299 @@ mod tests {
                 offset: 14
             }
         );
+    }
+
+    #[tokio::test]
+    async fn stream_lists_match_off_for_each_role() {
+        let ids = stream_ids(&[
+            ("logs", "allowed"),
+            ("traces", "hidden"),
+            ("metrics", "m"),
+            ("logs", "allowed"),
+            ("logs", "hidden"),
+        ]);
+        for (role, user, want) in [
+            ("user", "reader", [true, false, true, true, false]),
+            ("custom", "custom-reader", [true, false, true, true, false]),
+            ("editor", "editor", [true; 5]),
+            ("admin", "o", [true; 5]),
+        ] {
+            let fake = FakeStreamChecker::default();
+            fake.set_role("o", user, role);
+            if role == "admin" {
+                fake.grant_admin("o", user);
+            }
+            grant_stream(&fake, user, StreamType::Logs, "allowed");
+            grant_stream(&fake, user, StreamType::Metrics, "m");
+            let latch = AuthzLatch::default();
+            let off = within_budget(5, checked_streams(&fake, user, &ids, &latch)).await;
+            assert_eq!(fake.calls(user).lists, 0);
+            fake.set_list_mode(user, ListMode::On);
+            let on = within_budget(10, checked_streams(&fake, user, &ids, &latch)).await;
+            assert_eq!(on, off, "{role}");
+            assert_eq!(on, want, "{role}");
+            assert_eq!(latch.failure(), None, "{role}");
+        }
+    }
+
+    #[tokio::test]
+    async fn scoped_stream_reads_refuse_unknown_types_in_every_mode() {
+        let ids = stream_ids(&[("nonsense", "a"), ("LOGS", "a"), ("logs", "a")]);
+        for mode in [ListMode::Off, ListMode::Shadow, ListMode::On] {
+            let fake = FakeStreamChecker::default();
+            let user = "typed-reader";
+            fake.set_list_mode(user, mode);
+            grant_stream(&fake, user, StreamType::Logs, "a");
+            let latch = AuthzLatch::default();
+            let got = within_budget(4, checked_streams(&fake, user, &ids, &latch)).await;
+            assert_eq!(got, [false, true, true], "{mode:?}");
+            assert_eq!(latch.failure(), None, "{mode:?}");
+        }
+    }
+
+    #[tokio::test]
+    async fn unknown_stream_ids_keep_the_list_path() {
+        let fake = FakeStreamChecker::default();
+        let user = "unknown-type-reader";
+        fake.set_list_mode(user, ListMode::On);
+        grant_stream(&fake, user, StreamType::Logs, "a");
+        let ids = stream_ids(&[("nonsense", "x"), ("logs", "a"), ("logs", "b")]);
+        let latch = AuthzLatch::default();
+        let got = within_budget(4, checked_streams(&fake, user, &ids, &latch)).await;
+        assert_eq!(got, [false, true, false]);
+        let calls = fake.calls(user);
+        assert_eq!((calls.lists, calls.streams), (1, 0));
+        assert_eq!(latch.failure(), None);
+
+        fake.fail_list_once(user, UnavailableReason::Timeout);
+        let got = within_budget(4, checked_streams(&fake, user, &ids, &latch)).await;
+        assert_eq!(got, [false; 3]);
+        assert_eq!(latch.failure(), Some(UnavailableReason::Timeout.into()));
+    }
+
+    #[tokio::test]
+    async fn off_checks_each_unique_stream_and_sends_no_list_call() {
+        let fake = FakeStreamChecker::default();
+        let user = "off-reader";
+        let ids = stream_ids(&[("logs", "a"), ("metrics", "b"), ("logs", "a")]);
+        grant_stream(&fake, user, StreamType::Logs, "a");
+        grant_stream(&fake, user, StreamType::Metrics, "b");
+        fake.fail_stream_read_once(user, "a");
+        let latch = AuthzLatch::default();
+        let got = within_budget(2, checked_streams(&fake, user, &ids, &latch)).await;
+        assert_eq!(got, [false, true, false]);
+        let calls = fake.calls(user);
+        assert_eq!((calls.streams, calls.types_access, calls.lists), (2, 0, 0));
+        assert_eq!(latch.failure(), None);
+    }
+
+    #[tokio::test]
+    async fn two_thousand_streams_use_one_list_per_type() {
+        const KINDS: [StreamType; 3] = [StreamType::Traces, StreamType::Logs, StreamType::Metrics];
+        const SHARED_C_PROBE: u32 = 1;
+        const B_PROBES_AND_LIST_PER_TYPE: u32 = 2 + 1;
+        const LIST_CALL_CAP: u32 = SHARED_C_PROBE + B_PROBES_AND_LIST_PER_TYPE * KINDS.len() as u32;
+
+        let fake = FakeStreamChecker::default();
+        let user = "budget-reader";
+        fake.set_role("o", user, "custom");
+        fake.set_list_mode(user, ListMode::On);
+        let mut ids = Vec::new();
+        let mut want = Vec::new();
+        for i in 0..2_000 {
+            let kind = KINDS[i % KINDS.len()];
+            let name = format!("s{i}");
+            let allowed = i % 7 == 0;
+            if allowed {
+                grant_stream(&fake, user, kind, &name);
+            }
+            ids.push((kind.as_str().to_string(), name));
+            want.push(allowed);
+        }
+        ids.extend([ids[0].clone(), ids[1].clone()]);
+        want.extend([true, false]);
+        let latch = AuthzLatch::default();
+        let got = within_budget(LIST_CALL_CAP, checked_streams(&fake, user, &ids, &latch)).await;
+        assert_eq!(got, want);
+        let calls = fake.calls(user);
+        assert_eq!(calls.types_access, 1);
+        assert_eq!(calls.org_wide_checks, 0);
+        assert_eq!(calls.probe_c, SHARED_C_PROBE as usize);
+        assert_eq!(calls.probe_b, 2 * KINDS.len());
+        assert_eq!(calls.lists, KINDS.len());
+        assert_eq!(calls.object_checks, 0);
+        assert_eq!(calls.stored_email_types, 1);
+        assert_eq!(latch.failure(), None);
+    }
+
+    #[tokio::test]
+    async fn non_listable_stream_timeout_keeps_other_grants() {
+        let fake = FakeStreamChecker::default();
+        let user = "mixed-stream-reader";
+        fake.set_list_mode(user, ListMode::On);
+        grant_stream(&fake, user, StreamType::Logs, "a");
+        grant_stream(&fake, user, StreamType::EnrichmentTables, "e");
+        // The fake needs an incomplete list to exercise the list path's object check.
+        fake.fail_list_incomplete_once(user, StreamType::EnrichmentTables);
+        fake.fail_object_check_once(user, UnavailableReason::Timeout);
+        fake.fail_stream_read_once(user, "e");
+        let ids = stream_ids(&[("logs", "a"), ("enrichment_tables", "e")]);
+        let latch = AuthzLatch::default();
+        let got = within_budget(8, checked_streams(&fake, user, &ids, &latch)).await;
+        assert_eq!(got, [true, false]);
+        assert_eq!(fake.calls(user).lists, 0);
+        assert!(latch.failure().is_none());
+    }
+
+    #[tokio::test]
+    async fn stream_failure_discards_grants_and_stops_later_callbacks() {
+        let fake = FakeStreamChecker::default();
+        let user = "failed-reader";
+        fake.set_list_mode(user, ListMode::On);
+        fake.grant_read_all(user, "o", StreamType::Traces);
+        fake.fail_list_once(user, UnavailableReason::Timeout);
+        let ids = stream_ids(&[("traces", "t"), ("logs", "a")]);
+        let latch = AuthzLatch::default();
+        let got = within_budget(6, checked_streams(&fake, user, &ids, &latch)).await;
+        assert_eq!(got, [false; 2]);
+        assert_eq!(latch.failure(), Some(UnavailableReason::Timeout.into()));
+
+        let calls = fake.calls(user);
+        let got = within_budget(0, checked_streams(&fake, user, &ids, &latch)).await;
+        assert_eq!(got, [false; 2]);
+        assert_eq!(fake.calls(user), calls);
+    }
+
+    #[tokio::test]
+    async fn shadow_keeps_the_legacy_mask_when_the_list_fails() {
+        let _slot = SHADOW_TESTS.lock().await;
+        let fake = FakeStreamChecker::default();
+        let user = "shadow-reader";
+        fake.set_list_mode(user, ListMode::Shadow);
+        fake.set_shadow_sample(user, 1.0);
+        fake.fail_list_once(user, UnavailableReason::Timeout);
+        grant_stream(&fake, user, StreamType::Logs, "allowed");
+        let ids = stream_ids(&[("logs", "allowed"), ("logs", "hidden")]);
+        let latch = AuthzLatch::default();
+        let got = within_budget(7, checked_streams(&fake, user, &ids, &latch)).await;
+        assert_eq!(got, [true, false]);
+        assert_eq!(latch.failure(), None);
+    }
+
+    #[tokio::test]
+    async fn shadow_compares_a_disagreeing_list_without_changing_the_mask() {
+        let _slot = SHADOW_TESTS.lock().await;
+        let (compared, mismatches) = shadow_list_counts(SITE_AUTOOBSERVE_STREAMS, StreamType::Logs);
+        let fake = FakeStreamChecker::default();
+        let user = "shadow-disagreement-reader";
+        fake.set_list_mode(user, ListMode::Shadow);
+        fake.set_shadow_sample(user, 1.0);
+        fake.list_extra_once(user, StreamType::Logs, "hidden");
+        grant_stream(&fake, user, StreamType::Logs, "allowed");
+        let ids = stream_ids(&[("logs", "allowed"), ("logs", "hidden")]);
+        let latch = AuthzLatch::default();
+        let got = within_budget(7, checked_streams(&fake, user, &ids, &latch)).await;
+        assert_eq!(got, [true, false]);
+        assert_eq!(latch.failure(), None);
+        assert_eq!(
+            shadow_list_counts(SITE_AUTOOBSERVE_STREAMS, StreamType::Logs),
+            (compared + 1, mismatches + 1),
+        );
+    }
+
+    #[tokio::test]
+    async fn read_with_latch_turns_a_reader_stream_failure_into_the_typed_503() {
+        let fake = fake_checker();
+        let user = "autoobserve-read-with-latch-stream-failure";
+        fake.set_list_mode(user, ListMode::On);
+        fake.fail_list_once(user, UnavailableReason::Timeout);
+        let latch = AuthzLatch::default();
+        let response = read_with_latch(&latch, "o", user, |reader| async move {
+            let mask = reader.streams(stream_ids(&[("logs", "a")])).await;
+            MetaHttpResponse::json(mask)
+        })
+        .await;
+        assert_authz_unavailable(response).await;
+        assert_eq!(latch.failure(), Some(UnavailableReason::Timeout.into()));
+    }
+
+    #[tokio::test]
+    async fn latched_failure_answers_503_without_waiting_on_later_checks() {
+        let latch = AuthzLatch::default();
+        let inner = HangingReader { latch: &latch };
+        let read = read_latched(&latch, inner, |reader| async move {
+            let streams = reader.streams(stream_ids(&[("logs", "a")])).await;
+            let subject = EntityRef::new(ENTITY_TYPE_ALERT, &[(dims::ENTITY_ID, "x")]);
+            let monitors = reader.monitors(vec![subject]).await;
+            let all_streams = reader.all_streams(vec!["logs".into()]).await;
+            let all_monitors = reader.all_monitors().await;
+            MetaHttpResponse::json((streams, monitors, all_streams, all_monitors))
+        });
+        let response = tokio::time::timeout(std::time::Duration::from_secs(5), read)
+            .await
+            .expect("a latched failure must not wait on later Checks");
+        assert_authz_unavailable(response).await;
+        assert_eq!(latch.failure(), Some(UnavailableReason::Timeout.into()));
+    }
+
+    #[tokio::test]
+    async fn read_with_latch_without_failure_keeps_the_reader_body() {
+        let fake = fake_checker();
+        let user = "autoobserve-read-with-latch-success";
+        fake.set_list_mode(user, ListMode::On);
+        grant_stream(&fake, user, StreamType::Logs, "a");
+        let latch = AuthzLatch::default();
+        let response = read_with_latch(&latch, "o", user, |reader| async move {
+            let mask = reader.streams(stream_ids(&[("logs", "a")])).await;
+            MetaHttpResponse::json(mask)
+        })
+        .await;
+        assert_eq!(response.status(), StatusCode::OK);
+        assert!(!response.headers().contains_key("x-o2-authz"));
+        let body = axum::body::to_bytes(response.into_body(), MAX_DELETE_BODY)
+            .await
+            .unwrap();
+        assert_eq!(body.as_ref(), b"[true]");
+        assert_eq!(latch.failure(), None);
+    }
+
+    #[tokio::test]
+    async fn latched_stream_failure_replaces_response_with_exact_authz_503() {
+        let fake = FakeStreamChecker::default();
+        let user = "response-reader";
+        fake.set_list_mode(user, ListMode::On);
+        fake.fail_list_once(user, UnavailableReason::Timeout);
+        let latch = AuthzLatch::default();
+        let ids = stream_ids(&[("logs", "a")]);
+        assert_eq!(checked_streams(&fake, user, &ids, &latch).await, [false]);
+        let original = Response::builder()
+            .status(StatusCode::OK)
+            .body(Body::from("partial response"))
+            .unwrap();
+        let response = with_authz_failure(&latch, original);
+        assert_authz_unavailable(response).await;
+    }
+
+    #[tokio::test]
+    async fn no_latched_failure_preserves_the_original_response() {
+        let latch = AuthzLatch::default();
+        let original = Response::builder()
+            .status(StatusCode::ACCEPTED)
+            .header("content-type", "text/plain")
+            .header("x-original", "kept")
+            .extension(17_u32)
+            .body(Body::from("original body"))
+            .unwrap();
+        let response = with_authz_failure(&latch, original);
+        assert_eq!(response.status(), StatusCode::ACCEPTED);
+        assert_eq!(response.headers()["content-type"], "text/plain");
+        assert_eq!(response.headers()["x-original"], "kept");
+        assert!(!response.headers().contains_key("x-o2-authz"));
+        assert!(!response.headers().contains_key("retry-after"));
+        assert_eq!(response.extensions().get::<u32>(), Some(&17));
+        let body = axum::body::to_bytes(response.into_body(), MAX_DELETE_BODY)
+            .await
+            .unwrap();
+        assert_eq!(body.as_ref(), b"original body");
     }
 }

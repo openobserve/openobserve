@@ -99,6 +99,7 @@ prost.workspace = true
 sea-orm.workspace = true
 svix-ksuid.workspace = true
 o2_enterprise = { workspace = true, default-features = false, features = ["test-utils"] }
+o2_openfga = { workspace = true, features = ["test-utils"] }
 tracing.workspace = true
 tracing-subscriber.workspace = true
 zstd.workspace = true
