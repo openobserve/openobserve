@@ -25,7 +25,7 @@ import {
 import { DASHBOARD_FRESH_ON_OPEN } from "./dashboardFreshOnOpen";
 import { parseCalendarToken } from "@/utils/dashboard/calendarPeriods";
 
-// Result fields a refresh after a cache restore keeps showing from the cache until its run settles.
+// Result fields a refresh after a cache restore keeps showing from the cache until its run has rows of its own.
 const HELD_RESULT_KEYS = [
   "data",
   "metadata",
@@ -41,6 +41,12 @@ const HELD_RESULT_KEYS = [
 
 type HeldKey = (typeof HELD_RESULT_KEYS)[number];
 
+// A run clears these at start and fills them after its first rows, so the cached ones stay until it does.
+const LATE_FILLED_KEYS: readonly HeldKey[] = ["annotations", "sparklineData", "sparklineWarning"];
+
+const isFilled = (value: unknown) =>
+  Array.isArray(value) ? value.length > 0 : typeof value === "string" ? value !== "" : !!value;
+
 type PanelLoaderState = Record<HeldKey, any> & {
   loading: boolean;
   isOperationCancelled: boolean;
@@ -50,6 +56,15 @@ type TimeWindow =
   | { start_time?: unknown; end_time?: unknown; relativeTimePeriod?: string | null }
   | null
   | undefined;
+
+/** Whether a panel result holds any rows: SQL hits per query, or a PromQL result per query. */
+export const hasResultRows = (data: unknown): boolean =>
+  Array.isArray(data) &&
+  data.some((queryData) =>
+    Array.isArray(queryData)
+      ? queryData.length > 0
+      : ((queryData as { result?: unknown[] } | null)?.result?.length ?? 0) > 0,
+  );
 
 const toMs = (time: unknown) => (time instanceof Date ? time.getTime() : Number(time));
 
@@ -86,8 +101,10 @@ export const usePanelRefreshAfterRestore = <S extends PanelLoaderState>({
   const panelKey = () => `${dashboardId?.value}/${panelSchema.value?.id}`;
 
   let queued = false;
-  // The executors keep writing to state; this is what the panel shows until the run settles.
+  // The executors keep writing to state; this is what the panel shows until the run has rows of its own.
   const heldResult = ref<Pick<S, HeldKey> | null>(null);
+  // Latched, so a superseding run that clears its rows keeps the last drawn chart instead of the older cache.
+  const handedOver = ref(false);
 
   // The cache key has no time range, so another absolute window of the same length would pass for this one.
   const isCalendarRange = (selectedWindow?: TimeWindow) =>
@@ -120,6 +137,7 @@ export const usePanelRefreshAfterRestore = <S extends PanelLoaderState>({
     queued = false;
     const restored = Object.fromEntries(HELD_RESULT_KEYS.map((key) => [key, state[key]]));
     heldResult.value = restored as Pick<S, HeldKey>;
+    handedOver.value = false;
     state.lastTriggeredAt = new Date().getTime();
   };
 
@@ -128,9 +146,21 @@ export const usePanelRefreshAfterRestore = <S extends PanelLoaderState>({
     const held = heldResult.value;
     if (!held) return false;
     heldResult.value = null;
+    handedOver.value = false;
     if (keepRestored) Object.assign(state, held);
     return true;
   };
+
+  watch(
+    () => {
+      const held = heldResult.value;
+      return !!held && state.data !== held.data && hasResultRows(state.data);
+    },
+    (hasOwnRows) => {
+      if (hasOwnRows) handedOver.value = true;
+    },
+    { flush: "sync" },
+  );
 
   // Sync, so the settled result replaces the restored one before any consumer sees the gap.
   watch(
@@ -155,13 +185,20 @@ export const usePanelRefreshAfterRestore = <S extends PanelLoaderState>({
     if (isComplete) freshOnOpen?.markRefreshed(panelKey());
   };
 
+  const writeTarget = () => (heldResult.value && !handedOver.value ? heldResult.value : state);
+
   const shownResult = Object.fromEntries(
     HELD_RESULT_KEYS.map((key) => [
       key,
       computed({
-        get: () => (heldResult.value ?? state)[key],
+        get: () => {
+          const held = heldResult.value;
+          if (!held) return state[key];
+          if (!handedOver.value) return held[key];
+          return LATE_FILLED_KEYS.includes(key) && !isFilled(state[key]) ? held[key] : state[key];
+        },
         set: (value: any) => {
-          ((heldResult.value ?? state) as Record<HeldKey, any>)[key] = value;
+          (writeTarget() as Record<HeldKey, any>)[key] = value;
         },
       }),
     ]),

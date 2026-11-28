@@ -19,6 +19,7 @@ pub mod ai;
 pub mod alerts;
 pub mod anomaly_detection;
 pub mod autoobserve;
+pub mod autoresolve;
 pub mod cluster;
 pub mod correlation;
 pub mod dashboards;

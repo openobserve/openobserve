@@ -18,6 +18,9 @@ import analytics from "./product_analytics";
 
 export type ToolsetKind = "mcp" | "skill" | "generic";
 
+/** What the caller must hold on a toolset for the list to include it; `update` also means approve through it. */
+export type ToolsetPermission = "list" | "update";
+
 export interface ToolsetCreateRequest {
   name: string;
   kind: ToolsetKind;
@@ -31,7 +34,10 @@ export interface ToolsetUpdateRequest {
 }
 
 const aiToolsets = {
-  list: (org_identifier: string, params?: { name?: string; kind?: string; limit?: number }) => {
+  list: (
+    org_identifier: string,
+    params?: { name?: string; kind?: string; limit?: number; permission?: ToolsetPermission },
+  ) => {
     return http().get(`/api/${org_identifier}/ai/toolsets`, { params });
   },
   get: (org_identifier: string, id: string) => {

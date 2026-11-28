@@ -221,6 +221,13 @@ export const useRolePermissionRows = (deps: RowDeps) => {
       if (resourceName === "prompt") {
         resource.entities[resource.entities.length - 1].permission.AllowDelete.show = false;
       }
+      // A toolset's detail read checks List, and nothing is created inside a toolset.
+      if (resourceName === "ai_toolsets") {
+        const entity = resource.entities[resource.entities.length - 1];
+        entity.permission.AllowList.show = true;
+        entity.permission.AllowGet.show = false;
+        entity.permission.AllowPost.show = false;
+      }
       // Hide non-applicable permissions for logs_cache entities (only All and Delete)
       if (resourceName === "logs_cache") {
         const entity = resource.entities[resource.entities.length - 1];

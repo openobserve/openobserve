@@ -59,6 +59,8 @@ export interface StreamInfo {
   filter_aliases?: Record<string, string[]>;
   /** Identity dimensions the backend could not resolve on this stream's schema (query is wider than chips imply). */
   dropped_dimensions?: string[];
+  /** Set only when the request asked `check_data`; absent means unknown, not empty. */
+  has_data?: boolean;
 }
 
 export interface RelatedStreams {
@@ -79,6 +81,8 @@ export interface CorrelationRequest {
   /** The drawer's window in microseconds; the record's spans are read over the last hour without it. */
   start_time?: number;
   end_time?: number;
+  /** Ask for `has_data` per stream over start_time..end_time; older servers ignore it. */
+  check_data?: boolean;
 }
 
 export interface CorrelationResponse extends ServiceDisplayFields {

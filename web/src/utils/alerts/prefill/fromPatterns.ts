@@ -37,6 +37,7 @@ import {
   buildPatternSetSqlQuery,
   patternFilterBlockedReason,
   resolvePatternMatchTerms,
+  type PatternTerms,
 } from "@/plugins/logs/patterns/patternUtils";
 
 export interface PatternsPrefillInput {
@@ -47,8 +48,8 @@ export interface PatternsPrefillInput {
    * which the dialog states explicitly rather than leaving implicit.
    */
   templates?: string[];
-  /** Every extracted template, so a pattern's terms are checked against all of them, not only the visible ones. */
-  allTemplates?: string[];
+  /** The extracted patterns, which carry each template's terms. */
+  patterns?: PatternTerms[];
   /** Every extracted pattern, for the "N of M" line. */
   totalCount?: number;
   /** True when the severity chips are narrowing the list. */
@@ -78,8 +79,8 @@ export interface PatternsPrefillInput {
   select?: "rows" | "count";
 }
 
-const usable = (templates: string[], all?: string[]) =>
-  templates.filter((t) => resolvePatternMatchTerms(t, all) !== null);
+const usable = (templates: string[], patterns?: PatternTerms[]) =>
+  templates.filter((t) => resolvePatternMatchTerms(t, patterns) !== null);
 
 const filterDropped = (input: PatternsPrefillInput) =>
   !!(input.baseFilterDropped || input.textFilterDropped || input.heldFilterDropped);
@@ -93,13 +94,12 @@ export const buildPrefillFromPatterns = (input: PatternsPrefillInput): AlertPref
   const mode: AlertPatternMode = input.mode ?? "exclude";
   const requested = input.templates ?? [];
 
-  // Patterns with no long constant, or whose constants all appear in another
-  // pattern, have no filter that selects only them; wildcards are per-log samples.
-  const allTemplates = input.allTemplates;
-  const templates = usable(requested, allTemplates);
+  // Patterns the extractor found no separating terms for cannot be filtered on.
+  const patterns = input.patterns;
+  const templates = usable(requested, patterns);
   const dropped = requested.filter((t) => !templates.includes(t));
   const sharedDropped = dropped.filter(
-    (t) => patternFilterBlockedReason(t, allTemplates) === "shared",
+    (t) => patternFilterBlockedReason(t, patterns) === "shared",
   ).length;
   if (dropped.length > sharedDropped) warnings.push(warn("noConstants", "warning"));
   if (sharedDropped) warnings.push(warn("patternsShared", "warning", { count: sharedDropped }));
@@ -160,7 +160,7 @@ export const buildPrefillFromPatterns = (input: PatternsPrefillInput): AlertPref
     includes: effectiveMode === "include" ? applied : [],
     excludes: effectiveMode === "exclude" ? applied : [],
     baseFilter,
-    allTemplates,
+    patterns,
     select,
   });
 

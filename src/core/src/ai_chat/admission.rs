@@ -27,7 +27,7 @@ use o2_enterprise::enterprise::{
             lease::{self, LeaseError, TurnLease},
             registry::{self, Registration, TurnCaps, TurnOwner, TurnRefusal, WaitingApproval},
         },
-        client::{QueryRequest, RCA_AGENT_TYPE},
+        client::{AUTORESOLVE_AGENT_TYPE, QueryRequest, RCA_AGENT_TYPE},
     },
     common::config::get_config as get_o2_config,
 };
@@ -126,12 +126,12 @@ pub fn prompt_title(prompt: &str) -> Option<String> {
     Some(title)
 }
 
-/// A new session's first title: an RCA run's whole rendered prompt, else the bounded first prompt
-/// line.
+/// A new session's first title: an RCA run's whole rendered prompt or an AutoResolve run's whole
+/// goal, else the bounded first prompt line.
 fn initial_title(agent_type: &str, user_email: &str, prompt: &str) -> Option<String> {
     let rca_run =
         agent_type == RCA_AGENT_TYPE && crate::organization::is_system_service_account(user_email);
-    if !rca_run {
+    if !rca_run && agent_type != AUTORESOLVE_AGENT_TYPE {
         return prompt_title(prompt);
     }
     let prompt = prompt.trim();

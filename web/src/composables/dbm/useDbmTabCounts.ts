@@ -40,12 +40,8 @@
  *     written, so files written before the seed landed carry none and fall back
  *     to a full scan. A window still holding pre-seed data pays the old cost for
  *     that part of it; the improvement arrives as that data ages out;
- *   - it is NOT unconditional. A tantivy index is abandoned for a file once the
- *     predicate matches more than `inverted_index_skip_threshold` percent of its
- *     rows (default 35), falling back to DataFusion. `o2_dbm_kind='activity'`
- *     measured ~21.6% of the stream — under the cutoff, but the same order of
- *     magnitude. The rarer kinds benefit most; `activity` is the weakest case
- *     and may show no improvement on a stream carrying little else;
+ *   - it helps rare kinds most. `o2_dbm_kind='activity'` measured ~21.6% of
+ *     the stream, so it prunes the least;
  *   - it prunes the SCAN, not the aggregate. The count is still
  *     `COUNT(DISTINCT pid)` over whatever survives the prune, and there is
  *     still no cheaper count to fetch INSTEAD — a pre-aggregated activity

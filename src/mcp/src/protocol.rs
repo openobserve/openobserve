@@ -25,14 +25,15 @@ use super::{
     response_filter::filter_response,
     streaming::StreamedCall,
     tools::{
-        get_pinned_tools, get_shared_http_client, get_tool_metadata, requires_confirmation,
-        tool_search,
+        get_pinned_tools, get_shared_http_client, get_tool_metadata, is_read_only,
+        requires_confirmation, tool_search,
     },
     types::*,
 };
 
 /// Answer given to tool calls when the MCP tool registry was never built.
 const MCP_DISABLED_MESSAGE: &str = "MCP is disabled on this node (ZO_MCP_ENABLED=false)";
+const READ_ONLY_REFUSAL: &str = "OpenObserve changes are not available to AutoResolve.";
 
 /// Largest upstream text a tool result carries; more would swamp most models' context windows.
 const MAX_TOOL_RESULT_BYTES: usize = 1024 * 1024;
@@ -79,6 +80,7 @@ pub async fn route_request(
     request: MCPRequest,
     auth_token: Option<String>,
     origin: Option<&Origin>,
+    access: ToolAccess,
 ) -> Result<MCPResponse> {
     // Validate JSON-RPC version
     if request.jsonrpc != JSONRPC_VERSION {
@@ -133,7 +135,9 @@ pub async fn route_request(
         MCPMethod::ToolsList if !mcp_enabled => Ok(json!({ "tools": [] })),
         MCPMethod::ToolsCall if !mcp_enabled => Err(anyhow!(MCP_DISABLED_MESSAGE).into()),
         MCPMethod::ToolsList => handle_tools_list().map_err(RpcError::from),
-        MCPMethod::ToolsCall => handle_tools_call(org_id, request.params, auth_token, origin).await,
+        MCPMethod::ToolsCall => {
+            handle_tools_call(org_id, request.params, auth_token, origin, access).await
+        }
         MCPMethod::ServerDiscover => handle_server_discover().map_err(RpcError::from),
         // Notifications are one-way; no response body required (HTTP layer returns 202)
         MCPMethod::NotificationsInitialized => Ok(Value::Null),
@@ -339,6 +343,21 @@ fn handle_tool_search(query: &str, limit: Option<usize>) -> Result<Value> {
     Ok(json!({ "tools": tool_summaries }))
 }
 
+/// A read-only caller is refused any tool that may change something, before it is sent or carded.
+fn refuse_change(
+    access: ToolAccess,
+    metadata: &rmcp_openapi::ToolMetadata,
+) -> Result<(), RpcError> {
+    if access == ToolAccess::ReadOnly && !is_read_only(metadata) {
+        return Err(RpcError {
+            code: MCPErrorCode::InvalidRequest,
+            message: READ_ONLY_REFUSAL.to_string(),
+            data: None,
+        });
+    }
+    Ok(())
+}
+
 /// Handle tools_call - execute a tool directly by name
 async fn handle_direct_call(
     org_id: &str,
@@ -347,10 +366,12 @@ async fn handle_direct_call(
     detail: &DetailLevel,
     auth_token: Option<String>,
     origin: Option<&Origin>,
+    access: ToolAccess,
 ) -> Result<Value, RpcError> {
     // Find the tool metadata for execution
     let tool_metadata = get_tool_metadata(tool_name)
         .ok_or_else(|| RpcError::invalid_params(format!("Unknown tool: {tool_name}")))?;
+    refuse_change(access, &tool_metadata)?;
     approval::check(
         org_id,
         &tool_metadata.name,
@@ -371,7 +392,6 @@ async fn handle_direct_call(
         origin,
     )
     .await;
-
     Ok(serde_json::to_value(result)?)
 }
 
@@ -382,6 +402,7 @@ async fn handle_tools_call(
     params: Value,
     auth_token: Option<String>,
     origin: Option<&Origin>,
+    access: ToolAccess,
 ) -> Result<Value, RpcError> {
     // Parse parameters
     let call_params: ToolsCallParams = serde_json::from_value(params)
@@ -410,6 +431,7 @@ async fn handle_tools_call(
                 &args.detail,
                 auth_token,
                 origin,
+                access,
             )
             .await
         }
@@ -423,6 +445,7 @@ async fn handle_tools_call(
                 &DetailLevel::default(),
                 auth_token,
                 origin,
+                access,
             )
             .await
         }
@@ -1009,7 +1032,9 @@ mod tests {
             params: Value::Null,
         };
 
-        let response = route_request("default", request, None, None).await.unwrap();
+        let response = route_request("default", request, None, None, ToolAccess::Any)
+            .await
+            .unwrap();
         assert!(response.error.is_some());
         assert_eq!(response.error.unwrap().code, -32600);
     }
@@ -1023,7 +1048,9 @@ mod tests {
             params: Value::Null,
         };
 
-        let response = route_request("default", request, None, None).await.unwrap();
+        let response = route_request("default", request, None, None, ToolAccess::Any)
+            .await
+            .unwrap();
         assert!(response.error.is_some());
         assert_eq!(response.error.unwrap().code, -32601);
     }
@@ -1037,7 +1064,9 @@ mod tests {
             params: Value::Null,
         };
 
-        let response = route_request("default", request, None, None).await.unwrap();
+        let response = route_request("default", request, None, None, ToolAccess::Any)
+            .await
+            .unwrap();
         assert!(response.result.is_some());
         assert!(response.error.is_none());
     }
@@ -1053,7 +1082,9 @@ mod tests {
             }),
         };
 
-        let response = route_request("default", request, None, None).await.unwrap();
+        let response = route_request("default", request, None, None, ToolAccess::Any)
+            .await
+            .unwrap();
         assert!(response.error.is_none());
         let result = response.result.unwrap();
         assert_eq!(result["resultType"], json!("complete"));
@@ -1092,7 +1123,9 @@ mod tests {
             }),
         };
 
-        let response = route_request("default", request, None, None).await.unwrap();
+        let response = route_request("default", request, None, None, ToolAccess::Any)
+            .await
+            .unwrap();
         let error = response.error.unwrap();
         assert_eq!(error.code, -32022);
         let data = error.data.unwrap();
@@ -1118,7 +1151,9 @@ mod tests {
             }),
         };
 
-        let response = route_request("default", request, None, None).await.unwrap();
+        let response = route_request("default", request, None, None, ToolAccess::Any)
+            .await
+            .unwrap();
         let result = response.result.unwrap();
         assert_eq!(result["resultType"], json!("complete"));
         assert!(result["ttlMs"].is_u64());
@@ -1138,7 +1173,9 @@ mod tests {
             params: Value::Null,
         };
 
-        let response = route_request("default", request, None, None).await.unwrap();
+        let response = route_request("default", request, None, None, ToolAccess::Any)
+            .await
+            .unwrap();
         let result = response.result.unwrap();
         let obj = result.as_object().unwrap();
         assert!(!obj.contains_key("resultType"));
@@ -1156,7 +1193,9 @@ mod tests {
             params: Value::Null,
         };
 
-        let response = route_request("default", request, None, None).await.unwrap();
+        let response = route_request("default", request, None, None, ToolAccess::Any)
+            .await
+            .unwrap();
         assert!(response.result.is_some());
         assert!(response.error.is_none());
         assert_eq!(response.id, Some(Value::from(2)));
@@ -1201,7 +1240,7 @@ mod tests {
             params: Value::Null,
         };
 
-        let list_response = route_request("default", list_request, None, None)
+        let list_response = route_request("default", list_request, None, None, ToolAccess::Any)
             .await
             .unwrap();
         assert!(list_response.result.is_some());
@@ -1234,7 +1273,7 @@ mod tests {
             }),
         };
 
-        let search_response = route_request("default", search_request, None, None)
+        let search_response = route_request("default", search_request, None, None, ToolAccess::Any)
             .await
             .unwrap();
         assert!(search_response.result.is_some());
@@ -1294,7 +1333,9 @@ mod tests {
             }),
         };
 
-        let response = route_request("default", request, None, None).await.unwrap();
+        let response = route_request("default", request, None, None, ToolAccess::Any)
+            .await
+            .unwrap();
         let error = response.error.unwrap();
         assert_eq!(error.code, -32602);
         assert_eq!(error.message, "Unknown tool: unknown_tool");
@@ -1316,7 +1357,9 @@ mod tests {
                 method: "tools/call".to_string(),
                 params: params.clone(),
             };
-            let response = route_request("default", request, None, None).await.unwrap();
+            let response = route_request("default", request, None, None, ToolAccess::Any)
+                .await
+                .unwrap();
             assert_eq!(response.error.unwrap().code, -32602, "{params}");
         }
     }
@@ -1632,6 +1675,35 @@ mod tests {
                     (p.to_string(), mapping)
                 })
                 .collect(),
+        }
+    }
+
+    #[tokio::test]
+    async fn a_read_only_caller_runs_only_reads() {
+        use ToolAccess::{Any, ReadOnly};
+        let search = crate::streaming::route_through_streams(vec![
+            operation("SearchSQL", "POST", "/api/{org_id}/_search"),
+            operation("SearchStreamHttp2", "POST", "/api/{org_id}/_search_stream"),
+        ])
+        .unwrap()
+        .remove(0);
+        let change = operation("CreateDashboard", "POST", "/api/{org_id}/dashboards");
+        let list = operation("StreamList", "GET", "/api/{org_id}/streams");
+        let cases = [
+            ("run token, change", ReadOnly, &change, false),
+            ("run token, GET read", ReadOnly, &list, true),
+            ("run token, streamed search", ReadOnly, &search, true),
+            ("person, change", Any, &change, true),
+        ];
+        for (case, access, tool, runs) in cases {
+            match refuse_change(access, tool) {
+                Ok(()) => assert!(runs, "{case}: ran"),
+                Err(e) => assert_eq!(
+                    (runs, e.code, e.message.as_str()),
+                    (false, MCPErrorCode::InvalidRequest, READ_ONLY_REFUSAL),
+                    "{case}"
+                ),
+            }
         }
     }
 

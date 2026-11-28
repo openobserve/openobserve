@@ -44,8 +44,18 @@ export function applyPieDonutChart(ctx: SQLContext): void {
     hoveredSeriesState,
     defaultSeriesProps,
     getAxisDataFromKey,
+    getRawAxisDataFromKey,
     getPieChartRadius,
+    xAxisKeys,
   } = ctx;
+  const rawNames = getRawAxisDataFromKey(xAxisKeys?.[0]);
+  const sliceData = (key: string) =>
+    getAxisDataFromKey(key).map((value: unknown, i: number) => {
+      const raw = rawNames[i];
+      // A (null) or (empty) slice drills down on the blank value it stands for.
+      const blank = raw === null || raw === undefined || raw === "";
+      return { value, name: options?.xAxis[0]?.data[i], ...(blank ? { rawName: "" } : {}) };
+    });
   const seriesOverrides = createSeriesOverrideLookup(panelSchema?.config);
   const percentDecimals = piePercentPrecision(panelSchema?.config);
   const slicePercent = createPieSlicePercent(panelSchema?.config);
@@ -92,9 +102,7 @@ export function applyPieDonutChart(ctx: SQLContext): void {
     options.series = yAxisKeys?.map((key: any) => {
       const seriesObj: any = {
         ...defaultSeriesProps,
-        data: getAxisDataFromKey(key).map((it: any, i: number) => {
-          return { value: it, name: options?.xAxis[0]?.data[i] };
-        }),
+        data: sliceData(key),
         itemStyle: {
           color: ["palette-classic"].includes(panelSchema.config?.color?.mode)
             ? null
@@ -238,9 +246,7 @@ export function applyPieDonutChart(ctx: SQLContext): void {
     options.series = yAxisKeys?.map((key: any) => {
       const seriesObj: any = {
         ...defaultSeriesProps,
-        data: getAxisDataFromKey(key).map((it: any, i: number) => {
-          return { value: it, name: options?.xAxis[0]?.data[i] };
-        }),
+        data: sliceData(key),
         itemStyle: {
           color: ["palette-classic"].includes(panelSchema.config?.color?.mode)
             ? null

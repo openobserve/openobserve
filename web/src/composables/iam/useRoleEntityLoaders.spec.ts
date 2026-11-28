@@ -63,6 +63,21 @@ vi.mock("@/services/alert_templates", async (importOriginal) => {
     default: { list: vi.fn(async () => ({ data: [{ name: "t1" }] })) },
   });
 });
+vi.mock("@/services/ai_toolsets", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock((await importOriginal()) as any, {
+    default: {
+      list: vi.fn(async () => ({
+        data: {
+          toolsets: [
+            { id: "ts1", name: "github", kind: "mcp" },
+            { id: "ts2", name: "kubectl", kind: "cli" },
+          ],
+        },
+      })),
+    },
+  });
+});
 vi.mock("@/services/alert_destination", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
   return overlayServiceMock((await importOriginal()) as any, {
@@ -182,6 +197,7 @@ vi.mock("@/services/llm-prompts.service", () => ({
 
 import { useRoleEntityLoaders } from "@/composables/iam/useRoleEntityLoaders";
 import { queryClient } from "@/composables/query/queryClient";
+import aiToolsetsService from "@/services/ai_toolsets";
 import alertService from "@/services/alerts";
 import cipherKeysService from "@/services/cipher_keys";
 import commonService from "@/services/common";
@@ -249,6 +265,7 @@ describe("useRoleEntityLoaders - license-locked features", () => {
     alerts: "locked",
     reports: "locked",
     synthetics: "locked",
+    ai_toolsets: "locked",
   };
 
   it("lists nothing for the rows of locked features", async () => {
@@ -264,6 +281,7 @@ describe("useRoleEntityLoaders - license-locked features", () => {
       row({ resourceName: "synthetic_environment" }),
       row({ resourceName: "downtime_folder" }),
       row({ name: "f1", resourceName: "downtime_folder", childName: "downtime" }),
+      row({ resourceName: "ai_toolsets" }),
     ];
 
     for (const r of rows) await expect(getResourceEntities(r as any)).resolves.toBe(true);
@@ -276,6 +294,7 @@ describe("useRoleEntityLoaders - license-locked features", () => {
     expect(alertService.listByFolderId).not.toHaveBeenCalled();
     expect(reportService.listByFolderId).not.toHaveBeenCalled();
     expect(syntheticsService.listByFolderId).not.toHaveBeenCalled();
+    expect(aiToolsetsService.list).not.toHaveBeenCalled();
     expect(rows.every((r) => !r.is_loading)).toBe(true);
   });
 
@@ -775,11 +794,12 @@ describe("useRoleEntityLoaders - flat resource loaders", () => {
     );
   });
 
-  it("getDestinations and getTemplates go through the query cache", async () => {
-    const { getDestinations, getTemplates, updateResourceEntities } = setup();
+  it("getDestinations, getTemplates and getAiToolsets go through the query cache", async () => {
+    const { getDestinations, getTemplates, getAiToolsets, updateResourceEntities } = setup();
 
     await getDestinations();
     await getTemplates();
+    await getAiToolsets();
 
     expect(destinationService.list).toHaveBeenCalledWith({
       page_num: 1,
@@ -793,6 +813,16 @@ describe("useRoleEntityLoaders - flat resource loaders", () => {
     expect(updateResourceEntities.mock.calls).toEqual([
       ["destination", ["name"], [{ name: "dest1" }]],
       ["template", ["name"], [{ name: "t1" }]],
+      [
+        "ai_toolsets",
+        ["id"],
+        [
+          { id: "ts1", name: "github" },
+          { id: "ts2", name: "kubectl" },
+        ],
+        false,
+        "name",
+      ],
     ]);
   });
 

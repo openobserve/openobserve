@@ -13,14 +13,18 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { toRaw } from "vue";
+import { toRaw, watch } from "vue";
 import {
   STATE_TIMELINE_Y_FUNCTION,
   buildDefaultBuilderFields,
   keepRawValueFields,
 } from "@/utils/dashboard/defaultFields";
 import { isCustomSqlPanel, isRowTimeline } from "@/utils/dashboard/chartTypeGroups";
-import type { LogsOrder } from "@/utils/dashboard/convertLogsPanelData";
+import {
+  DEFAULT_LOGS_ORDER,
+  LOGS_ORDERS,
+  type LogsOrder,
+} from "@/utils/dashboard/convertLogsPanelData";
 import {
   HOSTMAP_DEFAULT_COLOR,
   HOSTMAP_MAX_GROUP_LEVELS,
@@ -50,7 +54,10 @@ export const defaultLogsPanelQuery = (
     : "";
 
 // The SQL each custom-SQL panel type starts from, keyed by panel type.
-const STARTER_QUERIES: Record<string, (stream: string, timestampColumn: string) => string> = {
+const STARTER_QUERIES: Record<
+  string,
+  (stream: string, timestampColumn: string, order?: LogsOrder) => string
+> = {
   "flame-graph": (stream) => defaultFlameGraphPanelQuery(stream),
   logs: defaultLogsPanelQuery,
 };
@@ -70,6 +77,18 @@ export const orderLogsStarter = (query: any, order: LogsOrder) => {
   query.query = query.query
     .trim()
     .replace(/ (?:ASC|DESC) LIMIT 100$/, ` ${order === "oldest" ? "ASC" : "DESC"} LIMIT 100`);
+  markPanelStarterQuery(query);
+};
+
+/** Rebuilds an untouched starter for the query's current stream, in the panel's stored logs order. */
+export const reseedStarterForStream = (query: any, panel: any, timestampColumn: string) => {
+  const build = STARTER_QUERIES[panel?.type];
+  if (!build || !query?.customQuery || !isPanelStarterQuery(query)) return;
+  const stored = panel?.config?.logs_order;
+  const order: LogsOrder = LOGS_ORDERS.includes(stored) ? stored : DEFAULT_LOGS_ORDER;
+  const next = build(query.fields?.stream ?? "", timestampColumn, order);
+  if (next === query.query) return;
+  query.query = next;
   markPanelStarterQuery(query);
 };
 
@@ -155,6 +174,15 @@ export const usePanelAggregation = ({
     // The builder is hidden for these types, so the SQL editor is where the panel is built.
     dashboardPanelData.layout.showQueryBar = true;
   };
+
+  // The starter names its stream, so picking another stream must not leave it querying the old one.
+  watch(
+    () => (dashboardPanelData.data?.queries ?? []).map((query: any) => query?.fields?.stream),
+    () =>
+      dashboardPanelData.data?.queries?.forEach((query: any) =>
+        reseedStarterForStream(query, dashboardPanelData.data, getTimestampColumn()),
+      ),
+  );
 
   const resetAggregationFunction = () => {
     dropFunnelConfig(dashboardPanelData.data);

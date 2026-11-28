@@ -863,16 +863,20 @@ describe("ONavGroup", () => {
     expect(flyout().find('[data-test="nav-group-item-notARoute"]').exists()).toBe(false);
   });
 
-  it("tags a beta child with the shared Beta badge, and only that child", async () => {
+  it.each([
+    [{ alpha: true }, "alpha-badge"],
+    [{ beta: true }, "beta-badge"],
+    [{}, null],
+  ])("shows Alpha on a child marked alpha and Beta on beta (%o)", async (mark, badge) => {
     wrapper = mountGroup();
-    await wrapper.setProps({
-      children: [children[0], { ...children[1], beta: true }],
-    });
+    await wrapper.setProps({ children: [children[0], { ...children[1], ...mark }] });
     await hoverOpen();
 
     const item = (name: string) => flyout().find(`[data-test="nav-group-item-${name}"]`);
-    expect(item("pipelines").find('[data-test="beta-badge"]').exists()).toBe(true);
-    expect(item("logstreams").find('[data-test="beta-badge"]').exists()).toBe(false);
+    for (const tag of ["alpha-badge", "beta-badge"]) {
+      expect(item("pipelines").find(`[data-test="${tag}"]`).exists()).toBe(tag === badge);
+      expect(item("logstreams").find(`[data-test="${tag}"]`).exists()).toBe(false);
+    }
   });
 
   it("heads a run of children sharing a categoryKey, and TRANSLATES the header", async () => {

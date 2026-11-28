@@ -78,33 +78,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >{{ t("dashboard.communityDashboard") }}</OButton
                   >
                 </div>
+                <!-- The destination folder applies to both tabs, so it sits above the file and URL inputs -->
+                <div class="bg-card-glass-bg shrink-0 px-2 pt-1">
+                  <div
+                    data-test="dashboard-folder-dropdown"
+                    class="import-folder-dropdown-container w-full max-w-sm"
+                  >
+                    <SelectFolderDropdown
+                      @folder-selected="selectedFolder = $event"
+                      :activeFolderId="selectedFolder.value"
+                      :disabled="!!isLoading"
+                    />
+                  </div>
+                </div>
                 <div
                   v-if="activeTab == 'import_json_url'"
                   class="editor-container-url bg-card-glass-bg flex min-h-0 flex-1 flex-col py-1"
                 >
                   <div class="mx-2 mt-1 mb-1 flex min-h-0 flex-1 flex-col">
-                    <div
-                      class="flex w-[calc(100%_-_0.625rem)] w-full shrink-0 items-center gap-2 max-md:flex-wrap"
-                    >
-                      <div data-test="dashboard-import-url-input" class="w-[69%] max-md:w-full">
-                        <OFormInput
-                          data-test="dashboard-import-url-control"
-                          name="url"
-                          :label="t('common.url')"
-                          :placeholder="t('dashboard.addURL')"
-                        />
-                      </div>
-
-                      <div
-                        data-test="dashboard-folder-dropdown"
-                        class="import-folder-dropdown-container w-[calc(30%)] max-md:w-full"
-                      >
-                        <SelectFolderDropdown
-                          @folder-selected="selectedFolder = $event"
-                          :activeFolderId="selectedFolder.value"
-                          :disabled="!!isLoading"
-                        />
-                      </div>
+                    <div data-test="dashboard-import-url-input" class="shrink-0">
+                      <OFormInput
+                        data-test="dashboard-import-url-control"
+                        name="url"
+                        :label="t('common.url')"
+                        :placeholder="t('dashboard.addURL')"
+                      />
                     </div>
                     <QueryEditor
                       data-test="dashboard-import-url-editor"
@@ -122,28 +120,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="dashboard-import-json-container bg-card-glass-bg flex min-h-0 flex-1 flex-col py-1"
                 >
                   <div class="mx-2 mt-1 mb-1 flex min-h-0 flex-1 flex-col">
-                    <div
-                      class="flex w-[calc(100%_-_0.625rem)] w-full shrink-0 items-center gap-2 max-md:flex-wrap"
-                    >
-                      <div data-test="dashboard-import-file-input" class="w-[69%] max-md:w-full">
-                        <OFormFile
-                          data-test="dashboard-import-file-control"
-                          name="jsonFiles"
-                          :label="t('dashboard.selectFile')"
-                          :placeholder="t('dashboard.dropFileMsg')"
-                          accept=".json"
-                          multiple
-                          dropZone
-                          :disabled="!!isLoading"
-                        />
-                      </div>
-                      <div class="import-folder-dropdown-container w-[calc(30%)] max-md:w-full">
-                        <SelectFolderDropdown
-                          @folder-selected="selectedFolder = $event"
-                          :activeFolderId="selectedFolder.value"
-                          :disabled="!!isLoading"
-                        />
-                      </div>
+                    <div data-test="dashboard-import-file-input" class="shrink-0">
+                      <OFormFile
+                        data-test="dashboard-import-file-control"
+                        name="jsonFiles"
+                        :label="t('dashboard.selectFile')"
+                        accept=".json"
+                        multiple
+                        :validate="validateJsonFile"
+                        :disabled="!!isLoading"
+                      />
                     </div>
                     <QueryEditor
                       data-test="dashboard-import-json-file-editor"
@@ -278,7 +264,7 @@ import {
   watch,
   defineAsyncComponent,
 } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { getAllDashboards, getFoldersList, dedupeDashboardIds } from "../../utils/commons.js";
 import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
@@ -297,6 +283,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormFile from "@/lib/forms/File/OFormFile.vue";
+import { createJsonFileValidator } from "@/lib/forms/File/validateJsonFile";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import { makeImportDashboardSchema, importDashboardDefaults } from "./ImportDashboard.schema";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
@@ -309,17 +296,22 @@ export default defineComponent({
   props: ["dashboardId"],
   setup() {
     const { t } = useI18nTyped();
+    const validateJsonFile = createJsonFileValidator(t);
     const store = useStore();
     const router = useRouter();
     const route = useRoute();
     const { showPositiveNotification, showErrorNotification } = useNotifications();
-    const selectedFolder = ref({
-      label:
-        store.state.organizationData.folders.find(
-          (item: any) => item.folderId === (route.query.folder ?? "default"),
-        )?.name ?? "default",
-      value: route.query.folder,
-    });
+    // The route may name a view such as Favorites, which is not a folder a dashboard can be created in.
+    const folderFromRoute = () => {
+      const folderId = route.query.folder ?? "default";
+      const folder = store.state.organizationData.folders.find(
+        (item: any) => item.folderId === folderId,
+      );
+      return folder
+        ? { label: folder.name, value: folderId }
+        : { label: "default", value: "default" };
+    };
+    const selectedFolder = ref(folderFromRoute());
 
     // Monaco editor content (a non-OForm* code editor, bridged at @submit).
     // url + jsonFiles are form-owned and read below via form.useStore.
@@ -389,16 +381,16 @@ export default defineComponent({
     onMounted(async () => {
       filesImportResults.value = [];
       await getFoldersList(store);
-      selectedFolder.value = {
-        label:
-          store.state.organizationData.folders.find(
-            (item: any) => item.folderId === (route.query.folder ?? "default"),
-          )?.name ?? "default",
-        value: route.query.folder,
-      };
+      selectedFolder.value = folderFromRoute();
     });
 
     watch(jsonFiles, (newVal) => {
+      // Every file removed or refused: nothing is left to import. Only this path clears the
+      // editor, since clearing it also resets the files and would drop a pick's valid ones.
+      if (!newVal || newVal.length === 0) {
+        jsonStr.value = "";
+        return;
+      }
       if (newVal && newVal.length > 0) {
         const fileContents = []; // Array to store parsed JSON objects
 
@@ -493,6 +485,13 @@ export default defineComponent({
       return converted;
     };
 
+    // The backend says why it refused the dashboard, as JSON or as a plain-text body; axios only reports the status code.
+    const importErrorMessage = (error: any) => {
+      const body = error?.response?.data;
+      const text = typeof body === "string" ? body.trim() : "";
+      return body?.message || text || error?.message || String(error);
+    };
+
     // Counts confirmed creates for the running import action; a later refresh failure must not hide them.
     let createdInAction = 0;
 
@@ -581,7 +580,7 @@ export default defineComponent({
                   const res = await importDashboardFromJSON(convertedSchema, importFolder);
                   results.push({ index: i + 1, result: res });
                 } catch (e) {
-                  results.push({ index: i + 1, error: e });
+                  results.push({ index: i + 1, error: new Error(importErrorMessage(e)) });
                 }
               }
 
@@ -692,10 +691,12 @@ export default defineComponent({
             const validationErrors = validateDashboardJson(t, converted);
             if (validationErrors.length > 0) {
               const errorMessage = validationErrors.join("; ");
-              return Promise.reject({ index, error: new Error(errorMessage) });
+              return Promise.reject({ index, error: errorMessage });
             }
 
-            return importDashboardFromJSON(converted, importFolder);
+            return importDashboardFromJSON(converted, importFolder).catch((e) =>
+              Promise.reject({ index, error: importErrorMessage(e) }),
+            );
           } catch (e) {
             return Promise.reject({ index, error: e });
           }
@@ -764,7 +765,11 @@ export default defineComponent({
           );
         });
       } catch (error) {
-        showErrorNotification(t("dashboard.importDashboardPage.pleaseEnterJsonObject"));
+        showErrorNotification(
+          error?.response
+            ? raw(importErrorMessage(error))
+            : t("dashboard.importDashboardPage.pleaseEnterJsonObject"),
+        );
       } finally {
         if (createdInAction > 0) {
           analytics.track("dashboard_imported", { source: "json", count: createdInAction });
@@ -794,6 +799,11 @@ export default defineComponent({
       setFormField("url", "");
     };
     const importDashboard = () => {
+      // An empty editor (no file left, nothing typed) has nothing to parse; say so, not "Failed".
+      if (activeTab.value === "import_json_file" && !String(jsonStr.value ?? "").trim()) {
+        showErrorNotification(t("dashboard.importDashboardPage.pleaseEnterJsonObject"));
+        return;
+      }
       try {
         dashboardErrorsToDisplay.value = [];
         const jsonObj = JSON.parse(jsonStr.value);
@@ -887,6 +897,7 @@ export default defineComponent({
     };
 
     return {
+      validateJsonFile,
       t,
       goBack,
       onSubmit,

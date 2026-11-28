@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import type { AxiosRequestConfig } from "axios";
 import http from "./http";
 import analytics from "./product_analytics";
 
@@ -26,6 +27,7 @@ const dashboards = {
     organization: string,
     folderId: string,
     title: string,
+    options?: AxiosRequestConfig,
   ) => {
     const params: any = {
       page_num,
@@ -41,7 +43,7 @@ const dashboards = {
     if (title) {
       params.title = title;
     }
-    return http().get(`/api/${organization}/dashboards`, { params });
+    return http().get(`/api/${organization}/dashboards`, { ...options, params });
   },
   /** Every folder's dashboards: with no folder, a title param, even empty, lifts the default-folder limit. */
   listAcrossFolders: (organization: string) =>
@@ -63,9 +65,15 @@ const dashboards = {
     }
     return http().delete(url, { data });
   },
-  get_Dashboard: (org_identifier: string, dashboardID: string, folderId?: string) => {
+  get_Dashboard: (
+    org_identifier: string,
+    dashboardID: string,
+    folderId?: string,
+    config?: AxiosRequestConfig,
+  ) => {
     return http().get(
       `/api/${org_identifier}/dashboards/${dashboardID}?folder=${folderId ?? "default"}`,
+      config,
     );
   },
   save: (organization: string, dashboardID: string, data: any, folderId?: string, hash?: any) => {

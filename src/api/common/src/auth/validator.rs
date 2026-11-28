@@ -73,7 +73,10 @@ pub enum AuthError {
     Unauthorized(String),
     Forbidden(String),
     /// A valid credential whose role was refused; `Forbidden` also means a failed credential.
-    RoleRefused(String),
+    RoleRefused {
+        user_email: String,
+        message: String,
+    },
     NotFound(String),
     /// Refused by the failed-login lockout rather than by the credential itself. Only the seconds
     /// left are disclosed: the thresholds behind them stay admin-only, since a brute-forcer who
@@ -89,7 +92,7 @@ impl std::fmt::Display for AuthError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             AuthError::Unauthorized(msg) => write!(f, "Unauthorized: {}", msg),
-            AuthError::Forbidden(msg) | AuthError::RoleRefused(msg) => {
+            AuthError::Forbidden(msg) | AuthError::RoleRefused { message: msg, .. } => {
                 write!(f, "Forbidden: {}", msg)
             }
             AuthError::NotFound(msg) => write!(f, "NotFound: {}", msg),
@@ -129,7 +132,7 @@ impl IntoResponse for AuthError {
                     .body(Body::from(msg))
                     .unwrap()
             }
-            AuthError::Forbidden(msg) | AuthError::RoleRefused(msg) => {
+            AuthError::Forbidden(msg) | AuthError::RoleRefused { message: msg, .. } => {
                 (StatusCode::FORBIDDEN, msg).into_response()
             }
             AuthError::NotFound(msg) => (StatusCode::NOT_FOUND, msg).into_response(),
@@ -274,7 +277,10 @@ pub async fn validator(
                         delegation: None,
                     })
                 } else {
-                    Err(AuthError::RoleRefused("Unauthorized Access".to_string()))
+                    Err(AuthError::RoleRefused {
+                        user_email: res.user_email,
+                        message: "Unauthorized Access".to_string(),
+                    })
                 }
             } else {
                 Err(AuthError::Unauthorized("Unauthorized Access".to_string()))
@@ -828,7 +834,10 @@ pub async fn validate_credentials(
             given_name: user.first_name,
         })
     } else {
-        Err(AuthError::RoleRefused("Not allowed".to_string()))
+        Err(AuthError::RoleRefused {
+            user_email: user.email,
+            message: "Not allowed".to_string(),
+        })
     }
 }
 
@@ -954,7 +963,10 @@ pub async fn validate_credentials_ext(
             given_name: user.first_name,
         })
     } else {
-        Err(AuthError::RoleRefused("Not allowed".to_string()))
+        Err(AuthError::RoleRefused {
+            user_email: user.email,
+            message: "Not allowed".to_string(),
+        })
     }
 }
 
@@ -2664,7 +2676,7 @@ CN5lTowpVXP2OIiiNTGa75Fj
         let path = "default/stream/traces/user";
         let refused = validate_credentials(login, pwd, path, None, &Method::GET, false).await;
         assert!(
-            matches!(&refused, Err(AuthError::RoleRefused(msg)) if msg == "Not allowed"),
+            matches!(&refused, Err(AuthError::RoleRefused { message, .. }) if message == "Not allowed"),
             "a verified non-admin on a /user path: {:?}",
             refused.map(|res| res.is_valid)
         );
@@ -3448,7 +3460,7 @@ CN5lTowpVXP2OIiiNTGa75Fj
                 .split_once("\n#[cfg(test)]\nmod tests {")
                 .unwrap_or_else(|| panic!("{file}: test module marker moved; update this scan"));
             let refusals: Vec<usize> = production
-                .match_indices("Err(AuthError::RoleRefused(")
+                .match_indices("Err(AuthError::RoleRefused {")
                 .map(|(at, _)| at)
                 .collect();
             assert_eq!(

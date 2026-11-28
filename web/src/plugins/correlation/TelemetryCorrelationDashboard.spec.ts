@@ -45,6 +45,7 @@ vi.mock("@/composables/useTraces", () => ({
 }));
 
 vi.mock("@/composables/useMetricsCorrelationDashboard", () => ({
+  metricWhereConditions: vi.fn(() => ""),
   useMetricsCorrelationDashboard: vi.fn(() => ({
     generateDashboard: vi.fn(() => ({ title: "Test Dashboard", panels: [] })),
     generateLogsDashboard: vi.fn(() => ({ title: "Logs Dashboard", panels: [] })),
@@ -132,6 +133,11 @@ vi.mock("@/views/Dashboards/RenderDashboardCharts.vue", () => ({
 }));
 
 const mockTranslations = {
+  "correlation.noDataInScope": "No data in this scope",
+  "correlation.noDataInScopeReason": "No rows match these filters in this time range.",
+  "correlation.allNoDataTitle": "No metric has data in this scope",
+  "correlation.allNoDataScope": "{scope}, {window}",
+  "correlation.allNoDataAction": "Show metrics without data",
   "correlation.correlatedStreamsFor": "Correlated Streams - {service}",
   "correlation.noMetricStreamsFor": "No metric streams found for this {kind}",
   "correlation.filters": "Filters",
@@ -755,8 +761,12 @@ describe("TelemetryCorrelationDashboard.vue", () => {
 
       await wrapper.vm.fetchTracesByDimensions();
 
-      expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalledOnce();
-      const callArg = mockFetchQueryDataWithHttpStream.mock.calls[0][0];
+      // The metric existence probes share the endpoint; only the traces read counts here.
+      const traceCalls = mockFetchQueryDataWithHttpStream.mock.calls.filter(
+        (c: any[]) => c[0].type === "traces",
+      );
+      expect(traceCalls).toHaveLength(1);
+      const callArg = traceCalls[0][0];
       expect(callArg.queryReq.stream_name).toBe("traces");
       expect(callArg.queryReq.start_time).toBe(defaultProps.timeRange.startTime);
       expect(callArg.queryReq.end_time).toBe(defaultProps.timeRange.endTime);
@@ -1057,6 +1067,144 @@ describe("TelemetryCorrelationDashboard.vue", () => {
       wrapper.vm.openTraceInNewWindow("t1");
       expect(open).not.toHaveBeenCalled();
       open.mockRestore();
+    });
+  });
+
+  describe("metrics with no data in scope", () => {
+    const withData = (flags: (boolean | undefined)[]) =>
+      mockMetricStreams.map((stream, i) =>
+        flags[i] === undefined ? stream : { ...stream, has_data: flags[i] },
+      );
+
+    it("moves has_data false streams out of the selection into a collapsed group", async () => {
+      wrapper = createWrapper({
+        externalActiveTab: "metrics",
+        metricStreams: withData([true, true, false]),
+      });
+      await flushPromises();
+
+      const names = wrapper.vm.selectedMetricStreams.map((s: any) => s.stream_name);
+      expect(names).not.toContain("disk_io");
+      const group = wrapper.find('[data-test="telemetry-correlation-no-data-group"]');
+      expect(group.exists()).toBe(true);
+      expect(group.text()).toContain("No data in this scope");
+      expect(group.findAll('[data-test="telemetry-correlation-metric-stream-item"]')).toHaveLength(
+        0,
+      );
+
+      await group.find('[data-test="telemetry-correlation-no-data-group-toggle"]').trigger("click");
+      expect(
+        group
+          .findAll('[data-test="telemetry-correlation-metric-stream-item"]')
+          .map((r: any) => r.text()),
+      ).toEqual(["disk_io"]);
+      expect(group.text()).toContain("No rows match these filters in this time range.");
+    });
+
+    it("shows no group when every stream has data", async () => {
+      wrapper = createWrapper({
+        externalActiveTab: "metrics",
+        metricStreams: withData([true, true, true]),
+      });
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="telemetry-correlation-no-data-group"]').exists()).toBe(
+        false,
+      );
+      expect(wrapper.vm.selectedMetricStreams.length).toBeGreaterThan(0);
+    });
+
+    it("probes streams without has_data over the streaming endpoint", async () => {
+      wrapper = createWrapper({
+        externalActiveTab: "metrics",
+        metricStreams: withData([true, undefined, true]),
+      });
+      await flushPromises();
+
+      const sqls = mockFetchQueryDataWithHttpStream.mock.calls.map(
+        (c: any[]) => c[0]?.queryReq?.query?.sql,
+      );
+      expect(sqls).toContain('SELECT _timestamp FROM "memory_usage" LIMIT 1');
+      expect(sqls.some((q: string) => q?.includes('"cpu_usage" LIMIT 1'))).toBe(false);
+      const probe = mockFetchQueryDataWithHttpStream.mock.calls.find((c: any[]) =>
+        c[0]?.queryReq?.query?.sql?.includes("memory_usage"),
+      );
+      expect(probe?.[0].pageType).toBe("metrics");
+    });
+
+    const answerProbes = (rows: (sql: string) => "rows" | "empty" | "partial") =>
+      mockFetchQueryDataWithHttpStream.mockImplementation((payload: any, handlers: any) => {
+        const sql: string = payload?.queryReq?.query?.sql ?? "";
+        const answer = rows(sql);
+        const results =
+          answer === "partial"
+            ? { hits: [], is_partial: true }
+            : { hits: answer === "rows" ? [{ _timestamp: 1 }] : [] };
+        handlers.data(payload, { type: "search_response_hits", content: { results } });
+        handlers.complete();
+      });
+    const selectedNames = () =>
+      wrapper.vm.selectedMetricStreams.map((s: any) => s.stream_name).sort();
+
+    it("counts only listed streams in the footer total", async () => {
+      wrapper = createWrapper({
+        externalActiveTab: "metrics",
+        metricStreams: withData([true, true, false]),
+      });
+      await flushPromises();
+
+      expect(wrapper.vm.listedMetricCount).toBe(2);
+      expect(wrapper.vm.listedSelectedCount).toBe(wrapper.vm.selectedMetricStreams.length);
+    });
+
+    it("recomputes on a range change, bringing back a stream that now has data", async () => {
+      answerProbes((sql) => (sql.includes('"cpu_usage"') ? "empty" : "rows"));
+      wrapper = createWrapper({
+        externalActiveTab: "metrics",
+        metricStreams: withData([undefined, undefined, undefined]),
+      });
+      await flushPromises();
+      expect(selectedNames()).not.toContain("cpu_usage");
+      expect([...wrapper.vm.noDataStreamNames]).toEqual(["cpu_usage"]);
+
+      answerProbes(() => "rows");
+      await wrapper.setProps({
+        timeRange: { startTime: SOURCE_TS - 2 * FIVE_MIN_US, endTime: SOURCE_TS + FIVE_MIN_US },
+      });
+      await flushPromises();
+      expect(selectedNames()).toContain("cpu_usage");
+      expect(wrapper.vm.noDataStreamNames.size).toBe(0);
+    });
+
+    it("keeps a stream listed when its probe answer is partial", async () => {
+      answerProbes((sql) => (sql.includes('"cpu_usage"') ? "partial" : "rows"));
+      wrapper = createWrapper({
+        externalActiveTab: "metrics",
+        metricStreams: withData([undefined, undefined, undefined]),
+      });
+      await flushPromises();
+
+      expect(wrapper.vm.noDataStreamNames.has("cpu_usage")).toBe(false);
+      expect(selectedNames()).toContain("cpu_usage");
+    });
+
+    it("shows the every-metric-empty state, whose action expands the group", async () => {
+      wrapper = createWrapper({
+        externalActiveTab: "metrics",
+        metricStreams: withData([false, false, false]),
+      });
+      await flushPromises();
+
+      expect(wrapper.vm.selectedMetricStreams).toHaveLength(0);
+      const empty = wrapper.find('[data-test="telemetry-correlation-all-no-data"]');
+      expect(empty.exists()).toBe(true);
+      expect(empty.text()).toContain("No metric has data in this scope");
+      await empty.find('[data-test="telemetry-correlation-all-no-data-show"]').trigger("click");
+      expect(
+        wrapper
+          .find('[data-test="telemetry-correlation-no-data-group"]')
+          .findAll('[data-test="telemetry-correlation-metric-stream-item"]'),
+      ).toHaveLength(3);
     });
   });
 });

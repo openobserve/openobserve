@@ -54,6 +54,7 @@ const ALL_GATES_OPEN: NavGateContext = {
   downtimesEnabled: true,
   alertCalibrationEnabled: true,
   fleetEnabled: true,
+  autoresolveEnabled: true,
   hiddenMenus: new Set<string>(),
   features: {},
 };
@@ -82,6 +83,7 @@ export function useNavGateContext(): ComputedRef<NavGateContext> {
       alertCalibrationEnabled: z.alert_calibration_enabled === true,
       // `!== false`: the flag defaults on, and a cold load with `/config` in flight must not hide the entry.
       fleetEnabled: z.fleet_enabled !== false,
+      autoresolveEnabled: z.autoresolve_enabled === true,
       // Raw split (no trim) to match how pages test custom_hide_menus.
       hiddenMenus: new Set((z.custom_hide_menus ?? "").split(",")),
       features: z.features ?? {},

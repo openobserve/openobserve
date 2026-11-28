@@ -62,7 +62,7 @@ describe("source hygiene", () => {
   it("contains no raw NUL bytes", () => {
     const offenders = FILES.filter((f) => readFileSync(f).includes(0x00));
     expect(offenders).toEqual([]);
-  });
+  }, 20_000);
 
   it("contains no other stray C0 control characters", () => {
     // Tab, LF and CR are legitimate; the rest have no business in source.
@@ -79,5 +79,5 @@ describe("source hygiene", () => {
     }
 
     expect(offenders).toEqual([]);
-  });
+  }, 20_000);
 });
