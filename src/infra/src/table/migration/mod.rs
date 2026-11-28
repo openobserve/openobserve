@@ -300,6 +300,7 @@ mod m20261226_000001_add_oncall_team_to_incident_integrations;
 mod m20261226_000001_create_autoresolve_corrections;
 mod m20261227_000001_add_autoresolve_plan_history;
 mod m20261228_000001_add_autoresolve_run_incident;
+mod m20261229_000001_add_source_stream_to_llm_annotation_queue_items;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
 
@@ -993,6 +994,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20261226_000001_create_autoresolve_corrections::Migration),
             Box::new(m20261227_000001_add_autoresolve_plan_history::Migration),
             Box::new(m20261228_000001_add_autoresolve_run_incident::Migration),
+            Box::new(m20261229_000001_add_source_stream_to_llm_annotation_queue_items::Migration),
         ]
     }
 }
@@ -1149,6 +1151,10 @@ mod tests {
         (171, "m20261226_000001_create_autoresolve_corrections"),
         (172, "m20261227_000001_add_autoresolve_plan_history"),
         (173, "m20261228_000001_add_autoresolve_run_incident"),
+        (
+            174,
+            "m20261229_000001_add_source_stream_to_llm_annotation_queue_items",
+        ),
     ];
 
     // Two branches that each claim the next version merge cleanly, so a reused number must fail

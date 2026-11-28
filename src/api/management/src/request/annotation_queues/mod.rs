@@ -11,13 +11,15 @@ use axum::{
     extract::{Path, Query},
     response::Response,
 };
-use db::authz::{remove_ownership, set_ownership};
+use config::{meta::stream::StreamType, utils::str::into_ofga_supported_format};
+use db::authz::{list_permitted_objects, remove_ownership, set_ownership};
 use openobserve_api_common::extractors::Headers;
 use openobserve_core::{
     auth::{UserEmail, is_ofga_object_visible},
+    authz::{StreamPermissionResourceType, check_stream_permissions},
     llm_evaluations::annotation_queues::{
-        self, AnnotationQueue, AnnotationQueueError, ListAnnotationQueueItemsFilter,
-        PinnedScoreConfig,
+        self, AnnotationQueue, AnnotationQueueError, AnnotationQueueItem,
+        ListAnnotationQueueItemsFilter, PinnedScoreConfig,
     },
     self_reporting::llm_scores_writer,
 };
@@ -228,6 +230,78 @@ async fn ensure_requested_score_configs_visible(
     Ok(())
 }
 
+/// Forbidden naming `stream` unless the caller may search that traces stream; one OpenFGA Check.
+async fn ensure_source_stream_readable(
+    org_id: &str,
+    user_id: &str,
+    stream: &str,
+    action: &str,
+) -> Result<(), Response> {
+    match check_stream_permissions(
+        stream,
+        org_id,
+        user_id,
+        &StreamType::Traces,
+        StreamPermissionResourceType::Search,
+    )
+    .await
+    {
+        Some(_) => Err(MetaHttpResponse::forbidden(format!(
+            "Read access to traces stream '{stream}' is required to {action}"
+        ))),
+        None => Ok(()),
+    }
+}
+
+fn traces_ofga_key() -> &'static str {
+    o2_openfga::meta::mapping::OFGA_MODELS
+        .get("traces")
+        .map_or("traces", |model| model.key)
+}
+
+/// `items` with previews hidden where the caller cannot read the source stream; at most one List.
+async fn hide_previews_for_user(
+    org_id: &str,
+    user_id: &str,
+    items: Vec<AnnotationQueueItem>,
+) -> Result<Vec<AnnotationQueueItem>, Response> {
+    if items.iter().all(|item| item.input_preview.is_none()) {
+        return Ok(items);
+    }
+    let permitted = list_permitted_objects(org_id, user_id, "GET", traces_ofga_key())
+        .await
+        .map_err(|error| MetaHttpResponse::forbidden(error.to_string()))?;
+    Ok(hide_unreadable_previews(
+        org_id,
+        items,
+        permitted.as_deref(),
+    ))
+}
+
+/// Nulls each preview whose source stream `permitted` does not cover; `None` permits all. [pure]
+fn hide_unreadable_previews(
+    org_id: &str,
+    mut items: Vec<AnnotationQueueItem>,
+    permitted: Option<&[String]>,
+) -> Vec<AnnotationQueueItem> {
+    let Some(permitted) = permitted else {
+        return items;
+    };
+    for item in &mut items {
+        // An unresolved stream is readable only under the org-wide traces grant.
+        let object_id = item
+            .source_stream
+            .as_deref()
+            .map_or_else(|| format!("_all_{org_id}"), into_ofga_supported_format);
+        let readable =
+            is_ofga_object_visible(org_id, traces_ofga_key(), &object_id, Some(permitted));
+        if !readable {
+            item.input_preview = None;
+        }
+    }
+    items
+}
+
 /// EnqueueAnnotationQueueItem
 #[utoipa::path(
     post,
@@ -261,7 +335,22 @@ pub async fn enqueue_annotation_queue_item(
     {
         return response;
     }
-    match annotation_queues::enqueue_item(&org_id, &queue_id, body.into()).await {
+    let resolved =
+        match annotation_queues::resolve_enqueue_item(&org_id, &queue_id, body.into()).await {
+            Ok(resolved) => resolved,
+            Err(err) => return annotation_queue_error_response(err),
+        };
+    if let Err(response) = ensure_source_stream_readable(
+        &org_id,
+        &user.user_id,
+        resolved.source_stream(),
+        "add this item",
+    )
+    .await
+    {
+        return response;
+    }
+    match annotation_queues::insert_enqueue_item(resolved).await {
         Ok(item) => MetaHttpResponse::json(AnnotationQueueItemResponseBody::from(item)),
         Err(err) => annotation_queue_error_response(err),
     }
@@ -298,7 +387,22 @@ pub async fn get_annotation_queue_item(
     {
         return response;
     }
-    match annotation_queues::get_item_detail(&org_id, &queue_id, &queue_item_id).await {
+    let resolved =
+        match annotation_queues::resolve_item_detail(&org_id, &queue_id, &queue_item_id).await {
+            Ok(resolved) => resolved,
+            Err(err) => return annotation_queue_error_response(err),
+        };
+    if let Err(response) = ensure_source_stream_readable(
+        &org_id,
+        &user.user_id,
+        resolved.source_stream(),
+        "open this item",
+    )
+    .await
+    {
+        return response;
+    }
+    match annotation_queues::hydrate_item_detail(resolved).await {
         Ok(item) => MetaHttpResponse::json(AnnotationQueueItemDetailResponseBody::from(item)),
         Err(err) => annotation_queue_error_response(err),
     }
@@ -516,7 +620,12 @@ pub async fn list_annotation_queue_items(
                 .into_iter()
                 .filter(|item| visible_queue_ids.contains(&item.queue_id))
                 .collect();
-            MetaHttpResponse::json(ListAnnotationQueueItemsResponseBody::from(items))
+            match hide_previews_for_user(&org_id, &user.user_id, items).await {
+                Ok(items) => {
+                    MetaHttpResponse::json(ListAnnotationQueueItemsResponseBody::from(items))
+                }
+                Err(response) => response,
+            }
         }
         Err(err) => annotation_queue_error_response(err),
     }
@@ -700,6 +809,9 @@ pub async fn delete_annotation_queue(
 mod tests {
     use super::*;
 
+    /// Case name, permitted traces objects, item source stream, preview shown.
+    type PreviewCase<'a> = (&'a str, Option<&'a [String]>, Option<&'a str>, bool);
+
     fn pinned_score_config(entity_id: &str) -> PinnedScoreConfig {
         PinnedScoreConfig {
             row_id: format!("row-{entity_id}"),
@@ -736,6 +848,44 @@ mod tests {
                 "score_config:config-2".to_string(),
             ]),
         ));
+    }
+
+    #[test]
+    fn hides_previews_of_unreadable_source_streams() {
+        let item = |source_stream: Option<&str>| AnnotationQueueItem {
+            id: "item-1".to_string(),
+            org_id: "org-1".to_string(),
+            queue_id: "queue-1".to_string(),
+            queue_name: None,
+            ref_type: "trace".to_string(),
+            ref_id: "trace-1".to_string(),
+            ref_trace_id: None,
+            ref_trace_start_time: 1,
+            input_preview: Some("secret prompt".to_string()),
+            source_stream: source_stream.map(str::to_string),
+            status: "pending".to_string(),
+            reviewed_at: None,
+            archived_at: None,
+            created_at: 1,
+            updated_at: 1,
+        };
+        let key = traces_ofga_key();
+        let own = vec![format!("{key}:s1")];
+        let other = vec![format!("{key}:s2")];
+        let all = vec![format!("{key}:_all_org-1")];
+        let cases: [PreviewCase; 7] = [
+            ("root or RBAC off", None, Some("s1"), true),
+            ("root or RBAC off, legacy row", None, None, true),
+            ("permitted stream", Some(&own), Some("s1"), true),
+            ("unpermitted stream", Some(&other), Some("s1"), false),
+            ("org-wide traces grant", Some(&all), Some("s1"), true),
+            ("legacy row, org-wide traces grant", Some(&all), None, true),
+            ("legacy row, single-stream grant", Some(&own), None, false),
+        ];
+        for (case, permitted, source_stream, shown) in cases {
+            let items = hide_unreadable_previews("org-1", vec![item(source_stream)], permitted);
+            assert_eq!(items[0].input_preview.is_some(), shown, "{case}");
+        }
     }
 
     #[test]

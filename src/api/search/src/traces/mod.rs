@@ -91,7 +91,7 @@ pub(crate) async fn check_stream_permissions(
     }
 }
 
-/// Requires search permission on every stream `sql` reads, not only the path stream.
+/// Requires search permission on every stream and cipher key `sql` reads, not only the path stream.
 pub(crate) async fn check_sql_permissions(
     org_id: &str,
     user_id: &str,
@@ -100,7 +100,7 @@ pub(crate) async fn check_sql_permissions(
 ) -> Option<Response> {
     #[cfg(feature = "enterprise")]
     {
-        return crate::search::check_sql_stream_permissions(
+        if let Some(res) = crate::search::check_sql_stream_permissions(
             sql,
             org_id,
             user_id,
@@ -108,7 +108,11 @@ pub(crate) async fn check_sql_permissions(
             openobserve_core::authz::StreamPermissionResourceType::Search,
             trace_id,
         )
-        .await;
+        .await
+        {
+            return Some(res);
+        }
+        return openobserve_core::authz::check_cipher_key_permissions(org_id, user_id, sql).await;
     }
 
     #[cfg(not(feature = "enterprise"))]
@@ -173,14 +177,6 @@ pub async fn traces_write(
         return otlp_rejection_response(req_type, status, e.to_string());
     }
 
-    let org_id = if let Some(Some(v)) = headers
-        .get(&cfg.grpc.org_header_key)
-        .map(|header| header.to_str().ok())
-    {
-        v.to_string()
-    } else {
-        org_id
-    };
     let in_stream_name = headers
         .get(&cfg.grpc.stream_header_key)
         .and_then(|header| header.to_str().ok());
@@ -495,15 +491,45 @@ mod tests {
         }
     }
 
+    #[test]
+    fn test_check_sql_permissions_authorizes_cipher_keys_after_streams() {
+        let text = include_str!("mod.rs");
+        let body = &text[text
+            .find("pub(crate) async fn check_sql_permissions(")
+            .expect("check_sql_permissions")..];
+        let body = &body[..body.find("\n}\n").expect("fn end")];
+        let streams = body
+            .find("check_sql_stream_permissions(")
+            .expect("must authorize every stream the SQL reads");
+        let keys = body
+            .find("check_cipher_key_permissions(")
+            .expect("must authorize every cipher key the SQL decrypts");
+        let call = &body[keys..keys + body[keys..].find(')').expect("call end")];
+        assert!(call.contains("sql"), "must authorize the SQL it runs");
+        assert!(
+            streams < keys,
+            "a stream denial must answer before the key check"
+        );
+    }
+
     #[cfg(not(feature = "cloud"))]
     async fn call_traces_write(
         content_type: &str,
         body: &'static [u8],
     ) -> (http::StatusCode, HeaderMap, json::Value) {
-        let mut headers = HeaderMap::new();
+        call_traces_write_to("default", HeaderMap::new(), content_type, body).await
+    }
+
+    #[cfg(not(feature = "cloud"))]
+    async fn call_traces_write_to(
+        org_id: &str,
+        mut headers: HeaderMap,
+        content_type: &str,
+        body: &'static [u8],
+    ) -> (http::StatusCode, HeaderMap, json::Value) {
         headers.insert(http::header::CONTENT_TYPE, content_type.parse().unwrap());
         let resp = traces_write(
-            Path("default".to_string()),
+            Path(org_id.to_string()),
             Headers(UserEmail {
                 user_id: "a@a.com".to_string(),
             }),
@@ -543,5 +569,31 @@ mod tests {
         assert_eq!(body["code"], 3);
         let message = body["message"].as_str().unwrap();
         assert!(message.contains(CONTENT_TYPE_JSON) && message.contains(CONTENT_TYPE_PROTO));
+    }
+
+    #[cfg(not(feature = "cloud"))]
+    #[tokio::test]
+    async fn test_traces_write_ignores_the_organization_header() {
+        use common::{infra::config::ORG_STATUS_CACHE, meta::organization::OrgStatus};
+
+        let (path_org, header_org) = ("traces_path_org_3711", "traces_header_org_3711");
+        // A blocked path org is refused before any write, which shows which org the request used.
+        ORG_STATUS_CACHE.insert(path_org.to_string(), OrgStatus::Blocked);
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            http::HeaderName::try_from(get_config().grpc.org_header_key.as_str()).unwrap(),
+            header_org.parse().unwrap(),
+        );
+        let (status, _, body) = call_traces_write_to(
+            path_org,
+            headers,
+            CONTENT_TYPE_JSON,
+            br#"{"resourceSpans":[]}"#,
+        )
+        .await;
+        ORG_STATUS_CACHE.remove(path_org);
+        assert_eq!(status, http::StatusCode::SERVICE_UNAVAILABLE, "{body}");
+        let message = body["message"].as_str().unwrap();
+        assert!(message.contains(path_org) && !message.contains(header_org));
     }
 }
