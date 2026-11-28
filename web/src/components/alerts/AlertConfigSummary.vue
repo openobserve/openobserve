@@ -21,11 +21,11 @@
   every change.
 -->
 <template>
-  <div class="grid grid-cols-1 gap-4 lg:grid-cols-2" data-test="alerts-alertconfigsummary">
-    <OCard v-for="section in sections" :key="section.key">
-      <OCardSection role="body">
+  <div class="grid grid-cols-1 gap-4 lg:flex lg:max-h-full" data-test="alerts-alertconfigsummary">
+    <OCard v-for="section in sections" :key="section.key" class="lg:min-w-0 lg:flex-1">
+      <OCardSection role="body" scrollable class="@container">
         <h3 class="text-text-heading mb-3 text-lg">{{ section.title }}</h3>
-        <div class="grid grid-cols-1 gap-x-4 gap-y-5 sm:grid-cols-2">
+        <div class="grid grid-cols-1 gap-x-4 gap-y-5 @sm:grid-cols-2">
           <div
             v-for="field in section.fields"
             :key="field.key"
@@ -42,7 +42,7 @@
               v-if="field.code"
               :code="field.value"
               :lang="field.code"
-              :max-lines="12"
+              :max-lines="6"
               wrap
               inset
               role="group"
@@ -155,7 +155,7 @@ const shownValue = (v: any): string => (isBlank(v) || v === EMPTY ? "" : String(
 const LONG_VALUE_CHARS = 32;
 const fieldSpan = (field: SummaryField): string => {
   if (field.code || field.wide) return "col-span-full";
-  return shownValue(field.value).length > LONG_VALUE_CHARS ? "sm:col-span-2" : "";
+  return shownValue(field.value).length > LONG_VALUE_CHARS ? "@sm:col-span-2" : "";
 };
 
 const idPrefix = useId();
