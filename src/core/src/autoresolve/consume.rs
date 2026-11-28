@@ -345,6 +345,8 @@ async fn run_next(
         step_id: next.id.clone(),
         arguments: resolved,
         headers: HashMap::new(),
+        allowed_hosts: Vec::new(),
+        follow_redirects: None,
     }))
 }
 
@@ -372,10 +374,12 @@ async fn deliver_answer(
         .write_headers(&run.org, &run.id, connection)
         .await
     {
-        Ok(headers) => Ok(ConsumeResponse::Run {
+        Ok(delivery) => Ok(ConsumeResponse::Run {
             step_id,
             arguments,
-            headers,
+            headers: delivery.headers,
+            allowed_hosts: delivery.allowed_hosts,
+            follow_redirects: delivery.follow_redirects,
         }),
         Err(_) => {
             let message = format!(
@@ -719,6 +723,7 @@ fn refuse(message: &str) -> ConsumeResponse {
 #[cfg(test)]
 mod tests {
     use infra::table::entity::autoresolve_steps::Entity as Steps;
+    use o2_enterprise::enterprise::ai::toolsets::AutoResolveWrite;
     use sea_orm::{DatabaseConnection, EntityTrait};
     use serde_json::json;
 
@@ -751,7 +756,7 @@ mod tests {
     struct WriteDelivery<'a> {
         db: &'a DatabaseConnection,
         source: &'a dyn ConnectionSource,
-        headers: Option<HashMap<String, String>>,
+        delivery: Option<AutoResolveWrite>,
     }
 
     #[async_trait::async_trait]
@@ -765,7 +770,7 @@ mod tests {
             org: &str,
             run_id: &str,
             connection: &AutoResolveConnection,
-        ) -> anyhow::Result<HashMap<String, String>> {
+        ) -> anyhow::Result<AutoResolveWrite> {
             assert_eq!((org, run_id), (ORG, RUN));
             assert_eq!(
                 (connection.id.as_str(), connection.fingerprint.as_str()),
@@ -775,7 +780,7 @@ mod tests {
             let step = steps.iter().find(|step| step.id == "s1").unwrap();
             assert_eq!(step.state, StepState::Running.as_str());
             assert!(step.consumed_at_us.is_some());
-            self.headers
+            self.delivery
                 .clone()
                 .ok_or_else(|| anyhow::anyhow!("private resolver details"))
         }
@@ -1006,6 +1011,8 @@ mod tests {
             step_id: step_id.into(),
             arguments,
             headers: HashMap::from([("Authorization".into(), "W".into())]),
+            allowed_hosts: Vec::new(),
+            follow_redirects: None,
         }
     }
 
@@ -1136,11 +1143,15 @@ mod tests {
     async fn write_headers_resolve_after_commit_and_refusal_finishes_the_consumed_step() {
         for resolved in [true, false] {
             let h = Harness::new(head_then_tag(), github(FP)).await;
-            let delivered = HashMap::from([("Authorization".into(), "resolved-write".into())]);
+            let delivered = AutoResolveWrite {
+                headers: HashMap::from([("Authorization".into(), "resolved-write".into())]),
+                allowed_hosts: vec!["https://github.example:443".into()],
+                follow_redirects: Some(false),
+            };
             let source = WriteDelivery {
                 db: &h.db,
                 source: &h.connections,
-                headers: resolved.then(|| delivered.clone()),
+                delivery: resolved.then(|| delivered.clone()),
             };
             let seams = Seams {
                 connections: &source,
@@ -1159,7 +1170,9 @@ mod tests {
                     ConsumeResponse::Run {
                         step_id: "s1".into(),
                         arguments: json!({"repo": "x"}),
-                        headers: delivered,
+                        headers: delivered.headers,
+                        allowed_hosts: delivered.allowed_hosts,
+                        follow_redirects: delivered.follow_redirects,
                     }
                 );
                 assert_eq!(h.run().await.state, RunState::Proceeding.as_str());

@@ -45,7 +45,7 @@ use o2_enterprise::enterprise::{
         client::{AUTORESOLVE_AGENT_TYPE, QueryRequest, SESSION_ID_HEADER, get_agent_client},
         toolsets::{
             McpEntry,
-            push::{autoresolve_entries, normalize_tool_name},
+            push::{autoresolve_entries, autoresolve_toolsets, normalize_tool_name},
         },
     },
     autoresolve::token::mint,
@@ -211,15 +211,12 @@ pub(crate) async fn spawn_check_turn(
     spawn_turn(run, Phase::Check, None, steps, false).await
 }
 
-/// The MCP tools of the run's chosen connections that still exist;
-/// [AutoResolveError::NoConnections] when none does. Only the chosen ones are read and decrypted.
-pub(crate) async fn load_tools(
-    org: &str,
-    run_id: &str,
-    ids: &[String],
-) -> Result<Vec<McpEntry>, AutoResolveError> {
+/// Run-start validation must not resolve credentials or audit a run that may never be stored.
+pub(crate) async fn check_tools(org: &str, ids: &[String]) -> Result<(), AutoResolveError> {
     let listed = org_ai_toolsets::list_described(org, MCP_KIND).await?;
-    load_listed(org, run_id, &listed, ids).await
+    let chosen = load_chosen(org, &listed, ids).await?;
+    let names: Vec<String> = listed.iter().map(|(_, name, _)| name.clone()).collect();
+    chosen_of(&names, chosen).map(|_| ())
 }
 
 /// The org's MCP connections the run does not have, each with its key, sorted by key, at most
@@ -429,6 +426,16 @@ async fn load_listed(
     listed: &[Listed],
     ids: &[String],
 ) -> Result<Vec<McpEntry>, AutoResolveError> {
+    let chosen = load_chosen(org, listed, ids).await?;
+    let names: Vec<String> = listed.iter().map(|(_, name, _)| name.clone()).collect();
+    tools_of(org, run_id, &names, chosen).await
+}
+
+async fn load_chosen(
+    org: &str,
+    listed: &[Listed],
+    ids: &[String],
+) -> Result<Vec<OrgToolset>, AutoResolveError> {
     let mut chosen = Vec::with_capacity(ids.len());
     for id in ids
         .iter()
@@ -438,8 +445,7 @@ async fn load_listed(
             chosen.push(toolset);
         }
     }
-    let names: Vec<String> = listed.iter().map(|(_, name, _)| name.clone()).collect();
-    tools_of(org, run_id, &names, chosen).await
+    Ok(chosen)
 }
 
 /// The run's tools and the context extras, read once per turn; a planning turn also records
@@ -619,11 +625,23 @@ async fn tools_of(
     mcp_names: &[String],
     chosen: Vec<OrgToolset>,
 ) -> Result<Vec<McpEntry>, AutoResolveError> {
+    let chosen = chosen_of(mcp_names, chosen)?;
     let mcps = autoresolve_entries(org, run_id, mcp_names, chosen).await;
     if mcps.is_empty() {
         return Err(AutoResolveError::NoConnections);
     }
     Ok(mcps)
+}
+
+fn chosen_of(
+    mcp_names: &[String],
+    chosen: Vec<OrgToolset>,
+) -> Result<Vec<OrgToolset>, AutoResolveError> {
+    let chosen = autoresolve_toolsets(mcp_names, chosen);
+    if chosen.is_empty() {
+        return Err(AutoResolveError::NoConnections);
+    }
+    Ok(chosen)
 }
 
 fn turn_context(
@@ -1158,6 +1176,57 @@ mod tests {
             assert!(!message.contains("…."), "{name}: {message}");
             assert!(!message.contains("[internal"), "{name}: {message}");
             assert!(message.matches("AI model").count() < 2, "{name}: {message}");
+        }
+    }
+
+    #[test]
+    fn a_turn_loads_only_the_run_connections_that_still_exist() {
+        let mcp = |id: &str, name: &str| OrgToolset {
+            id: id.into(),
+            org: ORG.into(),
+            name: name.into(),
+            kind: "mcp".into(),
+            description: None,
+            data: Some(json!({"url": format!("https://{name}.example")}).to_string()),
+            created_by: "rita@example.com".into(),
+            created_at: 0,
+            updated_at: 0,
+            enabled: true,
+            status_state: None,
+            status_since: None,
+            last_error: None,
+            last_used_at: None,
+        };
+        let org = [mcp("c1", "code-host"), mcp("c2", "k8s")];
+        let names: Vec<String> = org.iter().map(|t| t.name.clone()).collect();
+        type Case = (
+            &'static str,
+            &'static [&'static str],
+            Option<&'static [&'static str]>,
+        );
+        let cases: [Case; 2] = [
+            ("one of two", &["c1"], Some(&["code-host"])),
+            ("all removed", &["gone"], None),
+        ];
+        for (case, ids, want) in cases {
+            let ids: Vec<String> = ids.iter().map(|id| id.to_string()).collect();
+            let chosen = org
+                .iter()
+                .filter(|t| ids.contains(&t.id))
+                .cloned()
+                .collect();
+            let got = chosen_of(&names, chosen);
+            let names = got
+                .as_ref()
+                .ok()
+                .map(|m| m.iter().map(|m| m.name.as_str()).collect::<Vec<_>>());
+            assert_eq!(names, want.map(<[&str]>::to_vec), "{case}");
+            if want.is_none() {
+                assert!(
+                    matches!(got, Err(AutoResolveError::NoConnections)),
+                    "{case}"
+                );
+            }
         }
     }
 

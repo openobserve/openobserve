@@ -57,7 +57,8 @@ use infra::{
 };
 use o2_enterprise::enterprise::{
     ai::toolsets::{
-        AutoResolveConnection, ToolsetKind, autoresolve_connection, autoresolve_write_headers,
+        AutoResolveConnection, AutoResolveWrite, ToolsetKind, autoresolve_connection,
+        autoresolve_write_headers,
     },
     common::config::get_config as get_o2_config,
 };
@@ -159,8 +160,12 @@ pub(crate) trait ConnectionSource: Send + Sync {
         _org: &str,
         _run_id: &str,
         connection: &AutoResolveConnection,
-    ) -> anyhow::Result<HashMap<String, String>> {
-        Ok(connection.write_headers.clone())
+    ) -> anyhow::Result<AutoResolveWrite> {
+        Ok(AutoResolveWrite {
+            headers: connection.write_headers.clone(),
+            allowed_hosts: Vec::new(),
+            follow_redirects: None,
+        })
     }
 
     /// The toolset with this id of any kind, as its name and whether it is an MCP connection.
@@ -188,7 +193,7 @@ impl ConnectionSource for LiveConnections {
         org: &str,
         run_id: &str,
         connection: &AutoResolveConnection,
-    ) -> anyhow::Result<HashMap<String, String>> {
+    ) -> anyhow::Result<AutoResolveWrite> {
         Ok(autoresolve_write_headers(org, &connection.id, run_id, &connection.fingerprint).await?)
     }
 
@@ -230,7 +235,7 @@ impl ConnectionSource for Listable<'_> {
         org: &str,
         run_id: &str,
         connection: &AutoResolveConnection,
-    ) -> anyhow::Result<HashMap<String, String>> {
+    ) -> anyhow::Result<AutoResolveWrite> {
         if !self.permits(org, &connection.id) {
             anyhow::bail!("connection is not permitted");
         }
@@ -310,6 +315,13 @@ pub async fn start_run_for(
     if !autoresolve_on() {
         return Err(AutoResolveError::NotEnabled);
     }
+    let ids: Vec<String> = connections.iter().map(|c| c.id.clone()).collect();
+    match turn::check_tools(org, &ids).await {
+        Err(AutoResolveError::NoConnections) if autoresolve_id.is_some() => {
+            return Err(AutoResolveError::ConnectionsGone);
+        }
+        checked => checked?,
+    };
     let new = launch_row(
         org,
         goal,
@@ -323,13 +335,6 @@ pub async fn start_run_for(
         autoresolve_id,
         incident_id.clone(),
     )?;
-    let ids: Vec<String> = connections.iter().map(|c| c.id.clone()).collect();
-    match turn::load_tools(org, &new.id, &ids).await {
-        Err(AutoResolveError::NoConnections) if new.autoresolve_id.is_some() => {
-            return Err(AutoResolveError::ConnectionsGone);
-        }
-        loaded => loaded?,
-    };
     let db = infra::db::get_orm_client_rw().await;
     let Some(run) = record_run_with(db, new).await? else {
         return match incident_id {
