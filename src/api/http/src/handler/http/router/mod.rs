@@ -6655,6 +6655,7 @@ mod tests {
             "POST /v2/{org_id}/downtimes",
             "POST /v2/{org_id}/downtimes/{downtime_id}/cancel",
             "POST /{org_id}/_search",
+            "POST /{org_id}/_search_stream",
             "POST /{org_id}/ai/chat",
             "POST /{org_id}/ai/chat_stream",
             "POST /{org_id}/ai/chats/{session_id}/cancel",
