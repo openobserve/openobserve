@@ -55,6 +55,10 @@ impl BytesCache {
         self.insert(key, value, now_secs());
     }
 
+    pub fn memory_size(&self) -> usize {
+        self.current_memory.load(Ordering::Relaxed).max(0) as usize
+    }
+
     fn lookup(&self, key: &str, now: u32) -> Option<Bytes> {
         if let Some(entry) = self.readers.get(key) {
             entry.recency.touch(now);

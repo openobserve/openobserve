@@ -22,7 +22,10 @@ use std::{
 };
 
 use arrow::buffer::BooleanBuffer;
-use config::metrics;
+use config::{
+    memory::{MemoryConsumer, memory_budget},
+    metrics,
+};
 use dashmap::{DashMap, mapref::entry::Entry};
 use infra::cache::recency::{EvictedKeys, Recency, now_secs};
 
@@ -232,11 +235,7 @@ impl TantivyResultCache {
 
 impl Default for TantivyResultCache {
     fn default() -> Self {
-        Self::new(
-            config::get_config()
-                .search
-                .inverted_index_result_cache_max_size,
-        )
+        Self::new(memory_budget().quota(MemoryConsumer::IndexResultCache))
     }
 }
 
@@ -511,14 +510,11 @@ mod tests {
     }
 
     #[test]
-    fn test_tantivy_result_cache_default() {
+    fn test_default_cache_without_a_quota_stores_nothing() {
         let cache = TantivyResultCache::default();
-        let key = "test_key".to_string();
-        let result = create_test_count_result();
-        cache.put(key.clone(), result.clone());
-
-        let retrieved = cache.get(&key);
-        assert!(retrieved.is_some());
+        cache.put("test_key".to_string(), create_test_count_result());
+        assert!(cache.get("test_key").is_none());
+        assert_eq!(cache.memory_size(), 0);
     }
 
     #[test]
@@ -559,24 +555,6 @@ mod tests {
             assert_eq!(top_n[0].1, 100);
         } else {
             panic!("Expected TopN result");
-        }
-    }
-
-    #[test]
-    fn test_global_cache_accessibility() {
-        let global_cache = &*GLOBAL_CACHE;
-
-        let key = "global_test_key".to_string();
-        let result = create_test_count_result();
-        global_cache.put(key.clone(), result.clone());
-
-        let retrieved = global_cache.get(&key);
-        assert!(retrieved.is_some());
-
-        if let Some(TantivyResult::Count(count)) = retrieved {
-            assert_eq!(count, 42);
-        } else {
-            panic!("Expected Count result");
         }
     }
 

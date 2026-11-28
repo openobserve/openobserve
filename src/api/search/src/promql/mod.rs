@@ -2101,7 +2101,9 @@ mod tests {
     #[cfg(not(feature = "cloud"))]
     #[tokio::test]
     async fn a_full_memtable_refuses_remote_write_with_503_and_a_bad_body_with_400() {
-        let full = config::get_config().limit.mem_table_max_size as i64;
+        use config::memory::{self, MemoryConsumer};
+
+        let full = memory::memory_budget().quota(MemoryConsumer::MemTable) as i64;
         let memtable = config::metrics::INGEST_MEMTABLE_ARROW_BYTES.with_label_values::<&str>(&[]);
         for (fill, status, message) in [
             (0, StatusCode::BAD_REQUEST, "Invalid snappy compressed data"),

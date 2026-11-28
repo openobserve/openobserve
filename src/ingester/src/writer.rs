@@ -24,7 +24,11 @@ use std::{
 use arrow_schema::Schema;
 use chrono::{Duration, Utc};
 use config::{
-    MEM_TABLE_INDIVIDUAL_STREAMS, get_config, meta::stream::StreamType, metrics, stats::MemorySize,
+    MEM_TABLE_INDIVIDUAL_STREAMS, get_config,
+    memory::{MemoryConsumer, memory_budget},
+    meta::stream::StreamType,
+    metrics,
+    stats::MemorySize,
     utils::hash::key_sum64,
 };
 use hashbrown::HashSet;
@@ -44,7 +48,7 @@ use crate::{
 
 static WRITERS: Lazy<Vec<RwMap<WriterKey, Arc<Writer>>>> = Lazy::new(|| {
     let cfg = get_config();
-    let writer_num = cfg.limit.mem_table_bucket_num + MEM_TABLE_INDIVIDUAL_STREAMS.len();
+    let writer_num = cfg.memory.memtable.bucket_num + MEM_TABLE_INDIVIDUAL_STREAMS.len();
     let mut writers = Vec::with_capacity(writer_num);
     for _ in 0..writer_num {
         writers.push(RwMap::default());
@@ -67,7 +71,7 @@ pub fn check_memtable_size() -> Result<()> {
     let cur_mem = metrics::INGEST_MEMTABLE_ARROW_BYTES
         .with_label_values::<&str>(&[])
         .get();
-    if cur_mem >= get_config().limit.mem_table_max_size as i64 {
+    if cur_mem >= memory_budget().quota(MemoryConsumer::MemTable) as i64 {
         Err(Error::MemoryTableOverflowError {})
     } else {
         Ok(())
@@ -128,10 +132,10 @@ fn get_table_idx(thread_id: usize, org_id: &str, stream_name: &str) -> usize {
 
 fn stream_bucket_indices(org_id: &str, stream_name: &str) -> Vec<usize> {
     let cfg = get_config();
-    if cfg.limit.mem_table_bucket_num <= 1 {
+    if cfg.memory.memtable.bucket_num <= 1 {
         return vec![get_table_idx(0, org_id, stream_name)];
     }
-    let mut indices = Vec::with_capacity(cfg.limit.mem_table_bucket_num);
+    let mut indices = Vec::with_capacity(cfg.memory.memtable.bucket_num);
     for thread_id in 0..cfg.limit.http_worker_num {
         let idx = get_table_idx(thread_id, org_id, stream_name);
         if !indices.contains(&idx) {
@@ -194,7 +198,7 @@ pub async fn read_from_memtable(
 ) -> Result<(HashSet<u64>, Vec<ReadRecordBatchEntry>)> {
     let cfg = get_config();
     // fast past
-    if cfg.limit.mem_table_bucket_num <= 1 {
+    if cfg.memory.memtable.bucket_num <= 1 {
         let idx = get_table_idx(0, org_id, stream_name);
         let key = WriterKey::new(idx, org_id, stream_type);
         let w = WRITERS[idx].read().await;

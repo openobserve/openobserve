@@ -20,7 +20,7 @@ whose marker still names the provider, such as o2-enterprise's older one, keeps 
 On each PR the workflow fetches the diff, filters noise, picks a risk tier (`trivial` / `lite` /
 `full` / `test-only` / `ci-only`), runs the tier's specialist agents (security, correctness, code-quality, performance,
 documentation) in parallel — plus any *conditional* agent whose domain the diff touches (frontend,
-qa, and release for migrations, `Cargo.toml`/`package.json`, `src/config/src/config.rs`, `.github/`,
+qa, and release for migrations, `Cargo.toml`/`package.json`, `src/config/src/config/mod.rs`, `.github/`,
 `deploy/` and Docker files) — and a coordinator consolidates their findings into one comment with
 a decision. Correctness owns the PR's behaviour end to end (callers, sibling
 paths, state, the tests that prove the change); every tier but `ci-only` runs it. Before the agents start, the
