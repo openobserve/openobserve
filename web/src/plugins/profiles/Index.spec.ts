@@ -7,10 +7,13 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import analytics from "@/services/product_analytics";
 import { LOADER_DELAY_MS } from "@/lib/styles/motion";
+import { queryClient } from "@/composables/query/queryClient";
 
 const mocks = vi.hoisted(() => ({
   nowMs: 1_700_000_000_000,
   nameList: vi.fn(),
+  schema: vi.fn(),
+  search: vi.fn(),
   meta: vi.fn(),
   series: vi.fn(),
   merge: vi.fn(),
@@ -27,7 +30,13 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/services/stream", () => ({
   default: {
     nameList: mocks.nameList,
+    schema: mocks.schema,
   },
+}));
+
+// The Top traces list queries profile rows through the search service.
+vi.mock("@/services/search", () => ({
+  default: { search: mocks.search },
 }));
 
 vi.mock("@/services/profiles", async (importOriginal) => ({
@@ -184,8 +193,8 @@ describe("Profiles page", () => {
     },
     OSelect: {
       template:
-        '<div :data-test="$attrs[\'data-test\']"><select :value="modelValue ?? \'\'" @change="$emit(\'update:modelValue\', $event.target.value)"><option v-for="option in options" :key="option.value" :value="option.value">{{ option.label }}</option></select></div>',
-      props: ["modelValue", "options", "label", "disabled", "clearable", "loading"],
+        '<div :data-test="$attrs[\'data-test\']"><select :value="modelValue ?? \'\'" @change="$emit(\'update:modelValue\', $event.target.value)"><option v-if="placeholder" value="" data-test="select-placeholder">{{ placeholder }}</option><option v-for="option in options" :key="option.value" :value="option.value">{{ option.label }}</option></select></div>',
+      props: ["modelValue", "options", "label", "disabled", "clearable", "loading", "placeholder"],
       emits: ["update:modelValue"],
     },
   };
@@ -209,6 +218,8 @@ describe("Profiles page", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // The Top traces list caches stream schemas and lists per org and stream.
+    queryClient.clear();
     // Most tests expect a changed input to run the query, which needs Auto Run on (server flag plus switch).
     store.state.zoConfig = { ...store.state.zoConfig, auto_query_enabled: true };
     localStorage.removeItem("oo_toggle_auto_run");
@@ -222,6 +233,9 @@ describe("Profiles page", () => {
       };
     });
     mocks.nameList.mockResolvedValue(streamResponse);
+    // No trace_id column by default, so the Top traces list stays out of the way.
+    mocks.schema.mockResolvedValue({ data: { schema: [{ name: "value" }] } });
+    mocks.search.mockResolvedValue({ data: { hits: [] } });
     mocks.meta.mockResolvedValue(profileMetaResponse);
     mocks.series.mockResolvedValue(seriesResponse);
     mocks.merge.mockResolvedValue(mergeFor("fn-a"));
@@ -2176,8 +2190,9 @@ describe("Profiles page", () => {
         orgIdentifier,
         "profiles-b",
         expect.objectContaining({
-          start_time: FROM,
-          end_time: TO,
+          // A trace filter widens the request: 120 s back, 60 s forward.
+          start_time: FROM - 120_000_000,
+          end_time: TO + 60_000_000,
           service_name: "service-b",
           profile_type: "cpu",
           profile_unit: "nanoseconds",
@@ -2198,8 +2213,8 @@ describe("Profiles page", () => {
       mountSeeded();
       await flushPromises();
       expect(mocks.meta).toHaveBeenCalledWith(orgIdentifier, "profiles-b", {
-        start_time: FROM,
-        end_time: TO,
+        start_time: FROM - 120_000_000,
+        end_time: TO + 60_000_000,
         service_name: "service-b",
       });
     });
@@ -2477,6 +2492,498 @@ describe("Profiles page", () => {
       expect(new Set(mocks.merge.mock.calls.map((call) => `${call[0]}/${call[1]}`))).toEqual(
         new Set(["other-org/profiles-c"]),
       );
+    });
+  });
+  describe("trace-filtered links", () => {
+    const FROM = 1_700_000_000_000_000;
+    const TO = 1_700_000_120_000_000;
+    const BEFORE = 120_000_000;
+    const AFTER = 60_000_000;
+    const traceQuery = (extra: Record<string, string> = {}) => ({
+      org_identifier: orgIdentifier,
+      stream: "profiles-b",
+      from: String(FROM),
+      to: String(TO),
+      filters: "trace_id=trace-1",
+      ...extra,
+    });
+    const meta = (services: string[]) => ({
+      data: {
+        ...profileMetaResponse.data,
+        services,
+        profile_types: [
+          { type: "alloc_space", unit: "bytes" },
+          { type: "cpu", unit: "nanoseconds" },
+        ],
+      },
+    });
+    const shareUrl = (wrapper: ReturnType<typeof mountPage>) =>
+      new URL(String(wrapper.findComponent({ name: "ShareButton" }).props("url")));
+    const pickWindow = async (
+      wrapper: ReturnType<typeof mountPage>,
+      start: number,
+      end: number,
+    ) => {
+      wrapper.findComponent({ name: "DateTimePickerDashboard" }).vm.$emit("update:modelValue", {
+        startTime: start,
+        endTime: end,
+        relativeTimePeriod: "",
+        valueType: "absolute",
+      });
+      await flushPromises();
+    };
+
+    beforeEach(() => {
+      mocks.meta.mockResolvedValue(meta(["service-a", "service-b"]));
+    });
+
+    it("widens the request for a trace filter but keeps the chosen window in the URL and share link", async () => {
+      route.query = traceQuery({ profile_type: "cpu", profile_unit: "nanoseconds" });
+      const wrapper = mountPage();
+      await settle();
+
+      expect(mocks.merge.mock.calls[0][2]).toMatchObject({
+        start_time: FROM - BEFORE,
+        end_time: TO + AFTER,
+      });
+      expect(mocks.series.mock.calls[0][2]).toMatchObject({
+        start_time: FROM - BEFORE,
+        end_time: TO + AFTER,
+      });
+      expect(mocks.meta.mock.calls[0][2]).toMatchObject({
+        start_time: FROM - BEFORE,
+        end_time: TO + AFTER,
+      });
+      expect(route.query.from).toBe(String(FROM));
+      expect(route.query.to).toBe(String(TO));
+      const share = shareUrl(wrapper).searchParams;
+      expect(share.get("from")).toBe(String(FROM));
+      expect(share.get("to")).toBe(String(TO));
+      expect(wrapper.find('[data-test="profiles-trace-window-hint"]').exists()).toBe(true);
+    });
+
+    it("lists label values over the padded window, cached apart from the unpadded one", async () => {
+      route.query = traceQuery({ profile_type: "cpu", profile_unit: "nanoseconds" });
+      const wrapper = mountPage();
+      await settle();
+      mocks.tagValues.mockClear();
+
+      const load = filterBuilder(wrapper).props("loadValues");
+      await load("span_id", "");
+      expect(mocks.tagValues.mock.calls[0][2]).toMatchObject({
+        start_time: FROM - BEFORE,
+        end_time: TO + AFTER,
+      });
+      // The trace filter is the one being listed: the body is the same, the window still pads and keys apart.
+      await load("trace_id", "");
+      expect(mocks.tagValues.mock.calls[1][2]).toMatchObject({
+        start_time: FROM - BEFORE,
+        end_time: TO + AFTER,
+      });
+    });
+
+    it("does not widen a request without a trace filter, and shows no hint", async () => {
+      route.query = traceQuery({ filters: "span_id=s1", profile_type: "cpu" });
+      const wrapper = mountPage();
+      await settle();
+
+      expect(mocks.merge.mock.calls[0][2]).toMatchObject({ start_time: FROM, end_time: TO });
+      expect(mocks.meta.mock.calls[0][2]).toMatchObject({ start_time: FROM, end_time: TO });
+      expect(wrapper.find('[data-test="profiles-trace-window-hint"]').exists()).toBe(false);
+    });
+
+    it("pads once across a reload and a window change, never writing the padded window back", async () => {
+      route.query = traceQuery({ profile_type: "cpu", profile_unit: "nanoseconds" });
+      const wrapper = mountPage();
+      await settle();
+
+      // A window change: the new chosen window is what the URL keeps; the request is that window, padded once.
+      const START = FROM + 600_000_000;
+      const END = TO + 600_000_000;
+      await pickWindow(wrapper, START, END);
+      expect(mocks.merge.mock.lastCall?.[2]).toMatchObject({
+        start_time: START - BEFORE,
+        end_time: END + AFTER,
+      });
+      expect(mocks.meta.mock.lastCall?.[2]).toMatchObject({
+        start_time: START - BEFORE,
+        end_time: END + AFTER,
+      });
+      expect(router.replace.mock.lastCall?.[0].query).toMatchObject({
+        from: String(START),
+        to: String(END),
+      });
+      expect(shareUrl(wrapper).searchParams.get("from")).toBe(String(START));
+      expect(shareUrl(wrapper).searchParams.get("to")).toBe(String(END));
+
+      // A reload opens the URL the page wrote, and pads that window once more, not twice.
+      wrapper.unmount();
+      mocks.merge.mockClear();
+      const reloaded = mountPage();
+      await settle();
+      expect(mocks.merge.mock.calls[0][2]).toMatchObject({
+        start_time: START - BEFORE,
+        end_time: END + AFTER,
+      });
+      expect(route.query.from).toBe(String(START));
+      expect(route.query.to).toBe(String(END));
+      expect(shareUrl(reloaded).searchParams.get("from")).toBe(String(START));
+    });
+
+    it("finds the profile types of a trace link with no profile type when its rows lie in the padding", async () => {
+      // The only rows sit 100 s before the chosen window: a window without the padding has no types.
+      const rowsAt = FROM - 100_000_000;
+      mocks.meta.mockImplementation(async (_org, _stream, payload) =>
+        payload.start_time <= rowsAt
+          ? meta(["service-a"])
+          : { data: { ...profileMetaResponse.data, services: [], profile_types: [] } },
+      );
+      route.query = traceQuery();
+      mountPage();
+      await settle();
+
+      expect(mocks.merge).toHaveBeenCalled();
+      expect(mocks.merge.mock.lastCall?.[2]).toMatchObject({
+        profile_type: "cpu",
+        profile_unit: "nanoseconds",
+        start_time: FROM - BEFORE,
+        end_time: TO + AFTER,
+      });
+    });
+
+    it("keeps all services for a trace filter with no service, also after reloadMeta, and picks one without it", async () => {
+      route.query = traceQuery({ profile_type: "cpu", profile_unit: "nanoseconds" });
+      const wrapper = mountPage();
+      await settle();
+
+      expect(
+        (wrapper.find('[data-test="profiles-service-select"] select').element as HTMLSelectElement)
+          .value,
+      ).toBe("");
+      expect(mocks.meta.mock.calls.every((call) => !("service_name" in call[2]))).toBe(true);
+      expect(mocks.merge.mock.calls.every((call) => call[2].service_name === undefined)).toBe(true);
+
+      // reloadMeta through a window change.
+      mocks.meta.mockClear();
+      mocks.merge.mockClear();
+      await pickWindow(wrapper, FROM + 600_000_000, TO + 600_000_000);
+      expect(mocks.meta).toHaveBeenCalled();
+      expect(mocks.meta.mock.calls.every((call) => !("service_name" in call[2]))).toBe(true);
+      expect(mocks.merge.mock.lastCall?.[2].service_name).toBeUndefined();
+
+      // Without a trace filter the first service is still picked.
+      wrapper.unmount();
+      mocks.merge.mockClear();
+      route.query = traceQuery({ filters: "span_id=s1", profile_type: "cpu" });
+      mountPage();
+      await settle();
+      expect(mocks.merge.mock.lastCall?.[2]).toMatchObject({ service_name: "service-a" });
+    });
+
+    const serviceSelect = (wrapper: ReturnType<typeof mountPage>) =>
+      wrapper.find('[data-test="profiles-service-select"] select').element as HTMLSelectElement;
+    const servicePlaceholder = (wrapper: ReturnType<typeof mountPage>) =>
+      wrapper.find('[data-test="profiles-service-select"] [data-test="select-placeholder"]');
+
+    it("says All services in the service select while a trace filter has no service", async () => {
+      route.query = traceQuery({ profile_type: "cpu", profile_unit: "nanoseconds" });
+      const wrapper = mountPage();
+      await settle();
+      expect(servicePlaceholder(wrapper).text()).toBe("All services");
+      expect(serviceSelect(wrapper).value).toBe("");
+    });
+
+    it("shows no All services placeholder for a named service or without a trace filter", async () => {
+      route.query = traceQuery({ service_name: "service-b", profile_type: "cpu" });
+      const named = mountPage();
+      await settle();
+      expect(servicePlaceholder(named).exists()).toBe(false);
+      expect(serviceSelect(named).value).toBe("service-b");
+
+      route.query = traceQuery({ filters: "span_id=s1", profile_type: "cpu" });
+      const plain = mountPage();
+      await settle();
+      expect(servicePlaceholder(plain).exists()).toBe(false);
+    });
+
+    it("keeps an explicit service pick with a trace filter, also after reloadMeta", async () => {
+      route.query = traceQuery({ profile_type: "cpu", profile_unit: "nanoseconds" });
+      const wrapper = mountPage();
+      await settle();
+
+      await wrapper.find('[data-test="profiles-service-select"] select').setValue("service-b");
+      await settle();
+      expect(serviceSelect(wrapper).value).toBe("service-b");
+      expect(mocks.merge.mock.lastCall?.[2].service_name).toBe("service-b");
+      expect(servicePlaceholder(wrapper).exists()).toBe(false);
+
+      // reloadMeta through a window change keeps it.
+      mocks.meta.mockClear();
+      await pickWindow(wrapper, FROM + 600_000_000, TO + 600_000_000);
+      expect(mocks.meta).toHaveBeenCalled();
+      expect(mocks.meta.mock.lastCall?.[2]).toMatchObject({ service_name: "service-b" });
+      expect(serviceSelect(wrapper).value).toBe("service-b");
+      expect(mocks.merge.mock.lastCall?.[2].service_name).toBe("service-b");
+    });
+
+    it("returns to the default service when the trace filter is removed on all services", async () => {
+      route.query = traceQuery({ profile_type: "cpu", profile_unit: "nanoseconds" });
+      const wrapper = mountPage();
+      await settle();
+      expect(mocks.merge.mock.lastCall?.[2].service_name).toBeUndefined();
+
+      mocks.meta.mockClear();
+      filterBuilder(wrapper).vm.$emit("update:modelValue", []);
+      await settle();
+
+      // The window is no longer padded, and the first service applies.
+      expect(mocks.meta.mock.lastCall?.[2]).toMatchObject({ start_time: FROM, end_time: TO });
+      expect(serviceSelect(wrapper).value).toBe("service-a");
+      expect(servicePlaceholder(wrapper).exists()).toBe(false);
+      expect(mocks.merge.mock.lastCall?.[2]).toMatchObject({
+        service_name: "service-a",
+        start_time: FROM,
+        end_time: TO,
+      });
+    });
+
+    it("keeps a chosen service when the trace filter is removed", async () => {
+      route.query = traceQuery({ service_name: "service-b", profile_type: "cpu" });
+      const wrapper = mountPage();
+      await settle();
+      filterBuilder(wrapper).vm.$emit("update:modelValue", []);
+      await settle();
+      expect(serviceSelect(wrapper).value).toBe("service-b");
+      expect(mocks.merge.mock.lastCall?.[2].service_name).toBe("service-b");
+    });
+
+    it("explains the window in the empty state of a trace-filtered run", async () => {
+      mocks.merge.mockResolvedValue({ data: { ...mergeResponse.data, total: 0, top: [] } });
+      route.query = traceQuery({ profile_type: "cpu", profile_unit: "nanoseconds" });
+      const wrapper = mountPage();
+      await settle();
+      expect(wrapper.find('[data-test="profiles-no-results"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="profiles-trace-window-hint"]').exists()).toBe(true);
+
+      wrapper.unmount();
+      route.query = traceQuery({ filters: "span_id=s1", profile_type: "cpu" });
+      const plain = mountPage();
+      await settle();
+      expect(plain.find('[data-test="profiles-no-results"]').exists()).toBe(true);
+      expect(plain.find('[data-test="profiles-trace-window-hint"]').exists()).toBe(false);
+    });
+
+    it("still leaves trace_id out of the Breakdown options with a trace filter applied", async () => {
+      mocks.meta.mockResolvedValue({
+        data: {
+          ...meta(["service-a"]).data,
+          label_names: ["k8s_pod_name", "trace_id", "span_id"],
+        },
+      });
+      route.query = traceQuery({ profile_type: "cpu", profile_unit: "nanoseconds" });
+      const wrapper = mountPage();
+      await settle();
+      const values = wrapper
+        .findAll('[data-test="profiles-breakdown-select"] option')
+        .map((option) => (option.element as HTMLOptionElement).value);
+      expect(values).toContain("k8s_pod_name");
+      expect(values).not.toContain("trace_id");
+      expect(values).not.toContain("span_id");
+    });
+
+    it("still replaces a service named in the link that has no data", async () => {
+      route.query = traceQuery({ service_name: "service-gone", profile_type: "cpu" });
+      mountPage();
+      await settle();
+      expect(mocks.merge.mock.lastCall?.[2]).toMatchObject({ service_name: "service-a" });
+    });
+
+    describe("Top traces", () => {
+      // The page hides the list (v-show on its wrapper) for a run without trace links, and keeps it mounted.
+      const topTracesShown = (wrapper: ReturnType<typeof mountPage>) =>
+        (wrapper.find('[data-test="profiles-top-traces"]').element.parentElement as HTMLElement)
+          .style.display !== "none";
+      const withTraceColumn = () =>
+        mocks.schema.mockResolvedValue({
+          data: { schema: [{ name: "trace_id" }, { name: "span_id" }, { name: "value" }] },
+        });
+
+      it("is listed for cpu and wall, hidden for inuse_* and without a trace_id column", async () => {
+        withTraceColumn();
+        mocks.meta.mockResolvedValue({
+          data: {
+            ...profileMetaResponse.data,
+            profile_types: [
+              { type: "cpu", unit: "nanoseconds" },
+              { type: "wall", unit: "nanoseconds" },
+              { type: "inuse_space", unit: "bytes" },
+            ],
+          },
+        });
+        route.query = {
+          ...traceQuery({ filters: "" }),
+          profile_type: "cpu",
+          profile_unit: "nanoseconds",
+        };
+        const wrapper = mountPage();
+        await settle();
+        const list = () => wrapper.find('[data-test="profiles-top-traces"]');
+        const shown = () => topTracesShown(wrapper);
+        expect(list().exists()).toBe(true);
+        expect(shown()).toBe(true);
+        // Closed, so it has run no query.
+        expect(mocks.search).not.toHaveBeenCalled();
+
+        await wrapper
+          .find('[data-test="profiles-type-select"] select')
+          .setValue("wall\u0000nanoseconds");
+        await settle();
+        expect(shown()).toBe(true);
+
+        await wrapper
+          .find('[data-test="profiles-type-select"] select')
+          .setValue("inuse_space\u0000bytes");
+        await settle();
+        // Kept mounted but hidden: inuse_* samples carry no trace links.
+        expect(shown()).toBe(false);
+
+        mocks.schema.mockResolvedValue({ data: { schema: [{ name: "value" }] } });
+        queryClient.clear();
+        wrapper.unmount();
+        route.query = {
+          ...traceQuery({ filters: "" }),
+          profile_type: "cpu",
+          profile_unit: "nanoseconds",
+        };
+        const other = mountPage();
+        await settle();
+        expect(other.find('[data-test="profiles-top-traces"]').exists()).toBe(false);
+      });
+
+      it("queries the padded request window with the run's filters when opened", async () => {
+        withTraceColumn();
+        route.query = { ...traceQuery(), profile_type: "cpu", profile_unit: "nanoseconds" };
+        const wrapper = mountPage();
+        await settle();
+
+        await wrapper.find('[data-test="profiles-top-traces-toggle"]').trigger("click");
+        await settle();
+
+        expect(mocks.search).toHaveBeenCalledTimes(1);
+        const request = mocks.search.mock.calls[0][0];
+        expect(request.page_type).toBe("profiles");
+        expect(request.query.query).toMatchObject({
+          start_time: FROM - BEFORE,
+          end_time: TO + AFTER,
+        });
+        expect(request.query.query.sql).toContain(`"trace_id" = 'trace-1'`);
+      });
+
+      const threeTypes = () =>
+        mocks.meta.mockResolvedValue({
+          data: {
+            ...profileMetaResponse.data,
+            profile_types: [
+              { type: "cpu", unit: "nanoseconds" },
+              { type: "wall", unit: "nanoseconds" },
+              { type: "inuse_space", unit: "bytes" },
+            ],
+          },
+        });
+      const isOpen = (wrapper: ReturnType<typeof mountPage>) =>
+        wrapper.find('[data-test="profiles-top-traces-toggle"]').attributes("aria-expanded");
+
+      it("stays open across runs and inuse and cpu switches, and runs no query for inuse", async () => {
+        withTraceColumn();
+        threeTypes();
+        mocks.search.mockResolvedValue({
+          data: { hits: [{ trace_id: "t".repeat(32), total: 15, first_ts: 5e12, last_ts: 5e12 }] },
+        });
+        route.query = {
+          ...traceQuery({ filters: "" }),
+          profile_type: "cpu",
+          profile_unit: "nanoseconds",
+        };
+        const wrapper = mountPage();
+        await settle();
+        await wrapper.find('[data-test="profiles-top-traces-toggle"]').trigger("click");
+        await settle();
+        expect(isOpen(wrapper)).toBe("true");
+        expect(mocks.search).toHaveBeenCalledTimes(1);
+
+        const type = () => wrapper.find('[data-test="profiles-type-select"] select');
+        await type().setValue("wall\u0000nanoseconds");
+        await settle();
+        expect(isOpen(wrapper)).toBe("true");
+        expect(mocks.search).toHaveBeenCalledTimes(2);
+
+        await type().setValue("inuse_space\u0000bytes");
+        await settle();
+        expect(topTracesShown(wrapper)).toBe(false);
+        expect(mocks.search).toHaveBeenCalledTimes(2);
+
+        await type().setValue("cpu\u0000nanoseconds");
+        await settle();
+        expect(topTracesShown(wrapper)).toBe(true);
+        expect(isOpen(wrapper)).toBe("true");
+        expect(wrapper.find('[data-test="profiles-top-traces-list"]').exists()).toBe(true);
+      });
+
+      it("runs no search while the results are expanded over it, and reads once they close", async () => {
+        withTraceColumn();
+        const hit = { trace_id: "t".repeat(32), total: 15, first_ts: 5e12, last_ts: 5e12 };
+        mocks.search.mockResolvedValue({ data: { hits: [hit] } });
+        route.query = {
+          ...traceQuery({ filters: "" }),
+          profile_type: "cpu",
+          profile_unit: "nanoseconds",
+        };
+        const wrapper = mountPage();
+        await settle();
+        await wrapper.find('[data-test="profiles-top-traces-toggle"]').trigger("click");
+        await settle();
+        expect(mocks.search).toHaveBeenCalledTimes(1);
+
+        await wrapper.find('[data-test="profiles-results-expand"]').trigger("click");
+        await settle();
+        expect(topTracesShown(wrapper)).toBe(false);
+        // A run while the results are expanded does not fire the top-20 search.
+        await wrapper.find('[data-test="profiles-run-query"]').trigger("click");
+        await settle();
+        expect(mocks.search).toHaveBeenCalledTimes(1);
+
+        // Closing the results shows the list again, now for the new run.
+        await wrapper.find('[data-test="profiles-results-expand"]').trigger("click");
+        await settle();
+        expect(topTracesShown(wrapper)).toBe(true);
+        expect(mocks.search).toHaveBeenCalledTimes(2);
+      });
+
+      it("reads the list again for a run with the same inputs, with that run's total", async () => {
+        withTraceColumn();
+        const hit = { trace_id: "t".repeat(32), total: 15, first_ts: 5e12, last_ts: 5e12 };
+        mocks.search.mockResolvedValue({ data: { hits: [hit] } });
+        route.query = {
+          ...traceQuery({ filters: "" }),
+          profile_type: "cpu",
+          profile_unit: "nanoseconds",
+        };
+        const wrapper = mountPage();
+        await settle();
+        await wrapper.find('[data-test="profiles-top-traces-toggle"]').trigger("click");
+        await settle();
+        const share = () => wrapper.find('[data-test="profiles-top-trace-0-total"]').text();
+        expect(share().startsWith("50.00% · ")).toBe(true);
+
+        // Run query again with nothing changed; the data has changed.
+        mocks.merge.mockResolvedValueOnce({ data: { ...mergeResponse.data, total: 60 } });
+        mocks.search.mockResolvedValue({ data: { hits: [{ ...hit, total: 45 }] } });
+        await wrapper.find('[data-test="profiles-run-query"]').trigger("click");
+        await settle();
+        expect(mocks.search).toHaveBeenCalledTimes(2);
+        // 45 of 60, not the old 15 against the new total.
+        expect(share().startsWith("75.00% · ")).toBe(true);
+      });
     });
   });
 });

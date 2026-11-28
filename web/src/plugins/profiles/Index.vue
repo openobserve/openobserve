@@ -144,6 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="t('profiles.service')"
             label-position="inside"
             :options="serviceOptions"
+            :placeholder="servicePlaceholder"
             class="w-full"
             data-test="profiles-service-select"
           />
@@ -221,6 +222,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="profiles-no-results"
       >
         <OEmptyState preset="no-profiles" size="block" :hide-action="true" />
+        <OBanner
+          v-if="traceFilterApplied"
+          variant="info"
+          icon="info"
+          dense
+          bar
+          class="mt-3 max-w-xl"
+          data-test="profiles-trace-window-hint"
+        >
+          {{ t("profiles.traceWindowHint") }}
+        </OBanner>
       </div>
 
       <OContent v-else class="flex flex-col gap-2.5 py-2.5 md:min-h-0 md:flex-1">
@@ -239,6 +251,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               t("emptyState.loadError.action")
             }}</OButton>
           </template>
+        </OBanner>
+        <OBanner
+          v-if="traceFilterApplied"
+          variant="info"
+          icon="info"
+          dense
+          bar
+          class="shrink-0"
+          data-test="profiles-trace-window-hint"
+        >
+          {{ t("profiles.traceWindowHint") }}
         </OBanner>
         <section
           v-show="!resultsExpanded"
@@ -649,6 +672,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
         </section>
+        <!-- profile -> trace: the traces that hold the most samples of this run (cpu and wall profiles carry trace ids).
+             Below the results, a one-line bar until opened, so it never pushes them down. It stays mounted across runs
+             (hidden, not removed, for inuse_* types) and its open state lives here, so a run does not close it.
+             It queries nothing while the results are expanded over it (inactive), and picks up again when they close. -->
+        <div
+          v-if="lastRun && orgIdentifier"
+          v-show="topTracesEligible && !resultsExpanded"
+          class="shrink-0"
+        >
+          <ProfilesTopTraces
+            v-model:expanded="topTracesExpanded"
+            :org-identifier="orgIdentifier"
+            :stream="lastRun.query.stream"
+            :profile-type="lastRun.payload.profile_type ?? ''"
+            :profile-unit="lastRun.payload.profile_unit"
+            :service="lastRun.payload.service_name"
+            :filters="lastRun.payload.filters ?? []"
+            :range="lastRun.range"
+            :grand-total="mergeResult?.total ?? 0"
+            :revision="runRevision"
+            :active="topTracesEligible && !resultsExpanded"
+            :value-formatter="formatTableValue"
+          />
+        </div>
       </OContent>
     </div>
   </OPageLayout>
@@ -688,6 +735,8 @@ import ProfilesLabelFilters from "./ProfilesLabelFilters.vue";
 import ProfilesFunctionMenu from "./ProfilesFunctionMenu.vue";
 import ProfilesFunctionDetails from "./ProfilesFunctionDetails.vue";
 import ProfilesCompare, { type CompareState } from "./ProfilesCompare.vue";
+import ProfilesTopTraces from "./ProfilesTopTraces.vue";
+import { hasTraceIdFilter, isTraceLinkedProfileType, requestRange } from "./traceLink";
 import { calleesOf, callersOf } from "./sandwich";
 import { formatPercent } from "./format";
 import { copyToClipboard } from "@/utils/clipboard";
@@ -875,6 +924,10 @@ const lastRun = ref<{
   range: { startTime: number; endTime: number };
   payload: ProfilesQueryBody;
 } | null>(null);
+// Counts the runs that completed and set lastRun; Top traces re-reads its list when it changes, even for identical inputs.
+const runRevision = ref(0);
+// Kept here, not in the list, so the list stays open across the remounts and run changes around it.
+const topTracesExpanded = ref(false);
 const compareState = ref<CompareState>(defaultCompareState());
 /** The label the chart draws one line per value of; null draws one line. */
 const breakdownLabel = ref<string | null>(null);
@@ -973,6 +1026,19 @@ const runButtonTooltip = computed(() => {
   if (!canQuery.value) return t("profiles.runNeedsProfileType");
   return runPending.value ? t("search.autoRunPendingDot") : t("search.autoRunEnabled");
 });
+// The run on screen was filtered to a trace: its results include the extra windows the request reached into.
+const traceFilterApplied = computed(
+  () => !!lastRun.value && hasTraceIdFilter(lastRun.value.payload.filters ?? []),
+);
+// A trace link queries every service and names none; say so instead of showing a blank select.
+const servicePlaceholder = computed(() =>
+  !selectedService.value && hasTraceIdFilter(appliedFilters.value)
+    ? t("profiles.allServices")
+    : undefined,
+);
+const topTracesEligible = computed(() =>
+  isTraceLinkedProfileType(lastRun.value?.payload.profile_type),
+);
 const hasProfileData = computed(() => (mergeResult.value?.total ?? 0) > 0);
 // The server keeps the most common stacks only; say how much of the data the views show.
 const sampledPercent = computed(() => {
@@ -1475,9 +1541,11 @@ const resolveTimeRange = () => {
 const queryPayload = (range = resolveTimeRange()): ProfilesQueryBody | null => {
   const profileType = currentProfileType.value;
   if (!range || !profileType) return null;
+  // The one place the request window is widened for a trace filter; lastRun.range, the URL and the picker keep the chosen window.
+  const requested = requestRange(range, appliedFilters.value);
   return {
-    start_time: range.startTime,
-    end_time: range.endTime,
+    start_time: requested.startTime,
+    end_time: requested.endTime,
     service_name: selectedService.value || undefined,
     profile_type: profileType.type,
     profile_unit: profileType.unit,
@@ -1561,6 +1629,16 @@ const filterToBreakdownValue = async (line: SeriesLine) => {
   await runOrMarkPending();
 };
 
+/**
+ * All services is kept only for a trace filter. When the filter goes while no service is chosen, reload meta
+ * (it also looks in the unpadded window now) so the normal default, the first service, applies on the next run.
+ */
+const defaultServiceAfterFilterChange = async (hadTraceFilter: boolean) => {
+  if (hadTraceFilter && !hasTraceIdFilter(appliedFilters.value) && !selectedService.value) {
+    await reloadMeta();
+  }
+};
+
 /** Takes the builder's filters, keeping one per label in the slot of its first chip, then re-runs. */
 const setFilters = async (next: ProfileFilter[]) => {
   const byKey = new Map<string, number>();
@@ -1572,7 +1650,9 @@ const setFilters = async (next: ProfileFilter[]) => {
       kept.push(filter);
     } else kept[at] = filter;
   }
+  const hadTraceFilter = hasTraceIdFilter(appliedFilters.value);
   appliedFilters.value = kept;
+  await defaultServiceAfterFilterChange(hadTraceFilter);
   await runOrMarkPending();
 };
 
@@ -1580,9 +1660,11 @@ const setFilters = async (next: ProfileFilter[]) => {
 const loadTagValues = async (tag: string, search: string): Promise<string[]> => {
   const org = orgIdentifier.value;
   const stream = selectedStream.value;
-  const range = resolveTimeRange();
+  const chosenRange = resolveTimeRange();
   const profileType = currentProfileType.value;
-  if (!org || !stream || !tag || !range) return [];
+  if (!org || !stream || !tag || !chosenRange) return [];
+  // A trace-filtered link can hold its profiles just outside the chosen window; values come from as far as the query looks.
+  const range = requestRange(chosenRange, appliedFilters.value);
   const requestSeq = tagValuesRequestSeq;
   const body = {
     service_name: selectedService.value || undefined,
@@ -1595,7 +1677,8 @@ const loadTagValues = async (tag: string, search: string): Promise<string[]> => 
   };
   const { valueType, relativeTimePeriod, startTime, endTime } = dateState.value;
   const period = valueType === "relative" ? relativeTimePeriod : [startTime, endTime];
-  const key = JSON.stringify([org, stream, period, body]);
+  // The padded window follows from a trace filter, which the body leaves out when it is the label being listed.
+  const key = JSON.stringify([org, stream, period, range.startTime - chosenRange.startTime, body]);
   let request = tagValuesCache.get(key);
   if (!request) {
     request = profilesService
@@ -1652,8 +1735,10 @@ const loadStreams = async () => {
 const loadMeta = async () => {
   const org = orgIdentifier.value;
   const stream = selectedStream.value;
-  const range = resolveTimeRange();
-  if (!org || !stream || !range) return;
+  const chosenRange = resolveTimeRange();
+  if (!org || !stream || !chosenRange) return;
+  // A trace-filtered link can hold its profiles just outside the chosen window; meta looks as far as the query does.
+  const range = requestRange(chosenRange, appliedFilters.value);
   const requestSeq = ++metaRequestSeq;
   const run = initRunSeq;
   const isStale = () => requestSeq !== metaRequestSeq || isStaleRun(run, org);
@@ -1670,7 +1755,9 @@ const loadMeta = async () => {
     if (isStale()) return;
     const services: string[] = response.data.services ?? [];
     // An empty window lists no services; keep the chosen one for when data comes back.
-    if (services.length && (!service || !services.includes(service))) {
+    // A trace link names no service: keep the query across all services rather than picking the first.
+    const keepAllServices = !service && hasTraceIdFilter(appliedFilters.value);
+    if (services.length && !keepAllServices && (!service || !services.includes(service))) {
       service = services[0];
       response = await fetchMeta(service);
       if (isStale()) return;
@@ -1766,6 +1853,7 @@ const runQuery = async (userRun = false) => {
     mergeResult.value = mergeResponseValue.data;
     if (!keepFocus) flameFocus.value = null;
     lastRun.value = runState;
+    runRevision.value += 1;
     resetStackExpansion(mergeResponseValue.data.root);
     syncUrl();
     if (userRun) {
