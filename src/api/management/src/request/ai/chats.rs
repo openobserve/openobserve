@@ -1842,6 +1842,12 @@ async fn forget_content(org_id: &str, session_ids: &[String]) {
     if let Err(e) = ai_chat_imports::delete_for_sessions(org_id, session_ids).await {
         log::warn!("[AI-CHAT] cannot delete the imports of deleted chats in {org_id}: {e}");
     }
+    if let Err(e) =
+        ai_approvals::expire_for_sessions(org_id, session_ids, config::utils::time::now_micros())
+            .await
+    {
+        log::warn!("[AI-CHAT] cannot expire the approvals of deleted chats in {org_id}: {e}");
+    }
 }
 
 /// Imports one chat into `response`: a new chat (`true`), a skipped repeat, or a failure code.
