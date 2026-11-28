@@ -16,7 +16,7 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { historyStubs } from "../__tests__/historyStubs";
+import { historyStubs } from "../__tests__/fakeAssistant";
 import AssistantLocalOnlyHeader, {
   NEAR_CAP,
   type AssistantLocalOnlyHeaderProps,

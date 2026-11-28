@@ -74,7 +74,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import { assistantGlyph } from "@/components/ai-assistant/common/glyphs";
 import type { AssistantScope, Container, Sid, Starter } from "@/composables/assistant";
+import type { IconName } from "@/lib/core/Icon/OIcon.types";
+import { trackAssistant, type StarterKind } from "@/services/assistantAnalytics";
 
 export interface AssistantWelcomeProps {
   variant: "compact" | "roomy";
@@ -103,6 +106,20 @@ const shown = new Set<string>();
 export function resetWelcomeTelemetryForTests(): void {
   shown.clear();
 }
+
+// One icon per kind of suggestion, so the cards read at a glance.
+const STARTER_ICONS: Record<StarterKind, IconName> = {
+  page: assistantGlyph.troubleshoot,
+  object: assistantGlyph.explain,
+  recent: assistantGlyph.history,
+  ingest: assistantGlyph.download,
+  learn: assistantGlyph.assistant,
+};
+
+/** The icon a starter card shows for its kind. */
+function starterIcon(kind: StarterKind): IconName {
+  return STARTER_ICONS[kind];
+}
 </script>
 
 <script setup lang="ts">
@@ -112,10 +129,8 @@ import { useStore } from "vuex";
 import AssistantSpark from "@/components/ai-assistant/common/AssistantSpark.vue";
 import { fadeUpClasses } from "@/components/ai-assistant/common/assistantMotion";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
-import { trackAssistant } from "@/services/assistantAnalytics";
 
 import AssistantStarterRow from "./AssistantStarterRow.vue";
-import { starterIcon } from "./starterIcons";
 import { useGreeting } from "./useGreeting";
 
 const props = withDefaults(defineProps<AssistantWelcomeProps>(), {

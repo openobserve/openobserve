@@ -16,7 +16,7 @@
 import { mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { settleAsyncParts } from "@/components/ai-assistant/__tests__/assistantPartStubs";
+import { settleAsyncParts } from "@/components/ai-assistant/__tests__/fakeAssistant";
 import { fakeRuntime } from "@/composables/assistant/__tests__/fakeRuntime";
 import { setRuntimeHandle } from "@/composables/assistant/runtimeHandle";
 import { resetEditorProposalsForTests } from "@/composables/assistant/useEditorProposal";
@@ -38,16 +38,16 @@ vi.mock("@/composables/useStreams", () => ({
 }));
 vi.mock("@/plugins/pipelines/useDnD", () => ({ default: vi.fn() }));
 vi.mock("@/components/ai-assistant/entry/AiEntryButton.vue", () =>
-  import("@/components/ai-assistant/__tests__/assistantPartStubs").then((m) => m.aiEntryButtonStub),
+  import("@/components/ai-assistant/__tests__/fakeAssistant").then((m) => m.aiEntryButtonStub),
 );
 vi.mock("@/components/ai-assistant/shell/AssistantDock.vue", () =>
-  import("@/components/ai-assistant/__tests__/assistantPartStubs").then((m) => m.assistantDockStub),
+  import("@/components/ai-assistant/__tests__/fakeAssistant").then((m) => m.assistantDockStub),
 );
 vi.mock("@/components/ai-assistant/entry/AiLabel.vue", () =>
-  import("@/components/ai-assistant/__tests__/assistantPartStubs").then((m) => m.aiLabelStub),
+  import("@/components/ai-assistant/__tests__/fakeAssistant").then((m) => m.aiLabelStub),
 );
 vi.mock("@/components/ai-assistant/evidence/AssistantDiffBlock.vue", () =>
-  import("@/components/ai-assistant/__tests__/assistantPartStubs").then((m) => m.diffBlockStub),
+  import("@/components/ai-assistant/__tests__/fakeAssistant").then((m) => m.diffBlockStub),
 );
 import Query from "./Query.vue";
 

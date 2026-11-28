@@ -24,7 +24,7 @@ import { raw } from "@/types/i18n";
 import { fakeEvidence } from "../__tests__/fakeEvidence";
 import { fakeRouter } from "../__tests__/fakeAssistant";
 import AssistantQueriesGroup from "./AssistantQueriesGroup.vue";
-import { revealStep } from "./revealStep";
+import { revealStep } from "./evidenceText";
 
 vi.mock("@/components/QueryEditor.vue", () => ({
   default: { props: ["query"], template: "<pre>{{ query }}</pre>" },

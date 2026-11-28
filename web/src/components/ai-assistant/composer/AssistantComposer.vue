@@ -300,10 +300,10 @@ import {
   noteCap,
   noteDraftCleared,
   STRIP_LINK_CLASS,
+  useComposerWidth,
 } from "./composerUi";
 import { useAssistantVoice } from "./useAssistantVoice";
 import { useComposerQueue } from "./useComposerQueue";
-import { useComposerWidth } from "./useComposerWidth";
 import { helpBrand } from "./voiceEngine";
 
 const props = withDefaults(defineProps<AssistantComposerProps>(), {

@@ -21,7 +21,7 @@ import type { HistoryRow } from "@/composables/assistant";
 import i18n from "@/locales";
 import { raw } from "@/types/i18n";
 
-import { historyRow } from "../__tests__/historyStubs";
+import { historyRow } from "../__tests__/fakeAssistant";
 import AssistantNewChatBelow, { RECENT_CARDS } from "./AssistantNewChatBelow.vue";
 
 const fake = vi.hoisted(() => ({

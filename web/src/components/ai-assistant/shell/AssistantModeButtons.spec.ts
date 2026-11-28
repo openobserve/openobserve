@@ -21,8 +21,7 @@ import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import { movedToTab, takeFullTabHandoff } from "@/composables/assistant/pure";
 import { raw } from "@/types/i18n";
 
-import { fakeAssistant, fakeRouter, fakeVuex } from "../__tests__/fakeAssistant";
-import { historyStubs } from "../__tests__/historyStubs";
+import { fakeAssistant, fakeRouter, fakeVuex, historyStubs } from "../__tests__/fakeAssistant";
 import AssistantModeButtons, { placementMode } from "./AssistantModeButtons.vue";
 import type { AssistantModeButtonsProps } from "./AssistantModeButtons.vue";
 

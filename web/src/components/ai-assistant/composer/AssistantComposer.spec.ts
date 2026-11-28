@@ -24,8 +24,7 @@ import { registerAssistantFocusTarget, runEscapeLadder } from "@/composables/ass
 import { trackAssistant } from "@/services/assistantAnalytics";
 import { raw } from "@/types/i18n";
 
-import { fakeAssistant, fakeRouter, fakeVuex } from "../__tests__/fakeAssistant";
-import { fakeVoiceEngine } from "../__tests__/fakeVoice";
+import { fakeAssistant, fakeRouter, fakeVuex, fakeVoiceEngine } from "../__tests__/fakeAssistant";
 import { queryClient } from "@/composables/query/queryClient";
 import { alertKeys } from "@/services/alerts.querykeys";
 import { dashboardKeys } from "@/services/dashboards.querykeys";

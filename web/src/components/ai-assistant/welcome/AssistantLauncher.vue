@@ -216,7 +216,6 @@ import AssistantChipTray, {
   useChipCollapse,
 } from "@/components/ai-assistant/context/AssistantChipTray.vue";
 import AssistantHiddenChipRow from "@/components/ai-assistant/context/AssistantHiddenChipRow.vue";
-import { useComposerWidth } from "@/components/ai-assistant/composer/useComposerWidth";
 import AssistantContextChip from "@/components/ai-assistant/context/AssistantContextChip.vue";
 import AssistantMentionMenu, {
   type MentionOption,
@@ -253,7 +252,11 @@ import {
   type NoticeAction,
 } from "@/components/ai-assistant/composer/composerNotice";
 import AssistantComposerFrame from "@/components/ai-assistant/composer/AssistantComposerFrame.vue";
-import { announceComposer, composerUi } from "@/components/ai-assistant/composer/composerUi";
+import {
+  announceComposer,
+  composerUi,
+  useComposerWidth,
+} from "@/components/ai-assistant/composer/composerUi";
 import AssistantComposerPlusMenu, {
   type ComposerPlusAction,
 } from "@/components/ai-assistant/composer/AssistantComposerPlusMenu.vue";

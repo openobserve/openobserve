@@ -21,9 +21,14 @@ import type { AssistantCapability } from "@/composables/assistant";
 import { registerHistoryTarget } from "@/composables/assistant/shortcuts";
 import { raw } from "@/types/i18n";
 
-import { fakeAssistant, fakeRouter, fakeVuex } from "../__tests__/fakeAssistant";
-import { historyStubs } from "../__tests__/historyStubs";
-import { fakeRuns, runRow } from "../runs/runsTestKit";
+import {
+  fakeAssistant,
+  fakeRouter,
+  fakeVuex,
+  historyStubs,
+  fakeRuns,
+  runRow,
+} from "../__tests__/fakeAssistant";
 import AssistantThreadHeader, {
   assistantThreadHostKey,
   type AssistantThreadHeaderProps,

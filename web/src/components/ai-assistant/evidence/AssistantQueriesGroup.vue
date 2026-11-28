@@ -201,8 +201,14 @@ import { formatCount } from "@/utils/formatters";
 
 import AssistantQueryText from "./AssistantQueryText.vue";
 import AssistantStepRowHead, { type StepRow } from "./AssistantStepRowHead.vue";
-import { clockRangeText, explorerLabel, queryFragments, rangeText, stepLine } from "./evidenceText";
-import { OPEN_STEP_EVENT } from "./revealStep";
+import {
+  OPEN_STEP_EVENT,
+  clockRangeText,
+  explorerLabel,
+  queryFragments,
+  rangeText,
+  stepLine,
+} from "./evidenceText";
 
 const ROW_CLASS = "min-h-7 w-full px-0 py-0 hover:bg-surface-subtle max-md:min-h-11";
 

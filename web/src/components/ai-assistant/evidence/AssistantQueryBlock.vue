@@ -236,8 +236,7 @@ import { formatBytes, formatCount, formatElapsed } from "@/utils/formatters";
 
 import AssistantQueryText from "./AssistantQueryText.vue";
 import AssistantResultTable from "./AssistantResultTable.vue";
-import { explorerLabel, languageLabel, rangeText } from "./evidenceText";
-import { revealStep } from "./revealStep";
+import { explorerLabel, languageLabel, rangeText, revealStep } from "./evidenceText";
 
 interface MenuItem {
   id: string;

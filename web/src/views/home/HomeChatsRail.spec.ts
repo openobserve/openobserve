@@ -21,8 +21,8 @@ import {
   fakeAssistant,
   fakeRouter,
   fakeVuex,
+  historyStubs,
 } from "@/components/ai-assistant/__tests__/fakeAssistant";
-import { historyStubs } from "@/components/ai-assistant/__tests__/historyStubs";
 import { SEARCH_DEBOUNCE_MS } from "@/components/ai-assistant/history/AssistantChatSearch.vue";
 import type { AssistantHistory } from "@/composables/assistant";
 import type { LocalRecord } from "@/composables/assistant/historyDb";

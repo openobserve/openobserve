@@ -17,7 +17,8 @@ import { mount } from "@vue/test-utils";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { defineComponent, h, nextTick, ref } from "vue";
 
-import { useComposerWidth, type ComposerWidth } from "./useComposerWidth";
+import * as composerUiModule from "./composerUi";
+import { composerPopoverClass, useComposerWidth, type ComposerWidth } from "./composerUi";
 
 let resize: (() => void) | null = null;
 
@@ -60,5 +61,19 @@ describe("useComposerWidth", () => {
 
   it("never drops the name before the composer is measured", async () => {
     expect((await measured(0)).agentIconOnly.value).toBe(false);
+  });
+});
+
+describe("composer rows (S1)", () => {
+  it("has no one-row decision left: the controls always sit under the text", () => {
+    expect("composerFitsOneRow" in composerUiModule).toBe(false);
+    expect("ONE_ROW_TEXT_PX" in composerUiModule).toBe(false);
+  });
+});
+
+describe("composerPopoverClass", () => {
+  it("takes 3 px a side off a 20 rem window", () => {
+    expect(composerPopoverClass(true)).toContain("calc(20rem-0.375rem)");
+    expect(composerPopoverClass(false)).toContain("min(20rem");
   });
 });

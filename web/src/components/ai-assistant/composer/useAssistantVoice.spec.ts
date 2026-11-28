@@ -16,7 +16,7 @@
 import { flushPromises } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { fakeVoiceEngine, fakeVoiceTarget } from "../__tests__/fakeVoice";
+import { fakeVoiceEngine, fakeVoiceTarget } from "../__tests__/fakeAssistant";
 import {
   HOLD_MS,
   PROCESSING_MS,

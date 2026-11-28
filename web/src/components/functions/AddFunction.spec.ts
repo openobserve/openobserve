@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import AddFunction from "./AddFunction.vue";
-import { settleAsyncParts } from "@/components/ai-assistant/__tests__/assistantPartStubs";
+import { settleAsyncParts } from "@/components/ai-assistant/__tests__/fakeAssistant";
 import { fakeRuntime } from "@/composables/assistant/__tests__/fakeRuntime";
 import { setRuntimeHandle } from "@/composables/assistant/runtimeHandle";
 import { resetEditorProposalsForTests } from "@/composables/assistant/useEditorProposal";
@@ -37,16 +37,16 @@ vi.mock("@/aws-exports", () => ({
   default: { isEnterprise: "false", isCloud: "false" },
 }));
 vi.mock("@/components/ai-assistant/entry/AiEntryButton.vue", () =>
-  import("@/components/ai-assistant/__tests__/assistantPartStubs").then((m) => m.aiEntryButtonStub),
+  import("@/components/ai-assistant/__tests__/fakeAssistant").then((m) => m.aiEntryButtonStub),
 );
 vi.mock("@/components/ai-assistant/shell/AssistantDock.vue", () =>
-  import("@/components/ai-assistant/__tests__/assistantPartStubs").then((m) => m.assistantDockStub),
+  import("@/components/ai-assistant/__tests__/fakeAssistant").then((m) => m.assistantDockStub),
 );
 vi.mock("@/components/ai-assistant/entry/AiLabel.vue", () =>
-  import("@/components/ai-assistant/__tests__/assistantPartStubs").then((m) => m.aiLabelStub),
+  import("@/components/ai-assistant/__tests__/fakeAssistant").then((m) => m.aiLabelStub),
 );
 vi.mock("@/components/ai-assistant/evidence/AssistantDiffBlock.vue", () =>
-  import("@/components/ai-assistant/__tests__/assistantPartStubs").then((m) => m.diffBlockStub),
+  import("@/components/ai-assistant/__tests__/fakeAssistant").then((m) => m.diffBlockStub),
 );
 
 const makeStore = (orgIdentifier = "test-org") =>
