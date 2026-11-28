@@ -263,9 +263,16 @@ const matchAll = (terms: string[]): string =>
 export const patternWhere = (pattern?: PatternTerms): string | null => {
   const include = pattern?.match_terms;
   if (!include?.length) return null;
-  const subtract = (pattern?.exclude_terms ?? [])
+  // CSE hoists a repeated match_all into a projection the index rewrite never visits, failing
+  // the query. Every returned log already has the include terms, so dropping them is lossless.
+  const own = new Set(include.map((t) => t.toLowerCase()));
+  const excludes = (pattern?.exclude_terms ?? [])
     .filter((terms) => terms.length)
-    .map((terms) => (terms.length > 1 ? `NOT (${matchAll(terms)})` : `NOT ${matchAll(terms)}`));
+    .map((terms) => terms.filter((t) => !own.has(t.toLowerCase())));
+  if (excludes.some((terms) => !terms.length)) return null;
+  const subtract = excludes.map((terms) =>
+    terms.length > 1 ? `NOT (${matchAll(terms)})` : `NOT ${matchAll(terms)}`,
+  );
   return [matchAll(include), ...subtract].join(" AND ");
 };
 
