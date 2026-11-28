@@ -608,7 +608,7 @@ mod tests {
             (body.org_id.as_str(), body.stream_name.as_str()),
             ("demo-org", DIGEST_STREAM)
         );
-        config::cache_instance_id("instance");
+        config::cache_stored_grpc_token("instance");
         let internal = config::meta::cluster::get_internal_grpc_token();
         let authorization = transport.sent.lock().unwrap()[0]
             .metadata()

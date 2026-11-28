@@ -76,8 +76,12 @@ async fn get_or_create_instance_identity(
     let mut last_err = None;
     for attempt in 1..=MAX_RETRIES {
         match read_instance_identity().await {
-            Ok(Some(identity)) => {
+            Ok(Some(mut identity)) => {
                 check_ext_auth_salt(false, env_ext_auth_salt)?;
+                if identity.grpc_token.is_none() {
+                    log::info!("Generating internal gRPC token for an existing install");
+                    identity.grpc_token = Some(create_grpc_token().await?);
+                }
                 return Ok(identity);
             }
             Ok(None) => {
@@ -156,8 +160,7 @@ async fn create_instance_identity(
     } else {
         None
     };
-    let candidate = config::utils::rand::random_hex(32);
-    let grpc_token = metas::grpc_token::get_or_create(&candidate).await?;
+    let grpc_token = create_grpc_token().await?;
     let instance_id = ider::generate();
     metas::instance::set(&instance_id).await?;
     Ok(InstanceIdentity {
@@ -167,15 +170,16 @@ async fn create_instance_identity(
     })
 }
 
+/// Returns the stored token, so nodes that start together agree on one value.
+async fn create_grpc_token() -> infra::errors::Result<String> {
+    let candidate = config::utils::rand::random_hex(32);
+    metas::grpc_token::get_or_create(&candidate).await
+}
+
 fn cache_instance_identity(identity: &InstanceIdentity, env_ext_auth_salt: &str) {
     cache_instance_id(&identity.instance_id);
     cache_stored_grpc_token(identity.grpc_token.as_deref().unwrap_or_default());
     cache_stored_ext_auth_salt(identity.ext_auth_salt.as_deref().unwrap_or_default());
-    if identity.grpc_token.is_none() && get_config().grpc.internal_grpc_token.is_empty() {
-        log::warn!(
-            "ZO_INTERNAL_GRPC_TOKEN is not set and this install has no stored internal gRPC token, so the instance id is used as the token; set ZO_INTERNAL_GRPC_TOKEN to the same secret on every node"
-        );
-    }
     match identity.ext_auth_salt.as_deref() {
         None if env_ext_auth_salt.is_empty() => log::warn!(
             "ZO_EXT_AUTH_SALT is not set and this install has no stored ext auth salt, so the public legacy salt is used; set ZO_EXT_AUTH_SALT to the same random secret of 16 to 48 bytes on every node"
@@ -267,19 +271,25 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_existing_install_keeps_the_instance_id_token() {
+    async fn test_existing_install_without_a_token_gets_one_stored() {
         let _guard = META_KEYS.lock().await;
         reset_identity().await;
         metas::instance::set("existing-instance").await.unwrap();
         let identity = get_or_create_instance_identity("").await.unwrap();
         assert_eq!(identity.instance_id, "existing-instance");
-        assert_eq!(identity.grpc_token, None);
-        assert_eq!(metas::grpc_token::get().await.unwrap(), None);
+        let token = identity.grpc_token.clone().expect("a token is generated");
+        assert_eq!(token.len(), 64);
+        assert!(token.chars().all(|c| c.is_ascii_hexdigit()));
+        assert_eq!(
+            metas::grpc_token::get().await.unwrap().as_deref(),
+            Some(token.as_str())
+        );
+        let again = get_or_create_instance_identity("").await.unwrap();
+        assert_eq!(again.grpc_token.as_deref(), Some(token.as_str()));
 
-        cache_stored_grpc_token("left-over");
         cache_stored_ext_auth_salt("left-over");
         cache_instance_identity(&identity, "");
-        assert_eq!(config::get_stored_grpc_token(), "");
+        assert_eq!(config::get_stored_grpc_token(), token);
         assert_eq!(config::get_stored_ext_auth_salt(), "");
         assert_eq!(config::get_instance_id(), "existing-instance");
     }

@@ -182,7 +182,6 @@ fn feature_writer_of(metadata: &MetadataMap, token: &str) -> Option<FeatureWrite
 }
 
 fn is_internal_token(token: &str) -> bool {
-    // get_grpc_token falls back to the instance id, so honor it only with super-cluster on
     #[cfg(feature = "enterprise")]
     let super_cluster_token = o2_enterprise::enterprise::common::config::get_config()
         .super_cluster
@@ -215,7 +214,7 @@ fn attach_user_id(mut req: Request<()>, user_id: &str) -> Result<Request<()>, St
 pub(crate) mod tests {
     use common::infra::config::{ORG_INGESTION_TOKENS, ORG_USERS, USERS};
     use config::{
-        cache_instance_id, get_config,
+        cache_stored_grpc_token, get_config,
         meta::user::{User, UserRole, UserType},
         utils::base64,
     };
@@ -228,7 +227,7 @@ pub(crate) mod tests {
     const ROOT_SALT: &str = "Complexpass#123";
 
     fn seed_root() {
-        cache_instance_id("instance");
+        cache_stored_grpc_token("instance");
         ROOT_USER.insert(
             "root".to_string(),
             User {
@@ -249,7 +248,7 @@ pub(crate) mod tests {
 
     /// Caches a non-root member of `org_id` whose password is `password` and API token is `token`.
     pub(crate) fn seed_org_user(org_id: &str, email: &str, password: &str, token: &str) {
-        cache_instance_id("instance");
+        cache_stored_grpc_token("instance");
         let salt = "grpc-auth-test-salt";
         USERS.insert(
             email.to_string(),
@@ -390,7 +389,7 @@ pub(crate) mod tests {
 
     #[test]
     fn test_check_auth_rejects_non_ascii_organization() {
-        cache_instance_id("instance");
+        cache_stored_grpc_token("instance");
         let mut request = tonic::Request::new(());
         request.metadata_mut().insert(
             "authorization",
@@ -460,7 +459,7 @@ pub(crate) mod tests {
 
     #[test]
     fn test_otlp_auth_rejects_org_ingestion_token_with_invalid_user_id() {
-        cache_instance_id("instance");
+        cache_stored_grpc_token("instance");
         let cache_key = db::org_ingestion_tokens::cache_key("auth-invalid-user-id", "o2oi_x");
         ORG_INGESTION_TOKENS.insert(cache_key.clone(), "collector-token".to_string());
 
@@ -497,7 +496,7 @@ pub(crate) mod tests {
 
     #[test]
     fn test_internal_auth_accepts_internal_token() {
-        cache_instance_id("instance");
+        cache_stored_grpc_token("instance");
         let mut request = tonic::Request::new(());
         request
             .metadata_mut()
@@ -596,7 +595,7 @@ pub(crate) mod tests {
 
     #[test]
     fn test_sso_user_with_empty_salt_does_not_panic() {
-        cache_instance_id("instance");
+        cache_stored_grpc_token("instance");
         USERS.insert(
             "sso@example.com".to_string(),
             UserRecord {
@@ -702,7 +701,7 @@ pub(crate) mod tests {
         assert_eq!(status.code(), tonic::Code::Unauthenticated);
         ORG_INGESTION_TOKENS.remove(&key);
 
-        cache_instance_id("instance");
+        cache_stored_grpc_token("instance");
         let mut request = tonic::Request::new(());
         request
             .metadata_mut()

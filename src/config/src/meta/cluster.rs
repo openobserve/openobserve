@@ -19,8 +19,7 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use crate::{
-    get_config, get_instance_id, get_stored_grpc_token, meta::search::SearchEventType,
-    utils::sysinfo::NodeMetrics,
+    get_config, get_stored_grpc_token, meta::search::SearchEventType, utils::sysinfo::NodeMetrics,
 };
 pub trait NodeInfo: Debug + Send + Sync {
     fn is_querier(&self) -> bool {
@@ -289,11 +288,7 @@ impl std::fmt::Display for RoleGroup {
 #[inline]
 pub fn get_internal_grpc_token() -> String {
     let cfg = get_config();
-    let token = select_internal_grpc_token(
-        &cfg.grpc.internal_grpc_token,
-        &get_stored_grpc_token(),
-        &get_instance_id(),
-    );
+    let token = select_internal_grpc_token(&cfg.grpc.internal_grpc_token, &get_stored_grpc_token());
 
     if token.is_empty() {
         panic!("grpc token is empty");
@@ -301,12 +296,13 @@ pub fn get_internal_grpc_token() -> String {
     token
 }
 
-fn select_internal_grpc_token(env_token: &str, stored_token: &str, instance_id: &str) -> String {
-    [env_token, stored_token, instance_id]
-        .into_iter()
-        .find(|t| !t.is_empty())
-        .unwrap_or_default()
-        .to_string()
+fn select_internal_grpc_token(env_token: &str, stored_token: &str) -> String {
+    if env_token.is_empty() {
+        stored_token
+    } else {
+        env_token
+    }
+    .to_string()
 }
 
 // CompactionJobType is used to distinguish between current and historical compaction jobs.
@@ -628,11 +624,10 @@ mod tests {
     }
 
     #[test]
-    fn test_internal_grpc_token_prefers_env_then_stored_then_instance_id() {
-        assert_eq!(select_internal_grpc_token("env", "stored", "inst"), "env");
-        assert_eq!(select_internal_grpc_token("env", "", "inst"), "env");
-        assert_eq!(select_internal_grpc_token("", "stored", "inst"), "stored");
-        assert_eq!(select_internal_grpc_token("", "", "inst"), "inst");
-        assert_eq!(select_internal_grpc_token("", "", ""), "");
+    fn test_internal_grpc_token_prefers_env_then_stored() {
+        assert_eq!(select_internal_grpc_token("env", "stored"), "env");
+        assert_eq!(select_internal_grpc_token("env", ""), "env");
+        assert_eq!(select_internal_grpc_token("", "stored"), "stored");
+        assert_eq!(select_internal_grpc_token("", ""), "");
     }
 }
