@@ -39,6 +39,7 @@ pub mod preview;
 pub mod render;
 pub mod resolve;
 pub mod send;
+pub mod servicenow;
 pub mod test_send;
 
 pub use context::{LegacyPayload, NotificationContext, build_row_columns};

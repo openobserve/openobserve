@@ -113,7 +113,29 @@ limitations under the License.
           tabindex="0"
         />
       </div>
-      <div class="w-1/2 py-1">
+      <div v-if="servicenowStoreSignIn" class="flex w-full flex-col gap-2 pt-1 pb-3">
+        <div class="text-sm font-medium">
+          {{ t("alerts.prebuiltDestinations.servicenowSignIn") }}
+        </div>
+        <OFormRadioGroup
+          name="credentials.authMethod"
+          data-test="servicenow-auth-method"
+          :label="t('alerts.prebuiltDestinations.servicenowSignIn')"
+          orientation="horizontal"
+        >
+          <ORadio
+            value="basic"
+            data-test="servicenow-auth-method-basic"
+            :label="t('alerts.prebuiltDestinations.servicenowSignInBasic')"
+          />
+          <ORadio
+            value="api_key"
+            data-test="servicenow-auth-method-api-key"
+            :label="t('alerts.prebuiltDestinations.servicenowSignInApiKey')"
+          />
+        </OFormRadioGroup>
+      </div>
+      <div v-if="!servicenowStoreSignIn || servicenowAuthMethod !== 'api_key'" class="w-1/2 py-1">
         <OFormInput
           name="credentials.username"
           data-test="servicenow-username-input"
@@ -123,7 +145,7 @@ limitations under the License.
           tabindex="0"
         />
       </div>
-      <div class="w-1/2 py-1">
+      <div v-if="!servicenowStoreSignIn" class="w-1/2 py-1">
         <OFormInput
           name="credentials.password"
           data-test="servicenow-password-input"
@@ -132,6 +154,44 @@ limitations under the License.
           type="password"
           :helpText="t('alerts.prebuiltDestinations.servicenowPasswordHelp')"
           tabindex="0"
+        />
+      </div>
+      <div v-else class="flex w-1/2 flex-col gap-2 py-1">
+        <OFormInput
+          :key="servicenowSecretField"
+          :name="`credentials.${servicenowSecretField}`"
+          :data-test="`servicenow-${servicenowSecretSlug}-secret-input`"
+          :label="
+            servicenowSecretField === 'apiKeySecret'
+              ? t('alerts.prebuiltDestinations.servicenowSignInApiKey')
+              : t('common.password')
+          "
+          required
+          readonly
+          :placeholder="t('alerts.prebuiltDestinations.servicenowPickSecret')"
+          :helpText="t('alerts.prebuiltDestinations.servicenowSecretHelp')"
+          tabindex="0"
+          @click="secretPickerOpen = true"
+        >
+          <template #icon-right>
+            <!-- The field opens the picker on click, so the key button's own click must not reach it. -->
+            <span class="flex" @click.stop>
+              <SecretPicker
+                v-model:open="secretPickerOpen"
+                consumer-type="alert_destination"
+                :consumer-id="consumerId"
+                :data-test="`servicenow-${servicenowSecretSlug}-secret-picker`"
+                @pick="(item: SecretPickerItem) => emit('pickSecret', servicenowSecretField, item)"
+              />
+            </span>
+          </template>
+        </OFormInput>
+        <OBanner
+          v-if="servicenowPlainPassword"
+          variant="warning"
+          dense
+          :content="t('alerts.prebuiltDestinations.servicenowPlainPassword')"
+          data-test="servicenow-plain-password-warning"
         />
       </div>
       <div class="w-1/2 py-1">
@@ -248,10 +308,14 @@ limitations under the License.
 </template>
 
 <script lang="ts" setup>
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, inject, onMounted, ref, watch } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OFormRadioGroup from "@/lib/forms/Radio/OFormRadioGroup.vue";
+import ORadio from "@/lib/forms/Radio/ORadio.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
 import SlackWebhookFields from "./SlackWebhookFields.vue";
@@ -260,6 +324,9 @@ import { useStore } from "vuex";
 import usersService from "@/services/users";
 import serviceAccountsService from "@/services/service_accounts";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
+import SecretPicker from "@/views/Secrets/SecretPicker.vue";
+import type { SecretPickerItem } from "@/services/secrets";
+import { servicenowSignIn } from "@/utils/prebuilt-templates/servicenow";
 
 // Presentational only: renders the active type's credential OForm* fields into
 // the parent AddDestination form (they carry `name="credentials.<key>"` and
@@ -280,12 +347,44 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  servicenowStoreSignIn: {
+    type: Boolean,
+    default: false,
+  },
+  consumerId: {
+    type: String,
+    default: "",
+  },
 });
 
-defineEmits(["preview", "test"]);
+const emit = defineEmits<{
+  preview: [];
+  test: [];
+  // The parent owns the secret consumer, which must see every pick to bind it.
+  pickSecret: [field: string, item: SecretPickerItem];
+}>();
 
 const { t } = useI18nTyped();
 const store = useStore();
+const form = inject(FORM_CONTEXT_KEY, null);
+
+const credentials = form?.useStore(
+  (s: { values: { credentials?: Record<string, unknown> } }) => s.values.credentials ?? {},
+);
+const secretPickerOpen = ref(false);
+const servicenowAuthMethod = computed(() => credentials?.value.authMethod);
+const servicenowSecretField = computed(() =>
+  servicenowAuthMethod.value === "api_key" ? "apiKeySecret" : "passwordSecret",
+);
+const servicenowSecretSlug = computed(() =>
+  servicenowSecretField.value === "apiKeySecret" ? "api-key" : "password",
+);
+const servicenowPlainPassword = computed(
+  () =>
+    props.servicenowStoreSignIn &&
+    servicenowSignIn(credentials?.value ?? {}) === "typed" &&
+    servicenowAuthMethod.value === "basic",
+);
 
 // ── Email recipients picker ───────────────────────────────────────────────
 // Only real accounts can receive alert emails, so the field offers the org's

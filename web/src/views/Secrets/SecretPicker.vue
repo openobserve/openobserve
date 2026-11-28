@@ -141,7 +141,8 @@ const emit = defineEmits<{ pick: [item: SecretPickerItem] }>();
 
 const { t } = useI18nTyped();
 const orgId = useOrgId();
-const open = ref(false);
+// Optional so a host can open the picker from its own control, such as the field it fills.
+const open = defineModel<boolean>("open", { default: false });
 const search = ref("");
 
 const query = refDebounced(

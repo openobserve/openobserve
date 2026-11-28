@@ -347,7 +347,8 @@ async fn request_for(
         return Err(SendError::RedirectRefused(status).into());
     }
     if !status.is_success() {
-        return Err(PlatformRejected { status, body: None }.into());
+        let rejected = PlatformRejected { status, body: None }.into();
+        return Err(attempt.explain(rejected, status, resp.headers()));
     }
     let sys_ids = if lookup {
         let text = resp.text().await.map_err(|e| attempt.transport_error(e))?;

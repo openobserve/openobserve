@@ -1567,6 +1567,16 @@ mod tests {
     }
 
     #[test]
+    fn test_servicenow_sign_in_refusal_is_bad_request() {
+        assert_eq!(
+            status(DestinationError::ServiceNowSignIn(
+                "servicenow_auth must be basic or api_key.".to_string()
+            )),
+            StatusCode::BAD_REQUEST
+        );
+    }
+
+    #[test]
     fn test_email_send_failed_is_bad_request() {
         assert_eq!(
             status(DestinationError::EmailSendFailed("timeout".to_string())),
