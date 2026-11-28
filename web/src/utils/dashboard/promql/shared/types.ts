@@ -72,6 +72,8 @@ export interface ProcessedPromQLData {
     data: Record<number, string>; // timestamp -> value map
   }>;
   queryIndex: number;
+  /** Position among the executed results (a time shift runs its own), the index its metadata has. */
+  resultIndex?: number;
   /** "shifted" for a past period drawn over its panel query. */
   seriesRole?: "primary" | "shifted";
   /** The shifted period's name, e.g. "1 day ago", which its series names already carry. */
@@ -80,6 +82,22 @@ export interface ProcessedPromQLData {
   histogramsLimited?: { shown: number; total: number };
   queryConfig: any;
 }
+
+/** What the point menu reads off a slice or bar: its series' labels, panel query and executed result. */
+export interface PointTags {
+  _labels: Record<string, string>;
+  _panelQueryIndex: number;
+  _resultIndex: number;
+}
+
+export const pointTags = (
+  queryData: Pick<ProcessedPromQLData, "queryIndex" | "resultIndex">,
+  labels: Record<string, string>,
+): PointTags => ({
+  _labels: labels,
+  _panelQueryIndex: queryData.queryIndex,
+  _resultIndex: queryData.resultIndex ?? queryData.queryIndex,
+});
 
 /**
  * Common converter interface

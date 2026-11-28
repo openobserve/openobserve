@@ -26,12 +26,13 @@ import CorrelatedLogsTable from "./CorrelatedLogsTable.vue";
 import store from "@/test/unit/helpers/store";
 
 const mockRouterPush = vi.fn();
+const mockRouterResolve = vi.fn((to: any) => ({ href: `/web/traces/${to.query.trace_id}` }));
 
 vi.mock("vue-router", async (importOriginal) => {
   const actual = await importOriginal<typeof import("vue-router")>();
   return {
     ...actual,
-    useRouter: () => ({ push: mockRouterPush }),
+    useRouter: () => ({ push: mockRouterPush, resolve: mockRouterResolve }),
   };
 });
 
@@ -164,6 +165,48 @@ describe("CorrelatedLogsTable — View Trace from an expanded row (issue #13708)
     expect(pushed.span_id).toBe(LOG.span_id);
     expect(pushed.query.from).toBe(LOG._timestamp - 900000000);
     expect(pushed.query.to).toBe(LOG._timestamp + 900000000);
+  });
+
+  it("inside a dashboard explorer, View trace opens a new tab and leaves the dashboard", async () => {
+    const { defineComponent, h, ref } = await import("vue");
+    const { provideTraceLinksInNewTab } =
+      await import("@/plugins/traces/composables/useTraceNavigation");
+    const open = vi.spyOn(window, "open").mockImplementation(() => null);
+    const Host = defineComponent({
+      setup() {
+        provideTraceLinksInNewTab(ref(true));
+        return () =>
+          h(CorrelatedLogsTable, {
+            matchedDimensions: { service: "api" },
+            additionalDimensions: {},
+            logStreams: [{ name: "test-stream", stream_type: "logs" }],
+            sourceStream: "logs",
+            sourceType: "logs",
+            timeRange: { startTime: 0, endTime: 1 },
+          });
+      },
+    });
+    const hosted = mount(Host, {
+      global: {
+        plugins: [i18n, store],
+        stubs: {
+          DimensionFiltersBar: true,
+          CellActions: true,
+          O2AIContextAddBtn: true,
+          JsonPreview: jsonPreviewStub,
+        },
+      },
+    });
+    await flushPromises();
+    await hosted.find('[data-test="json-preview-view-trace"]').trigger("click");
+    expect(mockRouterPush).not.toHaveBeenCalled();
+    expect(open).toHaveBeenCalledWith(
+      `/web/traces/${LOG.trace_id}`,
+      "_blank",
+      "noopener,noreferrer",
+    );
+    open.mockRestore();
+    hosted.unmount();
   });
 
   it("does not throw or navigate when the log is missing", () => {

@@ -347,7 +347,7 @@ import {
 } from "@/composables/useMetricSubjectButtons";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
-import { useRouter } from "vue-router";
+import { useTraceNavigate } from "@/plugins/traces/composables/useTraceNavigation";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OPagination from "@/lib/navigation/Pagination/OPagination.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -398,7 +398,8 @@ const emit = defineEmits<{
 // Composables
 const { t } = useI18nTyped();
 const store = useStore();
-const router = useRouter();
+// Inside a dashboard explorer the trace opens in a new tab, so the dashboard stays.
+const navigate = useTraceNavigate();
 const { searchObj } = searchState();
 const { loadKeyFields } = useServiceCorrelation();
 
@@ -1299,7 +1300,7 @@ const handleViewTrace = (log: any) => {
 
   query["span_id"] = log[store.state.organizationData.organizationSettings.span_id_field_name];
 
-  router.push(query);
+  navigate(query);
 };
 
 const handleNestedCorrelation = () => {

@@ -80,7 +80,31 @@ export const lexicalParenDepth = (sql: string): number => {
  */
 export const stripWherePredicate = (sql: string): string => {
   if (!sql || typeof sql !== "string") return sql;
+  const ranges = topLevelWhereRanges(sql);
+  if (!ranges.length) return sql;
 
+  let out = "";
+  let prev = 0;
+  for (const [start, end] of ranges) {
+    out += sql.slice(prev, start) + " 1 = 1 ";
+    prev = end;
+  }
+  return out + sql.slice(prev);
+};
+
+/** The predicate of a query's one top-level WHERE; null when it has none, or several (a UNION). */
+export const topLevelWherePredicate = (
+  sql: string,
+): { predicate: string | null; count: number } => {
+  const ranges = sql && typeof sql === "string" ? topLevelWhereRanges(sql) : [];
+  const text =
+    ranges.length === 1
+      ? sql.slice(ranges[0][0], ranges[0][1]).trim().replace(/;$/, "").trim()
+      : "";
+  return { predicate: text || null, count: ranges.length };
+};
+
+const topLevelWhereRanges = (sql: string): Array<[number, number]> => {
   const ranges: Array<[number, number]> = [];
   const n = sql.length;
   let depth = 0;
@@ -149,15 +173,7 @@ export const stripWherePredicate = (sql: string): string => {
   }
 
   if (whereStart !== -1) ranges.push([whereStart, n]);
-  if (!ranges.length) return sql;
-
-  let out = "";
-  let prev = 0;
-  for (const [start, end] of ranges) {
-    out += sql.slice(prev, start) + " 1 = 1 ";
-    prev = end;
-  }
-  return out + sql.slice(prev);
+  return ranges;
 };
 
 function skipQuoted(sql: string, start: number): number {

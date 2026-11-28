@@ -3,7 +3,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later -->
 
 <!-- Log-explorer results filtered by a clicked dashboard cell; row click opens a detail drawer. -->
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount, watch, defineAsyncComponent } from "vue";
+import { ref, computed, onMounted, watch, defineAsyncComponent } from "vue";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import { useI18nTyped, raw } from "@/types/i18n";
@@ -17,8 +17,26 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import DateTime from "@/components/DateTime.vue";
-import QueryEditor from "@/components/QueryEditor.vue";
 import TablePaginationControls from "@/components/dashboards/addPanel/TablePaginationControls.vue";
+import ExplorerResultsPager from "@/components/dashboards/pointExplorer/ExplorerResultsPager.vue";
+import ExplorerResultRow from "@/components/dashboards/pointExplorer/ExplorerResultRow.vue";
+import ExplorerFilterBar from "@/components/dashboards/pointExplorer/ExplorerFilterBar.vue";
+import {
+  explorerClock,
+  explorerErrorText,
+  explorerSql,
+  explorerTime,
+  whereOfExplorerSql,
+} from "@/utils/dashboard/pointExplorers";
+import ExplorerQueryError from "@/components/dashboards/pointExplorer/ExplorerQueryError.vue";
+import { provideTraceLinksInNewTab } from "@/plugins/traces/composables/useTraceNavigation";
+import useStreams from "@/composables/useStreams";
+import { toFilterFields } from "@/utils/query/filterBar";
+import {
+  requestFieldValues,
+  requestFieldValuesMatching,
+  valuesWindowFor,
+} from "@/composables/fieldValueStore";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
@@ -34,18 +52,28 @@ import {
   patternFilterBlockedReason,
   type PatternTerms,
 } from "@/plugins/logs/patterns/patternUtils";
-import searchService from "@/services/search";
 import patternsService from "@/services/patterns";
-import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
-import { useLicenseLock, useLicenseLocks } from "@/composables/useFeatureLock";
+import { useLicenseLocks } from "@/composables/useFeatureLock";
 import { streamTypeFeature } from "@/utils/featureGate";
-import { buildChipDimensionsFromFilters } from "@/services/service_streams";
-import { correlationDisplayProps } from "@/types/serviceRef";
-import { buildWorkloadChipDimensions } from "@/composables/useMetricSubjectButtons";
-import { extractSeverity } from "@/utils/sourceEventSeverity";
-import type { TelemetryContext } from "@/utils/telemetryCorrelation";
+import { useExplorerSqlSearch } from "@/composables/dashboard/useExplorerSqlSearch";
+import { useExplorerTotal } from "@/composables/dashboard/useExplorerTotal";
+import { useExplorerPagedStep } from "@/composables/dashboard/useExplorerPagedStep";
+import { useExplorerCorrelation } from "@/composables/dashboard/useExplorerCorrelation";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
+import {
+  filtersWhere,
+  type FieldFilter,
+  type ExplorerMode,
+} from "@/utils/dashboard/chartPointExplore";
+import { eventSecondWindow } from "@/utils/dashboard/pointExplorers";
+import { useExplorerDetailKeys } from "@/composables/dashboard/useExplorerDetailKeys";
 const DetailTable = defineAsyncComponent(() => import("@/plugins/logs/DetailTable.vue"));
+const DashboardTraceExplorer = defineAsyncComponent(
+  () => import("@/components/dashboards/pointExplorer/DashboardTraceExplorer.vue"),
+);
+const DashboardMetricsExplorer = defineAsyncComponent(
+  () => import("@/components/dashboards/pointExplorer/DashboardMetricsExplorer.vue"),
+);
 const AiEntryButton = defineAsyncComponent(
   () => import("@/components/ai-assistant/entry/AiEntryButton.vue"),
 );
@@ -54,13 +82,25 @@ const props = defineProps<{
   stream: string;
   streamType?: string;
   field: string;
-  value: string | number;
+  // A table cell's raw value: NULL filters IS NULL, an empty string = ''.
+  value: string | number | null;
   startTime: number; // microseconds
   endTime: number; // microseconds
   baseWhere?: string; // panel's own WHERE, AND-combined with the clicked cell
+  // A chart point's group-by values; they replace the single field/value of a table cell.
+  filters?: FieldFilter[];
+  // Logs unless a chart point opened its traces or metrics.
+  mode?: ExplorerMode;
   /** The panel the cell came from, named in the cell door's prompt. */
   panelTitle?: string;
 }>();
+
+const isLogs = computed(() => (props.mode ?? "logs") === "logs");
+// Only the chart-point path passes filters; a table cell gives one field/value.
+const openedFromPoint = computed(() => props.filters !== undefined);
+
+// Trace links in any explorer's detail (View trace in the correlated Logs tab) open in a new tab.
+provideTraceLinksInNewTab(ref(true));
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -107,7 +147,12 @@ const cellDoor = (verb: "explain" | "add_to_chat") => ({
 });
 
 const SQL_IDENT = /^[A-Za-z_][A-Za-z0-9_.]*$/;
-const paramsValid = computed(() => SQL_IDENT.test(props.field) && SQL_IDENT.test(props.stream));
+const activeFilters = computed<FieldFilter[]>(
+  () => props.filters ?? [{ field: props.field, value: props.value }],
+);
+const paramsValid = computed(
+  () => SQL_IDENT.test(props.stream) && activeFilters.value.every((f) => SQL_IDENT.test(f.field)),
+);
 
 // Editable time range (µs); searches read these refs, not the fixed props.
 const rangeStart = ref(props.startTime);
@@ -127,18 +172,28 @@ const onDateChange = (d: { startTime: number; endTime: number }) => {
   if (s === rangeStart.value && e === rangeEnd.value) return;
   rangeStart.value = s;
   rangeEnd.value = e;
-  loadEvents();
+  // The user's filter or SQL stays; only the range changes, as in the Traces and Metrics explorers.
+  runQuery();
 };
 
 // ── Search state ──────────────────────────────────────────────────────────────
 const events = ref<any[]>([]);
-const total = ref(0);
+// The match total of the current query: null until a short page or the count makes it known.
+const {
+  total,
+  counting,
+  begin: beginTotal,
+  pageLoaded,
+  counted,
+  fail: failTotal,
+  currentRun,
+} = useExplorerTotal();
 const page = ref(0);
 const pageSize = ref(100);
 const loading = ref(false);
 const errorMsg = ref("");
-
-const resultTotalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize.value)));
+// The SQL a failed search ran, shown under its message.
+const errorSql = ref("");
 
 // Inline per-row JSON expand (same interaction as Surrounding events), keyed by page index.
 const resultExpandedIdx = ref(new Set<number>());
@@ -152,31 +207,52 @@ function isResultExpanded(i: number) {
   return resultExpandedIdx.value.has(i);
 }
 
-// ── SQL editor ────────────────────────────────────────────────────────────────
+// ── Filter bar and SQL mode ───────────────────────────────────────────────────
+// Clicked predicates AND-combined with the panel's own filter to match its scoped data.
+const defaultWhere = () => filtersWhere(props.baseWhere, activeFilters.value);
+function whereClause(): string {
+  const where = defaultWhere();
+  return where ? ` WHERE ${where}` : "";
+}
+// One query: the chips edit its WHERE while it keeps the plain shape (they open as the panel filter
+// and the clicked values); "write your own" edits it all. The SQL button shows or hides the area.
+const showSql = ref(false);
 const customSql = ref("");
-const showSql = ref(false); // query editor is collapsed until the SQL toggle
-
-function escSql(v: string | number): string {
-  return String(v).replace(/'/g, "''");
-}
-// Clicked cell predicate: IS NULL for empty, unquoted for numbers, escaped-quote otherwise.
-function cellWhere(): string {
-  const v = props.value;
-  if (v === null || v === undefined || v === "") return `${props.field} IS NULL`;
-  if (typeof v === "number") return `${props.field} = ${v}`;
-  return `${props.field} = '${escSql(v)}'`;
-}
-// Cell predicate AND-combined with the panel's own filter to match its scoped data.
-function effectiveWhere(): string {
-  const cell = cellWhere();
-  return props.baseWhere ? `(${props.baseWhere}) AND ${cell}` : cell;
-}
-function buildDefaultSql(): string {
-  return `SELECT * FROM "${props.stream}" WHERE ${effectiveWhere()} ORDER BY _timestamp DESC`;
-}
 function activeSql() {
-  return customSql.value || buildDefaultSql();
+  return customSql.value.trim() || explorerSql(props.stream, defaultWhere());
 }
+// A query the chips cannot draw goes to them whole, so the builder shows its banner.
+const chipsQuery = computed(() => whereOfExplorerSql(props.stream, activeSql()) ?? activeSql());
+const onChipsQuery = (where: string) => {
+  customSql.value = explorerSql(props.stream, where);
+};
+
+const { getStream } = useStreams(t);
+const schemaRows = ref<{ name: string; type?: string }[]>([]);
+const fieldsLoading = ref(true);
+async function loadFields() {
+  fieldsLoading.value = true;
+  try {
+    const stream: any = await getStream(props.stream, props.streamType ?? "logs", true);
+    schemaRows.value = stream?.schema ?? [];
+  } catch {
+    schemaRows.value = [];
+  }
+  fieldsLoading.value = false;
+}
+const filterFields = computed(() => toFilterFields(schemaRows.value));
+// Values come from the stream over the drawer's own range.
+const loadFilterValues = (field: string, search: string): Promise<string[]> => {
+  const ctx = {
+    org: orgId.value,
+    streamType: props.streamType ?? "logs",
+    streamName: props.stream,
+  };
+  const timeRange = valuesWindowFor(rangeStart.value, rangeEnd.value) ?? undefined;
+  return search.trim()
+    ? requestFieldValuesMatching(ctx, field, search, { timeRange })
+    : requestFieldValues(ctx, field, { timeRange });
+};
 
 // ── Event detail drawer ───────────────────────────────────────────────────────
 const selectedEvent = ref<Record<string, any> | null>(null);
@@ -366,23 +442,18 @@ async function loadSurrounding(ev: Record<string, any>) {
   surroundPage.value = 0;
   surroundExpandedIdx.value = new Set();
   try {
-    const res = await searchService.search(
-      {
-        org_identifier: orgId.value,
-        query: {
-          query: {
-            sql: `SELECT * FROM "${props.stream}" ORDER BY _timestamp ASC`,
-            start_time: ts - win,
-            end_time: ts + win,
-            from: 0,
-            size: 200,
-          },
-        },
-        page_type: props.streamType ?? "logs",
-      },
-      "ui",
+    const res = await streamSearch("surround", {
+      sql: `SELECT * FROM "${props.stream}" ORDER BY _timestamp ASC`,
+      start_time: ts - win,
+      end_time: ts + win,
+      from: 0,
+      size: 200,
+    });
+    if (!res) return;
+    // Streamed partitions arrive in their own order, so restore the ascending order the SQL asks for.
+    surroundEvents.value = [...res.hits].sort(
+      (a, b) => Number(a._timestamp ?? 0) - Number(b._timestamp ?? 0),
     );
-    surroundEvents.value = res.data?.hits ?? [];
     // Jump to the page containing the selected event
     const idx = surroundEvents.value.findIndex((e) => String(e._timestamp) === String(ts));
     if (idx >= 0) surroundPage.value = Math.floor(idx / surroundPageSize.value);
@@ -400,26 +471,17 @@ async function loadInsights(ev: Record<string, any>) {
   surroundEvents.value = [];
 
   const intv = getTimeBucket();
-  const where = effectiveWhere();
+  const where = whereClause();
 
   const [histR, patR] = await Promise.allSettled([
     // 1. Histogram — event count per time bucket over full range
-    searchService.search(
-      {
-        org_identifier: orgId.value,
-        query: {
-          query: {
-            sql: `SELECT histogram(_timestamp, '${intv}') AS zo_key, COUNT(*) AS zo_cnt FROM "${props.stream}" WHERE ${where} GROUP BY zo_key ORDER BY zo_key`,
-            start_time: rangeStart.value,
-            end_time: rangeEnd.value,
-            from: 0,
-            size: 500,
-          },
-        },
-        page_type: props.streamType ?? "logs",
-      },
-      "ui",
-    ),
+    streamSearch("histogram", {
+      sql: `SELECT histogram(_timestamp, '${intv}') AS zo_key, COUNT(*) AS zo_cnt FROM "${props.stream}"${where} GROUP BY zo_key ORDER BY zo_key`,
+      start_time: rangeStart.value,
+      end_time: rangeEnd.value,
+      from: 0,
+      size: 500,
+    }),
 
     // 2. Log patterns — cluster similar log lines
     patternsService.extractPatterns({
@@ -427,7 +489,7 @@ async function loadInsights(ev: Record<string, any>) {
       stream_name: props.stream,
       query: {
         query: {
-          sql: `SELECT * FROM "${props.stream}" WHERE ${where}`,
+          sql: `SELECT * FROM "${props.stream}"${where}`,
           start_time: rangeStart.value,
           end_time: rangeEnd.value,
           from: 0,
@@ -443,7 +505,7 @@ async function loadInsights(ev: Record<string, any>) {
       const iso = /[zZ]|[+-]\d{2}:?\d{2}$/.test(key) ? key : `${key}Z`;
       return new Date(iso).getTime();
     };
-    timeline.value = (histR.value.data?.hits ?? [])
+    timeline.value = (histR.value?.hits ?? [])
       .map((h: any) => ({ keyMs: toUtcMs(String(h.zo_key ?? "")), num: Number(h.zo_cnt) }))
       .filter((b: any) => !isNaN(b.keyMs))
       .sort((a: any, b: any) => a.keyMs - b.keyMs);
@@ -470,14 +532,18 @@ async function loadInsights(ev: Record<string, any>) {
   loadSurrounding(ev);
 }
 
+// Only a table cell's drawer lives in the URL (cell_*); a chart point's leaves the URL alone.
 function openEventDetail(ev: Record<string, any>) {
   selectedEvent.value = ev;
-  router.replace({ query: { ...route.query, cell_event_ts: String(ev._timestamp ?? "") } });
+  if (!openedFromPoint.value) {
+    router.replace({ query: { ...route.query, cell_event_ts: String(ev._timestamp ?? "") } });
+  }
   loadInsights(ev);
 }
 
 function closeEventDetail() {
   selectedEvent.value = null;
+  if (openedFromPoint.value) return;
   const q = { ...route.query };
   delete (q as any).cell_event_ts;
   router.replace({ query: q });
@@ -487,33 +553,30 @@ function closeEventDetail() {
 const selectedIndex = computed(() =>
   selectedEvent.value ? events.value.indexOf(selectedEvent.value) : -1,
 );
-const hasPrev = computed(() => selectedIndex.value > 0);
-const hasNext = computed(
-  () => selectedIndex.value >= 0 && selectedIndex.value < events.value.length - 1,
-);
-function goPrev() {
-  if (hasPrev.value) openEventDetail(events.value[selectedIndex.value - 1]);
-}
-function goNext() {
-  if (hasNext.value) openEventDetail(events.value[selectedIndex.value + 1]);
-}
-function onDetailKeydown(e: KeyboardEvent) {
-  if (!selectedEvent.value) return;
-  if (e.key === "ArrowLeft") {
-    e.preventDefault();
-    goPrev();
-  } else if (e.key === "ArrowRight") {
-    e.preventDefault();
-    goNext();
-  } else if (e.key === "Escape") {
-    // Return to the results list instead of letting the drawer close.
-    e.preventDefault();
-    e.stopPropagation();
-    closeEventDetail();
-  }
-}
-onMounted(() => window.addEventListener("keydown", onDetailKeydown, true));
-onBeforeUnmount(() => window.removeEventListener("keydown", onDetailKeydown, true));
+// The event's place in the whole result, out of the total once it is known.
+const detailPosition = computed(() => {
+  const at = page.value * pageSize.value + selectedIndex.value + 1;
+  return total.value !== null ? `${at} / ${total.value}` : String(at);
+});
+const { hasPrev, hasNext, step } = useExplorerPagedStep({
+  items: () => events.value,
+  index: () => selectedIndex.value,
+  page: () => page.value,
+  nextPageExists: () =>
+    total.value !== null
+      ? (page.value + 1) * pageSize.value < total.value
+      : events.value.length >= pageSize.value,
+  loadPage: (p) => goToPage(p),
+  open: openEventDetail,
+});
+const goPrev = () => step(-1);
+const goNext = () => step(1);
+const onExplorerKeydown = useExplorerDetailKeys({
+  isOpen: () => !!selectedEvent.value,
+  prev: goPrev,
+  next: goNext,
+  back: closeEventDetail,
+});
 
 // ── Source Details (DetailTable) — Insights leading tab + correlation wiring ────
 const detailLeadingTabs = computed(() => [
@@ -525,17 +588,6 @@ const detailLeadingTabs = computed(() => [
   },
 ]);
 
-const correlationDashboardProps = ref<any>(null);
-const correlationLoading = ref(false);
-const correlationError = ref<string | null>(null);
-const correlationFetchInProgress = ref(false);
-const {
-  findRelatedTelemetry,
-  semanticGroups,
-  noMatch: correlationNoMatch,
-  error: serviceCorrelationError,
-} = useServiceCorrelation();
-const { locked: correlationLocked } = useLicenseLock("correlation");
 const licenseLocks = useLicenseLocks();
 const logsFeature = computed(() => streamTypeFeature(props.streamType));
 const openInLogsLocked = computed(() => licenseLocks.isLocked(logsFeature.value));
@@ -543,88 +595,18 @@ const openInLogsLockedReason = computed(() =>
   logsFeature.value ? licenseLocks.lockedReason(logsFeature.value) : raw(""),
 );
 
-// Fresh correlation per event (mirrors the Logs page reset on row change).
-watch(selectedEvent, () => {
-  correlationDashboardProps.value = null;
-  correlationLoading.value = false;
-  correlationError.value = null;
-  correlationFetchInProgress.value = false;
+const {
+  correlationDashboardProps,
+  correlationLoading,
+  correlationError,
+  openCorrelation: openCorrelationFromLog,
+} = useExplorerCorrelation({
+  sourceType: "logs",
+  stream: () => props.stream,
+  selected: selectedEvent,
+  // FTS fields drive full log-body colorization in the correlated logs table.
+  ftsFields: ["body"],
 });
-
-// Lazy correlation fetch — replicated from SearchResult.vue's openCorrelationFromLog.
-async function openCorrelationFromLog(logData: any) {
-  if (correlationFetchInProgress.value || correlationLocked.value) return;
-  try {
-    correlationFetchInProgress.value = true;
-    correlationLoading.value = true;
-    correlationError.value = null;
-    const context: TelemetryContext = {
-      timestamp: logData._timestamp || Date.now() * 1000,
-      fields: logData,
-    };
-    const timeWindowMicros = 5 * 60 * 1000000;
-    const startTimeMicros = context.timestamp - timeWindowMicros;
-    let endTimeMicros = context.timestamp + timeWindowMicros;
-    const currentTimeMicros = Date.now() * 1000;
-    if (endTimeMicros > currentTimeMicros) endTimeMicros = currentTimeMicros;
-    const result = await findRelatedTelemetry(context, "logs", 5, props.stream, {
-      start: startTimeMicros,
-      end: endTimeMicros,
-    });
-    if (!result) {
-      correlationError.value = correlationNoMatch.value
-        ? t("logs.searchResult.noMatchingService")
-        : serviceCorrelationError.value || t("logs.searchResult.unableToRetrieveCorrelation");
-      return;
-    }
-    if (!result.correlationData) {
-      correlationError.value = t("logs.searchResult.unableToRetrieveCorrelation");
-      return;
-    }
-    const logFilters = result.correlationData.related_streams.logs?.[0]?.filters || {};
-    const actualMatchedDimensions =
-      Object.keys(logFilters).length > 0 ? logFilters : result.correlationData.matched_dimensions;
-    correlationDashboardProps.value = {
-      serviceName: result.correlationData.service_name,
-      ...correlationDisplayProps(result.correlationData),
-      matchedDimensions: actualMatchedDimensions,
-      additionalDimensions: {},
-      matchedSetId: result.correlationData.matched_set_id,
-      chipDimensions: {
-        ...buildChipDimensionsFromFilters(result.correlationData, semanticGroups.value),
-        ...buildWorkloadChipDimensions(
-          result.correlationData.matched_set_id,
-          semanticGroups.value,
-          logData,
-        ),
-      },
-      sourceEvent: {
-        timestamp: logData._timestamp,
-        severity: extractSeverity(logData) ?? undefined,
-        message: logData.body || logData.message || logData.log || logData.msg,
-      },
-      metricStreams: result.correlationData.related_streams.metrics || [],
-      logStreams: result.correlationData.related_streams.logs || [],
-      traceStreams: result.correlationData.related_streams.traces || [],
-      sourceStream: props.stream,
-      sourceType: "logs",
-      availableDimensions: { ...logFilters, ...context.fields },
-      semanticGroups: semanticGroups.value,
-      // FTS fields drive full log-body colorization in the correlated logs table;
-      // "body" is the log message field for the default log stream.
-      ftsFields: ["body"],
-      timeRange: { startTime: startTimeMicros, endTime: endTimeMicros },
-    };
-  } catch (err: any) {
-    correlationError.value = t("logs.searchResult.correlationError", {
-      error: err?.message || err,
-    });
-    correlationDashboardProps.value = null;
-  } finally {
-    correlationLoading.value = false;
-    correlationFetchInProgress.value = false;
-  }
-}
 
 // JsonPreview's @copy emits an object; stringify non-strings as pretty JSON.
 function copyToClipboard(value: unknown) {
@@ -636,35 +618,22 @@ function copyToClipboard(value: unknown) {
       /* best-effort */
     });
 }
-function copyCurrentUrl() {
-  copyToClipboard(window.location.href);
+// A table cell's drawer is restored from its cell_* URL params, so its link is the current URL.
+// A chart point's drawer is not in the URL, so its link opens the event on the Logs page.
+function copyEventLink() {
+  const ts = Number(selectedEvent.value?._timestamp);
+  if (!openedFromPoint.value || !Number.isFinite(ts)) {
+    copyToClipboard(window.location.href);
+    return;
+  }
+  const { startTime, endTime } = eventSecondWindow(ts);
+  copyToClipboard(logsPageUrl(activeSql(), startTime, endTime, false));
 }
 
 // ── Formatters ────────────────────────────────────────────────────────────────
-function fmtTs(ts: unknown): string {
-  if (!ts) return "—";
-  const raw = Number(ts);
-  const ms = raw > 1e13 ? raw / 1000 : raw;
-  return new Date(ms).toLocaleString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  });
-}
-
-function fmtTsShort(ts: unknown): string {
-  if (!ts) return "—";
-  const raw = Number(ts);
-  const ms = raw > 1e13 ? raw / 1000 : raw;
-  return new Date(ms).toLocaleTimeString(undefined, {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  });
-}
+// Times read in the app's timezone, as the rest of the dashboard shows them.
+const fmtTs = (ts: unknown): string => explorerTime(ts, store.state.timezone);
+const fmtTsShort = (ts: unknown): string => explorerClock(ts, store.state.timezone);
 
 function fmtRelTime(tsMicros: number, refMicros: number): string {
   const diffMs = (tsMicros - refMicros) / 1_000;
@@ -679,57 +648,68 @@ function fmtRelTime(tsMicros: number, refMicros: number): string {
 }
 
 // ── Search ────────────────────────────────────────────────────────────────────
-async function runSql(sql: string, fromOffset: number) {
+const { streamSearch, countMatches: countIn } = useExplorerSqlSearch(
+  () => props.streamType ?? "logs",
+);
+
+const countMatches = (sql: string) =>
+  countIn(sql, { start_time: rangeStart.value, end_time: rangeEnd.value });
+
+// `count` is set for a new query (its own run and total); paging keeps the run's total.
+async function runSql(sql: string, fromOffset: number, count = false) {
   if (!orgId.value || !props.stream) {
     errorMsg.value = props.stream ? "" : `Stream not resolved (field: ${props.field})`;
+    errorSql.value = "";
     return;
   }
   if (!paramsValid.value) {
     errorMsg.value = t("panel.logExplorer.invalidParams");
+    errorSql.value = "";
     events.value = [];
     total.value = 0;
     return;
   }
   loading.value = true;
   errorMsg.value = "";
+  errorSql.value = "";
+  let superseded = false;
+  const run = count ? beginTotal() : currentRun();
   try {
-    const res = await searchService.search(
-      {
-        org_identifier: orgId.value,
-        query: {
-          query: {
-            sql,
-            start_time: rangeStart.value,
-            end_time: rangeEnd.value,
-            from: fromOffset,
-            size: pageSize.value,
-          },
-        },
-        page_type: props.streamType ?? "logs",
-      },
-      "ui",
-    );
-    events.value = res.data?.hits ?? [];
-    total.value = res.data?.total ?? events.value.length;
+    if (count) void countMatches(sql).then((matches) => counted(run, matches));
+    const res = await streamSearch("events", {
+      sql,
+      start_time: rangeStart.value,
+      end_time: rangeEnd.value,
+      from: fromOffset,
+      size: pageSize.value,
+    });
+    // A newer query took over this one; its own run owns the results and the spinner.
+    superseded = !res;
+    if (!res) return;
+    events.value = res.hits;
+    pageLoaded(run, fromOffset, res.hits.length, pageSize.value);
     resultExpandedIdx.value = new Set();
-  } catch (e: any) {
-    errorMsg.value = `${e?.response?.data?.error ?? e?.message ?? "Search failed"}\n\n${sql}`;
+  } catch (e: unknown) {
+    errorMsg.value = explorerErrorText(e);
+    errorSql.value = sql;
     events.value = [];
-    total.value = 0;
+    failTotal(run);
   } finally {
-    loading.value = false;
+    if (!superseded) loading.value = false;
   }
 }
 
 async function loadEvents() {
   page.value = 0;
-  const sql = buildDefaultSql();
-  customSql.value = sql;
-  await runSql(sql, 0);
+  customSql.value = explorerSql(props.stream, defaultWhere());
+  await runSql(activeSql(), 0, true);
 }
+// The chip bar's pending auto-run, if any; a run from here supersedes it, so one click sends one search.
+const filterBarRef = ref<InstanceType<typeof ExplorerFilterBar> | null>(null);
 async function runQuery() {
+  filterBarRef.value?.cancelPendingRun();
   page.value = 0;
-  await runSql(activeSql(), 0);
+  await runSql(activeSql(), 0, true);
 }
 async function goToPage(p: number) {
   page.value = p;
@@ -738,28 +718,19 @@ async function goToPage(p: number) {
 
 // Restore the detail drawer from URL param via a 1-row fetch by exact _timestamp.
 async function restoreEventDetail() {
-  if (selectedEvent.value || !paramsValid.value) return;
+  if (selectedEvent.value || !paramsValid.value || openedFromPoint.value) return;
   const rawTs = String(route.query.cell_event_ts ?? "");
   if (!/^\d{1,20}$/.test(rawTs)) return;
   const ts = Number(rawTs);
   try {
-    const res = await searchService.search(
-      {
-        org_identifier: orgId.value,
-        query: {
-          query: {
-            sql: `SELECT * FROM "${props.stream}" WHERE _timestamp = ${ts}`,
-            start_time: rangeStart.value,
-            end_time: rangeEnd.value,
-            from: 0,
-            size: 1,
-          },
-        },
-        page_type: props.streamType ?? "logs",
-      },
-      "ui",
-    );
-    const found = res.data?.hits?.[0];
+    const res = await streamSearch("restore", {
+      sql: `SELECT * FROM "${props.stream}" WHERE _timestamp = ${ts}`,
+      start_time: rangeStart.value,
+      end_time: rangeEnd.value,
+      from: 0,
+      size: 1,
+    });
+    const found = res?.hits[0];
     if (found) {
       selectedEvent.value = found;
       loadInsights(found);
@@ -771,14 +742,18 @@ async function restoreEventDetail() {
 
 watch(pageSize, () => goToPage(0));
 onMounted(async () => {
+  if (!isLogs.value) return;
   dateReady = true;
+  void loadFields();
   await loadEvents();
   await restoreEventDetail();
 });
 watch(
-  () => [props.field, props.value, props.stream],
+  () => [props.field, props.value, props.stream, props.filters],
   () => {
+    if (!isLogs.value) return;
     selectedEvent.value = null;
+    void loadFields();
     loadEvents();
   },
 );
@@ -799,7 +774,12 @@ function isSurroundExpanded(pageIdx: number) {
 
 // ── Navigation ────────────────────────────────────────────────────────────────
 function patternToSql(template: string): string | null {
-  return buildPatternLogsSql(template, props.stream, allPatternTerms.value, effectiveWhere());
+  return buildPatternLogsSql(
+    template,
+    props.stream,
+    allPatternTerms.value,
+    defaultWhere() || undefined,
+  );
 }
 
 function openPatternInLogs(template: string) {
@@ -827,7 +807,8 @@ function openPatternInLogs(template: string) {
   window.open(url.toString(), "_blank", "noopener,noreferrer");
 }
 
-function openInLogs() {
+// The Logs page running `sql` over [from, to) µs on this drawer's stream.
+function logsPageUrl(sql: string, from: number, to: number, showHistogram: boolean): string {
   const pos = window.location.pathname.indexOf("/web/");
   const base =
     pos > -1
@@ -837,18 +818,42 @@ function openInLogs() {
   url.searchParams.set("org_identifier", orgId.value);
   url.searchParams.set("stream_type", props.streamType ?? "logs");
   url.searchParams.set("stream", props.stream);
-  url.searchParams.set("from", String(rangeStart.value));
-  url.searchParams.set("to", String(rangeEnd.value));
-  url.searchParams.set("query", b64EncodeUnicode(activeSql()) ?? "");
+  url.searchParams.set("from", String(from));
+  url.searchParams.set("to", String(to));
+  url.searchParams.set("query", b64EncodeUnicode(sql) ?? "");
   url.searchParams.set("sql_mode", "true");
   url.searchParams.set("quick_mode", "false");
-  url.searchParams.set("show_histogram", "false");
-  window.open(url.toString(), "_blank", "noopener,noreferrer");
+  url.searchParams.set("show_histogram", String(showHistogram));
+  return url.toString();
+}
+
+function openInLogs() {
+  window.open(
+    logsPageUrl(activeSql(), rangeStart.value, rangeEnd.value, false),
+    "_blank",
+    "noopener,noreferrer",
+  );
 }
 </script>
 
 <template>
-  <div class="flex h-full min-h-0 flex-col overflow-hidden">
+  <DashboardTraceExplorer
+    v-if="mode === 'traces'"
+    :stream="stream"
+    :filters="filters ?? []"
+    :start-time="startTime"
+    :end-time="endTime"
+    :base-where="baseWhere"
+  />
+  <DashboardMetricsExplorer
+    v-else-if="mode === 'metrics'"
+    :stream="stream"
+    :filters="filters ?? []"
+    :start-time="startTime"
+    :end-time="endTime"
+    :base-where="baseWhere"
+  />
+  <div v-else class="flex h-full min-h-0 flex-col overflow-hidden" @keydown="onExplorerKeydown">
     <div v-show="!detailOpen" class="flex min-h-0 flex-1 flex-col overflow-hidden">
       <!-- ── Toolbar: datetime picker + open-in-logs + run ───── -->
       <div class="border-border-default flex min-w-0 shrink-0 flex-col border-b">
@@ -866,6 +871,7 @@ function openInLogs() {
             size="sm"
             :variant="showSql ? 'primary' : 'outline'"
             icon-left="code"
+            :aria-pressed="showSql"
             data-test="log-explorer-sql-toggle"
             @click="showSql = !showSql"
           >
@@ -907,28 +913,29 @@ function openInLogs() {
             <OTooltip :content="t('panel.logExplorer.runQuery')" />
           </OButton>
         </div>
-        <div v-if="showSql" class="px-2 pb-2">
-          <div class="border-border-default rounded-default overflow-hidden border">
-            <QueryEditor
-              :query="customSql"
-              :languages="['sql']"
-              editor-height="4rem"
-              hide-nl-toggle
-              data-test-prefix="log-explorer-editor"
-              @update:query="customSql = $event"
-              @run-query="runQuery"
-            />
-          </div>
-        </div>
+        <ExplorerFilterBar
+          v-if="showSql"
+          ref="filterBarRef"
+          :chips-query="chipsQuery"
+          own-kind="sql"
+          :own-value="activeSql()"
+          :fields="filterFields"
+          :fields-loading="fieldsLoading"
+          :load-values="loadFilterValues"
+          data-test-prefix="log-explorer"
+          @update:chips-query="onChipsQuery"
+          @update:own-value="(sql: string) => (customSql = sql)"
+          @run="runQuery"
+        />
       </div>
 
       <!-- ── Error ────────────────────────────────────────────────────── -->
-      <div v-if="errorMsg" class="flex shrink-0 items-start gap-2 px-4 py-3">
-        <OIcon name="error-outline" size="sm" class="text-error-500 mt-0.5 shrink-0" />
-        <code class="text-error-500 font-mono text-xs break-all whitespace-pre-wrap">{{
-          errorMsg
-        }}</code>
-      </div>
+      <ExplorerQueryError
+        v-if="errorMsg"
+        :message="errorMsg"
+        :sql="errorSql"
+        data-test="log-explorer-error"
+      />
 
       <!-- ── Results — rendered by the dashboard table-panel renderer for parity ── -->
       <div
@@ -947,39 +954,22 @@ function openInLogs() {
           <span class="text-text-secondary text-sm">{{ t("panel.logExplorer.noEvents") }}</span>
           <code
             class="text-text-secondary bg-surface-subtle rounded-default max-w-full overflow-x-auto px-3 py-2 text-center font-mono text-xs break-all whitespace-pre-wrap"
-            >{{ customSql }}</code
+            >{{ activeSql() }}</code
           >
         </div>
 
         <!-- Highlighted log rows — same LogsHighLighting + expandable JSON as Surrounding events. -->
         <div v-else class="min-h-0 flex-1 overflow-y-auto">
           <template v-for="(ev, i) in events" :key="i">
-            <div
-              class="dld-result-row border-border-default hover:bg-surface-subtle flex cursor-pointer items-center gap-2 border-b px-2 py-1"
-              @click="toggleResultExpand(i)"
-            >
-              <button
-                class="dld-expand-btn shrink-0"
-                :aria-label="isResultExpanded(i) ? t('common.collapse') : t('common.expand')"
-                @click.stop="toggleResultExpand(i)"
-              >
-                <OIcon :name="isResultExpanded(i) ? 'expand-less' : 'expand-more'" size="xs" />
-              </button>
-              <span class="text-text-secondary shrink-0 text-xs whitespace-nowrap tabular-nums">{{
-                fmtTs(ev._timestamp)
-              }}</span>
-              <OTruncatedText class="flex-1 font-mono text-xs" :tooltip="false">
-                <LogsHighLighting :data="ev" :show-braces="true" />
-              </OTruncatedText>
-              <span
-                class="text-text-secondary hover:text-accent flex w-8 shrink-0 cursor-pointer items-center justify-center"
-                data-test="log-explorer-row-open"
-                @click.stop="openEventDetail(ev)"
-              >
-                <OIcon name="chevron-right" size="sm" />
-                <OTooltip :content="t('panel.logExplorer.detail.insights')" />
-              </span>
-            </div>
+            <ExplorerResultRow
+              :record="ev"
+              :time="fmtTs(ev._timestamp)"
+              :expanded="isResultExpanded(i)"
+              :open-label="t('panel.logExplorer.detail.insights')"
+              open-data-test="log-explorer-row-open"
+              @toggle="toggleResultExpand(i)"
+              @open="openEventDetail(ev)"
+            />
             <div
               v-if="isResultExpanded(i)"
               class="dld-json-preview border-border-default bg-surface-panel border-b px-2 py-2"
@@ -1000,25 +990,14 @@ function openInLogs() {
         </div>
 
         <!-- Server pagination: the list shows one loaded page; controls fetch the next. -->
-        <div
-          v-if="total > 0"
-          class="bg-dialog-bg border-border-default sticky bottom-0 z-10 flex w-full items-center border-t px-3 py-2"
-        >
-          <div class="flex-1" />
-          <TablePaginationControls
-            :show-pagination="true"
-            :pagination="{ page: page + 1, rowsPerPage: pageSize }"
-            :total-rows="total"
-            :pages-number="resultTotalPages"
-            :is-first-page="page === 0"
-            :is-last-page="page >= resultTotalPages - 1"
-            @update:rows-per-page="(n: number) => (pageSize = n)"
-            @first-page="goToPage(0)"
-            @prev-page="goToPage(page - 1)"
-            @next-page="goToPage(page + 1)"
-            @last-page="goToPage(resultTotalPages - 1)"
-          />
-        </div>
+        <ExplorerResultsPager
+          v-model:page-size="pageSize"
+          :page="page"
+          :total="total"
+          :rows="events.length"
+          :counting="counting"
+          @go-to-page="goToPage"
+        />
       </div>
     </div>
 
@@ -1056,8 +1035,10 @@ function openInLogs() {
             >
               <OTooltip :content="t('panel.logExplorer.detail.prevEvent')" />
             </OButton>
-            <span class="text-text-secondary w-12 text-center text-xs tabular-nums"
-              >{{ selectedIndex + 1 }} / {{ events.length }}</span
+            <span
+              class="text-text-secondary min-w-12 px-1 text-center text-xs whitespace-nowrap tabular-nums"
+              data-test="log-explorer-detail-position"
+              >{{ detailPosition }}</span
             >
             <OButton
               size="icon-xs"
@@ -1070,7 +1051,13 @@ function openInLogs() {
               <OTooltip :content="t('panel.logExplorer.detail.nextEvent')" />
             </OButton>
           </div>
-          <OButton size="sm-toolbar" variant="outline" icon-left="link" @click="copyCurrentUrl()">
+          <OButton
+            size="sm-toolbar"
+            variant="outline"
+            icon-left="link"
+            data-test="log-explorer-detail-copy-link"
+            @click="copyEventLink()"
+          >
             {{ t("panel.logExplorer.detail.copyLink") }}
           </OButton>
         </div>

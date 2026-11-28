@@ -32,6 +32,12 @@ export const breakdownValueLabel = (value: string): string => {
   return value === "" ? "(empty)" : value;
 };
 
+/** A category axis label for a row's raw x value, as the SQL converters draw it. */
+export const categoryAxisLabel = (value: unknown): string =>
+  breakdownValueLabel(
+    value === null || value === undefined ? NULL_BREAKDOWN_VALUE : (value as string),
+  );
+
 const breakdownValueOf = (item: Record<string, unknown>, breakdownKey: string): string | number => {
   const value = getDataValue(item, breakdownKey);
   return value === null || value === undefined ? NULL_BREAKDOWN_VALUE : value;

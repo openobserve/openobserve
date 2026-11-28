@@ -15,7 +15,7 @@
 
 import { ref, computed, watch, nextTick, onBeforeMount, onUnmounted } from "vue";
 import { toZonedTime } from "date-fns-tz";
-import type { I18nText, TranslateFn } from "@/types/i18n";
+import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
 import { useLicenseLocks } from "@/composables/useFeatureLock";
 import { streamTypeFeature } from "@/utils/featureGate";
 import { getAllDashboardsByFolderId, getDashboard, getFoldersList } from "@/utils/commons";
@@ -37,6 +37,7 @@ import {
   maxParenDepth,
   SQL_PARSE_MAX_DEPTH,
   stripWherePredicate,
+  topLevelWherePredicate,
 } from "@/utils/query/sqlComplexity";
 import { isExemplarSeriesId } from "@/utils/dashboard/exemplars/applyExemplarSeries";
 import {
@@ -48,6 +49,36 @@ import { NULL_BREAKDOWN_VALUE, OTHERS_BREAKDOWN_VALUE } from "@/utils/dashboard/
 import { boxplotDrilldownSeries, boxplotDrilldownTime } from "@/utils/dashboard/convertBoxplotData";
 import { barGaugeDrilldownSeries } from "@/utils/dashboard/convertBarGaugeData";
 import { hostmapDrilldownSeries, hostmapEntityColumn } from "@/utils/dashboard/convertHostmapData";
+import {
+  filtersSummary,
+  filtersWhere,
+  correlationConfigured,
+  isHorizontalBarChart,
+  funnelStageQuery,
+  isPathChart,
+  isTimeXField,
+  logsAvailability,
+  metricsAvailability,
+  pointFamily,
+  pointGroupScope,
+  promqlMetricName,
+  promqlPointWindow,
+  sliceBounds,
+  tracesAvailability,
+  treeOpensPointMenu,
+  type FieldFilter,
+  type PointClick,
+  type PointExplore,
+  type PointExploreItem,
+  type PointFamily,
+  type PointTarget,
+} from "@/utils/dashboard/chartPointExplore";
+import type {
+  CorrelationResult,
+  TelemetryContext,
+  TelemetryType,
+} from "@/utils/telemetryCorrelation";
+import config from "@/aws-exports";
 
 // A click on these lands on a named item (slice, bar, tile), not on a named series.
 const NAMED_ITEM_TYPES = ["pie", "donut", "bar-gauge", "treemap", "sunburst", "funnel"];
@@ -109,6 +140,9 @@ export function usePanelDrilldown({
   t,
   onExemplarClick,
   hideChartTooltip,
+  findRelatedTelemetry,
+  allowPointExplore,
+  sqlResultIndex,
 }: {
   panelSchema: any;
   variablesData: any;
@@ -135,6 +169,15 @@ export function usePanelDrilldown({
   t: TranslateFn;
   onExemplarClick?: (params: any) => void | Promise<void>;
   hideChartTooltip?: () => void;
+  findRelatedTelemetry?: (
+    context: TelemetryContext,
+    sourceType: TelemetryType,
+    timeWindowMinutes: number,
+    currentStream: string,
+  ) => Promise<CorrelationResult | null>;
+  allowPointExplore?: { value: boolean };
+  /** Maps a SQL series' drawn position to its executed result, which hidden queries still occupy. */
+  sqlResultIndex?: (position: number) => number | undefined;
 }) {
   // Cross-linking: store cross-links from result_schema response
   const { getStream } = useStreams(t);
@@ -403,6 +446,36 @@ export function usePanelDrilldown({
     };
   };
 
+  // The span a click covers: its segment, heatmap column or histogram bucket, else the panel range.
+  const clickedTimeRange = async (params: any) => {
+    const type = panelSchema.value.type;
+    if (isRowTimeline(type)) {
+      const segment = stateTimelineDrilldownSeries(params);
+      return { startTime: segment.__start * 1000, endTime: segment.__end * 1000 };
+    }
+    const columnRange = type === "heatmap" ? heatmapColumnRange(params) : null;
+    if (columnRange) return columnRange;
+    // A host map cell spans the whole panel range; its value[0] is a cell index, not a time.
+    const hoveredTime =
+      type === "heatmap" || type === "hostmap"
+        ? null
+        : type === "boxplot"
+          ? boxplotDrilldownTime(panelSchema.value, panelData?.value?.options, params)
+          : params?.value?.[0];
+    const hoveredTimestamp = hoveredTime
+      ? getUTCTimestampFromZonedTimestamp(hoveredTime, store.state.timezone)
+      : null;
+    return calculateTimeRange(hoveredTimestamp, intervalMicro.value);
+  };
+
+  // A breakdown series keeps its raw breakdown value apart from the name it is drawn with.
+  const clickedSeriesName = (params: any) => {
+    const seriesIndex = params?.seriesIndex;
+    const series =
+      seriesIndex !== undefined ? panelData.value?.options?.series?.[seriesIndex] : undefined;
+    return series ? series.originalSeriesName : params?.seriesName;
+  };
+
   const parseQuery = async (originalQuery: string, parser: any) => {
     try {
       return parser.astify(originalQuery);
@@ -464,6 +537,20 @@ export function usePanelDrilldown({
     Array.isArray(ast?.columns) &&
     ast.columns.some((col: any) => col?.expr?.column === "*" || col?.expr?.type === "star");
 
+  // The SELECT of an executed query, or null when it is not one; its WHERE is never read.
+  const parseSelectColumns = (executedQuery: string): any => {
+    // astify() is exponential in WHERE nesting; only SELECT/FROM are read.
+    const parseTarget = stripWherePredicate(executedQuery);
+    if (maxParenDepth(parseTarget) > SQL_PARSE_MAX_DEPTH) return null;
+    try {
+      const parsed = parser.astify(parseTarget);
+      const ast = Array.isArray(parsed) ? parsed[0] : parsed;
+      return ast?.type === "select" ? ast : null;
+    } catch {
+      return null;
+    }
+  };
+
   const computeCellDrilldownFields = async () => {
     const map = new Map<string, any>();
     const byQuery = new Map<number, Map<string, any>>();
@@ -486,18 +573,8 @@ export function usePanelDrilldown({
       const streamType = query?.fields?.stream_type;
       if (!executedQuery || !streamName) return;
 
-      // astify() is exponential in WHERE nesting; only SELECT/FROM are read below.
-      const parseTarget = stripWherePredicate(executedQuery);
-      if (maxParenDepth(parseTarget) > SQL_PARSE_MAX_DEPTH) return;
-
-      let parsed: any;
-      try {
-        parsed = parser.astify(parseTarget);
-      } catch {
-        return;
-      }
-      const ast = Array.isArray(parsed) ? parsed[0] : parsed;
-      if (!ast || ast.type !== "select") return;
+      const ast = parseSelectColumns(executedQuery);
+      if (!ast) return;
 
       const isJoin = (ast.from?.length ?? 0) > 1;
 
@@ -708,6 +785,513 @@ export function usePanelDrilldown({
     if (panelSchema.value.type !== "metric" || params?.seriesIndex === undefined) return {};
     const cell = panelData.value?.options?.series?.[params.seriesIndex];
     return cell ? { __name: cell._metricName ?? "", __value: cell._metricRaw ?? "" } : {};
+  };
+
+  // The point menu's View logs / View traces section; null while the menu shows none.
+  const pointExplore = ref<PointExplore | null>(null);
+  // Each click supersedes the correlation lookup of the one before.
+  let pointRequest = 0;
+
+  const pointSeries = (params: any) =>
+    params?.seriesIndex !== undefined
+      ? panelData.value?.options?.series?.[params.seriesIndex]
+      : undefined;
+
+  // A PromQL pie slice or plain h-bar is one series of its own, so its tags sit on the data item.
+  const pointTag = (params: any, key: "_labels" | "_panelQueryIndex" | "_resultIndex") => {
+    const item = params?.data;
+    // A PromQL heatmap cell is [column, row, value]; its row names the series it came from.
+    const rows = pointSeries(params)?._rows;
+    if (Array.isArray(rows) && Array.isArray(item)) return rows[item[1]]?.[key];
+    const own = item && typeof item === "object" && !Array.isArray(item) ? item[key] : undefined;
+    return own ?? pointSeries(params)?.[key];
+  };
+
+  // A SQL series' _queryIndex counts drawn results; hidden queries still run, so the host maps it.
+  const sqlSeriesOrigin = (
+    params: any,
+  ): { resultIndex: number; panelQueryIndex: number } | null => {
+    const position = pointSeries(params)?._queryIndex;
+    if (panelSchema.value?.queryType === "promql" || typeof position !== "number") return null;
+    const resultIndex = sqlResultIndex ? sqlResultIndex(position) : position;
+    if (resultIndex === undefined) return null;
+    const panelQueryIndex = metadata?.value?.queries?.[resultIndex]?.panelQueryIndex;
+    return { resultIndex, panelQueryIndex: panelQueryIndex ?? resultIndex };
+  };
+
+  // A funnel stage shown as "(empty)" or "(null)" keeps its own value as rawName.
+  const funnelStage = (params: any): string | null =>
+    params?.data && typeof params.data === "object" && "rawName" in params.data
+      ? params.data.rawName
+      : String(params?.name ?? "");
+
+  const pointQueryIndex = (params: any): number | null => {
+    const queries = panelSchema.value?.queries ?? [];
+    if (panelSchema.value?.type === "funnel") {
+      return funnelStageQuery(panelSchema.value, data.value ?? [], funnelStage(params));
+    }
+    const firstVisible = Math.max(
+      0,
+      queries.findIndex((q: any) => !q?.config?.hide),
+    );
+    // A tile carries no query of its own; treeOpensPointMenu admits only one visible query.
+    if (isPathChart(panelSchema.value?.type)) return firstVisible;
+    const index = sqlSeriesOrigin(params)?.panelQueryIndex ?? pointTag(params, "_panelQueryIndex");
+    // An untagged series is never a hidden query's: those are not drawn.
+    return typeof index === "number" && queries[index] ? index : firstVisible;
+  };
+
+  // A multi-field category chart draws one axis per x and breakdown field, row-aligned by dataIndex.
+  const axisFieldValues = (params: any, query: any): Map<string, unknown> | undefined => {
+    const fields = [...(query?.fields?.x ?? []), ...(query?.fields?.breakdown ?? [])];
+    const options = panelData.value?.options;
+    const axes = isHorizontalBarChart(panelSchema.value?.type) ? options?.yAxis : options?.xAxis;
+    const index = params?.dataIndex;
+    if (fields.length < 2 || !Array.isArray(axes) || axes.length !== fields.length)
+      return undefined;
+    if (typeof index !== "number") return undefined;
+    const values: [string, unknown][] = fields.map((field: any, i: number) => [
+      field.alias,
+      axes[i]?.data?.[index],
+    ]);
+    // Only trust the axes when they agree with what the click itself names.
+    const seriesValue = clickedSeriesName(params);
+    const breakdownAt = query?.fields?.x?.length ?? 0;
+    const agrees =
+      String(values[0][1]) === String(params?.name) &&
+      (seriesValue === undefined ||
+        !query?.fields?.breakdown?.length ||
+        String(values[breakdownAt]?.[1]) === String(seriesValue));
+    return agrees ? new Map(values) : undefined;
+  };
+
+  // An h-bar draws time on a category axis, so only its x field tells whether it is a time chart.
+  const pointTimeAxis = (): boolean => {
+    const schema = panelSchema.value;
+    if (schema?.queryType === "promql") return true;
+    if (isHorizontalBarChart(schema?.type)) {
+      const timestamp = store.state.zoConfig?.timestamp_column ?? "_timestamp";
+      return (schema.queries?.[0]?.fields?.x ?? []).some((f: any) => isTimeXField(f, timestamp));
+    }
+    return panelData.value?.extras?.isTimeSeries === true;
+  };
+
+  const pointClick = (params: any, family: PointFamily, query: any): PointClick => {
+    if (family !== "heatmap") {
+      return {
+        name: panelSchema.value?.type === "funnel" ? funnelStage(params) : params?.name,
+        seriesValue: clickedSeriesName(params),
+        // A tile keeps its raw path when a level stands in for NULL or "".
+        path: params?.data?.rawPath ?? params?.data?.path,
+        fieldValues: family === "category" ? axisFieldValues(params, query) : undefined,
+      };
+    }
+    const { column, row } = heatmapCellValues(params);
+    return { heatmapRow: row, heatmapColumn: heatmapColumnRange(params) ? undefined : column };
+  };
+
+  // Keyed by the executed SQL, so a repeat click on an unchanged query skips the costly astify.
+  const customColumnsCache = new Map<string, Map<string, string>>();
+
+  // A custom SQL field is named by its result alias; only the query says which column it reads.
+  const customQueryColumns = async (queryIndex: number): Promise<Map<string, string>> => {
+    const sql =
+      metadata?.value?.queries?.[queryIndex]?.query ??
+      panelSchema.value?.queries?.[queryIndex]?.query;
+    if (!sql) return new Map();
+    const cached = customColumnsCache.get(sql);
+    if (cached) return cached;
+    if (!parser) await importSqlParser();
+    const columns = new Map<string, string>();
+    const ast = parseSelectColumns(sql);
+    if (ast) {
+      extractFields(ast, "_timestamp", parser).forEach((field: any) => {
+        if (!field.aggregationFunction && field.column) columns.set(field.alias, field.column);
+      });
+    }
+    customColumnsCache.set(sql, columns);
+    return columns;
+  };
+
+  // A builder join or a custom SQL JOIN; either way the executed SQL reads more than one table.
+  const queryJoinsStreams = async (queryIndex: number, resultIndex: number): Promise<boolean> => {
+    if (panelSchema.value?.queries?.[queryIndex]?.joins?.length) return true;
+    const sql =
+      metadata?.value?.queries?.[resultIndex]?.query ??
+      panelSchema.value?.queries?.[queryIndex]?.query;
+    if (!sql) return false;
+    if (!parser) await importSqlParser();
+    const from = parseSelectColumns(sql)?.from;
+    return Array.isArray(from) && from.length > 1;
+  };
+
+  // result_schema gives a panel WHERE for logs streams only; a metrics or traces panel's comes from its
+  // own SQL, and only from one plain SELECT on one stream, where it names that stream's columns.
+  const panelSqlWhere = async (
+    queryIndex: number,
+    resultIndex: number,
+  ): Promise<{ where: string; applied: boolean }> => {
+    const sql = executedQuery(queryIndex, resultIndex);
+    const { predicate, count } = topLevelWherePredicate(sql);
+    if (!count) return { where: "", applied: true };
+    if (!parser) await importSqlParser();
+    const from = parseSelectColumns(sql)?.from;
+    const oneStream =
+      Array.isArray(from) && from.length === 1 && !!from[0]?.table && !from[0]?.expr;
+    return predicate && oneStream
+      ? { where: predicate, applied: true }
+      : { where: "", applied: false };
+  };
+
+  // An h-bar time label is the raw histogram key in UTC, without a zone suffix.
+  const labelTimestamp = (label: unknown): number | null => {
+    if (typeof label === "number") return label > 1e14 ? label : label * 1000;
+    const text = String(label ?? "");
+    const ms = Date.parse(/[zZ]|[+-]\d{2}:?\d{2}$/.test(text) ? text : `${text}Z`);
+    return Number.isFinite(ms) ? ms * 1000 : null;
+  };
+
+  // The range the clicked series' own query ran over; a time-shifted query ran over an earlier one.
+  const pointQueryRange = (resultIndex: number) => {
+    const meta = metadata?.value?.queries?.[resultIndex];
+    const startTime = Number(meta?.startTime ?? 0);
+    const endTime = Number(meta?.endTime ?? 0);
+    return {
+      range: startTime && endTime ? { startTime, endTime } : null,
+      // timeRangeGap.seconds holds milliseconds.
+      shiftUs: Number(meta?.timeRangeGap?.seconds ?? 0) * 1000,
+    };
+  };
+
+  // A stacked bar's value is a bare number, so its bucket's time comes from the series (seconds).
+  const promqlPointUs = (params: any): number | null => {
+    const series = pointSeries(params);
+    const times = series?._timestamps;
+    if (Array.isArray(times)) {
+      // A heatmap's data index runs over every cell; its column is the cell's first value.
+      const column = Array.isArray(series?._rows) ? params?.data?.[0] : params?.dataIndex;
+      const seconds = Number(times[column ?? -1]);
+      return Number.isFinite(seconds) ? seconds * 1_000_000 : null;
+    }
+    return getUTCTimestampFromZonedTimestamp(params?.value?.[0], store.state.timezone);
+  };
+
+  const pointTimeRange = async (
+    params: any,
+    family: PointFamily,
+    queryIndex: number,
+    resultIndex: number,
+  ): Promise<{
+    startTime: number;
+    endTime: number;
+    lookBack?: boolean;
+  }> => {
+    const { range, shiftUs } = pointQueryRange(resultIndex);
+    if (family === "category") return range ?? calculateTimeRange(null, intervalMicro.value);
+    // A PromQL stacked bar names its bucket by the time it carries; see promqlPointUs below.
+    const stackedPromqlTime =
+      panelSchema.value?.queryType === "promql" && Array.isArray(pointSeries(params)?._timestamps);
+    // An h-bar label is the raw histogram key, which no shift has moved.
+    if (isHorizontalBarChart(panelSchema.value.type) && !stackedPromqlTime) {
+      return calculateTimeRange(labelTimestamp(params?.name), intervalMicro.value);
+    }
+    // A PromQL point is computed from the samples in the look-back before it, not a bucket after it.
+    const pointUs =
+      (family === "time" || family === "heatmap") && panelSchema.value?.queryType === "promql"
+        ? promqlPointUs(params)
+        : null;
+    if (pointUs !== null) {
+      const expression = executedQuery(queryIndex, resultIndex);
+      // Each selector's own offset moves the samples it reads back (or forward, when negative).
+      return { ...promqlPointWindow(pointUs - shiftUs, expression), lookBack: true };
+    }
+    const clicked = await clickedTimeRange(params);
+    if (family !== "time") return clicked;
+    // A shifted series is drawn moved forward by its shift, so the clicked bucket moves back.
+    return { startTime: clicked.startTime - shiftUs, endTime: clicked.endTime - shiftUs };
+  };
+
+  const sliceText = (target: PointTarget): I18nText => {
+    const bounds = sliceBounds(target.startTime, target.endTime, store.state.timezone);
+    return target.timeSlice === "panelRange"
+      ? t("panel.pointExplore.wholeRange", bounds)
+      : t("panel.pointExplore.slice", bounds);
+  };
+
+  const pointDetail = (target: PointTarget, extra: I18nText[] = []): I18nText =>
+    [...(target.notes ?? []), ...extra].reduce<I18nText>(
+      (detail, note) => t("panel.pointExplore.withNote", { detail, note }),
+      target.filters.length
+        ? t("panel.pointExplore.detail", {
+            slice: sliceText(target),
+            filters: filtersSummary(target.filters),
+          })
+        : sliceText(target),
+    );
+
+  const hiddenItem: PointExploreItem = { state: "hidden" };
+
+  const lockedItem = (feature: string): PointExploreItem => ({
+    state: "locked",
+    detail: licenseLocks.lockedReason(feature),
+  });
+
+  const logsItem = (target: PointTarget, joinsStreams: boolean): PointExploreItem => {
+    const availability = logsAvailability({
+      queryType: panelSchema.value?.queryType,
+      streamType: target.streamType,
+      joinsStreams,
+      isLocked: licenseLocks.isLocked,
+    });
+    if (availability.kind === "locked") return lockedItem(availability.feature);
+    if (availability.kind === "blocked") return hiddenItem;
+    return { state: "enabled", detail: pointDetail(target) };
+  };
+
+  const correlationEnabled = () =>
+    !!findRelatedTelemetry && correlationConfigured(config.isEnterprise, store.state.zoConfig);
+
+  const correlationItem = (
+    availability: { kind: string; feature?: string },
+    target: PointTarget,
+  ): PointExploreItem => {
+    if (availability.kind === "locked") return lockedItem(availability.feature ?? "");
+    if (availability.kind === "blocked") return hiddenItem;
+    if (availability.kind === "correlate") {
+      return { state: "pending", detail: t("panel.pointExplore.findingService") };
+    }
+    const skipped = target.panelWhere?.applied === false;
+    return {
+      state: "enabled",
+      detail: pointDetail(target, skipped ? [t("panel.pointExplore.panelFilterNotApplied")] : []),
+    };
+  };
+
+  const availabilityInput = (target: PointTarget) => ({
+    queryType: panelSchema.value?.queryType,
+    streamType: target.streamType,
+    hasGroupValues: target.filters.length > 0,
+    correlationEnabled: correlationEnabled(),
+    isLocked: licenseLocks.isLocked,
+  });
+
+  const tracesItem = (target: PointTarget): PointExploreItem =>
+    correlationItem(tracesAvailability(availabilityInput(target)), target);
+
+  const metricsItem = (target: PointTarget): PointExploreItem =>
+    correlationItem(metricsAvailability(availabilityInput(target)), target);
+
+  const streamFilters = (
+    stream: { filters?: Record<string, string> },
+    serviceName: string,
+  ): FieldFilter[] => {
+    const filters = Object.entries(stream.filters ?? {}).map(([field, value]) => ({
+      field,
+      value,
+    }));
+    return filters.length ? filters : [{ field: "service_name", value: serviceName }];
+  };
+
+  const correlationSource = (streamType: string): TelemetryType =>
+    streamType === "metrics" ? "metrics" : streamType === "traces" ? "traces" : "logs";
+
+  // One lookup settles both the traces and the metrics row, after the menu has opened.
+  const correlatePoint = async (request: number, target: PointTarget) => {
+    const fields = Object.fromEntries(target.filters.map((f) => [f.field, f.value ?? ""]));
+    let result: CorrelationResult | null = null;
+    try {
+      result = await findRelatedTelemetry!(
+        { timestamp: target.startTime, fields },
+        correlationSource(target.streamType),
+        5,
+        target.stream,
+      );
+    } catch {
+      result = null;
+    }
+    const explore = pointExplore.value;
+    if (request !== pointRequest || !explore) return;
+    const data = result?.correlationData;
+    const next: PointExplore = { ...explore };
+    if (explore.traces.state === "pending") {
+      const traceStream = data?.related_streams?.traces?.[0];
+      next.traces = hiddenItem;
+      if (data && traceStream?.stream_name) {
+        const filters = streamFilters(traceStream, data.service_name);
+        next.tracesTarget = {
+          stream: traceStream.stream_name,
+          filter: filtersWhere("", filters),
+          filters,
+        };
+        next.traces = {
+          state: "enabled",
+          detail: t("panel.pointExplore.tracesForService", {
+            service: data.service_name,
+            slice: sliceText(target),
+          }),
+        };
+      }
+    }
+    if (explore.metrics.state === "pending") {
+      const metricStreams = (data?.related_streams?.metrics ?? []).filter((s) => s.stream_name);
+      next.metrics = hiddenItem;
+      if (data && metricStreams.length) {
+        next.metricsTarget = {
+          // The drawer reads the first related metric; Open in Metrics reaches the others.
+          stream: metricStreams[0].stream_name,
+          filters: streamFilters(metricStreams[0], data.service_name),
+        };
+        next.metrics = {
+          state: "enabled",
+          detail: t("panel.pointExplore.metricsForService", {
+            service: data.service_name,
+            slice: sliceText(target),
+          }),
+        };
+      }
+    }
+    if ([next.logs, next.traces, next.metrics].every((item) => item.state === "hidden")) {
+      // Nothing is left in the point section; the right-click menu closes if it has nothing else.
+      pointExplore.value = null;
+      return;
+    }
+    pointExplore.value = next;
+  };
+
+  // The executed query has the dashboard variables resolved; the panel query is the fallback.
+  const executedQuery = (queryIndex: number, resultIndex: number): string =>
+    String(
+      metadata?.value?.queries?.[resultIndex]?.query ??
+        panelSchema.value?.queries?.[queryIndex]?.query ??
+        "",
+    );
+
+  // Fills the point section for a click on a supported chart; false where the chart has none.
+  const visibleQueries = (schema: { queries?: Array<{ config?: { hide?: boolean } }> }) =>
+    (schema?.queries ?? []).filter((query) => !query?.config?.hide).length;
+
+  // A query's own label with its series placeholders taken out, else its number.
+  const queryName = (queryIndex: number): I18nText => {
+    const config = panelSchema.value?.queries?.[queryIndex]?.config ?? {};
+    const label = String(config.query_label ?? config.promql_legend ?? "")
+      .replace(/\{[^}]*\}/g, "")
+      .trim();
+    return label ? raw(label) : t("common.queryNumber", { index: queryIndex + 1 });
+  };
+
+  const preparePointExplore = async (params: any): Promise<boolean> => {
+    pointRequest += 1;
+    const request = pointRequest;
+    const schema = panelSchema.value;
+    // A treemap or sunburst tile offers the point menu only where it can open something.
+    const treeBlocked =
+      isPathChart(schema?.type) &&
+      !treeOpensPointMenu(schema, {
+        correlationEnabled: correlationEnabled(),
+        isLocked: licenseLocks.isLocked,
+      });
+    const family =
+      allowPointExplore?.value && !treeBlocked ? pointFamily(schema?.type, pointTimeAxis()) : null;
+    if (!family) {
+      pointExplore.value = null;
+      return false;
+    }
+    const queryIndex = pointQueryIndex(params);
+    // A funnel stage that several queries share has no single query to open.
+    if (queryIndex === null) {
+      pointExplore.value = null;
+      return false;
+    }
+    // A funnel's results are indexed by panel query; other charts' series carry their own result index
+    // (a PromQL time shift runs as a result of its own, which _queryIndex leaves out).
+    const resultIndex =
+      schema.type === "funnel"
+        ? queryIndex
+        : (sqlSeriesOrigin(params)?.resultIndex ??
+          pointTag(params, "_resultIndex") ??
+          pointSeries(params)?._queryIndex ??
+          0);
+    const query = schema.queries?.[queryIndex];
+    const isPromql = schema.queryType === "promql";
+    // A PromQL heatmap cell that names no series would open another query's metric unfiltered.
+    if (isPromql && family === "heatmap" && pointTag(params, "_resultIndex") === undefined) {
+      pointExplore.value = null;
+      return false;
+    }
+    const customColumns =
+      !isPromql && query?.customQuery ? await customQueryColumns(queryIndex) : undefined;
+    const rows = data.value?.[resultIndex];
+    const seriesLabels: Record<string, string> | undefined = isPromql
+      ? (pointTag(params, "_labels") ?? {})
+      : undefined;
+    const { filters, unfiltered } = pointGroupScope(
+      query,
+      schema,
+      family,
+      isPromql ? { seriesLabels } : pointClick(params, family, query),
+      Array.isArray(rows) ? rows : undefined,
+      customColumns,
+    );
+    const range = await pointTimeRange(params, family, queryIndex, resultIndex);
+    const sameAs = (other: { startTime?: number; endTime?: number } | null) =>
+      !!other && range.startTime === other.startTime && range.endTime === other.endTime;
+    const wholeRange =
+      sameAs(pointQueryRange(resultIndex).range) ||
+      sameAs({
+        startTime: selectedTimeObj.value?.start_time?.getTime?.(),
+        endTime: selectedTimeObj.value?.end_time?.getTime?.(),
+      });
+    const promql = isPromql ? executedQuery(queryIndex, resultIndex) : undefined;
+    const target: PointTarget = {
+      queryIndex,
+      stream: isPromql
+        ? promqlMetricName(promql, seriesLabels) || (query?.fields?.stream ?? "")
+        : (query?.fields?.stream ?? ""),
+      streamType: isPromql ? "metrics" : query?.fields?.stream_type || "logs",
+      startTime: range.startTime,
+      endTime: range.endTime,
+      timeSlice: range.lookBack
+        ? "lookBack"
+        : family === "category" || wholeRange
+          ? "panelRange"
+          : "bucket",
+      filters,
+    };
+    const notes = [
+      ...(visibleQueries(schema) > 1 ? [queryName(queryIndex)] : []),
+      ...(unfiltered ? [t("panel.pointExplore.seriesNotFiltered")] : []),
+    ];
+    if (notes.length) target.notes = notes;
+    // View logs reads its panel WHERE from result_schema; a metrics or traces panel carries its own.
+    if (!isPromql && target.streamType !== "logs") {
+      target.panelWhere = await panelSqlWhere(queryIndex, resultIndex);
+    }
+    const joinsStreams = !isPromql && (await queryJoinsStreams(queryIndex, resultIndex));
+    if (request !== pointRequest) return false;
+    const logs = logsItem(target, joinsStreams);
+    const traces = tracesItem(target);
+    // A metrics chart whose metric cannot be named has no stream to open.
+    const metrics =
+      target.streamType === "metrics" && !target.stream ? hiddenItem : metricsItem(target);
+    if ([logs, traces, metrics].every((item) => item.state === "hidden")) {
+      pointExplore.value = null;
+      return false;
+    }
+    const baseWhere = target.panelWhere?.where ?? "";
+    const direct = { filters, ...(baseWhere ? { baseWhere } : {}) };
+    pointExplore.value = {
+      target,
+      logs,
+      traces,
+      metrics,
+      tracesTarget:
+        traces.state === "enabled"
+          ? { stream: target.stream, filter: filtersWhere(baseWhere, filters), ...direct }
+          : null,
+      metricsTarget: metrics.state === "enabled" ? { stream: target.stream, ...direct } : null,
+    };
+    if (traces.state === "pending" || metrics.state === "pending") correlatePoint(request, target);
+    return true;
   };
 
   const onChartClick = async (params: any, ...args: any) => {
@@ -1005,27 +1589,13 @@ export function usePanelDrilldown({
           getOriginalQueryAndStream(queryDetails, metadata, querySource ?? undefined) || {};
         if (!originalQuery || !streamName) return;
 
-        const isHeatmap = panelSchema.value.type === "heatmap";
-        // A host map cell spans the whole panel range; its value[0] is a cell index, not a time.
-        const hoveredTime =
-          isHeatmap || queryDetails.type === "hostmap"
-            ? null
-            : queryDetails.type === "boxplot"
-              ? boxplotDrilldownTime(queryDetails, panelData?.value?.options, drilldownParams[0])
-              : drilldownParams[0]?.value?.[0];
-        const hoveredTimestamp = hoveredTime
-          ? getUTCTimestampFromZonedTimestamp(hoveredTime, store.state.timezone)
-          : null;
         const breakdown = queryDetails.queries[0].fields?.breakdown || [];
 
         const isStateTimeline = isRowTimeline(queryDetails.type);
         const cell =
           queryDetails.type === "hostmap" ? hostmapDrilldownSeries(drilldownParams[0]) : null;
         const segment = isStateTimeline ? stateTimelineDrilldownSeries(drilldownParams[0]) : null;
-        const calculatedTimeRange = segment
-          ? { startTime: segment.__start * 1000, endTime: segment.__end * 1000 }
-          : ((isHeatmap ? heatmapColumnRange(drilldownParams[0]) : null) ??
-            (await calculateTimeRange(hoveredTimestamp, intervalMicro.value)));
+        const calculatedTimeRange = await clickedTimeRange(drilldownParams[0]);
 
         let modifiedQuery = originalQuery;
 
@@ -1508,9 +2078,22 @@ export function usePanelDrilldown({
     { deep: true },
   );
 
+  /** Fills the right-click menu's point rows; true when one shows, though a fast correlation miss
+   * can still clear it afterwards. */
+  const explorePoint = async (params: any): Promise<boolean> => {
+    // Only a series item is a data point; an annotation marker or empty space has none.
+    if (!params || (params.componentType ?? "series") !== "series") {
+      pointExplore.value = null;
+      return false;
+    }
+    return (await preparePointExplore(params)) && !!pointExplore.value;
+  };
+
   return {
     drilldownArray,
     crossLinksData,
+    pointExplore,
+    explorePoint,
     onChartClick,
     openDrilldown,
     drilldownLockedReason,

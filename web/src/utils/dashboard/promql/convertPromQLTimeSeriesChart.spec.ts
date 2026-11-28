@@ -98,6 +98,25 @@ describe("TimeSeriesConverter", () => {
       expect(result.series[0].name).toBe("cpu");
     });
 
+    it("carries each series' label set for the point menu", () => {
+      const result = converter.convert(
+        [
+          {
+            series: [
+              { name: "cpu", metric: { pod: "p-1" }, values: [[1, "10"]], data: { "1": "10" } },
+            ],
+            timestamps: [[1, "00:00:00"]],
+            queryIndex: 0,
+          } as any,
+        ],
+        { type: "line", config: {} },
+        mockStore,
+        mockExtras,
+      );
+
+      expect(result.series[0]._labels).toEqual({ pod: "p-1" });
+    });
+
     it("should apply line thickness", () => {
       const processedData: ProcessedPromQLData[] = [
         {

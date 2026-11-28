@@ -845,6 +845,11 @@ export default defineComponent({
       >,
       default: () => [],
     },
+    // Built-in tabs a host leaves out (e.g. the Metrics Explorer drops "correlated-metrics").
+    hiddenTabs: {
+      type: Array as PropType<string[]>,
+      default: () => [],
+    },
     // Embedded mode: the host owns navigation, so hide the built-in prev/next footer.
     embedded: {
       type: Boolean,
@@ -1215,7 +1220,7 @@ export default defineComponent({
           },
         );
       }
-      return tabs;
+      return tabs.filter((tab) => !props.hiddenTabs.includes(tab.name));
     });
 
     type DetailTab = { name: string; label: I18nText; dataTest: string; locked?: boolean };

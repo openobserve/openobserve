@@ -1684,7 +1684,8 @@ describe("TraceTree", () => {
         await viewLogsBtnFor(ossWrapper, formattedSpan.spanId).trigger("click");
 
         expect(mockNavigateToLogs).toHaveBeenCalledTimes(1);
-        expect(mockNavigateToLogs).toHaveBeenCalledWith(queryDetailsStub);
+        // The second argument is the navigator, which opens a new tab when an embedding host asks.
+        expect(mockNavigateToLogs).toHaveBeenCalledWith(queryDetailsStub, expect.any(Function));
         expect(mockNavigateToLogs.mock.calls[0][0]).toBe(queryDetailsStub);
         expect(mockToast).not.toHaveBeenCalled();
       });

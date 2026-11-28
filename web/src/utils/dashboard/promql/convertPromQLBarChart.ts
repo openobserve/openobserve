@@ -13,7 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { PromQLChartConverter, ProcessedPromQLData } from "./shared/types";
+import {
+  PromQLChartConverter,
+  ProcessedPromQLData,
+  pointTags,
+  type PointTags,
+} from "./shared/types";
 import { applyAggregation } from "./shared/dataProcessor";
 import {
   buildCategoryXAxis,
@@ -98,7 +103,12 @@ export class BarConverter implements PromQLChartConverter {
           series.push({
             name: seriesData.name,
             _panelQueryIndex: queryData.queryIndex,
+            _resultIndex: queryData.resultIndex ?? queryData.queryIndex,
             _seriesRole: queryData.seriesRole,
+            // The point menu scopes a click to the series by its labels.
+            _labels: seriesData.metric,
+            // Bars hold bare values; a click needs its bucket's time (seconds).
+            _timestamps: queryData.timestamps.map(([ts]) => ts),
             type: "bar",
             // A past period stacks on its own, or it would add to the current totals.
             stack: queryData.nameSuffix ? `total (${queryData.nameSuffix})` : "total",
@@ -129,10 +139,10 @@ export class BarConverter implements PromQLChartConverter {
     } else {
       // For non-stacked h-bar: use instant/aggregated values
       // Categories are series names
-      const dataItems: Array<{ value: number; itemStyle?: { color: string } }> = [];
+      const dataItems: Array<{ value: number; itemStyle?: { color: string } } & PointTags> = [];
 
       // First pass: calculate min/max and collect data
-      const seriesDataCollection: Array<{ name: string; value: number }> = [];
+      const seriesDataCollection: Array<{ name: string; value: number } & PointTags> = [];
 
       processedData.forEach((queryData) => {
         queryData.series.forEach((seriesData) => {
@@ -141,7 +151,11 @@ export class BarConverter implements PromQLChartConverter {
           if (value < chartMin) chartMin = value;
           if (value > chartMax) chartMax = value;
 
-          seriesDataCollection.push({ name: seriesData.name, value });
+          seriesDataCollection.push({
+            name: seriesData.name,
+            value,
+            ...pointTags(queryData, seriesData.metric),
+          });
 
           categories.push(seriesData.name);
         });
@@ -163,8 +177,15 @@ export class BarConverter implements PromQLChartConverter {
             config,
           );
 
+        const tags = {
+          _labels: seriesData._labels,
+          _panelQueryIndex: seriesData._panelQueryIndex,
+          _resultIndex: seriesData._resultIndex,
+        };
         dataItems.push(
-          color ? { value: seriesData.value, itemStyle: { color } } : { value: seriesData.value },
+          color
+            ? { value: seriesData.value, itemStyle: { color }, ...tags }
+            : { value: seriesData.value, ...tags },
         );
       });
 

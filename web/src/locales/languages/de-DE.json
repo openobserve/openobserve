@@ -10590,7 +10590,12 @@
         "contextHint": "Ereignisse in der Nähe dieses Zeitstempels",
         "contextTooltip": "Andere Ereignisse aus diesem Stream in den 3 Minuten vor und nach diesem Ereignis — zeigt, was sonst noch im selben Moment geschah.",
         "contextEmpty": "Keine umgebenden Ereignisse gefunden"
-      }
+      },
+      "pagerCounting": "{start}-{end} von …",
+      "pagerRange": "{start}-{end}",
+      "pagerEmptyPage": "Nichts auf dieser Seite",
+      "searchFailed": "Suche fehlgeschlagen",
+      "queryFailed": "Die Abfrage konnte nicht ausgeführt werden"
     },
     "addJoin": "Join hinzufügen",
     "removeJoin": "Join entfernen",
@@ -10618,7 +10623,38 @@
     "wellSubgroup": "Untergruppe",
     "wellSize": "Größe",
     "wellCategory": "Kategorie",
-    "value": "Wert"
+    "value": "Wert",
+    "pointExplore": {
+      "viewLogs": "Logs anzeigen",
+      "viewTraces": "Traces anzeigen",
+      "viewMetrics": "Metriken anzeigen",
+      "slice": "{start}–{end}",
+      "wholeRange": "Gesamter Bereich {start}–{end}",
+      "detail": "{slice} · {filters}",
+      "withNote": "{detail} · {note}",
+      "seriesNotFiltered": "Serie nicht gefiltert",
+      "panelFilterNotApplied": "Panel-Filter nicht angewendet",
+      "tracesForService": "Traces für Service {service} · {slice}",
+      "metricsForService": "Metriken für Service {service} · {slice}",
+      "findingService": "Service für diesen Punkt wird ermittelt…"
+    },
+    "traceExplorer": {
+      "title": "Traces-Explorer",
+      "filter": "Filter",
+      "openInTraces": "In Traces öffnen",
+      "noTraces": "Keine Traces in diesem Abschnitt",
+      "pageRange": "{from}–{to}",
+      "prevTrace": "Vorheriger Trace",
+      "nextTrace": "Nächster Trace"
+    },
+    "metricsExplorer": {
+      "title": "Metriken-Explorer",
+      "openInMetrics": "In Metriken öffnen",
+      "openSample": "Messwert öffnen",
+      "prevSample": "Vorheriger Messwert",
+      "nextSample": "Nächster Messwert",
+      "noSamples": "Keine Messwerte entsprechen diesem Filter"
+    }
   },
   "home": {
     "alertsOverviewSection": "Alarmübersicht",

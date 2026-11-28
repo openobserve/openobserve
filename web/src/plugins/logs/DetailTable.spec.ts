@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it, beforeEach, vi, afterEach, Mock } from "vitest";
+import { describe, expect, it, beforeEach, vi, afterEach, Mock, onTestFinished } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { copyToClipboard } from "@/utils/clipboard";
 import { nextTick } from "vue";
@@ -1215,6 +1215,19 @@ describe("DetailTable Component", () => {
         expect(wrapper.emitted("update:tab")?.at(-1)).toEqual(["table"]);
       });
 
+      it("a host can leave out a built-in tab; by default every correlated tab shows", async () => {
+        const names = () => wrapper.vm.tabOrder.map((t: any) => t.name);
+        await mountFooter({ initialTab: "json" });
+        expect(names()).toEqual(
+          expect.arrayContaining(["correlated-logs", "correlated-metrics", "correlated-traces"]),
+        );
+        await mountFooter({ initialTab: "json", hiddenTabs: ["correlated-metrics"] });
+        expect(names()).toEqual(
+          expect.arrayContaining(["json", "table", "correlated-logs", "correlated-traces"]),
+        );
+        expect(names()).not.toContain("correlated-metrics");
+      });
+
       it("lets only the visible correlated-traces tab own the trace shortcuts (AC1.8)", async () => {
         await mountFooter({ correlationProps: { serviceName: "svc" }, initialTab: "json" });
         const traces = () =>
@@ -1251,6 +1264,12 @@ describe("DetailTable Component", () => {
     });
 
     it("never emits a locked correlated tab and bounces back from one", async () => {
+      // Correlation is locked by edition, so pin the build this test is about instead of reading .env.
+      const originalIsEnterprise = config.isEnterprise;
+      (config as any).isEnterprise = "false";
+      onTestFinished(() => {
+        (config as any).isEnterprise = originalIsEnterprise;
+      });
       await mountFooter({ initialTab: "json" });
       wrapper.vm.tab = "correlated-logs";
       await flushPromises();

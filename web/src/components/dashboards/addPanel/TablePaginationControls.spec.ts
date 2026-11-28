@@ -188,6 +188,11 @@ describe("TablePaginationControls", () => {
   });
 
   describe("Count Display", () => {
+    it("shows a caller-given count text in place of the computed range", () => {
+      wrapper = createWrapper({ countText: "1-10 of …", totalRows: 10 });
+      expect(wrapper.find("[data-test='dashboard-table-row-count']").text()).toBe("1-10 of …");
+    });
+
     it("should show correct count when pagination is enabled", () => {
       wrapper = createWrapper({
         showPagination: true,

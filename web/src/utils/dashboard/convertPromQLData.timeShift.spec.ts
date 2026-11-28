@@ -308,6 +308,22 @@ describe("convertPromQLData with time-shifted results", () => {
     ]);
   });
 
+  it("carries each series' label set, so a click can scope to that series", async () => {
+    const result = await convert(
+      panel("line"),
+      [twoPods()],
+      meta([{ panelQueryIndex: 0 }]),
+      stepMeta(1, 60),
+    );
+
+    expect(
+      result.options.series.filter((s: any) => s.name).map((s: any) => [s.name, s._labels]),
+    ).toEqual([
+      ["api-1", { __name__: "x", pod: "api-1" }],
+      ["api-2", { __name__: "x", pod: "api-2" }],
+    ]);
+  });
+
   it("tags stacked series with their panel query and role", async () => {
     const result = await convert(
       panel("stacked", [{ config: {} }, { config: {} }]),

@@ -10590,7 +10590,12 @@
         "contextHint": "このタイムスタンプの近くのイベント",
         "contextTooltip": "このイベントの前後3分間にこのストリーム内で発生した他のイベント — 同じ時点で他に何が起こっていたかを示します。",
         "contextEmpty": "周辺のイベントが見つかりません"
-      }
+      },
+      "pagerCounting": "{start}-{end} / …",
+      "pagerRange": "{start}-{end}",
+      "pagerEmptyPage": "このページには何もありません",
+      "searchFailed": "検索に失敗しました",
+      "queryFailed": "クエリを実行できませんでした"
     },
     "addJoin": "結合を追加",
     "removeJoin": "結合を削除",
@@ -10618,7 +10623,38 @@
     "wellSubgroup": "サブグループ",
     "wellSize": "サイズ",
     "wellCategory": "カテゴリ",
-    "value": "値"
+    "value": "値",
+    "pointExplore": {
+      "viewLogs": "ログを表示",
+      "viewTraces": "トレースを表示",
+      "viewMetrics": "メトリクスを表示",
+      "slice": "{start}–{end}",
+      "wholeRange": "全体範囲 {start}–{end}",
+      "detail": "{slice} · {filters}",
+      "withNote": "{detail} · {note}",
+      "seriesNotFiltered": "系列はフィルターされていません",
+      "panelFilterNotApplied": "パネルのフィルターは適用されていません",
+      "tracesForService": "サービス {service} のトレース · {slice}",
+      "metricsForService": "サービス {service} のメトリクス · {slice}",
+      "findingService": "このポイントのサービスを検索中…"
+    },
+    "traceExplorer": {
+      "title": "トレースエクスプローラー",
+      "filter": "フィルター",
+      "openInTraces": "トレースで開く",
+      "noTraces": "このスライスにはトレースがありません",
+      "pageRange": "{from}–{to}",
+      "prevTrace": "前のトレース",
+      "nextTrace": "次のトレース"
+    },
+    "metricsExplorer": {
+      "title": "メトリクスエクスプローラー",
+      "openInMetrics": "メトリクスで開く",
+      "openSample": "サンプルを開く",
+      "prevSample": "前のサンプル",
+      "nextSample": "次のサンプル",
+      "noSamples": "このフィルターに一致するサンプルはありません"
+    }
   },
   "home": {
     "alertsOverviewSection": "アラート概要セクション",

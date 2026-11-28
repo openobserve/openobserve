@@ -10590,7 +10590,12 @@
         "contextHint": "События рядом с этой временной меткой",
         "contextTooltip": "Другие события из этого потока за 3 минуты до и после этого события — показывает, что еще происходило в тот же момент времени.",
         "contextEmpty": "Окружающие события не найдены"
-      }
+      },
+      "pagerCounting": "{start}-{end} из …",
+      "pagerRange": "{start}-{end}",
+      "pagerEmptyPage": "На этой странице ничего нет",
+      "searchFailed": "Ошибка поиска",
+      "queryFailed": "Не удалось выполнить запрос"
     },
     "addJoin": "Добавить объединение",
     "removeJoin": "Удалить объединение",
@@ -10618,7 +10623,38 @@
     "wellSubgroup": "Подгруппа",
     "wellSize": "Размер",
     "wellCategory": "Категория",
-    "value": "Значение"
+    "value": "Значение",
+    "pointExplore": {
+      "viewLogs": "Просмотреть логи",
+      "viewTraces": "Просмотреть трейсы",
+      "viewMetrics": "Просмотреть метрики",
+      "slice": "{start}–{end}",
+      "wholeRange": "Весь диапазон {start}–{end}",
+      "detail": "{slice} · {filters}",
+      "withNote": "{detail} · {note}",
+      "seriesNotFiltered": "серии не отфильтрованы",
+      "panelFilterNotApplied": "фильтр панели не применён",
+      "tracesForService": "Трейсы для сервиса {service} · {slice}",
+      "metricsForService": "Метрики для сервиса {service} · {slice}",
+      "findingService": "Поиск сервиса для этой точки…"
+    },
+    "traceExplorer": {
+      "title": "Проводник трейсов",
+      "filter": "Фильтр",
+      "openInTraces": "Открыть в трейсах",
+      "noTraces": "В этом интервале нет трейсов",
+      "pageRange": "{from}–{to}",
+      "prevTrace": "Предыдущий трейс",
+      "nextTrace": "Следующий трейс"
+    },
+    "metricsExplorer": {
+      "title": "Проводник метрик",
+      "openInMetrics": "Открыть в метриках",
+      "openSample": "Открыть образец",
+      "prevSample": "Предыдущий образец",
+      "nextSample": "Следующий образец",
+      "noSamples": "Нет образцов, соответствующих этому фильтру"
+    }
   },
   "home": {
     "alertsOverviewSection": "Раздел обзора оповещений",

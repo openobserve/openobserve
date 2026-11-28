@@ -10590,7 +10590,12 @@
         "contextHint": "Eventi vicini a questo timestamp",
         "contextTooltip": "Altri eventi da questo stream nei 3 minuti prima e dopo questo evento — mostra cosa altro stava accadendo nello stesso momento.",
         "contextEmpty": "Nessun evento circostante trovato"
-      }
+      },
+      "pagerCounting": "{start}-{end} di …",
+      "pagerRange": "{start}-{end}",
+      "pagerEmptyPage": "Nulla in questa pagina",
+      "searchFailed": "Ricerca non riuscita",
+      "queryFailed": "Impossibile eseguire la query"
     },
     "addJoin": "Aggiungi Unisciti",
     "removeJoin": "Rimuovi Join",
@@ -10618,7 +10623,38 @@
     "wellSubgroup": "Sottogruppo",
     "wellSize": "Dimensione",
     "wellCategory": "Categoria",
-    "value": "Valore"
+    "value": "Valore",
+    "pointExplore": {
+      "viewLogs": "Visualizza log",
+      "viewTraces": "Visualizza tracce",
+      "viewMetrics": "Visualizza metriche",
+      "slice": "{start}–{end}",
+      "wholeRange": "Intero intervallo {start}–{end}",
+      "detail": "{slice} · {filters}",
+      "withNote": "{detail} · {note}",
+      "seriesNotFiltered": "serie non filtrate",
+      "panelFilterNotApplied": "filtro del pannello non applicato",
+      "tracesForService": "Tracce per il servizio {service} · {slice}",
+      "metricsForService": "Metriche per il servizio {service} · {slice}",
+      "findingService": "Ricerca del servizio per questo punto…"
+    },
+    "traceExplorer": {
+      "title": "Esplora tracce",
+      "filter": "Filtro",
+      "openInTraces": "Apri in Tracce",
+      "noTraces": "Nessuna traccia in questa slice",
+      "pageRange": "{from}–{to}",
+      "prevTrace": "Traccia precedente",
+      "nextTrace": "Traccia successiva"
+    },
+    "metricsExplorer": {
+      "title": "Esplora metriche",
+      "openInMetrics": "Apri in Metriche",
+      "openSample": "Apri campione",
+      "prevSample": "Campione precedente",
+      "nextSample": "Campione successivo",
+      "noSamples": "Nessun campione corrisponde a questo filtro"
+    }
   },
   "home": {
     "alertsOverviewSection": "Sezione panoramica avvisi",

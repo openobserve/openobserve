@@ -19,16 +19,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       v-if="visible"
       ref="menuRef"
-      class="bg-dropdown-bg rounded-default shadow-overlay fixed z-9999 max-w-[calc(100vw-1rem)] min-w-70 border border-transparent px-0 py-1"
+      class="bg-dropdown-bg rounded-default shadow-overlay fixed z-9999 max-w-[calc(100vw-1rem)] min-w-40 border border-transparent p-1"
       :style="menuStyle"
       @click.stop
       data-test="alert-context-menu"
     >
-      <template v-if="locked">
+      <template v-if="showAlert && locked">
         <div
           v-for="item in lockedItems"
           :key="item.condition"
-          class="text-dropdown-item-disabled focus-visible:ring-focus-ring-accent flex cursor-not-allowed items-center px-4 py-2 text-sm focus-visible:ring-2 focus-visible:ring-inset"
+          class="text-dropdown-item-disabled focus-visible:ring-focus-ring-accent rounded-default flex cursor-not-allowed items-center gap-2 px-3 py-1.5 text-sm focus-visible:ring-2 focus-visible:ring-inset"
           role="menuitem"
           aria-disabled="true"
           tabindex="0"
@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon
             name="lock"
             size="sm"
-            class="lock-chip me-2"
+            class="lock-chip"
             :data-test="`alert-context-menu-${item.condition}-lock`"
           />
           <span class="flex min-w-0 flex-col">
@@ -52,41 +52,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
         </div>
       </template>
-      <template v-else>
+      <template v-else-if="showAlert">
         <div
           v-if="seriesRole === 'forecast'"
-          class="text-dropdown-item-text hover:bg-dropdown-item-hover-bg active:bg-dropdown-item-active-bg flex cursor-pointer items-center px-4 py-2 text-sm [transition:background-color_0.2s]"
+          class="text-dropdown-item-text hover:bg-dropdown-item-hover-bg active:bg-dropdown-item-active-bg rounded-default flex cursor-pointer items-center gap-2 px-3 py-1.5 text-sm [transition:background-color_0.2s]"
           @click="handleMenuItemClick('forecast')"
           data-test="alert-context-menu-forecast"
         >
-          <OIcon name="trending-up" size="sm" class="me-2" />
+          <OIcon name="trending-up" size="sm" />
           <span class="whitespace-nowrap select-none max-md:whitespace-normal">{{
             t("dashboard.alertContextMenu.forecastReaches", { value: forecastText })
           }}</span>
         </div>
         <div
           v-if="seriesRole !== 'forecast'"
-          class="text-dropdown-item-text hover:bg-dropdown-item-hover-bg active:bg-dropdown-item-active-bg flex cursor-pointer items-center px-4 py-2 text-sm [transition:background-color_0.2s]"
+          class="text-dropdown-item-text hover:bg-dropdown-item-hover-bg active:bg-dropdown-item-active-bg rounded-default flex cursor-pointer items-center gap-2 px-3 py-1.5 text-sm [transition:background-color_0.2s]"
           @click="handleMenuItemClick('above')"
           data-test="alert-context-menu-above"
         >
-          <OIcon name="arrow-upward" size="sm" class="me-2" />
+          <OIcon name="arrow-upward" size="sm" />
           <span class="whitespace-nowrap select-none max-md:whitespace-normal">{{
             t("dashboard.alertContextMenu.thresholdAbove", { value: valueText })
           }}</span>
         </div>
         <div
           v-if="seriesRole !== 'forecast'"
-          class="text-dropdown-item-text hover:bg-dropdown-item-hover-bg active:bg-dropdown-item-active-bg flex cursor-pointer items-center px-4 py-2 text-sm [transition:background-color_0.2s]"
+          class="text-dropdown-item-text hover:bg-dropdown-item-hover-bg active:bg-dropdown-item-active-bg rounded-default flex cursor-pointer items-center gap-2 px-3 py-1.5 text-sm [transition:background-color_0.2s]"
           @click="handleMenuItemClick('below')"
           data-test="alert-context-menu-below"
         >
-          <OIcon name="arrow-downward" size="sm" class="me-2" />
+          <OIcon name="arrow-downward" size="sm" />
           <span class="whitespace-nowrap select-none max-md:whitespace-normal">{{
             t("dashboard.alertContextMenu.thresholdBelow", { value: valueText })
           }}</span>
         </div>
       </template>
+      <!-- A chart point's View logs / traces / metrics rows, below the alert items: a row that
+           resolves or disappears changes only the bottom of the menu. -->
+      <OSeparator v-if="$slots.points && showAlert" class="my-1" />
+      <slot name="points" />
     </div>
   </teleport>
 </template>
@@ -94,14 +98,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, ref, computed, watch, onBeforeUnmount, nextTick } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import { useI18nTyped } from "@/types/i18n";
 import { formatUnitValue, getUnitValue } from "@/utils/dashboard/convertDataIntoUnitValue";
-import { placeMenu } from "@/utils/dashboard/menuPlacement";
+import { keepPlacement, placeMenu } from "@/utils/dashboard/menuPlacement";
 
 export default defineComponent({
   name: "AlertContextMenu",
   components: {
     OIcon,
+    OSeparator,
   },
   props: {
     visible: {
@@ -133,6 +139,10 @@ export default defineComponent({
     unitCustom: { type: String, default: null },
     locked: { type: Boolean, default: false },
     lockedReason: { type: String, default: "" },
+    /** The Create alert items; off where alerts cannot be created, leaving only the point rows. */
+    showAlert: { type: Boolean, default: true },
+    /** Changes whenever the slotted rows change, so the menu is measured and placed again. */
+    contentKey: { type: String, default: "" },
   },
   emits: ["select", "close"],
   setup(props, { emit }) {
@@ -149,11 +159,16 @@ export default defineComponent({
     });
 
     const menuSize = ref({ width: 0, height: 0 });
+    // Kept from the first full-size measure: a point row resolving or leaving later must not flip
+    // the menu, or the alert items at its top would jump.
+    const placedTop = ref<number | null>(null);
+    const viewport = () => ({ width: window.innerWidth, height: window.innerHeight });
     const menuStyle = computed(() => {
-      const { left, top } = placeMenu({ x: props.x, y: props.y }, menuSize.value, {
-        width: window.innerWidth,
-        height: window.innerHeight,
-      });
+      const click = { x: props.x, y: props.y };
+      const { left, top } =
+        placedTop.value === null
+          ? placeMenu(click, menuSize.value, viewport())
+          : keepPlacement(placedTop.value, click, menuSize.value, viewport());
       return { left: `${left}px`, top: `${top}px` };
     });
 
@@ -226,14 +241,46 @@ export default defineComponent({
       }
     };
 
+    // Fixed to the viewport, so a scroll or resize would leave it over the wrong panel; another
+    // right-click elsewhere opens its own menu, so this one must not stay open beside it.
+    const isOutside = (event: Event) =>
+      !!menuRef.value && !menuRef.value.contains(event.target as Node);
+    const closeIfOutside = (event: Event) => {
+      if (isOutside(event)) emit("close");
+    };
+    const closeOnResize = () => emit("close");
+    const listen = (on: boolean) => {
+      if (on) {
+        document.addEventListener("click", handleClickOutside);
+        document.addEventListener("keydown", handleEscape);
+        document.addEventListener("contextmenu", closeIfOutside, true);
+        window.addEventListener("scroll", closeIfOutside, true);
+        window.addEventListener("resize", closeOnResize);
+        return;
+      }
+      document.removeEventListener("click", handleClickOutside);
+      document.removeEventListener("keydown", handleEscape);
+      document.removeEventListener("contextmenu", closeIfOutside, true);
+      window.removeEventListener("scroll", closeIfOutside, true);
+      window.removeEventListener("resize", closeOnResize);
+    };
+
     const measure = async () => {
       await nextTick();
       menuSize.value = {
         width: menuRef.value?.offsetWidth ?? 0,
         height: menuRef.value?.offsetHeight ?? 0,
       };
+      if (placedTop.value === null && menuSize.value.height > 0) {
+        placedTop.value = placeMenu({ x: props.x, y: props.y }, menuSize.value, viewport()).top;
+      }
     };
-    watch([valueText, forecastText, () => props.seriesRole], () => {
+    watch([valueText, forecastText, () => props.seriesRole, () => props.contentKey], () => {
+      if (props.visible) measure();
+    });
+    // A new right-click is a new menu: placed afresh at the new cursor.
+    watch([() => props.x, () => props.y], () => {
+      placedTop.value = null;
       if (props.visible) measure();
     });
 
@@ -243,22 +290,16 @@ export default defineComponent({
         if (newVisible) {
           // The size is known only once rendered; until then the menu sits at the click.
           menuSize.value = { width: 0, height: 0 };
+          placedTop.value = null;
           measure();
-          setTimeout(() => {
-            document.addEventListener("click", handleClickOutside);
-            document.addEventListener("keydown", handleEscape);
-          }, 0);
+          setTimeout(() => listen(true), 0);
         } else {
-          document.removeEventListener("click", handleClickOutside);
-          document.removeEventListener("keydown", handleEscape);
+          listen(false);
         }
       },
     );
 
-    onBeforeUnmount(() => {
-      document.removeEventListener("click", handleClickOutside);
-      document.removeEventListener("keydown", handleEscape);
-    });
+    onBeforeUnmount(() => listen(false));
 
     return {
       t,

@@ -10590,7 +10590,12 @@
         "contextHint": "Eventos cercanos a esta marca de tiempo",
         "contextTooltip": "Otros eventos de este stream en los 3 minutos antes y después de este evento — muestra qué más estaba sucediendo en el mismo momento.",
         "contextEmpty": "No se encontraron eventos circundantes"
-      }
+      },
+      "pagerCounting": "{start}-{end} de …",
+      "pagerRange": "{start}-{end}",
+      "pagerEmptyPage": "No hay nada en esta página",
+      "searchFailed": "La búsqueda falló",
+      "queryFailed": "No se pudo ejecutar la consulta"
     },
     "addJoin": "Agregar unirse",
     "removeJoin": "Eliminar Join",
@@ -10618,7 +10623,38 @@
     "wellSubgroup": "Subgrupo",
     "wellSize": "Tamaño",
     "wellCategory": "Categoría",
-    "value": "Valor"
+    "value": "Valor",
+    "pointExplore": {
+      "viewLogs": "Ver logs",
+      "viewTraces": "Ver trazas",
+      "viewMetrics": "Ver métricas",
+      "slice": "{start}–{end}",
+      "wholeRange": "Intervalo completo {start}–{end}",
+      "detail": "{slice} · {filters}",
+      "withNote": "{detail} · {note}",
+      "seriesNotFiltered": "series sin filtrar",
+      "panelFilterNotApplied": "filtro del panel no aplicado",
+      "tracesForService": "Trazas del servicio {service} · {slice}",
+      "metricsForService": "Métricas del servicio {service} · {slice}",
+      "findingService": "Buscando el servicio para este punto…"
+    },
+    "traceExplorer": {
+      "title": "Explorador de trazas",
+      "filter": "Filtro",
+      "openInTraces": "Abrir en Trazas",
+      "noTraces": "No hay trazas en este intervalo",
+      "pageRange": "{from}–{to}",
+      "prevTrace": "Traza anterior",
+      "nextTrace": "Traza siguiente"
+    },
+    "metricsExplorer": {
+      "title": "Explorador de métricas",
+      "openInMetrics": "Abrir en Métricas",
+      "openSample": "Abrir muestra",
+      "prevSample": "Muestra anterior",
+      "nextSample": "Muestra siguiente",
+      "noSamples": "Ninguna muestra coincide con este filtro"
+    }
   },
   "home": {
     "alertsOverviewSection": "Sección de resumen de alertas",

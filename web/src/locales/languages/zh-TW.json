@@ -10585,7 +10585,12 @@
         "contextHint": "此時間戳記附近的事件",
         "contextTooltip": "此資料流中，此事件前後 3 分鐘內的其他事件 — 顯示同一時間點還發生了什麼事。",
         "contextEmpty": "找不到周圍事件"
-      }
+      },
+      "pagerCounting": "{start}-{end}，共 …",
+      "pagerRange": "{start}-{end}",
+      "pagerEmptyPage": "此頁沒有內容",
+      "searchFailed": "搜尋失敗",
+      "queryFailed": "查詢無法執行"
     },
     "addJoin": "新增 Join",
     "removeJoin": "移除 Join",
@@ -10613,7 +10618,38 @@
     "wellSubgroup": "子分組",
     "wellSize": "大小",
     "wellCategory": "類別",
-    "value": "值"
+    "value": "值",
+    "pointExplore": {
+      "viewLogs": "檢視日誌",
+      "viewTraces": "檢視追蹤",
+      "viewMetrics": "檢視指標",
+      "slice": "{start}–{end}",
+      "wholeRange": "完整範圍 {start}–{end}",
+      "detail": "{slice} · {filters}",
+      "withNote": "{detail} · {note}",
+      "seriesNotFiltered": "系列未套用篩選",
+      "panelFilterNotApplied": "未套用面板篩選",
+      "tracesForService": "服務 {service} 的追蹤 · {slice}",
+      "metricsForService": "服務 {service} 的指標 · {slice}",
+      "findingService": "正在尋找此資料點所屬的服務…"
+    },
+    "traceExplorer": {
+      "title": "追蹤探索器",
+      "filter": "篩選",
+      "openInTraces": "在追蹤中開啟",
+      "noTraces": "此區段內沒有追蹤",
+      "pageRange": "{from}–{to}",
+      "prevTrace": "上一筆追蹤",
+      "nextTrace": "下一筆追蹤"
+    },
+    "metricsExplorer": {
+      "title": "指標探索器",
+      "openInMetrics": "在指標中開啟",
+      "openSample": "開啟樣本",
+      "prevSample": "上一個樣本",
+      "nextSample": "下一個樣本",
+      "noSamples": "沒有符合此篩選條件的樣本"
+    }
   },
   "home": {
     "alertsOverviewSection": "警示概覽區段",

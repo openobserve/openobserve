@@ -145,6 +145,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @contextmenu="(event) => !store.state.kioskMode && onChartContextMenu(event)"
           @domcontextmenu="(event) => !store.state.kioskMode && onChartDomContextMenu(event)"
           :find-line-on-context-menu="findsLineOnContextMenu"
+          :context-menu-alert="!store.state.kioskMode && !!allowAlertCreation"
+          :context-menu-points="pointMenuAllowed"
           @mouseover="onChartMouseOver"
           @mouseout="onChartMouseOut"
           @finished="onChartFinished"
@@ -344,9 +346,67 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :unit-custom="panelSchema?.config?.unit_custom"
         :locked="alertsLocked"
         :locked-reason="alertsLockedReason"
+        :show-alert="contextMenuShowsAlert"
+        :content-key="pointMenuKey"
         @select="handleCreateAlert"
         @close="hideContextMenu"
-      />
+      >
+        <template v-if="pointExploreItems.length" #points>
+          <template v-for="item in pointExploreItems" :key="item.id">
+            <div
+              v-if="item.state !== 'enabled'"
+              class="text-dropdown-item-disabled rounded-default flex cursor-not-allowed items-center gap-2 px-3 py-1.5 text-sm"
+              role="menuitem"
+              aria-disabled="true"
+              tabindex="0"
+              :aria-busy="item.state === 'pending' ? 'true' : undefined"
+              :data-test="`point-menu-item-${item.id}`"
+            >
+              <OIcon
+                v-if="item.state === 'locked'"
+                size="sm"
+                class="text-icon-locked shrink-0"
+                name="lock"
+                :data-test="`point-menu-item-${item.id}-lock`"
+              />
+              <OIcon
+                v-else
+                size="sm"
+                class="shrink-0"
+                name="hourglass-empty"
+                :data-test="`point-menu-item-${item.id}-pending`"
+              />
+              <span class="flex min-w-0 flex-col gap-0.5">
+                <span class="select-none">{{ item.label }}</span>
+                <OTruncatedText
+                  :lines="2"
+                  class="text-text-secondary max-w-80 text-xs leading-snug break-words whitespace-normal select-none"
+                  :data-test="`point-menu-item-${item.id}-reason`"
+                  >{{ item.detail }}</OTruncatedText
+                >
+              </span>
+            </div>
+            <div
+              v-else
+              class="text-dropdown-item-text hover:bg-dropdown-item-hover-bg active:bg-dropdown-item-active-bg rounded-default flex cursor-pointer items-center gap-2 px-3 py-1.5 text-sm transition-colors duration-200"
+              role="menuitem"
+              :data-test="`point-menu-item-${item.id}`"
+              @click="item.open"
+            >
+              <OIcon size="sm" class="shrink-0" :name="item.icon" />
+              <span class="flex min-w-0 flex-col gap-0.5">
+                <span class="select-none">{{ item.label }}</span>
+                <OTruncatedText
+                  :lines="2"
+                  class="text-text-secondary max-w-80 text-xs leading-snug break-words whitespace-normal select-none"
+                  :data-test="`point-menu-item-${item.id}-detail`"
+                  >{{ item.detail }}</OTruncatedText
+                >
+              </span>
+            </div>
+          </template>
+        </template>
+      </AlertContextMenu>
     </div>
 
     <!-- Cell explorer drawer -->
@@ -356,8 +416,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       side="right"
       :width="85"
       bleed
-      :title="t('panel.logExplorer.title')"
+      :title="cellDrawerTitle"
       data-test="dashboard-cell-explorer-drawer"
+      :close-guard="cellDrawerCloseGuard"
       @update:open="onCellDrawerOpenChange"
     >
       <DashboardLogDrawer
@@ -369,6 +430,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :start-time="cellDrawer.startTime"
         :end-time="cellDrawer.endTime"
         :base-where="cellDrawer.baseWhere"
+        :filters="cellDrawer.filters"
+        :mode="cellDrawer.mode"
         :panel-title="panelSchema?.title"
       />
     </ODrawer>
@@ -386,6 +449,7 @@ import {
   inject,
   nextTick,
   defineAsyncComponent,
+  provide,
   onMounted,
   onUnmounted,
   toRaw,
@@ -431,11 +495,17 @@ import {
   type TableExport,
 } from "@/composables/dashboard/usePanelActions";
 import { usePanelDrilldown } from "@/composables/dashboard/usePanelDrilldown";
+import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
+import { type FieldFilter, type ExplorerMode } from "@/utils/dashboard/chartPointExplore";
 import { alertableQueryIndexes } from "@/utils/alerts/prefill/fromPanel";
 import { overlayNewDataOnOldOptions, isOverlayEligible } from "@/utils/dashboard/streaming";
 import { usePanelExemplars } from "@/composables/dashboard/usePanelExemplars";
 import { usePanelExemplarInteraction } from "@/composables/dashboard/usePanelExemplarInteraction";
 import { useExemplarTraceLookup } from "@/composables/dashboard/useExemplarTraceLookup";
+import {
+  EXPLORER_BACK_KEY,
+  createExplorerBack,
+} from "@/composables/dashboard/useExplorerDetailKeys";
 import {
   applyExemplarSeries,
   seriesValueExtent,
@@ -527,6 +597,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { copyToClipboard } from "@/utils/clipboard";
 import { calculateWidthText } from "@/utils/dashboard/chartDimensionUtils";
 import { resolveNoDataText } from "@/utils/dashboard/noDataText";
@@ -536,6 +607,7 @@ export default defineComponent({
   name: "PanelSchemaRenderer",
   components: {
     OSeparator,
+    OTruncatedText,
     QueryAnnotationTooltip,
     ChartRenderer,
     AlertContextMenu,
@@ -611,6 +683,12 @@ export default defineComponent({
     // Off where the viewer can't follow a drilldown, such as the anonymous public page.
     allowDrilldown: {
       default: true,
+      required: false,
+      type: Boolean,
+    },
+    // Off by default: only a dashboard panel offers View logs / View traces on a point click.
+    allowPointExplore: {
+      default: false,
       required: false,
       type: Boolean,
     },
@@ -919,6 +997,7 @@ export default defineComponent({
       allowAnnotationsAPI,
       allowAlertCreation,
       allowDrilldown,
+      allowPointExplore,
       alertSource,
       runId,
       tabId,
@@ -1446,15 +1525,18 @@ export default defineComponent({
           (panelSchema.value?.queries?.[alertableQueries.value[0]]?.fields?.y?.length ?? 0) > 1),
     );
     // SQL drops hidden queries' data but not their metadata, so a series' position counts the kept entries only.
-    const sqlPanelQueryIndex = (position: number): number | undefined => {
+    const sqlResultIndex = (position: number): number | undefined => {
       const kept = keptDataIndexes.value;
-      const index = kept === null ? position : kept[position];
+      return kept === null ? position : kept[position];
+    };
+    const sqlPanelQueryIndex = (position: number): number | undefined => {
+      const index = sqlResultIndex(position);
       return index === undefined
         ? undefined
         : (metadata.value?.queries?.[index]?.panelQueryIndex ?? index);
     };
     // ECharts' seriesIndex is the position in the series we rendered, which carry their query.
-    const onChartDomContextMenu = (event: any) => {
+    const alertMenuPayload = (event: any) => {
       const series =
         typeof event?.seriesIndex === "number"
           ? panelData.value?.options?.series?.[event.seriesIndex]
@@ -1463,7 +1545,7 @@ export default defineComponent({
         panelSchema.value?.queryType !== "promql" && typeof series?._queryIndex === "number"
           ? sqlPanelQueryIndex(series._queryIndex)
           : series?._panelQueryIndex;
-      openAlertContextMenu({
+      return {
         ...event,
         // A query plotting several y fields needs to know which one the clicked series drew.
         ...(typeof series?.yAxisGroup === "number" ? { yField: series.yAxisGroup } : {}),
@@ -1472,7 +1554,7 @@ export default defineComponent({
         ...(series?._seriesRole === "forecast"
           ? { forecastPoint: forecastPointOf(series, event.dataIndex) }
           : {}),
-      });
+      };
     };
 
     // hovered series state
@@ -2079,12 +2161,15 @@ export default defineComponent({
       if (props.panelSchema.type !== "table" || props.panelSchema.queryType === "promql") return;
       const field = String(query.cell_field ?? "");
       const rawValue = String(query.cell_value ?? "");
-      const value: string | number =
-        String(query.cell_vtype) === "number" &&
-        rawValue !== "" &&
-        Number.isFinite(Number(rawValue))
-          ? Number(rawValue)
-          : rawValue;
+      // A NULL cell went into the URL as "null" with type "object"; it must filter IS NULL again.
+      const value: string | number | null =
+        String(query.cell_vtype) === "object" && rawValue === "null"
+          ? null
+          : String(query.cell_vtype) === "number" &&
+              rawValue !== "" &&
+              Number.isFinite(Number(rawValue))
+            ? Number(rawValue)
+            : rawValue;
       const stream = String(query.cell_stream ?? "");
       const stype = String(query.cell_stype ?? "logs");
       const t0 = Number(query.cell_t0 ?? 0);
@@ -2472,8 +2557,11 @@ export default defineComponent({
       return [...new Set(aliases.filter(Boolean))];
     });
 
+    const { findRelatedTelemetry } = useServiceCorrelation();
     const {
       drilldownArray,
+      pointExplore,
+      explorePoint,
       onChartClick,
       openDrilldown,
       drilldownLockedReason,
@@ -2510,6 +2598,94 @@ export default defineComponent({
       t,
       onExemplarClick: exemplarInteraction.onExemplarClick,
       hideChartTooltip: () => chartRendererRef.value?.chart?.dispatchAction?.({ type: "hideTip" }),
+      findRelatedTelemetry,
+      allowPointExplore,
+      sqlResultIndex: (position: number) => sqlResultIndex(position),
+    });
+
+    const pointExploreItems = computed(() => {
+      const explore = pointExplore.value;
+      if (!explore) return [];
+      return [
+        {
+          id: "view-logs",
+          icon: "search" as const,
+          label: t("panel.pointExplore.viewLogs"),
+          ...explore.logs,
+          open: openPointLogs,
+        },
+        {
+          id: "view-traces",
+          icon: "account-tree" as const,
+          label: t("panel.pointExplore.viewTraces"),
+          ...explore.traces,
+          open: openPointTraces,
+        },
+        {
+          id: "view-metrics",
+          icon: "bar-chart" as const,
+          label: t("panel.pointExplore.viewMetrics"),
+          ...explore.metrics,
+          open: openPointMetrics,
+        },
+      ].filter((item) => item.state !== "hidden");
+    });
+
+    // Right-click opens one menu: the point's View rows, then Create alert. The rows follow the
+    // drilldown switch, so the anonymous public page (drilldowns off) never offers them.
+    const pointMenuAllowed = computed(
+      () => !!allowPointExplore.value && !!allowDrilldown.value && !store.state.kioskMode,
+    );
+    // Create alert shows where alerts can be made and the click read a value to alert on.
+    const contextMenuShowsAlert = ref(false);
+    // The menu is placed again whenever its rows change (a correlated row resolving, say).
+    const pointMenuKey = computed(() =>
+      pointExploreItems.value.map((item) => `${item.id}:${item.state}:${item.detail}`).join("|"),
+    );
+    let contextMenuRequest = 0;
+    const openContextMenu = (event: any, payload: any, hasPoint: boolean) => {
+      contextMenuShowsAlert.value = !!allowAlertCreation.value && event?.alertable !== false;
+      if (contextMenuShowsAlert.value) {
+        openAlertContextMenu(payload);
+        return;
+      }
+      if (!hasPoint) return;
+      // Only the point rows: open the menu here, as the alert path would.
+      chartRendererRef.value?.chart?.dispatchAction?.({ type: "hideTip" });
+      contextMenuPosition.value = { x: event.x, y: event.y };
+      contextMenuValue.value = event.value;
+      contextMenuData.value = payload;
+      contextMenuVisible.value = true;
+    };
+    const onChartDomContextMenu = (event: any): Promise<void> | void => {
+      const request = ++contextMenuRequest;
+      hidePopupsAndOverlays();
+      const payload = alertMenuPayload(event);
+      const point = pointMenuAllowed.value ? event?.point : null;
+      // No point to explore: the alert menu opens at once, exactly as before.
+      if (!point) {
+        pointExplore.value = null;
+        openContextMenu(event, payload, false);
+        return;
+      }
+      return explorePoint(point).then(
+        (hasPoint) => {
+          // A newer right-click owns the menu.
+          if (request === contextMenuRequest) openContextMenu(event, payload, hasPoint);
+        },
+        () => {
+          // A failed point lookup leaves the menu as if no point were clicked: the alert items stay.
+          if (request !== contextMenuRequest) return;
+          pointExplore.value = null;
+          openContextMenu(event, payload, false);
+        },
+      );
+    };
+    // A correlation miss can empty the rows after the menu opened; with no alert items left, it closes.
+    watch(pointExploreItems, (items) => {
+      if (contextMenuVisible.value && !contextMenuShowsAlert.value && !items.length) {
+        hideContextMenu();
+      }
     });
 
     // A click opens the drilldown menu, so it does nothing where drilldowns are off.
@@ -2666,12 +2842,14 @@ export default defineComponent({
     const cellDrawer = ref<{
       open: boolean;
       field: string;
-      value: string | number;
+      value: string | number | null;
       stream: string;
       streamType: string;
       startTime: number;
       endTime: number;
       baseWhere: string;
+      filters?: FieldFilter[];
+      mode?: ExplorerMode;
     }>({
       open: false,
       field: "",
@@ -2762,7 +2940,7 @@ export default defineComponent({
 
     function openCellDrawer(params: {
       field: string;
-      value: string | number;
+      value: string | number | null;
       stream: string;
       streamType: string;
       startTime: number;
@@ -2785,6 +2963,12 @@ export default defineComponent({
         },
       });
     }
+
+    // With an item open (a log event, metric sample or trace), the drawer's ×, Escape and outside
+    // click go back to the list; only from the list do they close the drawer.
+    const explorerBack = createExplorerBack();
+    provide(EXPLORER_BACK_KEY, explorerBack);
+    const cellDrawerCloseGuard = () => !explorerBack.back();
 
     function onCellDrawerOpenChange(open: boolean) {
       cellDrawer.value.open = open;
@@ -2838,7 +3022,7 @@ export default defineComponent({
 
       openCellDrawer({
         field: realField,
-        value: value as string | number,
+        value: (value ?? null) as string | number | null,
         stream,
         streamType,
         startTime: metaStartMicros || selStartMicros,
@@ -2846,6 +3030,75 @@ export default defineComponent({
         baseWhere,
       });
     }
+
+    // Not synced to the URL: the cell_* params can only describe a single table cell.
+    async function openPointLogs() {
+      const explore = pointExplore.value;
+      hidePopupsAndOverlays();
+      hideContextMenu();
+      if (!explore || explore.logs.state !== "enabled") return;
+      const { target } = explore;
+      await ensureDrilldownSchema(target.queryIndex, true);
+      cellDrawer.value = {
+        open: true,
+        field: "",
+        value: "",
+        stream: target.stream,
+        streamType: target.streamType,
+        startTime: target.startTime,
+        endTime: target.endTime,
+        baseWhere: panelBaseWhere.value,
+        filters: target.filters,
+        mode: "logs",
+      };
+    }
+
+    function openPointTraces() {
+      const explore = pointExplore.value;
+      hidePopupsAndOverlays();
+      hideContextMenu();
+      if (!explore?.tracesTarget || explore.traces.state !== "enabled") return;
+      const { target, tracesTarget } = explore;
+      cellDrawer.value = {
+        open: true,
+        field: "",
+        value: "",
+        stream: tracesTarget.stream,
+        streamType: "traces",
+        startTime: target.startTime,
+        endTime: target.endTime,
+        baseWhere: tracesTarget.baseWhere ?? "",
+        filters: tracesTarget.filters,
+        mode: "traces",
+      };
+    }
+
+    function openPointMetrics() {
+      const explore = pointExplore.value;
+      hidePopupsAndOverlays();
+      hideContextMenu();
+      if (!explore?.metricsTarget || explore.metrics.state !== "enabled") return;
+      const { target, metricsTarget } = explore;
+      cellDrawer.value = {
+        open: true,
+        field: "",
+        value: "",
+        stream: metricsTarget.stream,
+        streamType: "metrics",
+        startTime: target.startTime,
+        endTime: target.endTime,
+        baseWhere: metricsTarget.baseWhere ?? "",
+        filters: metricsTarget.filters,
+        mode: "metrics",
+      };
+    }
+
+    const EXPLORER_TITLES = {
+      logs: "panel.logExplorer.title",
+      traces: "panel.traceExplorer.title",
+      metrics: "panel.metricsExplorer.title",
+    } as const;
+    const cellDrawerTitle = computed(() => t(EXPLORER_TITLES[cellDrawer.value.mode ?? "logs"]));
 
     return {
       hoveredQueryAnnotation,
@@ -2887,6 +3140,12 @@ export default defineComponent({
       tableRowKeyFields,
       drilldownAllColumns,
       drilldownArray,
+      pointExplore,
+      pointExploreItems,
+      openPointLogs,
+      openPointTraces,
+      openPointMetrics,
+      cellDrawerTitle,
       selectedAnnotationData,
       openDrilldown,
       alertsLocked,
@@ -2937,6 +3196,9 @@ export default defineComponent({
       contextMenuPosition,
       contextMenuValue,
       contextMenuData,
+      contextMenuShowsAlert,
+      pointMenuKey,
+      pointMenuAllowed,
       onChartContextMenu,
       onChartDomContextMenu,
       findsLineOnContextMenu,
@@ -2947,6 +3209,7 @@ export default defineComponent({
       ensureDrilldownSchema,
       panelBaseWhere,
       onCellDrawerOpenChange,
+      cellDrawerCloseGuard,
       exemplarsEligible,
       exemplarsEnabled,
       exemplarsStatus,

@@ -10590,7 +10590,12 @@
         "contextHint": "الأحداث القريبة من هذا الطابع الزمني",
         "contextTooltip": "أحداث أخرى من هذا التدفق خلال الثلاث دقائق التي سبقت وبعد هذا الحدث — تظهر ما كان يحدث في نفس اللحظة.",
         "contextEmpty": "لم يتم العثور على أحداث محيطة"
-      }
+      },
+      "pagerCounting": "{start}-{end} من …",
+      "pagerRange": "{start}-{end}",
+      "pagerEmptyPage": "لا يوجد شيء في هذه الصفحة",
+      "searchFailed": "فشل البحث",
+      "queryFailed": "تعذر تشغيل الاستعلام"
     },
     "addJoin": "إضافة الانضمام",
     "removeJoin": "إزالة الانضمام",
@@ -10618,7 +10623,38 @@
     "wellSubgroup": "المجموعة الفرعية",
     "wellSize": "الحجم",
     "wellCategory": "الفئة",
-    "value": "القيمة"
+    "value": "القيمة",
+    "pointExplore": {
+      "viewLogs": "عرض السجلات",
+      "viewTraces": "عرض التتبعات",
+      "viewMetrics": "عرض المقاييس",
+      "slice": "{start}–{end}",
+      "wholeRange": "النطاق الكامل {start}–{end}",
+      "detail": "{slice} · {filters}",
+      "withNote": "{detail} · {note}",
+      "seriesNotFiltered": "السلاسل غير مفلترة",
+      "panelFilterNotApplied": "لم يتم تطبيق فلتر اللوحة",
+      "tracesForService": "تتبعات الخدمة {service} · {slice}",
+      "metricsForService": "مقاييس الخدمة {service} · {slice}",
+      "findingService": "جارٍ العثور على الخدمة لهذه النقطة…"
+    },
+    "traceExplorer": {
+      "title": "مستكشف التتبعات",
+      "filter": "الفلتر",
+      "openInTraces": "فتح في التتبعات",
+      "noTraces": "لا توجد تتبعات في هذه الشريحة",
+      "pageRange": "{from}–{to}",
+      "prevTrace": "التتبع السابق",
+      "nextTrace": "التتبع التالي"
+    },
+    "metricsExplorer": {
+      "title": "مستكشف المقاييس",
+      "openInMetrics": "فتح في المقاييس",
+      "openSample": "فتح عينة",
+      "prevSample": "العينة السابقة",
+      "nextSample": "العينة التالية",
+      "noSamples": "لا توجد عينات تطابق هذا الفلتر"
+    }
   },
   "home": {
     "alertsOverviewSection": "قسم نظرة عامة على التنبيهات",

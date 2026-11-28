@@ -10590,7 +10590,12 @@
         "contextHint": "Bu zaman damgasına yakın olaylar",
         "contextTooltip": "Bu olaydan önceki ve sonraki 3 dakika içinde bu akıştan diğer olaylar — aynı anda başka neler olduğunu gösterir.",
         "contextEmpty": "Çevredeki olay bulunamadı"
-      }
+      },
+      "pagerCounting": "{start}-{end} / …",
+      "pagerRange": "{start}-{end}",
+      "pagerEmptyPage": "Bu sayfada hiçbir şey yok",
+      "searchFailed": "Arama başarısız oldu",
+      "queryFailed": "Sorgu çalıştırılamadı"
     },
     "addJoin": "Birleştirme Ekle",
     "removeJoin": "Birleştirmeyi Kaldır",
@@ -10618,7 +10623,38 @@
     "wellSubgroup": "Alt grup",
     "wellSize": "Boyut",
     "wellCategory": "Kategori",
-    "value": "Değer"
+    "value": "Değer",
+    "pointExplore": {
+      "viewLogs": "Günlükleri görüntüle",
+      "viewTraces": "İzleri görüntüle",
+      "viewMetrics": "Metrikleri görüntüle",
+      "slice": "{start}–{end}",
+      "wholeRange": "Tüm aralık {start}–{end}",
+      "detail": "{slice} · {filters}",
+      "withNote": "{detail} · {note}",
+      "seriesNotFiltered": "seri filtrelenmedi",
+      "panelFilterNotApplied": "panel filtresi uygulanmadı",
+      "tracesForService": "{service} hizmeti için izler · {slice}",
+      "metricsForService": "{service} hizmeti için metrikler · {slice}",
+      "findingService": "Bu noktanın hizmeti bulunuyor…"
+    },
+    "traceExplorer": {
+      "title": "İz Gezgini",
+      "filter": "Filtre",
+      "openInTraces": "İzlerde aç",
+      "noTraces": "Bu dilimde iz yok",
+      "pageRange": "{from}–{to}",
+      "prevTrace": "Önceki iz",
+      "nextTrace": "Sonraki iz"
+    },
+    "metricsExplorer": {
+      "title": "Metrik Gezgini",
+      "openInMetrics": "Metriklerde aç",
+      "openSample": "Örneği aç",
+      "prevSample": "Önceki örnek",
+      "nextSample": "Sonraki örnek",
+      "noSamples": "Bu filtreyle eşleşen örnek yok"
+    }
   },
   "home": {
     "alertsOverviewSection": "Uyarılar genel bakış bölümü",

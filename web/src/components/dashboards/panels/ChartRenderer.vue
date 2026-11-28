@@ -256,6 +256,16 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    /** A right-click on a bar, line or scatter chart opens the alert menu; off, the browser keeps its own menu. */
+    contextMenuAlert: {
+      type: Boolean,
+      default: true,
+    },
+    /** A right-click on a data point of any chart opens the point menu, and carries the point. */
+    contextMenuPoints: {
+      type: Boolean,
+      default: false,
+    },
   },
   setup(props: any, { emit }) {
     const chartRef: any = ref(null);
@@ -559,7 +569,7 @@ export default defineComponent({
         : Array.isArray(point)
           ? Number(point[1])
           : NaN;
-      if (!event || !Number.isFinite(value)) return;
+      if (!event || !Number.isFinite(value) || !props.contextMenuAlert) return;
       event.preventDefault();
       event.stopPropagation();
       emit("domcontextmenu", {
@@ -579,16 +589,30 @@ export default defineComponent({
       }
       // Get chart type from the first series
       const chartType = chart?.getOption()?.series?.[0]?.type;
-
-      if (!chartType || !CONTEXT_MENU_SERIES_TYPES.includes(chartType)) {
-        return;
-      }
+      const alertable =
+        props.contextMenuAlert && !!chartType && CONTEXT_MENU_SERIES_TYPES.includes(chartType);
+      // A data point of any chart can open the point menu; elsewhere the browser keeps its own menu.
+      const isPoint = props.contextMenuPoints && (params?.componentType ?? "series") === "series";
+      if (!alertable && !isPoint) return;
 
       // Prevent default context menu
       const event = params.event?.event;
       if (event) {
         event.preventDefault();
         event.stopPropagation();
+      }
+
+      if (!alertable) {
+        emit("domcontextmenu", {
+          x: event?.clientX ?? 0,
+          y: event?.clientY ?? 0,
+          value: NaN,
+          seriesIndex: params.seriesIndex,
+          dataIndex: params.dataIndex,
+          alertable: false,
+          point: params,
+        });
+        return;
       }
 
       // Extract data point value
@@ -634,6 +658,18 @@ export default defineComponent({
           value: Number(dataPointValue),
           seriesIndex: params.seriesIndex,
           dataIndex: params.dataIndex,
+          ...(props.contextMenuPoints ? { point: params } : {}),
+        });
+      } else if (isPoint) {
+        // No number for an alert threshold, but the point can still be explored.
+        emit("domcontextmenu", {
+          x: event?.clientX ?? 0,
+          y: event?.clientY ?? 0,
+          value: NaN,
+          seriesIndex: params.seriesIndex,
+          dataIndex: params.dataIndex,
+          alertable: false,
+          point: params,
         });
       }
     };
@@ -716,6 +752,8 @@ export default defineComponent({
     // Handle native DOM contextmenu event for alert creation
     // This handles right-clicks anywhere on the chart (including empty space)
     const handleNativeContextMenu = async (event: MouseEvent) => {
+      // Empty space opens only the alert menu; without it the browser keeps its own menu.
+      if (!props.contextMenuAlert) return;
       // Get chart type from the first series
       await nextTick();
       const option = chart?.getOption();

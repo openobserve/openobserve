@@ -115,6 +115,7 @@ export async function processPromQLData(
       timestamps: formattedTimestamps,
       series,
       queryIndex: queryIndexOf(index),
+      resultIndex: index,
       seriesRole: shift.nameSuffixes?.[index] ? "shifted" : "primary",
       ...(shift.nameSuffixes?.[index] ? { nameSuffix: shift.nameSuffixes[index] } : {}),
       ...(histogramsLimited[index] ? { histogramsLimited: histogramsLimited[index] } : {}),

@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                     :column="column"
                     :row="row"
-                    :selected-stream-fields="searchObj.data.stream.selectedStreamFields"
+                    :selected-stream-fields="streamFields"
                     :hide-search-term-actions="false"
                     :hide-ai="true"
                     @copy="copyToClipboard(column.id, row[column.id])"
@@ -186,11 +186,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :tokens="extractLLMData(row)?.usage?.total ?? 0"
                       :unpriced-tokens="unpricedFields(row).unpricedTokens"
                       :unpriced-models="unpricedFields(row).unpricedModels"
-                      :stream="searchObj.data.stream.selectedStream?.value ?? ''"
-                      :time-window="{
-                        start: searchObj.data.datetime.startTime,
-                        end: searchObj.data.datetime.endTime,
-                      }"
+                      :stream="costStream"
+                      :time-window="costWindow"
                       :format="(c: number) => `$${formatCost(c)}`"
                     />
                     <template v-else>-</template>
@@ -283,13 +280,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onMounted, reactive, ref, watch } from "vue";
 import { nextRowTarget } from "@/utils/rowNavigation";
 import { acceptsPageLoad, type PageLoad, type PendingPageSelection } from "@/utils/pageCrossing";
 import { announceTracesRowNav as announce } from "@/plugins/traces/composables/tracesRowNav";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { copyToClipboard as qCopyToClipboard } from "@/utils/clipboard";
 import OTable from "@/lib/core/Table/OTable.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import CellActions from "@/plugins/logs/data-table/CellActions.vue";
 import useTraces, { DEFAULT_TRACE_COLUMNS } from "@/composables/useTraces";
 import {
@@ -364,6 +362,12 @@ interface Props {
   rowHref?: (row: any) => string | undefined;
   /** Adds a read-only Version column from the trace's `o2_service_version`. */
   versionColumn?: boolean;
+  /** Columns owned by the host; given, the list never reads or writes the Traces page state. */
+  columns?: OTableColumnDef<any>[];
+  /** With `columns`: the stream's schema fields, which decide the include/exclude actions. */
+  streamFields?: { name: string; isSchemaField: boolean }[];
+  /** With `columns`: the stream the rows came from. */
+  streamName?: string;
 }
 
 const store = useStore();
@@ -386,6 +390,9 @@ const props = withDefaults(defineProps<Props>(), {
   scrollEl: null,
   rowHref: undefined,
   versionColumn: false,
+  columns: undefined,
+  streamFields: undefined,
+  streamName: "",
 });
 
 const emit = defineEmits<{
@@ -398,6 +405,8 @@ const emit = defineEmits<{
   copy: [value: any];
   "remove-filter": [];
   "jump-to-stream-data": [fromUs: number, toUs: number];
+  /** With `columns`: an include/exclude condition for the host's own filter. */
+  "add-filter": [condition: string];
 }>();
 
 const copyToClipboard = (field: string, value: any) =>
@@ -415,7 +424,7 @@ const addSearchTerm = (
   const operator = action === "include" ? "=" : "!=";
   if (fieldValue === null || fieldValue === "" || fieldValue === "null") {
     const isOp = action === "include" ? "is" : "is not";
-    searchObj.data.stream.addToFilter = `${field} ${isOp} null`;
+    applyFilter(`${field} ${isOp} null`);
   } else {
     // For nanosecond timestamp fields, use the exact string shadow value to avoid
     // the ~52-unit rounding that JSON.parse introduces for 19-digit integers.
@@ -428,11 +437,18 @@ const addSearchTerm = (
     const displayValue =
       exactNsValue !== undefined
         ? String(exactNsValue)
-        : field === "span_kind" && !searchObj.meta.sqlMode
+        : // A host that owns the columns (a dashboard) never runs in the Traces page's SQL mode.
+          field === "span_kind" && (ownsColumns.value || !searchObj.meta.sqlMode)
           ? (SPAN_KIND_MAP[String(fieldValue)] ?? String(fieldValue))
           : String(fieldValue);
-    searchObj.data.stream.addToFilter = `${field} ${operator} '${escapeSingleQuotes(displayValue)}'`;
+    applyFilter(`${field} ${operator} '${escapeSingleQuotes(displayValue)}'`);
   }
+};
+
+// A host that owns the columns owns the filter too, so the Traces page query stays untouched.
+const applyFilter = (condition: string) => {
+  if (ownsColumns.value) emit("add-filter", condition);
+  else searchObj.data.stream.addToFilter = condition;
 };
 
 const onRowClick = (row: any, event?: MouseEvent) => {
@@ -484,7 +500,7 @@ const headerSorting = computed(() =>
 const contextCellIsStreamField = computed(() => {
   const columnId = contextCell.value?.columnId;
   if (!columnId) return false;
-  const fields = (searchObj.data.stream.selectedStreamFields ?? []) as any[];
+  const fields = (streamFields.value ?? []) as any[];
   return fields.find((field: any) => field.name === columnId)?.isSchemaField ?? false;
 });
 
@@ -543,6 +559,31 @@ const { searchObj, updatedLocalLogFilterField, loadLocalLogFilterField } = useTr
 
 const { buildColumns } = useTracesTableColumns();
 
+const ownsColumns = computed(() => props.columns !== undefined);
+const localColumns = ref<OTableColumnDef<any>[]>([...(props.columns ?? [])]);
+watch(
+  () => props.columns,
+  (columns) => (localColumns.value = [...(columns ?? [])]),
+);
+const gridColumns = computed<OTableColumnDef<any>[]>({
+  get: () => (ownsColumns.value ? localColumns.value : searchObj.data.resultGrid.columns),
+  set: (columns) => {
+    if (ownsColumns.value) localColumns.value = columns;
+    else searchObj.data.resultGrid.columns = columns;
+  },
+});
+const streamFields = computed(() =>
+  ownsColumns.value ? props.streamFields : searchObj.data.stream.selectedStreamFields,
+);
+const costStream = computed(() =>
+  ownsColumns.value ? props.streamName : (searchObj.data.stream.selectedStream?.value ?? ""),
+);
+const costWindow = computed(() =>
+  ownsColumns.value
+    ? { start: props.queryWindowUs?.start ?? 0, end: props.queryWindowUs?.end ?? 0 }
+    : { start: searchObj.data.datetime.startTime, end: searchObj.data.datetime.endTime },
+);
+
 const timestampCol = computed(() => store.state.zoConfig.timestamp_column || "_timestamp");
 
 const VERSION_COLUMN_ID = "o2_service_version";
@@ -550,12 +591,10 @@ const VERSION_COLUMN_ID = "o2_service_version";
 const injectsVersionColumn = computed(
   () =>
     props.versionColumn &&
-    !searchObj.data.resultGrid.columns.some(
-      (column: { id: string }) => column.id === VERSION_COLUMN_ID,
-    ),
+    !gridColumns.value.some((column: { id: string }) => column.id === VERSION_COLUMN_ID),
 );
-const tableColumns = computed(() => {
-  const columns = searchObj.data.resultGrid.columns;
+const tableColumns = computed<OTableColumnDef<any>[]>(() => {
+  const columns = gridColumns.value;
   if (!injectsVersionColumn.value) return columns;
   const at = columns.findIndex((column: { id: string }) => column.id === "service_name");
   const version = {
@@ -577,12 +616,10 @@ const sortFieldMap = computed<Record<string, string>>(() => ({
 }));
 
 // Rows of another stream or mode must never show under this one's columns, even dimmed.
-const rowsKey = computed(
-  () => `${searchObj.data.stream.selectedStream?.value ?? ""}|${props.searchMode ?? "traces"}`,
-);
+const rowsKey = computed(() => `${costStream.value}|${props.searchMode ?? "traces"}`);
 
 onMounted(() => {
-  if (!searchObj.data.resultGrid.columns.length) {
+  if (!ownsColumns.value && !searchObj.data.resultGrid.columns.length) {
     // The cold skeleton shows the current mode's columns, so they do not swap when rows land.
     const mode = props.searchMode === "spans" ? "spans" : "traces";
     loadLocalLogFilterField(mode);
@@ -622,35 +659,36 @@ onMounted(() => {
  */
 const onColumnReorder = (newOrder: string[]) => {
   const mode = props.searchMode ?? "traces";
+  const rank = new Map(newOrder.map((id, index) => [id, index]));
+  const ordered = [...gridColumns.value].sort(
+    (a: { id: string }, b: { id: string }) =>
+      (rank.get(a.id) ?? newOrder.length) - (rank.get(b.id) ?? newOrder.length),
+  );
+  fillLastColumn(ordered, timestampCol.value);
+  gridColumns.value = ordered;
+  if (ownsColumns.value) return;
   searchObj.data.stream.selectedFields = newOrder.filter(
     (id) =>
       id !== store.state.zoConfig.timestamp_column &&
       !SPAN_DERIVED_COLUMN_IDS.has(id) &&
       !(id === VERSION_COLUMN_ID && injectsVersionColumn.value),
   );
-  const rank = new Map(newOrder.map((id, index) => [id, index]));
-  const ordered = [...searchObj.data.resultGrid.columns].sort(
-    (a: { id: string }, b: { id: string }) =>
-      (rank.get(a.id) ?? newOrder.length) - (rank.get(b.id) ?? newOrder.length),
-  );
-  fillLastColumn(ordered, timestampCol.value);
-  searchObj.data.resultGrid.columns = ordered;
   // useTraces only persists per traces/spans; other modes have no column state.
   updatedLocalLogFilterField(mode as "traces" | "spans");
 };
 
 const onCloseColumn = (columnDef: any) => {
   const mode = props.searchMode ?? "traces";
-  const fieldIdx = searchObj.data.stream.selectedFields.indexOf(columnDef.id);
+  const fieldIdx = ownsColumns.value
+    ? -1
+    : searchObj.data.stream.selectedFields.indexOf(columnDef.id);
   if (fieldIdx !== -1) {
     searchObj.data.stream.selectedFields.splice(fieldIdx, 1);
     updatedLocalLogFilterField(mode as "traces" | "spans");
   }
-  const remaining = searchObj.data.resultGrid.columns.filter(
-    (c: { id: string }) => c.id !== columnDef.id,
-  );
+  const remaining = gridColumns.value.filter((c: { id: string }) => c.id !== columnDef.id);
   fillLastColumn(remaining, timestampCol.value);
-  searchObj.data.resultGrid.columns = remaining;
+  gridColumns.value = remaining;
 
   // If the closed column was the active sort column, reset to default
   if (columnDef.id === props.sortBy) {
@@ -678,7 +716,15 @@ const noResults = computed(
 const hasResults = computed(() => props.searchPerformed && props.hits.length > 0);
 
 const listRef = ref<HTMLElement | null>(null);
-const navigation = () => searchObj.meta.resultGrid.navigation;
+// A host-owned list keeps its row selection to itself, so the Traces page's stays put.
+const localNavigation = reactive({
+  currentRowIndex: null as number | null,
+  selectionActive: false,
+  pendingPageSelection: null as PendingPageSelection | null,
+  lastOpenedId: null as string | null,
+});
+const navigation = () =>
+  ownsColumns.value ? localNavigation : searchObj.meta.resultGrid.navigation;
 
 const totalPages = computed(() =>
   props.total && props.rowsPerPage ? Math.max(1, Math.ceil(props.total / props.rowsPerPage)) : 1,
@@ -786,6 +832,7 @@ const resolveCrossing = (pending: PendingPageSelection, load: PageLoad) => {
 watch(
   () => searchObj.data.resultGrid.pageLoad,
   (load) => {
+    if (ownsColumns.value) return;
     const pending = navigation().pendingPageSelection ?? null;
     if (pending && acceptsPageLoad(pending, load ?? null)) resolveCrossing(pending, load!);
   },

@@ -448,6 +448,7 @@ import { getServiceIconDataUrl, getSpanTechIconDataUrl } from "@/utils/traces/co
 import { getKindIcon } from "@/composables/traces/useTraceProcessing";
 import { useVirtualizer, type VirtualItem } from "@tanstack/vue-virtual";
 import { useRouter } from "vue-router";
+import { useTraceNavigate } from "@/plugins/traces/composables/useTraceNavigation";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -554,6 +555,7 @@ export default defineComponent({
 
     const { t } = useI18nTyped();
     useRouter();
+    const navigate = useTraceNavigate();
 
     // As there are some UX issues, disabling it for now
     const enableHoverSelection = false;
@@ -690,7 +692,7 @@ export default defineComponent({
         return;
       }
       const queryDetails = buildQueryDetails(rawSpan);
-      navigateToLogs(queryDetails);
+      navigateToLogs(queryDetails, navigate);
     };
 
     const getChildCount = (span: any): number => {

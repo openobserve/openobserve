@@ -18,7 +18,7 @@ import { escapeHtml } from "@/utils/html";
 import { getDataValue } from "./aliasUtils";
 import { formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
 import { groupName, isStandIn, paintByPalette } from "./categoryNodes";
-import { undrawnQueryCount } from "./chartTypeGroups";
+import { drawnQueryIndex, undrawnQueryCount } from "./chartTypeGroups";
 import { labelColorOn } from "./chartLabelContrast";
 
 export const FUNNEL_SORTS = ["descending", "ascending", "none"] as const;
@@ -78,7 +78,7 @@ export const buildFunnelStages = (
 ): { stages: FunnelStage[]; skippedRows: number } => {
   // Each stage is one measure, so a saved panel with more queries draws only its first visible one.
   const queries: any[] = panelSchema?.queries ?? [];
-  const drawn = queries.findIndex((query) => !query?.config?.hide);
+  const drawn = drawnQueryIndex(queries);
   const rows = data?.[drawn];
   const stage = queries[drawn]?.fields?.x?.[0];
   const value = queries[drawn]?.fields?.y?.[0];

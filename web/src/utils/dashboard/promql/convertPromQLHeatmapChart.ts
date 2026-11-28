@@ -18,6 +18,8 @@ import {
   PromQLChartConverter,
   ProcessedPromQLData,
   TOOLTIP_SCROLL_STYLE,
+  pointTags,
+  type PointTags,
 } from "./shared/types";
 import { getUnitValue, formatUnitValue } from "../convertDataIntoUnitValue";
 import { chartAxisTextColor, chartColor } from "@/utils/chartTheme";
@@ -92,6 +94,10 @@ interface HeatmapCells {
 interface HistogramGroupBuckets {
   label: string;
   source: Omit<HeatmapExemplarGroup, "bounds"> | null;
+  /** The query, executed result and non-`le` labels the histogram came from, for the point menu. */
+  origin: Pick<ProcessedPromQLData, "queryIndex" | "resultIndex"> & {
+    labels: Record<string, string>;
+  };
   buckets: HistogramSeriesOutput[];
 }
 
@@ -228,6 +234,11 @@ function histogramGroupsOf(processedData: ProcessedPromQLData[]): HistogramGroup
       ]
         .filter(Boolean)
         .join(" "),
+      origin: {
+        queryIndex: queryData.queryIndex ?? queryPosition,
+        resultIndex: queryData.resultIndex,
+        labels: group.labels,
+      },
       source:
         queryData.seriesRole === "shifted"
           ? null
@@ -745,6 +756,12 @@ export class HeatmapConverter implements PromQLChartConverter {
         {
           type: "heatmap",
           data,
+          // A cell is [column, row, value]; the point menu reads its row's series and its column's time.
+          _rows: rows.map((row): PointTags | null => {
+            const source = sourceOf.get(allSeries[row]);
+            return source ? pointTags(source, allSeries[row].metric) : null;
+          }),
+          _timestamps: timeAxis.map(([ts]) => Number(ts)),
           // Per-cell labels only while the grid is small enough to read them,
           // and chunked rendering when it is not — a `sum by (le) (rate(...))`
           // over a full-size panel is thousands of cells, and a text element +
@@ -932,6 +949,15 @@ export class HeatmapConverter implements PromQLChartConverter {
             config,
             store,
           );
+    // A row is one `le` bucket series of one histogram, so a cell opens that series' samples.
+    options.series?.forEach((series: any, index: number) => {
+      const group = kept[index];
+      if (!group) return;
+      series._rows = group.buckets.map((bucket) =>
+        pointTags(group.origin, { ...group.origin.labels, le: bucket.le }),
+      );
+      series._timestamps = timestamps.map(([ts]) => Number(ts));
+    });
     applyTimeInteraction(options, extras, panelSchema.id, timestamps, grid, context, store);
     return config?.compact_preview ? applyCompactPreview(options) : options;
   }
