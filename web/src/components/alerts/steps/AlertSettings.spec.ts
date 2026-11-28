@@ -267,6 +267,18 @@ describe("AlertSettings — descendant (binds into ancestor OForm) mode", () => 
     expect(trigger.timezone).toBeTruthy();
   });
 
+  it("period with no even cron step: emits an empty cron", () => {
+    const host = mountDescendant("false");
+    const step = host.findComponent(AlertSettings);
+
+    (step.vm as any).handlePeriodChange("300");
+
+    const events = step.emitted("update:trigger") as any[];
+    const trigger = events[events.length - 1][0];
+    expect(trigger.silence).toBe(300);
+    expect(trigger.cron).toBe("");
+  });
+
   it("period cleared: emits update:trigger without cascading", () => {
     const host = mountDescendant("false");
     const step = host.findComponent(AlertSettings);

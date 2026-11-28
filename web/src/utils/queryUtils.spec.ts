@@ -885,6 +885,27 @@ describe("convertMinutesToCron", () => {
   it("returns cron expression for 1 minute", () => {
     expect(convertMinutesToCron(1)).toBe("0 */1 * * * *");
   });
+
+  it("steps minutes and hours only when the step divides the parent unit", () => {
+    expect(convertMinutesToCron(30)).toBe("0 */30 * * * *");
+    expect(convertMinutesToCron(60)).toBe("0 0 */1 * * *");
+    expect(convertMinutesToCron(120)).toBe("0 0 */2 * * *");
+    expect(convertMinutesToCron(360)).toBe("0 0 */6 * * *");
+    expect(convertMinutesToCron(720)).toBe("0 0 */12 * * *");
+  });
+
+  it("runs daily and weekly schedules without restarting on the 1st", () => {
+    expect(convertMinutesToCron(1440)).toBe("0 0 0 * * *");
+    expect(convertMinutesToCron(10080)).toBe("0 0 0 * * 0");
+  });
+
+  it("returns '' for an interval no cron step can keep evenly", () => {
+    expect(convertMinutesToCron(7)).toBe("");
+    expect(convertMinutesToCron(90)).toBe("");
+    expect(convertMinutesToCron(300)).toBe("");
+    expect(convertMinutesToCron(1500)).toBe("");
+    expect(convertMinutesToCron(2880)).toBe("");
+  });
 });
 
 // ---------------------------------------------------------------------------

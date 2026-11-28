@@ -458,7 +458,15 @@ export const convertMinutesToCron = (minutes: number): string => {
     return "";
   }
 
-  return `0 */${minutes} * * * *`;
+  // A step restarts at the top of its parent unit (*/7 minutes fires at :56 then :00), so it
+  // only keeps the interval when it divides that unit. Anything else has no cron step.
+  if (minutes < 60) return 60 % minutes === 0 ? `0 */${minutes} * * * *` : "";
+  if (minutes < 1440 && minutes % 60 === 0 && 24 % (minutes / 60) === 0)
+    return `0 0 */${minutes / 60} * * *`;
+  if (minutes === 1440) return "0 0 0 * * *";
+  // Day of month restarts on the 1st, so weekly has to use day of week instead.
+  if (minutes === 10080) return "0 0 0 * * 0";
+  return "";
 };
 
 export const processQueryMetadataErrors = (metadata: any, timezone: string = "UTC"): string => {
