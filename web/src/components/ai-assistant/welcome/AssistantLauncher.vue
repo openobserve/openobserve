@@ -47,7 +47,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :input-attrs="{
           'aria-label': t('assistant.welcome.launcher.inputName', { product }),
           'aria-describedby': notice ? noticeId : undefined,
-          maxlength: MAX_LAUNCHER_CHARS,
           enterkeyhint: 'send',
           ...(mentionAt !== null && {
             role: 'combobox',
@@ -177,9 +176,6 @@ import type { AgentId, ContextChip, Sid } from "@/composables/assistant";
 
 // Dictation writes here, never to a chat; the line becomes a chat only when it is sent.
 const LAUNCHER_DRAFT: Sid = "assistant-launcher";
-
-/** The launcher's line is one prompt; longer text belongs in the full view's composer. */
-export const MAX_LAUNCHER_CHARS = 4_000;
 
 // G0 and G1 leave no gap on Home: the header carries the locked or muted button (DG-04 AC 3, DG-05 AC 1).
 const HIDDEN_GATES: ReadonlySet<string> = new Set([

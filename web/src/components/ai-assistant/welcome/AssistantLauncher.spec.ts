@@ -195,7 +195,7 @@ describe("AssistantLauncher", () => {
     expect(launcher.attributes("aria-label")).toBe(`Ask ${brandNames.autobot}`);
     expect(launcher.find("h2").exists()).toBe(false);
     expect(input(wrapper).attributes("aria-label")).toBe(`Ask ${brandNames.autobot}`);
-    expect(input(wrapper).attributes("maxlength")).toBe("4000");
+    expect(input(wrapper).attributes("maxlength")).toBeUndefined();
     expect(wrapper.find('[data-test^="assistant-launcher-starter-"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="assistant-launcher-your-chats"]').exists()).toBe(false);
   });
@@ -366,6 +366,16 @@ describe("AssistantLauncher", () => {
       payload: { text: "why 5xx?", chips: [] },
     });
     expect((input(wrapper).element as HTMLInputElement).value).toBe("");
+  });
+
+  it("sends the full 4,500-character prompt on Enter", async () => {
+    const { wrapper } = setup();
+    const prompt = "a".repeat(4_500);
+    await input(wrapper).setValue(prompt);
+    await input(wrapper).trigger("keydown", { key: "Enter" });
+    expect(open).toHaveBeenCalledWith(
+      expect.objectContaining({ payload: expect.objectContaining({ text: prompt }) }),
+    );
   });
 
   it("keeps the text on Escape and draws no clear button in the bar (HOME-03, round 1 X-20)", async () => {
