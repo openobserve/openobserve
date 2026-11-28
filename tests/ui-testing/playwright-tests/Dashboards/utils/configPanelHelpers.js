@@ -6,7 +6,12 @@
 
 import * as crypto from "crypto";
 import { setupTestDashboard, deleteDashboard } from "./dashCreation.js";
-import { ingestionForMaps, ingestionForStateTimeline } from "./dashIngestion.js";
+import {
+  ingestionForMaps,
+  ingestionForStateTimeline,
+  ingestionForNodeGraph,
+  NODE_GRAPH_FIXTURE,
+} from "./dashIngestion.js";
 import testLogger from '../../utils/test-logger.js';
 
 // ---------------------------------------------------------------------------
@@ -404,6 +409,30 @@ export async function setupSunburstPanelWithConfig(page, pm, dashboardName, {
   await pm.dashboardPanelActions.applyDashboardBtn();
   await pm.dashboardPanelConfigs.openConfigPanel();
   testLogger.info("Sunburst panel with config ready", { dashboardName, panelName, groupFields, subGroupField });
+}
+
+// Node graph panel with the config sidebar open; the type switch clears the seeded X/Y.
+// Pass null for a field to leave its well empty (validation tests).
+export async function setupNodeGraphPanelWithConfig(page, pm, dashboardName, {
+  panelName = "Test Panel",
+  stream = NODE_GRAPH_FIXTURE.streamName,
+  sourceField = NODE_GRAPH_FIXTURE.sourceField,
+  targetField = NODE_GRAPH_FIXTURE.targetField,
+  valueField = NODE_GRAPH_FIXTURE.valueField,
+} = {}) {
+  await ingestionForNodeGraph(page, stream);
+  await setupTestDashboard(page, pm, dashboardName);
+  await pm.dashboardCreate.addPanel();
+  await pm.chartTypeSelector.selectChartType("node-graph");
+  await pm.chartTypeSelector.selectStreamType("logs");
+  await pm.chartTypeSelector.selectStream(stream);
+  if (sourceField) await pm.chartTypeSelector.searchAndAddField(sourceField, "source");
+  if (targetField) await pm.chartTypeSelector.searchAndAddField(targetField, "target");
+  if (valueField) await pm.chartTypeSelector.searchAndAddField(valueField, "sankeyvalue");
+  await pm.dashboardPanelActions.addPanelName(panelName);
+  await pm.dashboardPanelActions.applyDashboardBtn();
+  await pm.dashboardPanelConfigs.openConfigPanel();
+  testLogger.info("Node graph panel with config ready", { dashboardName, panelName, sourceField, targetField, valueField });
 }
 
 // The editor opens as a bar with histogram(_timestamp) on X, which survives the switch to funnel, so drop it.
