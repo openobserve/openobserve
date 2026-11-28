@@ -23,7 +23,7 @@ env:
   ZO_RESULT_CACHE_ENABLED: true
   # coverage mapping needs no DWARF; dropping debuginfo (test inherits dev) cuts compile and link time
   CARGO_PROFILE_DEV_DEBUG: "0"
-  # PR UI tests: shadow = full suite, picked set only reported; on = run only the picked specs and gate changed lines.
+  # PR UI tests: on = run only the picked specs and gate changed lines; off = full suite.
   UI_TEST_SELECTION: on
 
 jobs:
@@ -38,9 +38,9 @@ jobs:
     outputs:
       has_backend_changes: ${{ steps.check.outputs.has_backend_changes }}
       has_ui_changes: ${{ steps.check.outputs.has_ui_changes }}
-      ui_selection: ${{ steps.select.outputs.ui_selection || 'off' }}
       ui_run: ${{ steps.select.outputs.ui_run || 'full' }}
       ui_count: ${{ steps.select.outputs.ui_count || '0' }}
+      ui_total: ${{ steps.select.outputs.ui_total || '0' }}
       ui_shards: ${{ steps.select.outputs.ui_shards || '4' }}
       ui_matrix: ${{ steps.select.outputs.ui_matrix || '[1,2,3,4]' }}
     steps:
@@ -83,13 +83,14 @@ jobs:
           node web/scripts/select-ui-tests.mjs --base "$BASE" --head HEAD --out ui-picked-specs
           mode=$(jq -r .mode ui-picked-specs/selection.json)
           count=$(jq '.specs | length' ui-picked-specs/selection.json)
+          total=$(jq '.total // 0' ui-picked-specs/selection.json)
           run=full shards=4
           if [ "$UI_TEST_SELECTION" = on ] && [ "$FORCE_FULL" != true ] && [ "$mode" = picked ]; then
             run=picked
             [ "$count" -le 300 ] && shards=1
           fi
           matrix=$(jq -cn --argjson n "$shards" '[range(1; $n + 1)]')
-          printf '%s\n' "ui_selection=$UI_TEST_SELECTION" "ui_run=$run" "ui_count=$count" \
+          printf '%s\n' "ui_run=$run" "ui_count=$count" "ui_total=$total" \
             "ui_shards=$shards" "ui_matrix=$matrix" >> "$GITHUB_OUTPUT"
 
       - if: steps.select.outcome == 'success'
@@ -362,18 +363,15 @@ jobs:
           UI_SHARD_BALANCE: '1'
           UI_RUN: ${{ needs.check_changes.outputs.ui_run }}
           SHARDS: ${{ needs.check_changes.outputs.ui_shards }}
-          # PR runs keep per-spec results for the selection shadow check.
-          JSON_OUT: ${{ github.event_name == 'pull_request' && format('../ui-results/shard-{0}.json', matrix.shard) || '' }}
         run: |
-          specs=() extra=()
-          [ -n "$JSON_OUT" ] && extra=(--reporter=json --outputFile.json="$JSON_OUT")
+          specs=()
           if [ "$UI_RUN" = picked ] && [ ! -f ../ui-picked-specs/picked.txt ]; then
             echo "::warning::picked spec list missing; running every spec"
           elif [ "$UI_RUN" = picked ]; then
             mapfile -t specs < ../ui-picked-specs/picked.txt
             [ "${#specs[@]}" -gt 0 ] || { echo "No spec reaches this change."; exit 0; }
           fi
-          npx vitest run "${specs[@]}" --coverage --shard="${{ matrix.shard }}/$SHARDS" --reporter=default --reporter=blob "${extra[@]}" \
+          npx vitest run "${specs[@]}" --coverage --shard="${{ matrix.shard }}/$SHARDS" --reporter=default --reporter=blob \
             --coverage.reportOnFailure --coverage.reporter=json \
             --coverage.thresholds.lines=0 --coverage.thresholds.functions=0 \
             --coverage.thresholds.branches=0 --coverage.thresholds.statements=0
@@ -386,13 +384,6 @@ jobs:
           include-hidden-files: true
           retention-days: 1
           compression-level: 1
-
-      - uses: actions/upload-artifact@v4
-        if: always() && github.event_name == 'pull_request'
-        with:
-          name: ui-unit-results-${{ matrix.shard }}
-          path: ui-results
-          retention-days: 7
 
   # Keeps the required-check name `ui_unit_tests` while the work runs in shards.
   ui_unit_tests:
@@ -477,28 +468,22 @@ jobs:
         working-directory: web
         run: node scripts/changed-lines-coverage.mjs --diff ../ui-picked-specs/changed.diff --report-only
 
-  # Shadow check: would the picked specs have caught this run's failures? Never blocks.
-  ui_test_selection_shadow:
-    needs: [check_changes, ui_unit_test_shards]
-    if: always() && needs.check_changes.outputs.ui_selection == 'shadow' && needs.check_changes.outputs.has_ui_changes == 'true'
+  # Shows in the PR checks list how many UI specs this run picked.
+  ui_test_selection:
+    needs: [check_changes]
+    if: github.event_name == 'pull_request' && needs.check_changes.outputs.has_ui_changes == 'true'
+    name: ${{ needs.check_changes.outputs.ui_run == 'picked' && format('UI tests picked {0} of {1} specs', needs.check_changes.outputs.ui_count, needs.check_changes.outputs.ui_total) || 'UI tests run all specs' }}
     runs-on: ubuntu-latest
-    continue-on-error: true
-    permissions:
-      contents: read
+    permissions: {}
     steps:
-      - uses: actions/checkout@v5
-        with:
-          sparse-checkout: web/scripts
-      - uses: actions/download-artifact@v4
-        with:
-          name: ui-picked-specs
-          path: ui-picked-specs
-      - uses: actions/download-artifact@v4
-        with:
-          pattern: ui-unit-results-*
-          path: ui-results
-          merge-multiple: true
-      - run: node web/scripts/select-ui-tests.mjs --compare ui-picked-specs/selection.json ui-results
+      - env:
+          UI_RUN: ${{ needs.check_changes.outputs.ui_run }}
+          UI_COUNT: ${{ needs.check_changes.outputs.ui_count }}
+          UI_TOTAL: ${{ needs.check_changes.outputs.ui_total }}
+        run: |
+          if [ "$UI_RUN" = picked ]; then msg="Picked $UI_COUNT of $UI_TOTAL UI specs."; else msg="Ran all UI specs; see check_changes for the reason."; fi
+          echo "$msg"
+          echo "$msg" >> "$GITHUB_STEP_SUMMARY"
 
   ui_code_quality:
     needs: [check_changes]

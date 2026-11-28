@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 // Picks the vitest specs a diff can reach through static imports; any doubt runs the full suite.
 // Usage: node scripts/select-ui-tests.mjs [--base origin/main] [--head HEAD] [--out dir] [--summary file]
-//        node scripts/select-ui-tests.mjs --compare <selection.json> <vitest-json-dir> [--summary file]
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
@@ -346,16 +345,27 @@ export function select({ repo, base, head }) {
       changed,
     };
   }
-  // The graph stops at web/, so a changed file outside it that web code imports runs everything.
+  // The graph stops at web/: outside JSON counts as a change to each web file naming it.
+  // Outside code or an outside glob can hide other consumers, so either one runs everything.
   const outside = new Set(changed.filter((p) => !p.startsWith("web/")));
+  const outsideUsers = [];
+  const nodesOutside = (c) => showFile(repo, head, c) != null;
   if (outside.size)
     for (const [f, t] of texts)
-      for (const m of t.matchAll(/["'](\.\.?\/[^"'\s]+)["']/g)) {
-        const p = posix.join("web", posix.dirname(f), m[1].replace(/[?#].*$/, ""));
-        const hit = [p, ...EXTS.map((e) => p + e), ...EXTS.map((e) => `${p}/index${e}`)].find(
-          (c) => outside.has(c),
-        );
-        if (hit) return { ...full(`web/ imports a changed file outside web/: ${hit}`), changed };
+      for (const m of t.matchAll(/(["'`])(\.\.?\/[^"'`\s]+)\1/g)) {
+        const spec = m[2].replace(/\?(?:raw|inline|url|worker)$/, "");
+        const p = posix.join("web", posix.dirname(f), spec);
+        if (p === "web" || p.startsWith("web/") || p.startsWith("..")) continue;
+        if (/[*?{[]/.test(spec))
+          return { ...full(`${f} globs files outside web/: ${m[2]}`), changed };
+        const cands = [p, ...EXTS.map((e) => p + e), ...EXTS.map((e) => `${p}/index${e}`)];
+        const hit = cands.find((c) => outside.has(c));
+        const code = cands.find((c) => PARSED.test(c) && nodesOutside(c));
+        if (code || (hit && !hit.endsWith(".json")))
+          return { ...full(`${f} imports code outside web/: ${hit ?? code}`), changed };
+        if (!hit) continue;
+        if (inSetup(f)) return { ...full(`setupTests loads ${f}, which names ${hit}`), changed };
+        outsideUsers.push([hit, f]);
       }
   const idx = new TextIndex(texts, specs);
   let switchers;
@@ -370,6 +380,7 @@ export function select({ repo, base, head }) {
     for (const s of got) picked.add(s);
     reasons.push({ file, specs: got.size });
   };
+  for (const [hit, f] of outsideUsers) take(hit, [f]);
   for (const repoPath of changed) {
     if (!repoPath.startsWith("web/")) continue;
     const f = repoPath.slice(4);
@@ -457,36 +468,11 @@ export function summary(r) {
   return lines.join("\n") + "\n";
 }
 
-// Shadow check: which failing specs the picked set would have missed.
-export function compare(selection, resultsDir) {
-  const failed = new Set();
-  for (const f of fs.existsSync(resultsDir) ? fs.readdirSync(resultsDir) : []) {
-    if (!f.endsWith(".json")) continue;
-    const j = JSON.parse(fs.readFileSync(path.join(resultsDir, f), "utf8"));
-    for (const t of j.testResults ?? [])
-      if (t.status === "failed") failed.add(/(?:^|\/)web\/(src\/.*)$/.exec(t.name)?.[1] ?? t.name);
-  }
-  const pickedSet = new Set(selection.specs);
-  const outside = selection.mode === "picked" ? [...failed].filter((s) => !pickedSet.has(s)) : [];
-  const head =
-    selection.mode === "picked"
-      ? `picked ${selection.specs.length} of ${selection.total}`
-      : `selector chose ${selection.mode} (${selection.reason})`;
-  const setupNote = selection.setupHits
-    ? `; ${selection.setupHits} changed files loaded by setupTests`
-    : "";
-  return `### UI test selection (shadow)\n\n${head}${setupNote}; ${failed.size} failing specs; failures outside picked set: ${outside.length ? outside.map((s) => `\`${s}\``).join(", ") : "none"}\n`;
-}
-
 function main(argv) {
   const opt = (name, dflt) => (argv.includes(name) ? argv[argv.indexOf(name) + 1] : dflt);
   const summaryFile = opt("--summary", process.env.GITHUB_STEP_SUMMARY);
   const emit = (md) =>
     summaryFile ? fs.appendFileSync(summaryFile, md) : process.stdout.write(md);
-  if (argv.includes("--compare")) {
-    const i = argv.indexOf("--compare");
-    return emit(compare(JSON.parse(fs.readFileSync(argv[i + 1], "utf8")), argv[i + 2]));
-  }
   const repo = gitText(process.cwd(), ["rev-parse", "--show-toplevel"]).trim();
   const head = opt("--head", "HEAD");
   const out = opt("--out");
