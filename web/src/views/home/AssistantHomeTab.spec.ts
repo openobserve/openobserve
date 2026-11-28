@@ -58,6 +58,27 @@ vi.mock("@/composables/assistant", () => ({
     return { rows: { value: [] }, active: { value: 0 }, cap: { value: 3 } };
   },
 }));
+// Packs stay off unless a spec turns them on; the offer is a double whose button asks with a chip.
+const packs = vi.hoisted(() => ({ enabled: false }));
+vi.mock("@/constants/starterPacks", () => ({
+  get STARTER_PACKS_ENABLED() {
+    return packs.enabled;
+  },
+}));
+vi.mock("@/components/starterPacks/StarterPackCatalogGate.vue", () => ({
+  __esModule: true,
+  default: { name: "StarterPackCatalogGate", props: ["org"], template: "<div><slot /></div>" },
+}));
+vi.mock("@/components/starterPacks/StarterPackOffer.vue", () => ({
+  __esModule: true,
+  default: {
+    name: "StarterPackOffer",
+    props: ["org", "variant"],
+    emits: ["ask"],
+    template:
+      "<button data-test=\"pack-offer-stub\" :data-variant=\"variant\" @click=\"$emit('ask', 'Which packs?', { id: 'starter-pack-digest' })\" />",
+  },
+}));
 vi.mock("@/services/rca_runs_org", () => ({ listOrgRcaRuns: mocks.listOrgRcaRuns }));
 vi.mock("vue-router", () => ({
   useRoute: () => ({ query: mocks.query }),
@@ -69,7 +90,7 @@ vi.mock("@/components/ai-assistant/welcome/AssistantLauncher.vue", () => ({
     props: ["pageRange"],
     methods: {
       focusAsk: () => mocks.focusAsk(),
-      fill: (prompt: string) => mocks.fill(prompt),
+      fill: (...args: unknown[]) => mocks.fill(...args),
       send: (prompt: string) => mocks.send(prompt),
     },
     template: '<div data-test="launcher-stub" />',
@@ -403,5 +424,21 @@ describe("AssistantHomeTab", () => {
     host.vm.shown = true;
     await nextTick();
     expect(greeting().join(" ")).not.toContain("animate-");
+  });
+
+  it("hands the pack question and its digest chip to the Ask box", async () => {
+    packs.enabled = true;
+    try {
+      const wrapper = mountTab();
+      await flushPromises();
+      const offer = wrapper.get('[data-test="pack-offer-stub"]');
+      expect(offer.attributes("data-variant")).toBe("roomy");
+      await offer.trigger("click");
+      expect(mocks.fill).toHaveBeenCalledWith("Which packs?", undefined, [
+        { id: "starter-pack-digest" },
+      ]);
+    } finally {
+      packs.enabled = false;
+    }
   });
 });

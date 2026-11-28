@@ -82,6 +82,7 @@ import Draft from "~icons/material-symbols/draft-outline";
 import DriveFileMove from "~icons/material-symbols/drive-file-move-outline";
 import ExpandLess from "~icons/material-symbols/expand-less";
 import Inventory2 from "~icons/material-symbols/inventory-2-outline";
+import Package2 from "~icons/material-symbols/package-2";
 import LightMode from "~icons/material-symbols/light-mode-outline";
 import Schema from "~icons/material-symbols/schema-outline";
 import Wifi from "~icons/material-symbols/wifi";
@@ -123,6 +124,7 @@ import Tune from "~icons/material-symbols/tune";
 import Visibility from "~icons/material-symbols/visibility-outline";
 import VisibilityOff from "~icons/material-symbols/visibility-off-outline";
 import Warning from "~icons/material-symbols/warning-outline";
+import WarningFilled from "~icons/material-symbols/warning";
 import Workspaces from "~icons/material-symbols/workspaces-outline";
 import WorkspacePremium from "~icons/material-symbols/workspace-premium-outline";
 import UnfoldLess from "~icons/material-symbols/unfold-less";
@@ -292,6 +294,8 @@ import SaveIcon from "~icons/material-symbols/save-outline";
 import SavedSearchIcon from "~icons/material-symbols/saved-search";
 import SearchOffIcon from "~icons/material-symbols/search-off";
 import SensorsOff from "~icons/material-symbols/sensors-off-outline";
+import Sensors from "~icons/material-symbols/sensors";
+import NotificationsOff from "~icons/material-symbols/notifications-off-outline";
 import NotificationsPaused from "~icons/material-symbols/notifications-paused-outline";
 import RepeatIcon from "~icons/material-symbols/repeat";
 import AddCommentIcon from "~icons/material-symbols/add-comment-outline";
@@ -469,6 +473,7 @@ export const iconRegistry = {
   "drive-file-move": DriveFileMove,
   "expand-less": ExpandLess,
   "inventory-2": Inventory2,
+  "package-2": Package2,
   "light-mode": LightMode,
   schema: Schema,
   wifi: Wifi,
@@ -511,6 +516,7 @@ export const iconRegistry = {
   visibility: Visibility,
   "visibility-off": VisibilityOff,
   warning: Warning,
+  "warning-filled": WarningFilled,
   workspaces: Workspaces,
   "workspace-premium": WorkspacePremium,
   "unfold-less": UnfoldLess,
@@ -791,6 +797,8 @@ export const iconRegistry = {
   "auto-fix-high": AutoFixHighIcon,
   "remove-circle-outline": RemoveCircleOutlineIcon,
   "push-pin": PushPinIcon,
+  sensors: Sensors,
+  "notifications-off": NotificationsOff,
 } as const satisfies Record<string, Component>;
 
 export type IconName = keyof typeof iconRegistry;

@@ -37,7 +37,11 @@ import {
 import { readEditorDraft, writeEditorDraft } from "@/utils/drafts/editorDraftStore";
 import { stopSessionServices } from "@/utils/sessionServices";
 import { invalidateLoginData } from "@/utils/zincutils";
-import { signOutDraftsToConfirm, signOutThroughLeaveGuards } from "./signOutFlow";
+import {
+  endSignedInSession,
+  signOutDraftsToConfirm,
+  signOutThroughLeaveGuards,
+} from "./signOutFlow";
 
 vi.mock("@/utils/sessionServices", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/utils/sessionServices")>()),
@@ -68,6 +72,23 @@ const makeRouter = () =>
 const makeStore = () => ({
   state: { userInfo: { email }, zoConfig: { rum: { enabled: true } } },
   dispatch: vi.fn(),
+});
+
+describe("endSignedInSession", () => {
+  afterEach(() => vi.clearAllMocks());
+
+  it("removes every starter pack key this browser stored, and nothing else", () => {
+    localStorage.setItem(`o2.starterPacks.browserMatches.org.${email}`, "{}");
+    localStorage.setItem(`o2.starterPacks.browserMatches.other.${email}`, "{}");
+    localStorage.setItem("o2.unrelated", "1");
+
+    endSignedInSession(makeStore());
+
+    const keys = Object.keys(localStorage);
+    expect(keys.filter((key) => key.startsWith("o2.starterPacks."))).toEqual([]);
+    expect(localStorage.getItem("o2.unrelated")).toBe("1");
+    localStorage.removeItem("o2.unrelated");
+  });
 });
 
 describe("signOutThroughLeaveGuards", () => {

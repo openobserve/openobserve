@@ -14,7 +14,7 @@
         "label": "Host",
         "query_data": {
           "stream_type": "metrics",
-          "stream": "system_memory_usage",
+          "stream": "system_cpu_time",
           "field": "host_name",
           "max_record_size": 100,
           "filter": []

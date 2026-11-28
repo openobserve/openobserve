@@ -700,6 +700,7 @@
       "cipherKeys": "加密金鑰",
       "announcementBanners": "公告橫幅",
       "regexPatterns": "正規表示式模式",
+      "keyValues": "鍵值",
       "evalJobs": "線上評估作業",
       "billingGroup": "計費群組",
       "syntheticChecks": "合成監控檢查",
@@ -757,6 +758,7 @@
       "cipherKeys": "加密金鑰",
       "announcementBanners": "公告橫幅",
       "regexPatterns": "正規表示式模式",
+      "keyValues": "鍵值",
       "unnamed": "此資源",
       "onCall": "值班",
       "incidentIntegrations": "事件整合",
@@ -15094,6 +15096,376 @@
     "countIncidentIntegration": "{count} 個事件整合 | {count} 個事件整合",
     "sectionOtherConsumers": "也用於",
     "countDowntime": "{count} 個停機 | {count} 個停機"
+  },
+  "starterPacks": {
+    "packs": {
+      "kubernetes": {
+        "title": "Kubernetes",
+        "fields": {
+          "k8s_cluster": "叢集名稱",
+          "k8s_namespace_name": "命名空間",
+          "k8s_pod_name": "Pod 名稱",
+          "k8s_node_name": "節點名稱",
+          "k8s_container_name": "容器名稱",
+          "kind": "事件類型",
+          "reason": "事件原因",
+          "message": "事件訊息"
+        },
+        "roles": {
+          "events": "Kubernetes 事件"
+        },
+        "flavours": {
+          "opentelemetry": "OpenTelemetry"
+        }
+      },
+      "hosts": {
+        "title": "主機"
+      },
+      "traces": {
+        "title": "追蹤 (APM)"
+      },
+      "postgresql": {
+        "title": "PostgreSQL"
+      },
+      "docker": {
+        "title": "Docker"
+      },
+      "aws-cloudwatch": {
+        "title": "AWS CloudWatch",
+        "roles": {
+          "metrics": "CloudWatch 指標"
+        }
+      },
+      "genai": {
+        "title": "AI (LLM 應用程式)"
+      },
+      "github": {
+        "title": "GitHub (Actions)",
+        "roles": {
+          "job_logs": "GitHub Actions 作業日誌"
+        }
+      },
+      "argocd": {
+        "title": "Argo CD"
+      }
+    },
+    "retryCheck": "再次嘗試套件檢查",
+    "countAlerts": "{count} 個警示 | {count} 個警示",
+    "scope": "警示範圍：{value}",
+    "scopeAll": "所有叢集",
+    "scopeSeen": "所有叢集 · 目前看到 {count} 個：{clusters}",
+    "noPermission": "您無法在此組織中設定此套件。請洽管理員。",
+    "askAdmin": "請管理員設定此項",
+    "busyBy": "{who} 正在設定此套件。請一分鐘後再回來查看。",
+    "busySomeone": "其他人正在設定此套件。請一分鐘後再回來查看。",
+    "busyYou": "您正在另一個分頁中設定此套件。請一分鐘後再回來查看。",
+    "startedBy": "{who} 已開始設定此套件。",
+    "startedBySomeone": "其他人已開始設定此套件。",
+    "card": {
+      "dashboards": "{count} 個儀表板 | {count} 個儀表板"
+    },
+    "manifest": {
+      "leftOut": "{count} 個項目未包含 | {count} 個項目未包含",
+      "tagEnterprise": "企業版",
+      "tagNeedsData": "需要資料",
+      "tagHaveIt": "已有資料",
+      "tagUnavailable": "無法使用",
+      "adapted": "已依您的資料調整"
+    },
+    "installDialog": {
+      "title": "已建立 {made} 個項目（共 {total} 個）",
+      "attention": "{title} · {count} 項需要您留意 | {title} · {count} 項需要您留意",
+      "failedReason": "無法建立。請重試。",
+      "kindDashboards": "儀表板",
+      "kindAlerts": "警示",
+      "rowFailed": "失敗 · {name}"
+    },
+    "home": {
+      "label": "入門套件",
+      "error": "無法檢查您的資料以比對套件",
+      "fromClusters": "來自 {clusters}",
+      "moreStreams": "+{count} 個串流 | +{count} 個串流",
+      "moreStreamsLabel": "更多符合的串流",
+      "interrupted": "{title} 設定中途停止 · 已完成 {made}/{total}",
+      "startedBy": "{who} 開始設定 {title}。",
+      "startedBySomeone": "其他人開始設定 {title}。",
+      "busyBy": "{who} 正在設定 {title}。",
+      "busySomeone": "其他人正在設定 {title}。",
+      "busyYou": "您正在另一個分頁設定 {title}。",
+      "askAdminLine": "入門套件符合您的資料。請管理員新增這些套件。",
+      "noAccessLine": "您無權在此組織使用入門套件。請聯絡管理員。",
+      "heroTitle": "資料已即時更新。約一分鐘即可設定現成的儀表板與警示",
+      "heroLead": "來自 {count} 個符合您資料的套件 | 來自 {count} 個符合您資料的套件",
+      "readyToAdd": "可新增",
+      "clusterKind": "叢集",
+      "connected": "已連線",
+      "moreClusters": "+{count} 個叢集 | +{count} 個叢集",
+      "railClusters": "{count} 個叢集 | {count} 個叢集",
+      "railCounts": "{clusters} · {streams}",
+      "streamsUses": "此套件使用的串流 · {count}",
+      "moreStreamsChip": "+{count} 個",
+      "streamTypeLogs": "日誌",
+      "streamTypeMetrics": "指標",
+      "streamTypeTraces": "追蹤",
+      "reviewSetUp": "檢視套件",
+      "reviewSetUpLabel": "檢視 {title} 套件",
+      "bestStart": "最佳起點",
+      "cards": {
+        "andMore": "{list} 以及另外 {count} 個",
+        "panels": "{count} 個面板 | {count} 個面板",
+        "kubernetes": {
+          "dashboards": {
+            "template": "{title}：{panels}，適用於 {clusters}。 | {title}：{panels}，適用於 {clusters} 個叢集。",
+            "fallback": "{title}：每個節點、Pod 與工作負載。"
+          },
+          "alerts": {
+            "template": "{alert_names}。對每個叢集觸發（{clusters}）。在您啟用前保持關閉。",
+            "fallback": "{alert_names}。對每個叢集觸發。在您啟用前保持關閉。",
+            "plain": "對每個叢集觸發。在您啟用前保持關閉。"
+          },
+          "savedViews": {
+            "template": "Kubernetes 事件：{stream} 中的每個事件，可從日誌一鍵開啟。",
+            "fallback": "Kubernetes 事件，可從日誌一鍵開啟。"
+          }
+        },
+        "hosts": {
+          "dashboards": {
+            "template": "主機指標：每台主機的 CPU、記憶體與磁碟。"
+          },
+          "alerts": {
+            "template": "{alert_names}。對每台主機觸發。在您啟用前保持關閉。",
+            "fallback": "對每台主機觸發。在您啟用前保持關閉。"
+          }
+        },
+        "default": {
+          "dashboards": {
+            "template": "{title}：{panels}，適用於您的資料。",
+            "fallback": "{title}，專為您的串流打造。"
+          },
+          "alerts": {
+            "template": "{alert_names}。會在您所有符合的資料上觸發。在您啟用前保持關閉。",
+            "fallback": "會在您所有符合的資料上觸發。在您啟用前保持關閉。"
+          },
+          "savedViews": {
+            "template": "{stream} 在日誌中，一鍵即可前往。",
+            "fallback": "從日誌一鍵前往。"
+          }
+        }
+      },
+      "previewFailed": "無法載入此入門套件設定的內容。請檢閱後再試一次。",
+      "nothingFitsYet": "此入門套件目前尚無項目符合您的資料。資料到達後，其項目會顯示在這裡。"
+    },
+    "whatGetsCreated": {
+      "subtitle": "{title} 入門套件",
+      "subtitleScoped": "{title} 入門套件 · 為 {scope} 打造",
+      "savedIn": "已儲存於資料夾 {folder}",
+      "skippedNote": "{count} 個項目已略過 · 保留您現有的項目 | {count} 個項目已略過 · 保留您現有的項目",
+      "nameInUse": "{name} 已存在 · 保留您的版本",
+      "skipped": "已略過",
+      "notSeenYet": "尚未看到",
+      "footprint": "涵蓋範圍",
+      "reachStarted": "背景查詢：每個已啟動的警示會依各自的排程執行",
+      "reachStartedScoped": "警示範圍：{scope} · 背景查詢：每個已啟動的警示會依各自的排程執行",
+      "selectGroup": "全選 {group}",
+      "selectRow": "選取 {name}"
+    },
+    "drawer": {
+      "packTitle": "{title} 套件",
+      "view": "Kubernetes 檢視",
+      "viewPath": "基礎設施 › Kubernetes",
+      "dashboard": "{title} 儀表板",
+      "dashboardNote": "設定後開啟",
+      "panelsFit": "{count} 個面板符合您的資料。設定後開啟。 | {count} 個面板符合您的資料。設定後開啟。",
+      "alerts": "警示，在您啟用前保持關閉",
+      "savedViews": "日誌中的儲存檢視",
+      "savedViewsNote": "與此組織中的所有人共用",
+      "folder": "資料夾",
+      "folderValue": "{name}（入門套件）",
+      "reach": "背景查詢：目前無",
+      "reachScoped": "警示範圍：{scope} · 背景查詢：目前無",
+      "notIncluded": "未包含",
+      "reasonAlreadyHave": "{name}：您已有此項目",
+      "reasonNoData": "{name}：尚未看到其資料",
+      "reasonUnavailable": "{name}：目前不在資源庫中",
+      "reasonNeedsPlan": "{name}：需要 Enterprise 方案",
+      "source": "取自 {host} 的資源庫。此版本內建的套件可離線使用。",
+      "sourceOffline": "無法連線到 {host}。使用此版本內建的套件，該套件可離線使用。",
+      "nothingToCreate": "您已擁有此套件中的所有項目",
+      "openDashboard": "開啟儀表板",
+      "error": "無法載入此套件建立的內容",
+      "reasonNoFlavour": "{name}：尚不支援您的指標名稱",
+      "loadingFit": "正在檢查哪些項目符合您的資料",
+      "noteForbidden": "{title} · 您沒有權限設定此套件",
+      "setUp": "設定",
+      "allExist": "您已擁有此套件中全部 {count} 個項目。現有警示會保留其設定。",
+      "continue": "繼續",
+      "setUpCount": "設定 {count} 個項目 | 設定 {count} 個項目",
+      "ordinaryNote": "會新增一般儀表板、警示和檢視，並列於套件頁面上。請在各自的頁面編輯或刪除。",
+      "alertsMetaLine": "{count} · {severity}"
+    },
+    "progress": {
+      "title": "正在設定 {title} 監控",
+      "summary": "已建立 {made}，共 {total} 個",
+      "created": "已建立",
+      "creating": "建立中",
+      "waiting": "等待中",
+      "rowAlerts": "警示 {made}/{total}",
+      "rowViews": "已儲存檢視 {made}/{total}",
+      "rowDashboards": "儀表板 {made}/{total}",
+      "retry": "重試 {count} 個項目 | 重試 {count} 個項目",
+      "finish": "完成",
+      "interrupted": "設定中斷 · 已完成 {made}/{total}",
+      "installError": "設定未完成。請再試一次。",
+      "comeBack": "已建立 {made}/{total} · 您可以關閉此視窗並繼續工作。可從頁首的入門包再次找到。",
+      "alertsOnTo": "建立中 · 已啟用，傳送至 {destination}",
+      "emailMe": "寄電子郵件給我（{email}）",
+      "creatingOn": "建立中 · 已啟用"
+    },
+    "severity": {
+      "critical": "嚴重",
+      "warning": "警告",
+      "info": "資訊"
+    },
+    "adapted": {
+      "someField": "某個欄位",
+      "flavour": "使用 {name} 版本",
+      "change": "變更",
+      "streams": "串流",
+      "fields": "欄位",
+      "version": "版本",
+      "streamCount": "{count} 個串流 | {count} 個串流",
+      "fieldCount": "{count} 個欄位 | {count} 個欄位",
+      "matchedBoth": "{streams} 和 {fields} 已對應到您的資料",
+      "matchedOne": "{what} 已對應到您的資料",
+      "needsChoiceCount": "{count} 個需要您選擇 | {count} 個需要您選擇",
+      "notFoundCount": "找不到 {count} 個",
+      "matchedCount": "已對應 {count} 個",
+      "whichStream": "{what} 是哪個串流？",
+      "lookRight": "{count} 個看起來正確 | {count} 個看起來正確",
+      "noneFound": "找不到 {what}",
+      "showMore": "再顯示 {count} 個",
+      "needsChoice": "需要選擇",
+      "severalMatch": "{count} 個串流看起來像 {what}",
+      "oneMatch": "{stream} 看起來像 {what}",
+      "sharedAsk": "哪些記錄是 {what}？",
+      "choose": "選擇",
+      "dialogFields": "{matched}/{total} 個欄位",
+      "dialogUse": "使用 {stream}",
+      "dialogUseAll": "使用全部 {count} 個",
+      "dialogUseChecked": "使用這 {count} 個",
+      "dialogAllNote": "全部：儀表板會取得串流選擇器，而每個讀取此項目的警示會針對每個串流各設定一次。",
+      "dialogPickFive": "最多可選 {count} 個串流。",
+      "dialogPickStream": "選擇串流",
+      "dialogPickPlaceholder": "選擇串流",
+      "dialogFiltersOn": "從 {stream} 讀取，僅限 {field} 為 {value} 的記錄",
+      "dialogNoValues": "過去 24 小時內找不到此欄位的任何值。",
+      "dialogSend": "或將它們傳送到 {stream}：在您的收集器中設定此標頭",
+      "dialogFieldTitle": "選擇 {what} 的欄位",
+      "dialogFieldLabel": "{stream} 中的欄位",
+      "values": "已見：{values}",
+      "or": "或",
+      "filterTitle": "新增篩選條件，讓套件只讀取 {what}",
+      "showFewer": "顯示較少"
+    },
+    "matchCheck": {
+      "checked": "已於 {when} 檢查",
+      "checkedAt": "已於 {time} 檢查（您的本地時間）",
+      "justNow": "剛剛",
+      "minutesAgo": "{count} 分鐘前",
+      "hoursAgo": "{count} 小時前",
+      "daysAgo": "{count} 天前"
+    },
+    "headerChip": {
+      "label": "入門套件",
+      "ariaLabel": "入門套件，有 {count} 個符合您的資料 | 入門套件，有 {count} 個符合您的資料",
+      "progress": "已建立 {made} / {total}",
+      "ariaLabelRunning": "入門套件，正在設定 {made} / {total}"
+    },
+    "guide": {
+      "rowSavedViews": "{count} 個已儲存檢視 | {count} 個已儲存檢視"
+    },
+    "stepper": {
+      "content": "選擇內容",
+      "setup": "正在設定",
+      "settingUp": "正在設定…",
+      "interrupted": "已中斷",
+      "ready": "就緒",
+      "noteRunning": "正在設定 · 已建立 {made} / {total}",
+      "noteAlertsOn": "已建立 {made} / {total} · {count} 個警示已開啟 | 已建立 {made} / {total} · {count} 個警示已開啟",
+      "noteAlertsOff": "已建立 {made} / {total} · 警示已關閉",
+      "noteAlreadyHere": "已建立 {made} / {total} · {count} 個已存在"
+    },
+    "alertStep": {
+      "turnOn": "開啟 {count} 個套件警示 | 開啟 {count} 個套件警示",
+      "sendTo": "傳送至",
+      "sendToEmail": "傳送至：{icon} 寄電子郵件給我 — {email}",
+      "emailCreateNote": "此組織尚無目標。設定會為您新增一個電子郵件目標（或重複使用僅傳送給您的目標）。",
+      "noDestination": "尚無目標。請在警示 → 目標下新增一個。",
+      "destinationsFailed": "無法載入目標，因此「傳送至」已關閉。之後可在警示 → 目標下為警示指定目標。",
+      "destinations": "此組織有 {count} 個目標 | 此組織有 {count} 個目標",
+      "chooseDestination": "選擇目標",
+      "pickDestination": "為「傳送至」選擇目標，或取消勾選"
+    },
+    "ready": {
+      "title": "{title} 監控已就緒",
+      "emailFailed": "無法建立您的電子郵件目標，因此警示已新增但處於關閉狀態。",
+      "emailForbidden": "您無法在此組織中新增警示目標，因此未建立您的電子郵件目標，警示已新增但處於關閉狀態。"
+    },
+    "popup": {
+      "title": "入門套件",
+      "subtitle": "{count} 個套件符合您已傳送的資料 | {count} 個套件符合您已傳送的資料",
+      "subtitleAllSetUp": "所有符合您資料的套件都已設定完成",
+      "subtitleNone": "尚無符合的套件",
+      "items": "{count} 個項目 | {count} 個項目",
+      "setUpAgo": "已於 {when} 設定",
+      "stopped": "設定中途停止",
+      "whatGetsCreated": "將建立的內容",
+      "tileDashboards": "{count} 個儀表板 | {count} 個儀表板",
+      "tileAlerts": "{count} 個警示 | {count} 個警示",
+      "tileSavedViews": "{count} 個已儲存檢視 | {count} 個已儲存檢視",
+      "noneDashboards": "儀表板",
+      "noneAlerts": "警示",
+      "noneSavedViews": "已儲存檢視",
+      "noneInPack": "此套件中沒有",
+      "sevCritical": "{count} 個嚴重",
+      "sevWarning": "{count} 個警告",
+      "sevInfo": "{count} 個資訊",
+      "chooseNext": "選擇要在下一步建立的項目",
+      "reviewSetUp": "檢閱套件",
+      "viewPack": "檢視套件",
+      "checkAgain": "重新檢查",
+      "checkFailed": "無法檢查。請再試一次",
+      "emptyTitle": "尚無符合你資料的套件",
+      "emptyText": "當 OpenObserve 偵測到來自已知來源的資料時，套件就會出現，例如 Kubernetes、主機、Docker、PostgreSQL 或 AWS。請傳送資料，然後再次檢查。",
+      "back": "返回",
+      "backToPacks": "返回套件",
+      "keepsGoing": "你可以關閉此視窗。設定會繼續進行。"
+    },
+    "viewPack": {
+      "open": "開啟",
+      "openLabel": "開啟 {name}",
+      "dashboard": "儀表板",
+      "dashboards": "儀表板",
+      "dashboardsMeta": "{count} 個儀表板 | {count} 個儀表板",
+      "alerts": "警示",
+      "alertsMeta": "{count} · {on} 開啟 · {silent} 靜默",
+      "alertsMetaFailed": "{count} · {on} 開啟 · {silent} 靜默 · {failed} 未建立",
+      "savedView": "已儲存檢視 · 與此組織中的所有人共用",
+      "savedViews": "已儲存檢視",
+      "savedViewsMeta": "{count} 個已儲存檢視 · 與此組織中的所有人共用 | {count} 個已儲存檢視 · 與此組織中的所有人共用",
+      "on": "開啟",
+      "silent": "靜默",
+      "notCreated": "未建立",
+      "showMore": "再顯示 {count} 個",
+      "showLess": "顯示較少",
+      "ordinary": "這些是一般的警示、儀表板與檢視。請在各自的頁面編輯或刪除。",
+      "setUpByYou": "由你設定 {when}",
+      "setUpBy": "由 {who} 設定 {when}",
+      "setUpWhen": "設定於 {when}",
+      "partialTitle": "{title} 監控已設定完成，有 {count} 個項目未建立 | {title} 監控已設定完成，有 {count} 個項目未建立",
+      "partialNote": "其餘項目已就緒。請在下方重試單一項目，或全部重試。",
+      "partialSubtitle": "已建立 {made}／{total} · {failed} 未建立"
+    }
   },
   "alert_library": {
     "header": "警示庫",

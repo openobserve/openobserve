@@ -398,6 +398,8 @@ export interface RichCardInput {
 
 export interface RichCardContent {
   provider: RichCardProvider;
+  /** The status bar offers this source's starter pack once data arrives. */
+  offersStarterPack?: boolean;
   steps: RichCardStep[];
   /**
    * Setup paths the user chooses between with a toggle above the steps (the

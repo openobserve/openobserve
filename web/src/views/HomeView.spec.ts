@@ -23,6 +23,37 @@ import { reactive } from "vue";
 // the panel's own layout rules are FirstDataPanel.spec's; here only HomeView's reading of them is pinned
 const panel = vi.hoisted(() => ({ layout: "none" as string }));
 
+const packs = vi.hoisted(() => ({
+  enabled: false,
+  offerShown: true,
+  offer: null as { value: boolean } | null,
+}));
+vi.mock("@/constants/starterPacks", () => ({
+  get STARTER_PACKS_ENABLED() {
+    return packs.enabled;
+  },
+}));
+vi.mock("@/components/starterPacks/StarterPackHomeSection.vue", async () => {
+  const {
+    defineComponent: define,
+    h: render,
+    onMounted: mounted,
+    ref: vueRef,
+  } = await import("vue");
+  return {
+    default: define({
+      name: "StarterPackHomeSection",
+      emits: ["ready"],
+      setup(_props, { emit }) {
+        mounted(() => {
+          packs.offer = vueRef(packs.offerShown);
+          emit("ready", { offerShown: packs.offer });
+        });
+        return () => render("div", { "data-test": "home-pack-section-stub" });
+      },
+    }),
+  };
+});
 vi.mock("@/components/ingestion/FirstDataPanel.vue", async () => {
   const { defineComponent: define, h: render } = await import("vue");
   const statusLine = define({
@@ -49,6 +80,15 @@ vi.mock("@/components/ingestion/FirstDataPanel.vue", async () => {
   };
 });
 vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
+const overviewData = vi.hoisted(() => ({
+  getOrgOverview: vi.fn(async () => ({
+    data: {
+      streams: { status: "ok", data: { total_streams: 9 } },
+      limits: { status: "ok", data: { used_today_gb: 1.2 } },
+    },
+  })),
+}));
+vi.mock("@/services/overview", () => ({ default: overviewData }));
 vi.mock("@/views/OverviewTab.vue", () => ({
   default: {
     name: "OverviewTab",
@@ -184,6 +224,9 @@ import { getManager, resetManager } from "@/lib/vue-shortcut-manager";
 import HomeView from "./HomeView.vue";
 import { HOME_RAIL_CLASS } from "./home/homeState";
 import { gt, raw } from "@/types/i18n";
+import { loadCatalogFixture } from "@/test/unit/helpers/starterPacksCatalog";
+
+loadCatalogFixture();
 
 const mountHome = () =>
   mount(HomeView, {
@@ -221,6 +264,12 @@ describe("HomeView", () => {
     config.isCloud = originalFlags.isCloud;
     localStorage.clear();
     vi.restoreAllMocks();
+  });
+
+  it("shows no pack card while the Starter Packs flag is off", async () => {
+    wrapper = mountHome();
+    await flushPromises();
+    expect(has("home-pack-section")).toBe(false);
   });
 
   describe("a pinned home dashboard", () => {
@@ -356,6 +405,52 @@ describe("HomeView", () => {
 
       expect(tab()).toBe("overview");
       expect(assistantDoor.open).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("while the Starter Packs offer shows", () => {
+    beforeEach(() => {
+      packs.enabled = true;
+      packs.offerShown = true;
+    });
+    afterEach(() => {
+      packs.enabled = false;
+    });
+    const setOffer = async (value: boolean) => {
+      packs.offer!.value = value;
+      await flushPromises();
+    };
+    const panelShown = () =>
+      !wrapper.get('[data-test="home-overview-panel"]').attributes("style")?.includes("none");
+
+    for (const flag of [false, true]) {
+      it(`hides the Overview panel under the Starter Packs section (empty-data flag ${flag})`, async () => {
+        setFlag(flag);
+        wrapper = mountHome();
+        await flushPromises();
+        expect(has("home-pack-section-stub")).toBe(true);
+        expect(panelShown()).toBe(false);
+        expect(has("overview-tab-stub")).toBe(true);
+        await setOffer(false);
+        expect(panelShown()).toBe(true);
+      });
+    }
+
+    it("shows no stream totals line under the strip while Overview is hidden", async () => {
+      setFlag(false);
+      wrapper = mountHome();
+      await flushPromises();
+      expect(panelShown()).toBe(false);
+      expect(has("home-stream-totals")).toBe(false);
+    });
+
+    it("keeps the Overview panel and no stream totals when the offer is not shown", async () => {
+      packs.offerShown = false;
+      setFlag(false);
+      wrapper = mountHome();
+      await flushPromises();
+      expect(panelShown()).toBe(true);
+      expect(has("home-stream-totals")).toBe(false);
     });
   });
 

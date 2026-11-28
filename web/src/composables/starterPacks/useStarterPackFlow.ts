@@ -1,0 +1,500 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+import { computed, onScopeDispose, ref, shallowRef, watch } from "vue";
+import { useRouter, type RouteLocationRaw } from "vue-router";
+import { useStore } from "vuex";
+
+import { useAlertLibrary } from "@/composables/alerts/useAlertLibrary";
+import { readQuery } from "@/composables/query/readQuery";
+import { refreshOrgResources } from "@/composables/useOrgResources";
+import { alertsByTagsQuery } from "@/services/alerts.queries";
+import { dashboardsByFolderQuery } from "@/services/dashboards.queries";
+import { featureState } from "@/utils/featureGate";
+
+import {
+  StarterPackBusyError,
+  StarterPackStaleError,
+  copyName,
+  copyParts,
+  leftOutIds,
+  type PackChoices,
+  type PackEmailFailure,
+  type PackInstallRecord,
+  type PackPreview,
+  type PackRecordItem,
+  type StarterPack,
+} from "./types";
+import { adaptSavedView } from "./packAdapt";
+import { RESERVED_FIELD } from "./packBinding";
+import { isRunning } from "./useInstallRecords";
+import { forgetPackCatalog } from "./usePackCatalog";
+import { forgetPackGate } from "./usePackGate";
+import { useStarterPacks } from "./useStarterPacks";
+
+const CLOCK_TICK_MS = 60_000;
+
+export type PackPreviewState = "idle" | "loading" | "ready" | "error" | "forbidden";
+
+/** What the user changed in the plan before setup. */
+export interface PackInstallChoice {
+  /** Item ids the user unticked, on top of the ones the preview leaves out. */
+  exclude?: string[];
+  enableAlerts?: boolean;
+  /** Alert destination the created alerts route to, whether they start on or off. */
+  destination?: string;
+  emailFailure?: PackEmailFailure;
+  /** The stopped setup a Finish continues. */
+  resumeOf?: string;
+}
+
+const isForbidden = (error: any): boolean => error?.response?.status === 403;
+const isRefusedRead = (error: any): boolean =>
+  isForbidden(error) && error?.config?.method === "get";
+
+const countsAsItem = (item: PackRecordItem) => item.kind !== "folder";
+const notSkipped = (item: PackRecordItem) => item.status !== "skipped";
+
+// Anyone who can set up may finish a stopped setup; the user's own unfinished one shows first.
+const newestRecord = (rows: PackInstallRecord[], me: string): PackInstallRecord | null => {
+  const unfinished = rows.filter((row) => row.status !== "complete");
+  const resumable =
+    unfinished.find(({ installedBy }) => (installedBy ?? "") === me) ?? unfinished[0];
+  if (resumable) return resumable;
+  return [...rows].sort((a, b) => (b.installedAt ?? 0) - (a.installedAt ?? 0))[0] ?? null;
+};
+
+/** One surface's view of a pack: its install, its preview, and the actions on both. */
+export function useStarterPackFlow(org: string, pack: StarterPack) {
+  const store = useStore();
+  const router = useRouter();
+  const { installPack, previewPack, listInstalls } = useStarterPacks(org);
+  const { manifest: libraryManifest } = useAlertLibrary();
+
+  const myEmail = (): string => store.state.userInfo?.email ?? "";
+  const isMe = (email: string): boolean => !!email && email === myEmail();
+  const record = shallowRef<PackInstallRecord | null>(null);
+  const loaded = ref(false);
+  const loadFailed = ref(false);
+  const running = ref(false);
+  /** The last run got its claim; a run still without one shows nothing as started. */
+  const claimed = ref(false);
+  const started = computed(() => running.value && claimed.value);
+  const installFailed = ref(false);
+  const forbidden = ref(false);
+  /** Who started the setup that is already running, or "" when its record names no one. */
+  const busyBy = ref<string | null>(null);
+  const preview = shallowRef<PackPreview | null>(null);
+  const startPlan = shallowRef<PackRecordItem[]>([]);
+  const previewState = ref<PackPreviewState>("idle");
+  const enabledAlertIds = shallowRef<Set<string>>(new Set());
+  const goneDashboards = shallowRef<Set<string>>(new Set());
+  const isGone = ({ kind, id }: PackRecordItem) =>
+    kind === "dashboard" && !!id && goneDashboards.value.has(id);
+  let previewRun = 0;
+  const choices = ref<PackChoices>({ streams: {}, fields: {} });
+  const nowUs = ref(Date.now() * 1000);
+  const clock = setInterval(() => (nowUs.value = Date.now() * 1000), CLOCK_TICK_MS);
+  onScopeDispose(() => clearInterval(clock));
+
+  const licensed = computed(
+    () =>
+      !!pack.nativeView &&
+      featureState(store.state.zoConfig?.features, pack.nativeView.feature) === "enabled",
+  );
+
+  // A failed folder stops the run, so what it left pending failed with it and Retry redoes both.
+  const items = computed(() => {
+    // A fresh record has no items until its first write, so the run counts the plan it started from.
+    const fresh = running.value && !record.value?.items.length;
+    const all = fresh ? startPlan.value : (record.value?.items ?? []);
+    const blocked =
+      !started.value && all.some((item) => !countsAsItem(item) && item.status === "failed");
+    return all
+      .filter((item) => countsAsItem(item) && !isGone(item))
+      .map((item) =>
+        blocked && item.status === "pending" ? { ...item, status: "failed" as const } : item,
+      );
+  });
+  const made = computed(() => items.value.filter(({ status }) => status === "created"));
+  // A folder that blocked no item is the only failure left to show and retry.
+  const failed = computed(() => {
+    const rows = items.value.filter(({ status }) => status === "failed");
+    if (rows.length || started.value) return rows;
+    return (record.value?.items ?? []).filter(
+      (item) => !countsAsItem(item) && item.status === "failed",
+    );
+  });
+  const skipped = computed(() => items.value.filter(({ status }) => status === "skipped"));
+  const toCreate = computed(() =>
+    items.value.filter((item) => item.status !== "existing" && notSkipped(item)),
+  );
+  const liveByClock = computed(
+    () => !running.value && !!record.value && isRunning(record.value, nowUs.value),
+  );
+  const recheck = ref(false);
+  // Until the re-read lands, a quiet run still reads as running, so Finish never shows on a stale copy.
+  const runningElsewhere = computed(() => liveByClock.value || recheck.value);
+  const interrupted = computed(
+    () =>
+      !started.value &&
+      !!record.value &&
+      record.value.status !== "complete" &&
+      !runningElsewhere.value,
+  );
+  /** Who started the setup another tab or user is running now, or "" when its record names no one. */
+  const runningBy = computed(() =>
+    runningElsewhere.value ? (record.value?.installedBy ?? "") : null,
+  );
+  /** Who started the unfinished setup when it was not this user, or "" when its record names no one. */
+  const interruptedBy = computed(() => {
+    const by = record.value?.installedBy ?? "";
+    return interrupted.value && by !== myEmail() ? by : null;
+  });
+  const installed = computed(() => record.value?.status === "complete");
+  const alertsTotal = computed(
+    () => items.value.filter(({ kind, status }) => kind === "alert" && status === "created").length,
+  );
+  const readAlertsOn = async () => {
+    const rows = await readQuery(alertsByTagsQuery(org, [`pack:${pack.id}`]), true);
+    enabledAlertIds.value = new Set(rows.filter((row) => row.enabled).map((row) => row.alert_id));
+  };
+
+  // A dashboard deleted by hand stays in the record, so each folder is listed to drop it.
+  const readGoneDashboards = async (shown: PackInstallRecord) => {
+    const recorded = shown.items.filter(
+      ({ kind, id, folderId }) => kind === "dashboard" && !!id && !!folderId,
+    );
+    const folders = [...new Set(recorded.map(({ folderId }) => folderId!))];
+    const listed = await Promise.all(
+      folders.map(async (folderId) => {
+        // An unread folder proves nothing, so its dashboards stay shown.
+        const rows = await readQuery(dashboardsByFolderQuery(org, folderId), true).catch(
+          () => null,
+        );
+        return [folderId, rows && new Set(rows.map((row) => row.dashboard_id))] as const;
+      }),
+    );
+    const present = new Map(listed);
+    goneDashboards.value = new Set(
+      recorded
+        .filter(({ id, folderId }) => {
+          const ids = present.get(folderId!);
+          return !!ids && !ids.has(id);
+        })
+        .map(({ id }) => id!),
+    );
+  };
+
+  const load = async () => {
+    loadFailed.value = false;
+    try {
+      const rows = await listInstalls(pack.id);
+      // A background tab's clock barely ticks, so a late one would misread these stamps.
+      nowUs.value = Date.now() * 1000;
+      record.value = newestRecord(rows, myEmail());
+      forbidden.value = false;
+      if (!rows.some(({ status }) => status === "installing" || status === "incomplete")) {
+        busyBy.value = null;
+      }
+      // The old set stays until the new one is read, so a reload never flashes a deleted dashboard.
+      if (record.value) {
+        await Promise.all([readAlertsOn(), readGoneDashboards(record.value)]);
+      } else goneDashboards.value = new Set();
+    } catch (error) {
+      // A retry cannot get past a refusal, so it reads as ask an admin, not as a failed load.
+      if (isForbidden(error)) forbidden.value = true;
+      else loadFailed.value = true;
+    }
+    loaded.value = true;
+  };
+
+  // A run that went quiet may have finished, so the record is read again before Finish shows.
+  watch(
+    liveByClock,
+    (live, was) => {
+      if (!was || live) return;
+      recheck.value = true;
+      void load().finally(() => (recheck.value = false));
+    },
+    { flush: "sync" },
+  );
+
+  const loadPreview = async () => {
+    previewRun += 1;
+    const run = previewRun;
+    previewState.value = "loading";
+    try {
+      const next = await previewPack(pack, choices.value);
+      if (run !== previewRun) return;
+      preview.value = next;
+      previewState.value = "ready";
+      forbidden.value = false;
+    } catch (error) {
+      if (run !== previewRun) return;
+      if (isForbidden(error)) forbidden.value = true;
+      previewState.value = isForbidden(error) ? "forbidden" : "error";
+    }
+  };
+
+  /** Records one answer; the next preview redoes the plan, so counts and rows stay one source. */
+  const chooseStream = (want: string, choice: PackChoices["streams"][string]) => {
+    choices.value = { ...choices.value, streams: { ...choices.value.streams, [want]: choice } };
+    return loadPreview();
+  };
+
+  /** One name means one meaning, so a change reaches every stream that has the column. */
+  const chooseField = (field: string, to: string) => {
+    if (to === RESERVED_FIELD) return Promise.resolve();
+    const fields = { ...choices.value.fields };
+    for (const { stream, from } of preview.value?.bindings ?? []) {
+      if (from === field && preview.value?.columns[stream]?.includes(to)) {
+        fields[`${stream}/${from}`] = to;
+      }
+    }
+    choices.value = { ...choices.value, fields };
+    return loadPreview();
+  };
+
+  // The preview may still be loading or have failed, so the pack's own names come before the id.
+  const packNames: Record<string, string> = Object.fromEntries([
+    ...(pack.bundledAlerts ?? []).map(({ entry }) => [entry.id, entry.title]),
+    ...pack.savedViews.map(({ id, name }) => [id, name]),
+    ...pack.dashboards.map(({ id, title }) => [id, title]),
+  ]);
+  // The preview fills the Library cache first, so its titles show before the rest of the plan.
+  const libraryTitle = (itemId: string): string | undefined =>
+    libraryManifest.value?.alerts.find(({ id }) => id === itemId)?.title;
+  const nameOf = (itemId: string): string => {
+    const known = preview.value?.names[itemId] ?? packNames[itemId] ?? libraryTitle(itemId);
+    const copy = copyParts(itemId);
+    if (known || !copy) return known ?? itemId;
+    return copyName(nameOf(copy.copyOf), copy.stream);
+  };
+
+  const planned = (kind: PackRecordItem["kind"]) =>
+    (preview.value?.items ?? []).filter((item) => item.kind === kind && item.status !== "existing");
+  // Null until the preview loads, since the raw pack counts items the data may not support.
+  const alertCount = computed(() => (preview.value ? planned("alert").length : null));
+  const dashboardCount = computed(() => (preview.value ? planned("dashboard").length : null));
+  const viewCount = computed(() => (preview.value ? planned("savedView").length : null));
+
+  const folderOf = (type: "alerts" | "dashboards") =>
+    record.value?.items.find((item) => item.kind === "folder" && item.itemId === type)?.id;
+
+  const alertsRoute = computed(() => ({
+    name: "alertList",
+    query: { org_identifier: org, folder: folderOf("alerts") },
+  }));
+
+  const dashboardsRoute = computed(() => ({
+    name: "dashboards",
+    query: { org_identifier: org, folder: folderOf("dashboards") },
+  }));
+
+  /** Where a created item opens; Logs has no saved-view link, so a view runs its search. */
+  const itemRoute = (item: PackRecordItem): RouteLocationRaw => {
+    if (item.kind === "alert") {
+      return {
+        name: "alertDetail",
+        params: { alert_id: item.id ?? "" },
+        query: { org_identifier: org, folder: item.folderId || "default" },
+      };
+    }
+    if (item.kind === "dashboard") {
+      return {
+        name: "viewDashboard",
+        query: { org_identifier: org, dashboard: item.id ?? "", folder: item.folderId ?? "" },
+      };
+    }
+    const view = pack.savedViews.find(({ id }) => id === item.itemId);
+    const stream = view
+      ? adaptSavedView(view.search, record.value?.repairs ?? []).data?.stream
+      : null;
+    return {
+      name: "logs",
+      query: {
+        org_identifier: org,
+        ...(stream?.selectedStream?.length
+          ? { stream_type: stream.streamType ?? "logs", stream: stream.selectedStream.join(",") }
+          : {}),
+      },
+    };
+  };
+
+  const isOpenable = (item: PackRecordItem) =>
+    item.kind === "dashboard" && !!item.id && !isGone(item);
+  // With nothing left to create there is no record, only the dashboard the preview found.
+  const dashboardItem = computed(
+    () => record.value?.items.find(isOpenable) ?? preview.value?.items.find(isOpenable),
+  );
+
+  /** The pack's first dashboard, so the user sees the result at once. */
+  const land = async () => {
+    const item = dashboardItem.value;
+    if (!item?.id) return;
+    const query = { org_identifier: org, dashboard: item.id, folder: item.folderId ?? "" };
+    await router.push({ name: "viewDashboard", query }).catch(() => {});
+  };
+
+  // Alerts made enabled are on without a re-read, so Home never calls them silent.
+  const trackEnabled = (next: PackInstallRecord) => {
+    const ids = next.items
+      .filter(({ kind, status, id }) => kind === "alert" && status === "created" && id)
+      .map(({ id }) => id!);
+    enabledAlertIds.value = new Set([...enabledAlertIds.value, ...ids]);
+  };
+
+  const install = async (folderName?: string, choice: PackInstallChoice = {}): Promise<boolean> => {
+    if (running.value) return false;
+    const {
+      exclude: unticked = [],
+      enableAlerts = false,
+      destination,
+      emailFailure,
+      resumeOf,
+    } = choice;
+    const shown = record.value;
+    running.value = true;
+    claimed.value = false;
+    installFailed.value = false;
+    forbidden.value = false;
+    busyBy.value = null;
+    try {
+      const plan = preview.value ?? (await previewPack(pack, choices.value));
+      const exclude = [...new Set([...leftOutIds(plan), ...unticked])];
+      startPlan.value = plan.items.filter(
+        (item) => !exclude.includes(item.itemId) && !exclude.includes(item.copyOf ?? item.itemId),
+      );
+      const done = await installPack(pack, {
+        exclude,
+        repairs: plan.repairs,
+        bindings: plan.bindings,
+        flavours: plan.flavours,
+        copies: plan.copies,
+        folderName,
+        enableAlerts,
+        destination,
+        emailFailure,
+        resumeOf,
+        onProgress: (next) => {
+          claimed.value = true;
+          record.value = { ...next, items: [...next.items] };
+          if (enableAlerts) trackEnabled(next);
+        },
+      });
+      record.value = { ...done, items: [...done.items] };
+      if (enableAlerts) trackEnabled(done);
+      // Alerts the lookup found keep their own state, so only the server knows which are on.
+      const tracked = enabledAlertIds.value;
+      await readAlertsOn().catch(() => {});
+      // The tag search trails a create, so keep the alerts this run just made on.
+      enabledAlertIds.value = new Set([...enabledAlertIds.value, ...tracked]);
+      return done.status === "complete";
+    } catch (error) {
+      if (error instanceof StarterPackStaleError) {
+        await load();
+        return false;
+      }
+      if (error instanceof StarterPackBusyError) {
+        // The record shown may be older than the run that refused this one.
+        await load();
+        busyBy.value = error.installedBy;
+        return false;
+      }
+      installFailed.value = !isForbidden(error);
+      if (!claimed.value || !record.value?.items.length) {
+        // A run with no plan may have withdrawn its claim, so only a reload says where it stands.
+        record.value = shown;
+        await load();
+      } else if (record.value.status === "installing") {
+        // This tab's run has ended, so its last progress must not read as a live run.
+        record.value = { ...record.value, status: "incomplete" };
+      }
+      // The access notice says a refused write; nothing else says a refused read.
+      if (isRefusedRead(error)) forbidden.value = true;
+      return false;
+    } finally {
+      running.value = false;
+      forgetPackCatalog(org);
+      forgetPackGate(org);
+      void refreshOrgResources(org);
+    }
+  };
+
+  const shownAs = (row: PackInstallRecord | null) =>
+    row ? [row.installId, row.status, row.runId].join(":") : "";
+
+  // Another tab or user may have moved the setup on since this view read it; then only refresh.
+  const stillAsShown = async (): Promise<boolean> => {
+    const before = shownAs(record.value);
+    await load();
+    return !loadFailed.value && shownAs(record.value) === before;
+  };
+
+  /** Finishes the interrupted install shown, the way it was asked for, even after a reload. */
+  const retry = async () => {
+    if (running.value || !(await stillAsShown())) return false;
+    const shown = record.value;
+    if (!shown || shown.status === "complete") return false;
+    const { enableAlerts, destination, emailFailure, installId } = shown;
+    return install(undefined, { enableAlerts, destination, emailFailure, resumeOf: installId });
+  };
+
+  return {
+    alertCount,
+    alertsRoute,
+    alertsTotal,
+    busyBy,
+    claimed,
+    chooseField,
+    chooseStream,
+    dashboardCount,
+    dashboardItem,
+    dashboardsRoute,
+    enabledAlertIds,
+    failed,
+    forbidden,
+    install,
+    installFailed,
+    installed,
+    interrupted,
+    interruptedBy,
+    isMe,
+    itemRoute,
+    items,
+    land,
+    licensed,
+    load,
+    loadFailed,
+    loadPreview,
+    loaded,
+    made,
+    nameOf,
+    org,
+    pack,
+    preview,
+    previewState,
+    record,
+    retry,
+    running,
+    runningBy,
+    skipped,
+    toCreate,
+    viewCount,
+  };
+}
+
+export type StarterPackFlow = ReturnType<typeof useStarterPackFlow>;

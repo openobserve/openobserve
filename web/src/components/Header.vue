@@ -179,6 +179,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       class="flex shrink-0 items-center justify-end gap-1 pe-3 max-xl:min-w-0 max-xl:shrink max-md:pe-1.5 xl:flex-1 xl:basis-0"
     >
+      <!-- keyed by org: the chip reads one org's browser copy -->
+      <StarterPackCatalogGate v-if="packsWanted" :org="store.state.selectedOrganization.identifier">
+        <StarterPackHeaderChip :key="store.state.selectedOrganization.identifier" class="me-1" />
+      </StarterPackCatalogGate>
       <!-- SAMPLE DATA: stays visible while the org holds sample data -->
       <SampleDataHeaderChip class="me-2" />
 
@@ -525,6 +529,11 @@ import { checkFeatureAccess } from "@/utils/enterpriseFeatures";
 import { readSlackOrgConfig } from "@/utils/slackSettings";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import SampleDataHeaderChip from "@/components/sampleData/SampleDataHeaderChip.vue";
+import StarterPackCatalogGate from "@/components/starterPacks/StarterPackCatalogGate.vue";
+import StarterPackHeaderChip from "@/components/starterPacks/StarterPackHeaderChip.vue";
+import { STARTER_PACKS_ENABLED } from "@/constants/starterPacks";
+import { hasSavedMatches } from "@/composables/starterPacks/useBrowserMatches";
+import { packCatalogOrg, packCatalogState } from "@/composables/starterPacks/usePackCatalog";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import ODropdownGroup from "@/lib/overlay/Dropdown/ODropdownGroup.vue";
@@ -547,6 +556,8 @@ export default defineComponent({
     OrganizationSelector,
     SolutionSwitcher,
     SampleDataHeaderChip,
+    StarterPackCatalogGate,
+    StarterPackHeaderChip,
     LinkedAccountsDialog,
     OButton,
     OShortcut,
@@ -796,6 +807,14 @@ export default defineComponent({
         : chartColor("--color-status-warning-text");
     });
 
+    // The header is on every page, so it asks for no catalog until this browser has something to show.
+    const packsWanted = computed(() => {
+      const org = props.store.state.selectedOrganization?.identifier;
+      if (!STARTER_PACKS_ENABLED || !org) return false;
+      const askedElsewhere = packCatalogOrg.value === org && packCatalogState.value !== "error";
+      return askedElsewhere || hasSavedMatches(org);
+    });
+
     // Event handlers that emit to parent component
     const updateOrganization = () => {
       emit("updateOrganization");
@@ -851,6 +870,7 @@ export default defineComponent({
     };
 
     return {
+      packsWanted,
       securityAccess,
       isDark,
       t,

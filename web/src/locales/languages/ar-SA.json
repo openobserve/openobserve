@@ -700,6 +700,7 @@
       "cipherKeys": "مفاتيح التشفير",
       "announcementBanners": "لافتات الإعلانات",
       "regexPatterns": "أنماط Regex",
+      "keyValues": "قيم المفاتيح",
       "evalJobs": "مهام التقييم عبر الإنترنت",
       "billingGroup": "مجموعة الفوترة",
       "syntheticChecks": "فحوصات المراقبة الاصطناعية",
@@ -757,6 +758,7 @@
       "cipherKeys": "مفاتيح التشفير",
       "announcementBanners": "لافتات الإعلانات",
       "regexPatterns": "أنماط Regex",
+      "keyValues": "قيم المفاتيح",
       "unnamed": "هذا المورد",
       "onCall": "المناوبة",
       "incidentIntegrations": "تكاملات الحوادث",
@@ -15099,6 +15101,376 @@
     "countIncidentIntegration": "{count} تكامل حوادث | تكاملات الحوادث: {count}",
     "sectionOtherConsumers": "يُستخدم أيضًا بواسطة",
     "countDowntime": "{count} فترة صيانة | فترات الصيانة: {count}"
+  },
+  "starterPacks": {
+    "packs": {
+      "kubernetes": {
+        "title": "Kubernetes",
+        "fields": {
+          "k8s_cluster": "اسم العنقود",
+          "k8s_namespace_name": "مساحة الاسم",
+          "k8s_pod_name": "اسم Pod",
+          "k8s_node_name": "اسم العقدة",
+          "k8s_container_name": "اسم الحاوية",
+          "kind": "نوع الحدث",
+          "reason": "سبب الحدث",
+          "message": "رسالة الحدث"
+        },
+        "roles": {
+          "events": "أحداث Kubernetes"
+        },
+        "flavours": {
+          "opentelemetry": "OpenTelemetry"
+        }
+      },
+      "hosts": {
+        "title": "المضيفون"
+      },
+      "traces": {
+        "title": "التتبعات (APM)"
+      },
+      "postgresql": {
+        "title": "PostgreSQL"
+      },
+      "docker": {
+        "title": "Docker"
+      },
+      "aws-cloudwatch": {
+        "title": "AWS CloudWatch",
+        "roles": {
+          "metrics": "مقاييس CloudWatch"
+        }
+      },
+      "genai": {
+        "title": "الذكاء الاصطناعي (تطبيقات LLM)"
+      },
+      "github": {
+        "title": "GitHub (Actions)",
+        "roles": {
+          "job_logs": "سجلات مهام GitHub Actions"
+        }
+      },
+      "argocd": {
+        "title": "Argo CD"
+      }
+    },
+    "retryCheck": "أعد محاولة فحص الحزمة",
+    "countAlerts": "{count} تنبيه | {count} تنبيهات",
+    "scope": "نطاق التنبيه: {value}",
+    "scopeAll": "كل العناقيد",
+    "scopeSeen": "كل العناقيد · {count} شوهدت حتى الآن: {clusters}",
+    "noPermission": "لا يمكنك إعداد هذه الحزمة في هذه المؤسسة. اطلب من أحد المسؤولين.",
+    "askAdmin": "اطلب من أحد المسؤولين إعدادها",
+    "busyBy": "يقوم {who} بإعداد هذه الحزمة الآن. تحقق مجددًا بعد دقيقة.",
+    "busySomeone": "يقوم شخص آخر بإعداد هذه الحزمة الآن. تحقق مجددًا بعد دقيقة.",
+    "busyYou": "أنت تعدّ هذه الحزمة في علامة تبويب أخرى. تحقق مجددًا بعد دقيقة.",
+    "startedBy": "بدأ {who} إعداد هذه الحزمة.",
+    "startedBySomeone": "بدأ شخص آخر إعداد هذه الحزمة.",
+    "card": {
+      "dashboards": "{count} لوحة معلومات | {count} لوحات معلومات"
+    },
+    "manifest": {
+      "leftOut": "{count} عنصر مستبعد | {count} عناصر مستبعدة",
+      "tagEnterprise": "Enterprise",
+      "tagNeedsData": "يتطلب بيانات",
+      "tagHaveIt": "لديك",
+      "tagUnavailable": "غير متاح",
+      "adapted": "مُكيَّف مع بياناتك"
+    },
+    "installDialog": {
+      "title": "تم إنشاء {made} من {total} عنصرًا",
+      "attention": "{title} · {count} يحتاج إلى انتباهك | {title} · {count} تحتاج إلى انتباهك",
+      "failedReason": "تعذّر الإنشاء. أعد المحاولة مرة أخرى.",
+      "kindDashboards": "لوحات المعلومات",
+      "kindAlerts": "التنبيهات",
+      "rowFailed": "فشل · {name}"
+    },
+    "home": {
+      "label": "حزم البدء",
+      "error": "تعذّر التحقق من بياناتك بحثًا عن الحزم",
+      "fromClusters": "من {clusters}",
+      "moreStreams": "+{count} تدفق | +{count} تدفقات",
+      "moreStreamsLabel": "المزيد من التدفقات المطابقة",
+      "interrupted": "توقف إعداد {title} في منتصفه · تم إنجاز {made} من {total}",
+      "startedBy": "بدأ {who} إعداد {title}.",
+      "startedBySomeone": "بدأ شخص آخر إعداد {title}.",
+      "busyBy": "{who} يقوم بإعداد {title} الآن.",
+      "busySomeone": "يقوم شخص آخر بإعداد {title} الآن.",
+      "busyYou": "أنت تقوم بإعداد {title} في علامة تبويب أخرى.",
+      "askAdminLine": "تناسب حزم البدء بياناتك. اطلب من المسؤول إضافتها.",
+      "noAccessLine": "ليس لديك حق الوصول إلى حزم البدء في هذه المؤسسة. اطلب من المسؤول.",
+      "heroTitle": "البيانات مباشرة. جهّز لوحات معلومات وتنبيهات جاهزة في نحو دقيقة",
+      "heroLead": "من {count} حزمة تناسب بياناتك | من {count} حزم تناسب بياناتك",
+      "readyToAdd": "جاهزة للإضافة",
+      "clusterKind": "عنقود",
+      "connected": "متصل",
+      "moreClusters": "+{count} عنقود | +{count} عناقيد",
+      "railClusters": "{count} عنقود | {count} عناقيد",
+      "railCounts": "{clusters} · {streams}",
+      "streamsUses": "التدفقات التي تستخدمها هذه الحزمة · {count}",
+      "moreStreamsChip": "+{count} أخرى",
+      "streamTypeLogs": "السجلات",
+      "streamTypeMetrics": "المقاييس",
+      "streamTypeTraces": "التتبعات",
+      "reviewSetUp": "راجع الحزمة",
+      "reviewSetUpLabel": "راجع حزمة {title}",
+      "bestStart": "أفضل نقطة للبدء",
+      "cards": {
+        "andMore": "{list} و{count} أخرى",
+        "panels": "{count} لوحة | {count} لوحات",
+        "kubernetes": {
+          "dashboards": {
+            "template": "{title}: {panels} لـ{clusters}. | {title}: {panels} لـ{clusters} عناقيد.",
+            "fallback": "{title}: كل عقدة وPod وحمل عمل."
+          },
+          "alerts": {
+            "template": "{alert_names}. تُطلق لكل عنقود ({clusters}). معطّلة حتى تشغّلها.",
+            "fallback": "{alert_names}. تُطلق لكل عنقود. معطّلة حتى تشغّلها.",
+            "plain": "تُطلق لكل عنقود. معطّلة حتى تشغّلها."
+          },
+          "savedViews": {
+            "template": "أحداث Kubernetes: كل حدث في {stream}، بنقرة واحدة من السجلات.",
+            "fallback": "أحداث Kubernetes، بنقرة واحدة من السجلات."
+          }
+        },
+        "hosts": {
+          "dashboards": {
+            "template": "مقاييس المضيف: CPU والذاكرة والقرص لكل مضيف."
+          },
+          "alerts": {
+            "template": "{alert_names}. تُطلق لكل مضيف. معطّلة حتى تشغّلها.",
+            "fallback": "Fire for every host. Off until you turn them on."
+          }
+        },
+        "default": {
+          "dashboards": {
+            "template": "{title}: {panels} لبياناتك.",
+            "fallback": "{title}، صُممت لتدفقاتك."
+          },
+          "alerts": {
+            "template": "{alert_names}. تُطلق على جميع بياناتك المطابقة. متوقفة إلى أن تشغّلها.",
+            "fallback": "تُطلق على جميع بياناتك المطابقة. متوقفة إلى أن تشغّلها."
+          },
+          "savedViews": {
+            "template": "{stream} في السجلات، على بُعد نقرة واحدة.",
+            "fallback": "على بُعد نقرة واحدة من السجلات."
+          }
+        }
+      },
+      "previewFailed": "تعذّر تحميل ما تُعِدّه هذه الحزمة. راجعها للمحاولة مرة أخرى.",
+      "nothingFitsYet": "لا يوجد في هذه الحزمة ما يناسب بياناتك بعد. ستظهر عناصرها هنا بمجرد وصول بياناتها."
+    },
+    "whatGetsCreated": {
+      "subtitle": "{title} — حزمة البداية",
+      "subtitleScoped": "{title} — حزمة البداية · مخصّصة لـ {scope}",
+      "savedIn": "محفوظة في المجلد {folder}",
+      "skippedNote": "تم تخطي {count} عنصر · تم الاحتفاظ بالعنصر الموجود لديك | تم تخطي {count} عناصر · تم الاحتفاظ بالعناصر الموجودة لديك",
+      "nameInUse": "{name} موجود بالفعل · تم الاحتفاظ بنسختك",
+      "skipped": "تم التخطي",
+      "notSeenYet": "لم يُرصد بعد",
+      "footprint": "البصمة",
+      "reachStarted": "الاستعلامات الخلفية: يعمل كل تنبيه يبدأ تشغيله وفق جدوله الخاص",
+      "reachStartedScoped": "نطاق التنبيه: {scope} · الاستعلامات الخلفية: يعمل كل تنبيه يبدأ تشغيله وفق جدوله الخاص",
+      "selectGroup": "تحديد الكل في {group}",
+      "selectRow": "تحديد {name}"
+    },
+    "drawer": {
+      "packTitle": "حزمة {title}",
+      "view": "عرض Kubernetes",
+      "viewPath": "البنية التحتية › Kubernetes",
+      "dashboard": "لوحة معلومات {title}",
+      "dashboardNote": "تُفتح بعد الإعداد",
+      "panelsFit": "{count} لوحة تتوافق مع بياناتك. تُفتح بعد الإعداد. | {count} لوحات تتوافق مع بياناتك. تُفتح بعد الإعداد.",
+      "alerts": "التنبيهات، متوقفة إلى أن تشغّلها",
+      "savedViews": "العروض المحفوظة في السجلات",
+      "savedViewsNote": "مشتركة مع الجميع في هذه المؤسسة",
+      "folder": "المجلد",
+      "folderValue": "{name} (حزمة البداية)",
+      "reach": "الاستعلامات الخلفية: لا توجد حاليًا",
+      "reachScoped": "نطاق التنبيه: {scope} · الاستعلامات الخلفية: لا توجد حاليًا",
+      "notIncluded": "غير مشمول",
+      "reasonAlreadyHave": "{name}: لديك بالفعل",
+      "reasonNoData": "{name}: لم تُرصد بيانات له بعد",
+      "reasonUnavailable": "{name}: غير موجود في المكتبة حاليًا",
+      "reasonNeedsPlan": "{name}: يتطلب خطة Enterprise",
+      "source": "من المكتبة على {host}. الحزمة المضمّنة في هذا الإصدار تعمل دون اتصال.",
+      "sourceOffline": "تعذّر الوصول إلى {host}. يتم استخدام الحزمة المضمّنة في هذا الإصدار، والتي تعمل دون اتصال.",
+      "nothingToCreate": "لديك بالفعل كل عنصر في هذه الحزمة",
+      "openDashboard": "فتح لوحة المعلومات",
+      "error": "تعذّر تحميل ما تنشئه هذه الحزمة",
+      "reasonNoFlavour": "{name}: غير متاح لأسماء المقاييس لديك بعد",
+      "loadingFit": "جارٍ التحقق من العناصر التي تناسب بياناتك",
+      "noteForbidden": "{title} · ليس لديك صلاحية لإعداد هذه الحزمة",
+      "setUp": "إعداد",
+      "allExist": "لديك بالفعل جميع العناصر البالغ عددها {count} في هذه الحزمة. تحتفظ التنبيهات الموجودة بإعداداتها.",
+      "continue": "متابعة",
+      "setUpCount": "إعداد {count} عنصر | إعداد {count} عناصر",
+      "ordinaryNote": "يضيف لوحات معلومات وتنبيهات وعروضًا عادية، مدرجة في صفحة الحزمة. حرّرها أو احذفها من صفحاتها الخاصة.",
+      "alertsMetaLine": "{count} · {severity}"
+    },
+    "progress": {
+      "title": "جارٍ إعداد مراقبة {title}",
+      "summary": "تم إنشاء {made} من {total}",
+      "created": "تم الإنشاء",
+      "creating": "جارٍ الإنشاء",
+      "waiting": "في الانتظار",
+      "rowAlerts": "التنبيهات {made} من {total}",
+      "rowViews": "العروض المحفوظة {made} من {total}",
+      "rowDashboards": "لوحات المعلومات {made} من {total}",
+      "retry": "إعادة محاولة {count} عنصر | إعادة محاولة {count} عناصر",
+      "finish": "إنهاء",
+      "interrupted": "توقف الإعداد · تم إنجاز {made} من {total}",
+      "installError": "لم يكتمل الإعداد. حاول مرة أخرى.",
+      "comeBack": "تم إنشاء {made} من {total} · يمكنك إغلاق هذا ومتابعة العمل. ستجده مجددًا ضمن حزم البدء في الشريط العلوي.",
+      "alertsOnTo": "جارٍ الإنشاء · مفعّل، الإرسال إلى {destination}",
+      "emailMe": "أرسل إليّ بريدًا ({email})",
+      "creatingOn": "جارٍ الإنشاء · مفعّل"
+    },
+    "severity": {
+      "critical": "حرج",
+      "warning": "تحذير",
+      "info": "معلومات"
+    },
+    "adapted": {
+      "someField": "حقل",
+      "flavour": "يستخدم إصدار {name}",
+      "change": "تغيير",
+      "streams": "التدفقات",
+      "fields": "الحقول",
+      "version": "الإصدار",
+      "streamCount": "{count} تدفق | {count} تدفقات",
+      "fieldCount": "{count} حقل | {count} حقول",
+      "matchedBoth": "تمت مطابقة {streams} و{fields} مع بياناتك",
+      "matchedOne": "تمت مطابقة {what} مع بياناتك",
+      "needsChoiceCount": "يحتاج {count} إلى اختيارك | تحتاج {count} إلى اختيارك",
+      "notFoundCount": "لم يتم العثور على {count}",
+      "matchedCount": "تمت مطابقة {count}",
+      "whichStream": "في أي تدفق يوجد {what}؟",
+      "lookRight": "يبدو {count} صحيحًا | تبدو {count} صحيحة",
+      "noneFound": "لم يتم العثور على {what}",
+      "showMore": "عرض {count} إضافية",
+      "needsChoice": "يحتاج إلى اختيار",
+      "severalMatch": "{count} تدفقات تشبه {what}",
+      "oneMatch": "{stream} يشبه {what}",
+      "sharedAsk": "ما السجلات التي تمثل {what}؟",
+      "choose": "اختر",
+      "dialogFields": "{matched} من {total} حقل",
+      "dialogUse": "استخدم {stream}",
+      "dialogUseAll": "استخدم جميع {count}",
+      "dialogUseChecked": "استخدم هذه {count}",
+      "dialogAllNote": "الكل: تحصل لوحة المعلومات على منتقي التدفقات، ويُعد كل تنبيه يقرأ هذا مرة واحدة لكل تدفق.",
+      "dialogPickFive": "اختر حتى {count} تدفقات.",
+      "dialogPickStream": "اختر التدفق",
+      "dialogPickPlaceholder": "اختر تدفقًا",
+      "dialogFiltersOn": "يقرأ من {stream}، فقط السجلات التي يكون فيها {field} هو {value}",
+      "dialogNoValues": "لم يتم العثور على قيم لهذا الحقل خلال آخر 24 ساعة.",
+      "dialogSend": "أو أرسلها إلى {stream}: عيّن هذه الترويسة في الجامع لديك",
+      "dialogFieldTitle": "اختر الحقل الخاص بـ {what}",
+      "dialogFieldLabel": "الحقل في {stream}",
+      "values": "القيم المرصودة: {values}",
+      "or": "أو",
+      "filterTitle": "أضف فلترًا كي لا تقرأ الحزمة سوى {what}",
+      "showFewer": "عرض أقل"
+    },
+    "matchCheck": {
+      "checked": "تم الفحص {when}",
+      "checkedAt": "تم الفحص {time} (بتوقيتك المحلي)",
+      "justNow": "قبل قليل",
+      "minutesAgo": "منذ {count} دقيقة",
+      "hoursAgo": "منذ {count} ساعة",
+      "daysAgo": "منذ {count} يوم"
+    },
+    "headerChip": {
+      "label": "حزم البدء",
+      "ariaLabel": "حزم البدء، {count} من الحزم تناسب بياناتك | حزم البدء، {count} من الحزم تناسب بياناتك",
+      "progress": "{made} من {total}",
+      "ariaLabelRunning": "حزم البدء، جارٍ إعداد {made} من {total}"
+    },
+    "guide": {
+      "rowSavedViews": "{count} عرض محفوظ | {count} عروض محفوظة"
+    },
+    "stepper": {
+      "content": "اختر المحتوى",
+      "setup": "جارٍ الإعداد",
+      "settingUp": "جارٍ الإعداد…",
+      "interrupted": "تمت المقاطعة",
+      "ready": "جاهز",
+      "noteRunning": "جارٍ الإعداد · تم إنشاء {made} من {total}",
+      "noteAlertsOn": "تم إنشاء {made} من {total} · {count} تنبيه مفعّل | تم إنشاء {made} من {total} · {count} تنبيهات مفعّلة",
+      "noteAlertsOff": "تم إنشاء {made} من {total} · التنبيهات متوقفة",
+      "noteAlreadyHere": "تم إنشاء {made} من {total} · {count} موجود بالفعل"
+    },
+    "alertStep": {
+      "turnOn": "فعّل تنبيه الحزمة {count} | فعّل تنبيهات الحزمة {count}",
+      "sendTo": "الإرسال إلى",
+      "sendToEmail": "الإرسال إلى: {icon} راسلني عبر البريد الإلكتروني — {email}",
+      "emailCreateNote": "لا توجد وجهة في هذه المؤسسة بعد. يضيف الإعداد وجهة بريد إلكتروني لك (أو يعيد استخدام وجهة ترسل إليك فقط).",
+      "noDestination": "لا توجد وجهة بعد. أضف واحدة ضمن التنبيهات → الوجهات.",
+      "destinationsFailed": "تعذّر تحميل الوجهات، لذا تم إيقاف الإرسال إلى. يمكن تعيين وجهة للتنبيهات لاحقًا ضمن التنبيهات → الوجهات.",
+      "destinations": "{count} وجهة في هذه المؤسسة | {count} وجهات في هذه المؤسسة",
+      "chooseDestination": "اختر وجهة",
+      "pickDestination": "اختر وجهة للإرسال إلى، أو ألغِ تحديده"
+    },
+    "ready": {
+      "title": "مراقبة {title} جاهزة",
+      "emailFailed": "تعذّر إنشاء وجهة بريدك الإلكتروني، لذا أُضيفت التنبيهات وهي متوقفة.",
+      "emailForbidden": "لا يمكنك إضافة وجهات تنبيه في هذه المؤسسة، لذا لم يتم إنشاء وجهة بريدك الإلكتروني وأُضيفت التنبيهات وهي متوقفة."
+    },
+    "popup": {
+      "title": "حزم البدء",
+      "subtitle": "{count} حزمة تناسب بيانات ترسلها بالفعل | {count} حزم تناسب بيانات ترسلها بالفعل",
+      "subtitleAllSetUp": "تم إعداد كل حزمة تناسب بياناتك",
+      "subtitleNone": "لا توجد حزم مطابقة بعد",
+      "items": "{count} عنصر | {count} عناصر",
+      "setUpAgo": "تم الإعداد {when}",
+      "stopped": "توقف الإعداد في منتصفه",
+      "whatGetsCreated": "ما الذي سيتم إنشاؤه",
+      "tileDashboards": "{count} لوحة معلومات | {count} لوحات معلومات",
+      "tileAlerts": "{count} تنبيه | {count} تنبيهات",
+      "tileSavedViews": "{count} عرض محفوظ | {count} عروض محفوظة",
+      "noneDashboards": "لوحات المعلومات",
+      "noneAlerts": "التنبيهات",
+      "noneSavedViews": "العروض المحفوظة",
+      "noneInPack": "لا يوجد أي منها في هذه الحزمة",
+      "sevCritical": "{count} حرج",
+      "sevWarning": "{count} تحذير",
+      "sevInfo": "{count} معلومات",
+      "chooseNext": "اختر العناصر التي تريد إنشاءها في الخطوة التالية",
+      "reviewSetUp": "مراجعة الحزمة",
+      "viewPack": "عرض الحزمة",
+      "checkAgain": "تحقق مرة أخرى",
+      "checkFailed": "تعذر التحقق. حاول مرة أخرى",
+      "emptyTitle": "لا توجد حزم تطابق بياناتك بعد",
+      "emptyText": "تظهر الحزم عندما يرى OpenObserve بيانات من مصدر يعرفه، مثل Kubernetes أو المضيفين أو Docker أو PostgreSQL أو AWS. أرسل البيانات، ثم تحقق مرة أخرى.",
+      "back": "رجوع",
+      "backToPacks": "العودة إلى الحزم",
+      "keepsGoing": "يمكنك إغلاق هذا. سيستمر الإعداد."
+    },
+    "viewPack": {
+      "open": "فتح",
+      "openLabel": "فتح {name}",
+      "dashboard": "لوحة المعلومات",
+      "dashboards": "لوحات المعلومات",
+      "dashboardsMeta": "{count} لوحة معلومات | {count} لوحات معلومات",
+      "alerts": "التنبيهات",
+      "alertsMeta": "{count} · {on} مفعّل · {silent} صامت",
+      "alertsMetaFailed": "{count} · {on} مفعّل · {silent} صامت · {failed} لم يُنشأ",
+      "savedView": "عرض محفوظ · مشترك مع الجميع في هذه المؤسسة",
+      "savedViews": "العروض المحفوظة",
+      "savedViewsMeta": "{count} عرض محفوظ · مشترك مع الجميع في هذه المؤسسة | {count} عروض محفوظة · مشتركة مع الجميع في هذه المؤسسة",
+      "on": "مفعّل",
+      "silent": "صامت",
+      "notCreated": "لم يُنشأ",
+      "showMore": "عرض {count} إضافية",
+      "showLess": "عرض أقل",
+      "ordinary": "هذه تنبيهات ولوحات معلومات وعروض عادية. حرّرها أو احذفها من صفحاتها الخاصة.",
+      "setUpByYou": "تم الإعداد بواسطتك {when}",
+      "setUpBy": "تم الإعداد بواسطة {who} {when}",
+      "setUpWhen": "تم الإعداد {when}",
+      "partialTitle": "تم إعداد مراقبة {title}، ولم يتم إنشاء {count} عنصر | تم إعداد مراقبة {title}، ولم يتم إنشاء {count} عناصر",
+      "partialNote": "الباقي جاهز. أعد محاولة أحد العناصر أدناه، أو أعد محاولة جميعها.",
+      "partialSubtitle": "تم إنشاء {made} من {total} · {failed} لم يُنشأ"
+    }
   },
   "alert_library": {
     "header": "مكتبة التنبيه",

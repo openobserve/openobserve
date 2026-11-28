@@ -17,8 +17,10 @@ import { describe, expect, it, beforeEach, vi } from "vitest";
 import alerts, { alertActionErrorOf } from "@/services/alerts";
 import http from "@/services/http";
 import analytics from "@/services/product_analytics";
+import { refreshOrgSummarySoon } from "@/services/orgSummaryRefresh";
 
 vi.mock("@/services/product_analytics", () => ({ default: { track: vi.fn() } }));
+vi.mock("@/services/orgSummaryRefresh", () => ({ refreshOrgSummarySoon: vi.fn() }));
 
 // Mock the http service
 vi.mock("@/services/http", () => ({
@@ -918,5 +920,24 @@ describe("alerts service", () => {
         expect(analytics.track).not.toHaveBeenCalled();
       },
     );
+  });
+
+  describe("org summary refresh", () => {
+    it.each([
+      ["create", () => alerts.create("org123", "logs", "logs", { name: "a" })],
+      ["create_by_alert_id", () => alerts.create_by_alert_id("org123", { name: "a" }, "f1")],
+      ["clone_by_id", () => alerts.clone_by_id("org123", "a1", { name: "copy" }, "f1")],
+    ])("asks for a summary refresh after %s succeeds", async (_name, call) => {
+      mockHttpInstance.post.mockResolvedValue({ data: {} });
+      await call();
+      expect(refreshOrgSummarySoon).toHaveBeenCalledTimes(1);
+      expect(refreshOrgSummarySoon).toHaveBeenCalledWith("org123");
+    });
+
+    it("asks for no refresh when a clone fails", async () => {
+      mockHttpInstance.post.mockRejectedValue(new Error("boom"));
+      await expect(alerts.clone_by_id("org123", "a1", {}, "f1")).rejects.toThrow("boom");
+      expect(refreshOrgSummarySoon).not.toHaveBeenCalled();
+    });
   });
 });

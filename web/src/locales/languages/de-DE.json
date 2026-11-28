@@ -700,6 +700,7 @@
       "cipherKeys": "Verschlüsselungsschlüssel",
       "announcementBanners": "Ankündigungsbanner",
       "regexPatterns": "Regex-Muster",
+      "keyValues": "Schlüsselwerte",
       "evalJobs": "Online-Eval-Jobs",
       "billingGroup": "Abrechnungsgruppe",
       "syntheticChecks": "Synthetics-Checks",
@@ -757,6 +758,7 @@
       "cipherKeys": "Verschlüsselungsschlüssel",
       "announcementBanners": "Ankündigungsbanner",
       "regexPatterns": "Regex-Muster",
+      "keyValues": "Schlüsselwerte",
       "unnamed": "diese Ressource",
       "onCall": "On-Call",
       "incidentIntegrations": "Vorfall-Integrationen",
@@ -15099,6 +15101,376 @@
     "countIncidentIntegration": "{count} Vorfall-Integration | {count} Vorfall-Integrationen",
     "sectionOtherConsumers": "Wird auch verwendet von",
     "countDowntime": "{count} Wartungsfenster | {count} Wartungsfenster"
+  },
+  "starterPacks": {
+    "packs": {
+      "kubernetes": {
+        "title": "Kubernetes",
+        "fields": {
+          "k8s_cluster": "Clustername",
+          "k8s_namespace_name": "Namespace",
+          "k8s_pod_name": "Pod-Name",
+          "k8s_node_name": "Node-Name",
+          "k8s_container_name": "Container-Name",
+          "kind": "Ereignisart",
+          "reason": "Ereignisgrund",
+          "message": "Ereignismeldung"
+        },
+        "roles": {
+          "events": "Kubernetes-Ereignisse"
+        },
+        "flavours": {
+          "opentelemetry": "OpenTelemetry"
+        }
+      },
+      "hosts": {
+        "title": "Hosts"
+      },
+      "traces": {
+        "title": "Traces (APM)"
+      },
+      "postgresql": {
+        "title": "PostgreSQL"
+      },
+      "docker": {
+        "title": "Docker"
+      },
+      "aws-cloudwatch": {
+        "title": "AWS CloudWatch",
+        "roles": {
+          "metrics": "CloudWatch-Metriken"
+        }
+      },
+      "genai": {
+        "title": "KI (LLM-Apps)"
+      },
+      "github": {
+        "title": "GitHub (Actions)",
+        "roles": {
+          "job_logs": "GitHub Actions Job-Logs"
+        }
+      },
+      "argocd": {
+        "title": "Argo CD"
+      }
+    },
+    "retryCheck": "Pack-Prüfung erneut versuchen",
+    "countAlerts": "{count} Alarm | {count} Alarme",
+    "scope": "Alarmbereich: {value}",
+    "scopeAll": "Alle Cluster",
+    "scopeSeen": "Alle Cluster · bisher {count} gesehen: {clusters}",
+    "noPermission": "Sie können dieses Pack in dieser Organisation nicht einrichten. Fragen Sie einen Administrator.",
+    "askAdmin": "Bitten Sie einen Administrator, dies einzurichten",
+    "busyBy": "{who} richtet dieses Pack gerade ein. Schauen Sie in einer Minute wieder vorbei.",
+    "busySomeone": "Jemand anderes richtet dieses Pack gerade ein. Schauen Sie in einer Minute wieder vorbei.",
+    "busyYou": "Sie richten dieses Pack gerade in einem anderen Tab ein. Schauen Sie in einer Minute wieder vorbei.",
+    "startedBy": "{who} hat mit der Einrichtung dieses Packs begonnen.",
+    "startedBySomeone": "Jemand anderes hat mit der Einrichtung dieses Packs begonnen.",
+    "card": {
+      "dashboards": "{count} Dashboard | {count} Dashboards"
+    },
+    "manifest": {
+      "leftOut": "{count} Element ausgelassen | {count} Elemente ausgelassen",
+      "tagEnterprise": "Enterprise",
+      "tagNeedsData": "Daten erforderlich",
+      "tagHaveIt": "Vorhanden",
+      "tagUnavailable": "Nicht verfügbar",
+      "adapted": "An Ihre Daten angepasst"
+    },
+    "installDialog": {
+      "title": "{made} von {total} Elementen erstellt",
+      "attention": "{title} · {count} erfordert Ihre Aufmerksamkeit | {title} · {count} erfordern Ihre Aufmerksamkeit",
+      "failedReason": "Konnte nicht erstellt werden. Versuchen Sie es erneut.",
+      "kindDashboards": "Dashboards",
+      "kindAlerts": "Alarme",
+      "rowFailed": "Fehlgeschlagen · {name}"
+    },
+    "home": {
+      "label": "Starter-Pakete",
+      "error": "Ihre Daten konnten nicht auf Pakete geprüft werden",
+      "fromClusters": "aus {clusters}",
+      "moreStreams": "+{count} Stream | +{count} Streams",
+      "moreStreamsLabel": "Weitere passende Streams",
+      "interrupted": "Einrichtung von {title} unterbrochen · {made} von {total} abgeschlossen",
+      "startedBy": "{who} hat mit der Einrichtung von {title} begonnen.",
+      "startedBySomeone": "Jemand anderes hat mit der Einrichtung von {title} begonnen.",
+      "busyBy": "{who} richtet {title} gerade ein.",
+      "busySomeone": "Jemand anderes richtet {title} gerade ein.",
+      "busyYou": "Sie richten {title} in einem anderen Tab ein.",
+      "askAdminLine": "Starter-Pakete passen zu Ihren Daten. Bitten Sie einen Administrator, sie hinzuzufügen.",
+      "noAccessLine": "Sie haben in dieser Organisation keinen Zugriff auf Starter-Pakete. Bitten Sie einen Administrator.",
+      "heroTitle": "Daten sind live. Fertige Dashboards und Alarme in etwa einer Minute einrichten",
+      "heroLead": "aus {count} Paket, das zu Ihren Daten passt | aus {count} Paketen, die zu Ihren Daten passen",
+      "readyToAdd": "Bereit zum Hinzufügen",
+      "clusterKind": "Cluster",
+      "connected": "Verbunden",
+      "moreClusters": "+{count} Cluster | +{count} Cluster",
+      "railClusters": "{count} Cluster | {count} Cluster",
+      "railCounts": "{clusters} · {streams}",
+      "streamsUses": "Von diesem Paket verwendete Streams · {count}",
+      "moreStreamsChip": "+{count} weitere",
+      "streamTypeLogs": "Logs",
+      "streamTypeMetrics": "Metriken",
+      "streamTypeTraces": "Traces",
+      "reviewSetUp": "Paket prüfen",
+      "reviewSetUpLabel": "Das Paket {title} prüfen",
+      "bestStart": "Bester Einstieg",
+      "cards": {
+        "andMore": "{list} und {count} weitere",
+        "panels": "{count} Panel | {count} Panels",
+        "kubernetes": {
+          "dashboards": {
+            "template": "{title}: {panels} für {clusters}. | {title}: {panels} für {clusters} Cluster.",
+            "fallback": "{title}: jeder Node, Pod und jede Workload."
+          },
+          "alerts": {
+            "template": "{alert_names}. Werden für jeden Cluster ausgelöst ({clusters}). Aus, bis Sie sie aktivieren.",
+            "fallback": "{alert_names}. Werden für jeden Cluster ausgelöst. Aus, bis Sie sie aktivieren.",
+            "plain": "Werden für jeden Cluster ausgelöst. Aus, bis Sie sie aktivieren."
+          },
+          "savedViews": {
+            "template": "Kubernetes-Ereignisse: jedes Ereignis in {stream}, ein Klick von den Logs entfernt.",
+            "fallback": "Kubernetes-Ereignisse, ein Klick von den Logs entfernt."
+          }
+        },
+        "hosts": {
+          "dashboards": {
+            "template": "Host-Metriken: CPU, Arbeitsspeicher und Festplatte für jeden Host."
+          },
+          "alerts": {
+            "template": "{alert_names}. Werden für jeden Host ausgelöst. Aus, bis Sie sie aktivieren.",
+            "fallback": "Werden für jeden Host ausgelöst. Aus, bis Sie sie aktivieren."
+          }
+        },
+        "default": {
+          "dashboards": {
+            "template": "{title}: {panels} für Ihre Daten.",
+            "fallback": "{title}, gebaut für Ihre Streams."
+          },
+          "alerts": {
+            "template": "{alert_names}. Lösen bei allen passenden Daten aus. Aus, bis Sie sie einschalten.",
+            "fallback": "Lösen bei allen passenden Daten aus. Aus, bis Sie sie einschalten."
+          },
+          "savedViews": {
+            "template": "{stream} in Logs, nur einen Klick entfernt.",
+            "fallback": "Nur einen Klick von Logs entfernt."
+          }
+        }
+      },
+      "previewFailed": "Konnte nicht geladen werden, was dieses Paket einrichtet. Prüfen Sie es, um es erneut zu versuchen.",
+      "nothingFitsYet": "Noch nichts in diesem Paket passt zu Ihren Daten. Die Elemente erscheinen hier, sobald ihre Daten eintreffen."
+    },
+    "whatGetsCreated": {
+      "subtitle": "{title} Starter-Paket",
+      "subtitleScoped": "{title} Starter-Paket · zugeschnitten auf {scope}",
+      "savedIn": "Im Ordner {folder} gespeichert",
+      "skippedNote": "{count} Element übersprungen · Ihr vorhandenes bleibt erhalten | {count} Elemente übersprungen · Ihre vorhandenen bleiben erhalten",
+      "nameInUse": "{name} existiert bereits · Ihr Eintrag bleibt erhalten",
+      "skipped": "Übersprungen",
+      "notSeenYet": "Noch nicht gesehen",
+      "footprint": "Umfang",
+      "reachStarted": "Hintergrundabfragen: Jeder gestartete Alarm läuft nach seinem eigenen Zeitplan",
+      "reachStartedScoped": "Alarmbereich: {scope} · Hintergrundabfragen: Jeder gestartete Alarm läuft nach seinem eigenen Zeitplan",
+      "selectGroup": "Alle in {group} auswählen",
+      "selectRow": "{name} auswählen"
+    },
+    "drawer": {
+      "packTitle": "{title}-Paket",
+      "view": "Kubernetes-Ansicht",
+      "viewPath": "Infrastruktur › Kubernetes",
+      "dashboard": "{title}-Dashboard",
+      "dashboardNote": "Öffnet nach der Einrichtung",
+      "panelsFit": "{count} Panel passt zu Ihren Daten. Öffnet nach der Einrichtung. | {count} Panels passen zu Ihren Daten. Öffnet nach der Einrichtung.",
+      "alerts": "Alarme, aus, bis Sie sie einschalten",
+      "savedViews": "Gespeicherte Ansichten in Logs",
+      "savedViewsNote": "Für alle in dieser Organisation freigegeben",
+      "folder": "Ordner",
+      "folderValue": "{name} (Starter-Paket)",
+      "reach": "Hintergrundabfragen: Derzeit keine",
+      "reachScoped": "Alarmbereich: {scope} · Hintergrundabfragen: Derzeit keine",
+      "notIncluded": "Nicht enthalten",
+      "reasonAlreadyHave": "{name}: bereits vorhanden",
+      "reasonNoData": "{name}: noch keine Daten dafür gesehen",
+      "reasonUnavailable": "{name}: derzeit nicht in der Bibliothek",
+      "reasonNeedsPlan": "{name}: erfordert den Enterprise-Plan",
+      "source": "Aus der Bibliothek unter {host}. Das in diese Version integrierte Paket funktioniert offline.",
+      "sourceOffline": "{host} ist nicht erreichbar. Es wird das in diese Version integrierte Paket verwendet, das offline funktioniert.",
+      "nothingToCreate": "Sie haben bereits alle Elemente dieses Pakets",
+      "openDashboard": "Dashboard öffnen",
+      "error": "Konnte nicht geladen werden, was dieses Paket erstellt",
+      "reasonNoFlavour": "{name}: noch nicht für Ihre Metriknamen verfügbar",
+      "loadingFit": "Es wird geprüft, welche Elemente zu Ihren Daten passen",
+      "noteForbidden": "{title} · Sie haben keine Berechtigung, dieses Paket einzurichten",
+      "setUp": "Einrichten",
+      "allExist": "Sie haben bereits alle {count} Elemente dieses Pakets. Vorhandene Alarme behalten ihre Einstellungen.",
+      "continue": "Weiter",
+      "setUpCount": "{count} Element einrichten | {count} Elemente einrichten",
+      "ordinaryNote": "Fügt gewöhnliche Dashboards, Alarme und Ansichten hinzu, die auf der Seite des Pakets aufgeführt sind. Bearbeiten oder löschen Sie sie auf ihren eigenen Seiten.",
+      "alertsMetaLine": "{count} · {severity}"
+    },
+    "progress": {
+      "title": "{title}-Überwachung wird eingerichtet",
+      "summary": "{made} von {total} erstellt",
+      "created": "Erstellt",
+      "creating": "Wird erstellt",
+      "waiting": "Wartet",
+      "rowAlerts": "Alarme {made} von {total}",
+      "rowViews": "Gespeicherte Ansichten {made} von {total}",
+      "rowDashboards": "Dashboards {made} von {total}",
+      "retry": "{count} Element wiederholen | {count} Elemente wiederholen",
+      "finish": "Abschließen",
+      "interrupted": "Einrichtung unterbrochen · {made} von {total} erledigt",
+      "installError": "Die Einrichtung wurde nicht abgeschlossen. Versuchen Sie es erneut.",
+      "comeBack": "{made} von {total} erstellt · Sie können dies schließen und weiterarbeiten. Sie finden es erneut unter Starter-Pakete in der Kopfzeile.",
+      "alertsOnTo": "Wird erstellt · aktiv, gesendet an {destination}",
+      "emailMe": "E-Mail an mich ({email})",
+      "creatingOn": "Wird erstellt · aktiv"
+    },
+    "severity": {
+      "critical": "Kritisch",
+      "warning": "Warnung",
+      "info": "Info"
+    },
+    "adapted": {
+      "someField": "Ein Feld",
+      "flavour": "Verwendet die Version {name}",
+      "change": "Ändern",
+      "streams": "Streams",
+      "fields": "Felder",
+      "version": "Version",
+      "streamCount": "{count} Stream | {count} Streams",
+      "fieldCount": "{count} Feld | {count} Felder",
+      "matchedBoth": "{streams} und {fields} auf Ihre Daten abgestimmt",
+      "matchedOne": "{what} auf Ihre Daten abgestimmt",
+      "needsChoiceCount": "{count} erfordert Ihre Auswahl | {count} erfordern Ihre Auswahl",
+      "notFoundCount": "{count} nicht gefunden",
+      "matchedCount": "{count} abgestimmt",
+      "whichStream": "Welcher Stream ist {what}?",
+      "lookRight": "{count} sieht richtig aus | {count} sehen richtig aus",
+      "noneFound": "Keine {what} gefunden",
+      "showMore": "{count} weitere anzeigen",
+      "needsChoice": "Auswahl erforderlich",
+      "severalMatch": "{count} Streams ähneln {what}",
+      "oneMatch": "{stream} ähnelt {what}",
+      "sharedAsk": "Welche Datensätze sind {what}?",
+      "choose": "Auswählen",
+      "dialogFields": "{matched} von {total} Feldern",
+      "dialogUse": "{stream} verwenden",
+      "dialogUseAll": "Alle {count} verwenden",
+      "dialogUseChecked": "Diese {count} verwenden",
+      "dialogAllNote": "Alle: Das Dashboard erhält eine Stream-Auswahl, und jeder Alarm, der dies liest, wird einmal pro Stream eingerichtet.",
+      "dialogPickFive": "Wählen Sie bis zu {count} Streams aus.",
+      "dialogPickStream": "Stream auswählen",
+      "dialogPickPlaceholder": "Stream auswählen",
+      "dialogFiltersOn": "Liest aus {stream}, nur Datensätze, bei denen {field} {value} ist",
+      "dialogNoValues": "Für dieses Feld wurden in den letzten 24 Stunden keine Werte gefunden.",
+      "dialogSend": "Oder senden Sie sie an {stream}: Setzen Sie diesen Header in Ihrem Collector",
+      "dialogFieldTitle": "Wählen Sie das Feld für {what}",
+      "dialogFieldLabel": "Feld in {stream}",
+      "values": "Gesehen: {values}",
+      "or": "oder",
+      "filterTitle": "Fügen Sie einen Filter hinzu, damit das Paket nur {what} liest",
+      "showFewer": "Weniger anzeigen"
+    },
+    "matchCheck": {
+      "checked": "Geprüft {when}",
+      "checkedAt": "Geprüft {time} (Ihre lokale Zeit)",
+      "justNow": "gerade eben",
+      "minutesAgo": "vor {count} Min.",
+      "hoursAgo": "vor {count} Std.",
+      "daysAgo": "vor {count} Tg."
+    },
+    "headerChip": {
+      "label": "Starter-Pakete",
+      "ariaLabel": "Starter-Pakete, {count} passt zu Ihren Daten | Starter-Pakete, {count} passen zu Ihren Daten",
+      "progress": "{made} von {total}",
+      "ariaLabelRunning": "Starter-Pakete, {made} von {total} werden eingerichtet"
+    },
+    "guide": {
+      "rowSavedViews": "{count} gespeicherte Ansicht | {count} gespeicherte Ansichten"
+    },
+    "stepper": {
+      "content": "Inhalt wählen",
+      "setup": "Wird eingerichtet",
+      "settingUp": "Wird eingerichtet…",
+      "interrupted": "Unterbrochen",
+      "ready": "Bereit",
+      "noteRunning": "Wird eingerichtet · {made} von {total} erstellt",
+      "noteAlertsOn": "{made} von {total} erstellt · {count} Alarm aktiv | {made} von {total} erstellt · {count} Alarme aktiv",
+      "noteAlertsOff": "{made} von {total} erstellt · Alarme aus",
+      "noteAlreadyHere": "{made} von {total} erstellt · {count} bereits vorhanden"
+    },
+    "alertStep": {
+      "turnOn": "Aktivieren Sie den {count} Paket-Alarm | Aktivieren Sie die {count} Paket-Alarme",
+      "sendTo": "Senden an",
+      "sendToEmail": "Senden an: {icon} E-Mail an mich — {email}",
+      "emailCreateNote": "Noch kein Ziel in dieser Organisation. Die Einrichtung fügt ein E-Mail-Ziel für Sie hinzu (oder verwendet eines wieder, das nur an Sie sendet).",
+      "noDestination": "Noch kein Ziel. Fügen Sie eines unter Alarme → Ziele hinzu.",
+      "destinationsFailed": "Ziele konnten nicht geladen werden, daher ist Senden an deaktiviert. Alarme können später unter Alarme → Ziele eines erhalten.",
+      "destinations": "{count} Ziel in dieser Organisation | {count} Ziele in dieser Organisation",
+      "chooseDestination": "Wählen Sie ein Ziel",
+      "pickDestination": "Wählen Sie ein Ziel für Senden an oder deaktivieren Sie es"
+    },
+    "ready": {
+      "title": "{title}-Überwachung ist bereit",
+      "emailFailed": "Ihr E-Mail-Ziel konnte nicht erstellt werden, daher wurden die Alarme deaktiviert hinzugefügt.",
+      "emailForbidden": "Sie können in dieser Organisation keine Alarmziele hinzufügen, daher wurde Ihr E-Mail-Ziel nicht erstellt und die Alarme wurden deaktiviert hinzugefügt."
+    },
+    "popup": {
+      "title": "Starter-Pakete",
+      "subtitle": "{count} Paket passt zu Daten, die Sie bereits senden | {count} Pakete passen zu Daten, die Sie bereits senden",
+      "subtitleAllSetUp": "Jedes Paket, das zu Ihren Daten passt, ist eingerichtet",
+      "subtitleNone": "Noch keine passenden Pakete",
+      "items": "{count} Element | {count} Elemente",
+      "setUpAgo": "Eingerichtet {when}",
+      "stopped": "Einrichtung mittendrin gestoppt",
+      "whatGetsCreated": "Was erstellt wird",
+      "tileDashboards": "{count} Dashboard | {count} Dashboards",
+      "tileAlerts": "{count} Alarm | {count} Alarme",
+      "tileSavedViews": "{count} gespeicherte Ansicht | {count} gespeicherte Ansichten",
+      "noneDashboards": "Dashboards",
+      "noneAlerts": "Alarme",
+      "noneSavedViews": "Gespeicherte Ansichten",
+      "noneInPack": "Keine in diesem Paket",
+      "sevCritical": "{count} kritisch",
+      "sevWarning": "{count} Warnung",
+      "sevInfo": "{count} Info",
+      "chooseNext": "Wählen Sie aus, welche Elemente im nächsten Schritt erstellt werden",
+      "reviewSetUp": "Paket überprüfen",
+      "viewPack": "Paket anzeigen",
+      "checkAgain": "Erneut prüfen",
+      "checkFailed": "Prüfung fehlgeschlagen. Versuchen Sie es erneut",
+      "emptyTitle": "Noch keine Pakete passen zu Ihren Daten",
+      "emptyText": "Pakete erscheinen, wenn OpenObserve Daten aus einer bekannten Quelle wie Kubernetes, Hosts, Docker, PostgreSQL oder AWS erkennt. Senden Sie Daten und prüfen Sie dann erneut.",
+      "back": "Zurück",
+      "backToPacks": "Zurück zu den Paketen",
+      "keepsGoing": "Sie können dies schließen. Die Einrichtung läuft weiter."
+    },
+    "viewPack": {
+      "open": "Öffnen",
+      "openLabel": "{name} öffnen",
+      "dashboard": "Dashboard",
+      "dashboards": "Dashboards",
+      "dashboardsMeta": "{count} Dashboard | {count} Dashboards",
+      "alerts": "Alarme",
+      "alertsMeta": "{count} · {on} aktiv · {silent} stumm",
+      "alertsMetaFailed": "{count} · {on} aktiv · {silent} stumm · {failed} nicht erstellt",
+      "savedView": "Gespeicherte Ansicht · für alle in dieser Organisation freigegeben",
+      "savedViews": "Gespeicherte Ansichten",
+      "savedViewsMeta": "{count} gespeicherte Ansicht · für alle in dieser Organisation freigegeben | {count} gespeicherte Ansichten · für alle in dieser Organisation freigegeben",
+      "on": "Aktiv",
+      "silent": "Stumm",
+      "notCreated": "Nicht erstellt",
+      "showMore": "{count} weitere anzeigen",
+      "showLess": "Weniger anzeigen",
+      "ordinary": "Dies sind normale Alarme, Dashboards und Ansichten. Bearbeiten oder löschen Sie sie auf ihren eigenen Seiten.",
+      "setUpByYou": "Von Ihnen eingerichtet {when}",
+      "setUpBy": "Eingerichtet von {who} {when}",
+      "setUpWhen": "Eingerichtet {when}",
+      "partialTitle": "{title}-Überwachung ist eingerichtet, {count} Element wurde nicht erstellt | {title}-Überwachung ist eingerichtet, {count} Elemente wurden nicht erstellt",
+      "partialNote": "Der Rest ist bereit. Wiederholen Sie ein Element unten oder wiederholen Sie alle.",
+      "partialSubtitle": "{made} von {total} erstellt · {failed} nicht erstellt"
+    }
   },
   "alert_library": {
     "header": "Alarm-Bibliothek",

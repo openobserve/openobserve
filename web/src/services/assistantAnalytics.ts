@@ -211,7 +211,7 @@ export type PlacementMode = "sidebar" | "window" | "sheet" | "docked" | "full";
 
 export type LengthBucket = "0" | "1_20" | "21_100" | "101_500" | "500_plus";
 
-export type StarterKind = "ingest" | "page" | "recent" | "object" | "learn";
+export type StarterKind = "ingest" | "page" | "recent" | "object" | "learn" | "pack";
 
 export type QueryLanguage = "sql" | "promql" | "vrl" | "json" | "regex" | "js";
 

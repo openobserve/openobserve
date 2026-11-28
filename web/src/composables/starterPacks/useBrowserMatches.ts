@@ -1,0 +1,215 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+import {
+  computed,
+  reactive,
+  toValue,
+  type ComputedRef,
+  type MaybeRefOrGetter,
+  type Ref,
+} from "vue";
+
+import store from "@/stores";
+
+import type { FindMoreResult, FindMoreSource } from "./findMore";
+import { packs } from "./usePackCatalog";
+
+export interface BrowserInterrupted {
+  packId: string;
+  label: string;
+  done?: number;
+  total?: number;
+}
+
+export interface BrowserMatchCopy {
+  /** Milliseconds since epoch of the last check (full or Home) that ran in this browser. */
+  checkedAt: number;
+  /** Built-in packs, set-up ones hidden by `installedPackIds`; load drops older copies' Library groups. */
+  sources: FindMoreSource[];
+  /** Built-in pack ids known to be installed at the last check. */
+  installedPackIds: string[];
+  /** Every unfinished setup, so the header counts them before any record loads. */
+  interrupted: BrowserInterrupted[];
+}
+
+interface OrgState {
+  copy: BrowserMatchCopy | null;
+}
+
+// Users share a browser, so one user's matches must never show to the next.
+export const matchesKey = (org: string, email: string) =>
+  `o2.starterPacks.browserMatches.${org}.${email}`;
+
+export const signedIn = (): string =>
+  String((store.state.userInfo as { email?: string } | null)?.email ?? "");
+
+const isBuiltIn = (packId: string) => packs().some(({ id }) => id === packId);
+
+const builtInOnly = (sources: FindMoreSource[]) =>
+  sources.filter(({ packId }) => !!packId && isBuiltIn(packId));
+
+// Shared by every caller in the tab, so a save on Home updates the header at once.
+const copies = new Map<string, OrgState>();
+
+// Storage can be missing or throw (private mode, blocked site data), so every access is guarded.
+const readJson = (key: string): unknown => {
+  try {
+    return JSON.parse(window.localStorage.getItem(key) ?? "null");
+  } catch {
+    return null;
+  }
+};
+
+const writeJson = (key: string, value: unknown) => {
+  try {
+    window.localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // The in-memory copy still serves this tab.
+  }
+};
+
+const strings = (value: unknown): string[] =>
+  Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === "string") : [];
+
+const parseInterrupted = (value: unknown): BrowserInterrupted[] =>
+  Array.isArray(value)
+    ? value.filter((entry): entry is BrowserInterrupted => typeof entry?.packId === "string")
+    : [];
+
+const parseCopy = (value: unknown): BrowserMatchCopy | null => {
+  const parsed = value as Partial<BrowserMatchCopy> | null;
+  if (typeof parsed?.checkedAt !== "number" || !Array.isArray(parsed?.sources)) return null;
+  const sources = builtInOnly(
+    parsed.sources.filter(
+      (source): source is FindMoreSource =>
+        typeof source?.id === "string" &&
+        Array.isArray(source?.items) &&
+        Array.isArray(source?.streams),
+    ),
+  );
+  return {
+    checkedAt: parsed.checkedAt,
+    sources,
+    installedPackIds: strings(parsed.installedPackIds),
+    interrupted: parseInterrupted(parsed.interrupted),
+  };
+};
+
+const stateOf = (key: string, stored: boolean): OrgState => {
+  let state = copies.get(key);
+  if (!state) {
+    state = reactive<OrgState>({ copy: stored ? parseCopy(readJson(key)) : null });
+    copies.set(key, state);
+  }
+  return state;
+};
+
+/** Whether storage holds a copy, without reading it: one read with no catalog loaded loses every source. */
+export const hasSavedMatches = (org: string): boolean => {
+  const email = signedIn();
+  try {
+    return !!email && window.localStorage.getItem(matchesKey(org, email)) !== null;
+  } catch {
+    return false;
+  }
+};
+
+/** Forgets the in-memory copies, so the next read comes from storage. */
+export const resetBrowserMatches = () => copies.clear();
+
+/** This browser's last match result for an org; no network calls. */
+export function useBrowserMatches(org: MaybeRefOrGetter<string>): {
+  copy: Readonly<Ref<BrowserMatchCopy | null>>;
+  show: ComputedRef<boolean>;
+  saveFull(
+    result: FindMoreResult,
+    installedPackIds: string[],
+    interrupted?: BrowserInterrupted[],
+  ): void;
+  saveBuiltIn(
+    sources: FindMoreSource[],
+    installedPackIds: string[],
+    interrupted: BrowserInterrupted[],
+  ): void;
+  markInstalled(sourceId: string, packId?: string): void;
+  clear(): void;
+} {
+  // Without a known user any key could be read by the next one, so the copy stays in memory.
+  const stored = computed(() => !!signedIn());
+  const key = computed(() => matchesKey(toValue(org), signedIn()));
+  const state = computed(() => stateOf(key.value, stored.value));
+  const copy = computed(() => state.value.copy);
+  // Set-up packs stay listed and an empty check still has its screen, so any check shows the chip.
+  const show = computed(() => copy.value !== null);
+
+  const setCopy = (next: BrowserMatchCopy) => {
+    state.value.copy = next;
+    if (stored.value) writeJson(key.value, next);
+  };
+
+  const saveBuiltIn = (
+    sources: FindMoreSource[],
+    installedPackIds: string[],
+    interrupted: BrowserInterrupted[] = [],
+  ) => {
+    const installed = [...new Set(installedPackIds)];
+    const fresh = builtInOnly(sources);
+    // A check leaves out a set-up pack, so its last source is kept for the popup to list its streams.
+    const kept = (copy.value?.sources ?? []).filter(
+      ({ packId }) =>
+        !!packId && installed.includes(packId) && !fresh.some((row) => row.packId === packId),
+    );
+    setCopy({
+      checkedAt: Date.now(),
+      sources: [...fresh, ...kept],
+      installedPackIds: installed,
+      interrupted,
+    });
+  };
+
+  const saveFull = (
+    result: FindMoreResult,
+    installedPackIds: string[],
+    interrupted: BrowserInterrupted[] = [],
+  ) => saveBuiltIn(result.sources, installedPackIds, interrupted);
+
+  const markInstalled = (sourceId: string, packId?: string) => {
+    const current = copy.value;
+    if (!current) return;
+    const builtIn = !!packId && isBuiltIn(packId);
+    // A built-in source stays, hidden by its installed id, so the popup can list its streams.
+    setCopy({
+      ...current,
+      sources: builtIn ? current.sources : current.sources.filter(({ id }) => id !== sourceId),
+      installedPackIds: builtIn
+        ? [...new Set([...current.installedPackIds, packId])]
+        : current.installedPackIds,
+      interrupted: current.interrupted.filter((entry) => entry.packId !== packId),
+    });
+  };
+
+  const clear = () => {
+    state.value.copy = null;
+    if (!stored.value) return;
+    try {
+      window.localStorage.removeItem(key.value);
+    } catch {
+      // The in-memory copy is gone for this tab either way.
+    }
+  };
+
+  return { copy, show, saveFull, saveBuiltIn, markInstalled, clear };
+}

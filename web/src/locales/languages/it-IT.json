@@ -700,6 +700,7 @@
       "cipherKeys": "Chiavi di cifratura",
       "announcementBanners": "Banner di annuncio",
       "regexPatterns": "Pattern regex",
+      "keyValues": "Valori chiave",
       "evalJobs": "Job di valutazione online",
       "billingGroup": "Gruppo di fatturazione",
       "syntheticChecks": "Controlli Synthetics",
@@ -757,6 +758,7 @@
       "cipherKeys": "chiavi di cifratura",
       "announcementBanners": "banner di annuncio",
       "regexPatterns": "pattern regex",
+      "keyValues": "valori chiave",
       "unnamed": "questa risorsa",
       "onCall": "reperibilità",
       "incidentIntegrations": "integrazioni degli incidenti",
@@ -15099,6 +15101,376 @@
     "countIncidentIntegration": "{count} integrazione di incidenti | {count} integrazioni di incidenti",
     "sectionOtherConsumers": "Utilizzato anche da",
     "countDowntime": "{count} downtime | {count} downtime"
+  },
+  "starterPacks": {
+    "packs": {
+      "kubernetes": {
+        "title": "Kubernetes",
+        "fields": {
+          "k8s_cluster": "Nome cluster",
+          "k8s_namespace_name": "Namespace",
+          "k8s_pod_name": "Nome pod",
+          "k8s_node_name": "Nome nodo",
+          "k8s_container_name": "Nome container",
+          "kind": "Tipo di evento",
+          "reason": "Motivo dell'evento",
+          "message": "Messaggio dell'evento"
+        },
+        "roles": {
+          "events": "Eventi Kubernetes"
+        },
+        "flavours": {
+          "opentelemetry": "OpenTelemetry"
+        }
+      },
+      "hosts": {
+        "title": "Host"
+      },
+      "traces": {
+        "title": "Tracce (APM)"
+      },
+      "postgresql": {
+        "title": "PostgreSQL"
+      },
+      "docker": {
+        "title": "Docker"
+      },
+      "aws-cloudwatch": {
+        "title": "AWS CloudWatch",
+        "roles": {
+          "metrics": "Metriche CloudWatch"
+        }
+      },
+      "genai": {
+        "title": "AI (app LLM)"
+      },
+      "github": {
+        "title": "GitHub (Actions)",
+        "roles": {
+          "job_logs": "Log dei job di GitHub Actions"
+        }
+      },
+      "argocd": {
+        "title": "Argo CD"
+      }
+    },
+    "retryCheck": "Riprova la verifica del pacchetto",
+    "countAlerts": "{count} avviso | {count} avvisi",
+    "scope": "Ambito dell'avviso: {value}",
+    "scopeAll": "Tutti i cluster",
+    "scopeSeen": "Tutti i cluster · {count} visualizzati finora: {clusters}",
+    "noPermission": "Non puoi configurare questo pacchetto in questa organizzazione. Chiedi a un amministratore.",
+    "askAdmin": "Chiedi a un amministratore di configurarlo",
+    "busyBy": "{who} sta configurando questo pacchetto in questo momento. Riprova tra un minuto.",
+    "busySomeone": "Qualcun altro sta configurando questo pacchetto in questo momento. Riprova tra un minuto.",
+    "busyYou": "Stai configurando questo pacchetto in un'altra scheda. Riprova tra un minuto.",
+    "startedBy": "{who} ha iniziato a configurare questo pacchetto.",
+    "startedBySomeone": "Qualcun altro ha iniziato a configurare questo pacchetto.",
+    "card": {
+      "dashboards": "{count} dashboard | {count} dashboard"
+    },
+    "manifest": {
+      "leftOut": "{count} elemento escluso | {count} elementi esclusi",
+      "tagEnterprise": "Enterprise",
+      "tagNeedsData": "Richiede dati",
+      "tagHaveIt": "Disponibile",
+      "tagUnavailable": "Non disponibile",
+      "adapted": "Adattato ai tuoi dati"
+    },
+    "installDialog": {
+      "title": "{made} di {total} elementi creati",
+      "attention": "{title} · {count} richiede la tua attenzione | {title} · {count} richiedono la tua attenzione",
+      "failedReason": "Non è stato possibile crearlo. Riprova.",
+      "kindDashboards": "Dashboard",
+      "kindAlerts": "Avvisi",
+      "rowFailed": "Non riuscito · {name}"
+    },
+    "home": {
+      "label": "Pacchetti iniziali",
+      "error": "Impossibile verificare i tuoi dati per i pacchetti",
+      "fromClusters": "da {clusters}",
+      "moreStreams": "+{count} stream | +{count} stream",
+      "moreStreamsLabel": "Altri stream corrispondenti",
+      "interrupted": "Configurazione di {title} interrotta a metà · {made} di {total} completati",
+      "startedBy": "{who} ha iniziato a configurare {title}.",
+      "startedBySomeone": "Qualcun altro ha iniziato a configurare {title}.",
+      "busyBy": "{who} sta configurando {title} in questo momento.",
+      "busySomeone": "Qualcun altro sta configurando {title} in questo momento.",
+      "busyYou": "Stai configurando {title} in un'altra scheda.",
+      "askAdminLine": "I pacchetti iniziali sono adatti ai tuoi dati. Chiedi a un amministratore di aggiungerli.",
+      "noAccessLine": "Non hai accesso ai pacchetti iniziali in questa organizzazione. Chiedi a un amministratore.",
+      "heroTitle": "I dati sono live. Configura dashboard e avvisi già pronti in circa un minuto",
+      "heroLead": "da {count} pacchetto adatto ai tuoi dati | da {count} pacchetti adatti ai tuoi dati",
+      "readyToAdd": "Pronto da aggiungere",
+      "clusterKind": "cluster",
+      "connected": "Connesso",
+      "moreClusters": "+{count} cluster | +{count} cluster",
+      "railClusters": "{count} cluster | {count} cluster",
+      "railCounts": "{clusters} · {streams}",
+      "streamsUses": "Stream usati da questo pacchetto · {count}",
+      "moreStreamsChip": "+{count} altri",
+      "streamTypeLogs": "log",
+      "streamTypeMetrics": "metriche",
+      "streamTypeTraces": "tracce",
+      "reviewSetUp": "Esamina pacchetto",
+      "reviewSetUpLabel": "Esamina il pacchetto {title}",
+      "bestStart": "Il punto di partenza migliore",
+      "cards": {
+        "andMore": "{list} e altri {count}",
+        "panels": "{count} pannello | {count} pannelli",
+        "kubernetes": {
+          "dashboards": {
+            "template": "{title}: {panels} per {clusters}. | {title}: {panels} per {clusters} cluster.",
+            "fallback": "{title}: ogni nodo, pod e workload."
+          },
+          "alerts": {
+            "template": "{alert_names}. Si attivano per ogni cluster ({clusters}). Disattivati finché non li attivi.",
+            "fallback": "{alert_names}. Si attivano per ogni cluster. Disattivati finché non li attivi.",
+            "plain": "Si attivano per ogni cluster. Disattivati finché non li attivi."
+          },
+          "savedViews": {
+            "template": "Eventi Kubernetes: ogni evento in {stream}, a un clic da Log.",
+            "fallback": "Eventi Kubernetes, a un clic da Log."
+          }
+        },
+        "hosts": {
+          "dashboards": {
+            "template": "Metriche host: CPU, memoria e disco per ogni host."
+          },
+          "alerts": {
+            "template": "{alert_names}. Si attivano per ogni host. Disattivati finché non li attivi.",
+            "fallback": "Si attivano per ogni host. Disattivati finché non li attivi."
+          }
+        },
+        "default": {
+          "dashboards": {
+            "template": "{title}: {panels} per i tuoi dati.",
+            "fallback": "{title}, creati per i tuoi stream."
+          },
+          "alerts": {
+            "template": "{alert_names}. Scattano su tutti i tuoi dati corrispondenti. Disattivati finché non li attivi.",
+            "fallback": "Scattano su tutti i tuoi dati corrispondenti. Disattivati finché non li attivi."
+          },
+          "savedViews": {
+            "template": "{stream} nei Log, a portata di clic.",
+            "fallback": "A un clic dai Log."
+          }
+        }
+      },
+      "previewFailed": "Impossibile caricare ciò che configura questo pacchetto. Controllalo e riprova.",
+      "nothingFitsYet": "Nessun elemento di questo pacchetto si adatta ancora ai tuoi dati. I suoi elementi compariranno qui quando arriveranno i loro dati."
+    },
+    "whatGetsCreated": {
+      "subtitle": "Pacchetto starter {title}",
+      "subtitleScoped": "Pacchetto starter {title} · creato per {scope}",
+      "savedIn": "Salvato nella cartella {folder}",
+      "skippedNote": "{count} elemento saltato · quello già esistente viene mantenuto | {count} elementi saltati · quelli già esistenti vengono mantenuti",
+      "nameInUse": "{name} esiste già · il tuo viene mantenuto",
+      "skipped": "Saltato",
+      "notSeenYet": "Non ancora rilevato",
+      "footprint": "Impronta",
+      "reachStarted": "Query in background: ogni avviso avviato segue la propria pianificazione",
+      "reachStartedScoped": "Ambito avvisi: {scope} · Query in background: ogni avviso avviato segue la propria pianificazione",
+      "selectGroup": "Seleziona tutto in {group}",
+      "selectRow": "Seleziona {name}"
+    },
+    "drawer": {
+      "packTitle": "Pacchetto {title}",
+      "view": "Vista Kubernetes",
+      "viewPath": "Infrastruttura › Kubernetes",
+      "dashboard": "Dashboard {title}",
+      "dashboardNote": "Si apre dopo la configurazione",
+      "panelsFit": "{count} pannello si adatta ai tuoi dati. Si apre dopo la configurazione. | {count} pannelli si adattano ai tuoi dati. Si apre dopo la configurazione.",
+      "alerts": "Avvisi, disattivati finché non li attivi",
+      "savedViews": "Viste salvate nei Log",
+      "savedViewsNote": "Condivise con tutti in questa organizzazione",
+      "folder": "Cartella",
+      "folderValue": "{name} (pacchetto starter)",
+      "reach": "Query in background: nessuna per ora",
+      "reachScoped": "Ambito avvisi: {scope} · Query in background: nessuna per ora",
+      "notIncluded": "Non incluso",
+      "reasonAlreadyHave": "{name}: lo hai già",
+      "reasonNoData": "{name}: nessun dato rilevato finora",
+      "reasonUnavailable": "{name}: non disponibile nella Libreria al momento",
+      "reasonNeedsPlan": "{name}: richiede il piano Enterprise",
+      "source": "Dalla Libreria su {host}. Il pacchetto integrato in questa versione funziona offline.",
+      "sourceOffline": "Impossibile raggiungere {host}. Viene usato il pacchetto integrato in questa versione, che funziona offline.",
+      "nothingToCreate": "Hai già tutti gli elementi di questo pacchetto",
+      "openDashboard": "Apri dashboard",
+      "error": "Impossibile caricare ciò che crea questo pacchetto",
+      "reasonNoFlavour": "{name}: non ancora disponibile per i nomi delle tue metriche",
+      "loadingFit": "Verifica degli elementi compatibili con i tuoi dati",
+      "noteForbidden": "{title} · non hai l'accesso per configurare questo pacchetto",
+      "setUp": "Configura",
+      "allExist": "Hai già tutti i {count} elementi di questo pacchetto. Gli avvisi esistenti mantengono le proprie impostazioni.",
+      "continue": "Continua",
+      "setUpCount": "Configura {count} elemento | Configura {count} elementi",
+      "ordinaryNote": "Aggiunge dashboard, avvisi e viste standard, elencati nella pagina del pacchetto. Modificali o eliminali nelle rispettive pagine.",
+      "alertsMetaLine": "{count} · {severity}"
+    },
+    "progress": {
+      "title": "Configurazione del monitoraggio di {title}",
+      "summary": "{made} di {total} creati",
+      "created": "Creato",
+      "creating": "Creazione",
+      "waiting": "In attesa",
+      "rowAlerts": "Avvisi {made} di {total}",
+      "rowViews": "Viste salvate {made} di {total}",
+      "rowDashboards": "Dashboard {made} di {total}",
+      "retry": "Riprova {count} elemento | Riprova {count} elementi",
+      "finish": "Termina",
+      "interrupted": "Configurazione interrotta · {made} di {total} completati",
+      "installError": "La configurazione non è terminata. Riprova.",
+      "comeBack": "{made} di {total} creati · puoi chiudere questa finestra e continuare a lavorare. La trovi di nuovo in Starter packs nell'intestazione.",
+      "alertsOnTo": "Creazione · attivo, invio a {destination}",
+      "emailMe": "Inviami un'email ({email})",
+      "creatingOn": "Creazione · attivo"
+    },
+    "severity": {
+      "critical": "Critico",
+      "warning": "Attenzione",
+      "info": "Info"
+    },
+    "adapted": {
+      "someField": "Un campo",
+      "flavour": "Usa la versione {name}",
+      "change": "Cambia",
+      "streams": "Stream",
+      "fields": "Campi",
+      "version": "Versione",
+      "streamCount": "{count} stream | {count} stream",
+      "fieldCount": "{count} campo | {count} campi",
+      "matchedBoth": "{streams} e {fields} associati ai tuoi dati",
+      "matchedOne": "{what} associato ai tuoi dati",
+      "needsChoiceCount": "{count} richiede una scelta | {count} richiedono una scelta",
+      "notFoundCount": "{count} non trovati",
+      "matchedCount": "{count} associati",
+      "whichStream": "Quale stream è {what}?",
+      "lookRight": "{count} sembra corretto | {count} sembrano corretti",
+      "noneFound": "Nessun {what} trovato",
+      "showMore": "Mostra altri {count}",
+      "needsChoice": "Richiede una scelta",
+      "severalMatch": "{count} stream sembrano {what}",
+      "oneMatch": "{stream} sembra {what}",
+      "sharedAsk": "Quali record sono {what}?",
+      "choose": "Scegli",
+      "dialogFields": "{matched} di {total} campi",
+      "dialogUse": "Usa {stream}",
+      "dialogUseAll": "Usa tutti i {count}",
+      "dialogUseChecked": "Usa questi {count}",
+      "dialogAllNote": "Tutti: la dashboard ottiene un selettore di stream e ogni avviso che legge questo viene configurato una volta per stream.",
+      "dialogPickFive": "Scegli fino a {count} stream.",
+      "dialogPickStream": "Scegli lo stream",
+      "dialogPickPlaceholder": "Scegli uno stream",
+      "dialogFiltersOn": "Legge da {stream}, solo i record in cui {field} è {value}",
+      "dialogNoValues": "Nessun valore trovato per questo campo nelle ultime 24 ore.",
+      "dialogSend": "Oppure inviali a {stream}: imposta questa intestazione nel tuo collector",
+      "dialogFieldTitle": "Scegli il campo per {what}",
+      "dialogFieldLabel": "Campo in {stream}",
+      "values": "Visti: {values}",
+      "or": "oppure",
+      "filterTitle": "Aggiungi un filtro in modo che il pack legga solo {what}",
+      "showFewer": "Mostra meno"
+    },
+    "matchCheck": {
+      "checked": "Verificato {when}",
+      "checkedAt": "Verificato {time} (ora locale)",
+      "justNow": "adesso",
+      "minutesAgo": "{count} min fa",
+      "hoursAgo": "{count} h fa",
+      "daysAgo": "{count} g fa"
+    },
+    "headerChip": {
+      "label": "Pack iniziali",
+      "ariaLabel": "Pack iniziali, {count} si adatta ai tuoi dati | Pack iniziali, {count} si adattano ai tuoi dati",
+      "progress": "{made} di {total}",
+      "ariaLabelRunning": "Pack iniziali, configurazione di {made} su {total}"
+    },
+    "guide": {
+      "rowSavedViews": "{count} vista salvata | {count} viste salvate"
+    },
+    "stepper": {
+      "content": "Scegli i contenuti",
+      "setup": "Configurazione",
+      "settingUp": "Configurazione in corso…",
+      "interrupted": "Interrotto",
+      "ready": "Pronto",
+      "noteRunning": "Configurazione · {made} di {total} creati",
+      "noteAlertsOn": "{made} di {total} creati · {count} avviso attivo | {made} di {total} creati · {count} avvisi attivi",
+      "noteAlertsOff": "{made} di {total} creati · avvisi disattivati",
+      "noteAlreadyHere": "{made} di {total} creati · {count} già presenti"
+    },
+    "alertStep": {
+      "turnOn": "Attiva {count} avviso del pack | Attiva {count} avvisi del pack",
+      "sendTo": "Invia a",
+      "sendToEmail": "Invia a: {icon} Inviami un'email — {email}",
+      "emailCreateNote": "Nessuna destinazione in questa organizzazione. La configurazione aggiunge una destinazione email per te (o ne riutilizza una che invia solo a te).",
+      "noDestination": "Nessuna destinazione. Aggiungine una in Avvisi → Destinazioni.",
+      "destinationsFailed": "Impossibile caricare le destinazioni, quindi Invia a è disattivato. Gli avvisi possono riceverne una in seguito in Avvisi → Destinazioni.",
+      "destinations": "{count} destinazione in questa organizzazione | {count} destinazioni in questa organizzazione",
+      "chooseDestination": "Scegli una destinazione",
+      "pickDestination": "Scegli una destinazione per Invia a, oppure deselezionalo"
+    },
+    "ready": {
+      "title": "Il monitoraggio di {title} è pronto",
+      "emailFailed": "Non è stato possibile creare la tua destinazione email, quindi gli avvisi sono stati aggiunti disattivati.",
+      "emailForbidden": "Non puoi aggiungere destinazioni di avvisi in questa organizzazione, quindi la tua destinazione email non è stata creata e gli avvisi sono stati aggiunti disattivati."
+    },
+    "popup": {
+      "title": "Pack iniziali",
+      "subtitle": "{count} pack si adatta ai dati che già invii | {count} pack si adattano ai dati che già invii",
+      "subtitleAllSetUp": "Tutti i pack che si adattano ai tuoi dati sono configurati",
+      "subtitleNone": "Nessun pack corrisponde ancora",
+      "items": "{count} elemento | {count} elementi",
+      "setUpAgo": "Configurato {when}",
+      "stopped": "Configurazione interrotta a metà",
+      "whatGetsCreated": "Cosa viene creato",
+      "tileDashboards": "{count} Dashboard | {count} Dashboard",
+      "tileAlerts": "{count} Avviso | {count} Avvisi",
+      "tileSavedViews": "{count} Vista salvata | {count} Viste salvate",
+      "noneDashboards": "Dashboard",
+      "noneAlerts": "Avvisi",
+      "noneSavedViews": "Viste salvate",
+      "noneInPack": "Nessuno in questo pacchetto",
+      "sevCritical": "{count} critici",
+      "sevWarning": "{count} avvisi",
+      "sevInfo": "{count} info",
+      "chooseNext": "Scegli quali elementi creare nel passaggio successivo",
+      "reviewSetUp": "Rivedi il pacchetto",
+      "viewPack": "Visualizza pacchetto",
+      "checkAgain": "Controlla di nuovo",
+      "checkFailed": "Impossibile controllare. Riprova",
+      "emptyTitle": "Nessun pacchetto corrisponde ancora ai tuoi dati",
+      "emptyText": "I pacchetti compaiono quando OpenObserve rileva dati da un'origine che conosce, come Kubernetes, host, Docker, PostgreSQL o AWS. Invia dati, poi controlla di nuovo.",
+      "back": "Indietro",
+      "backToPacks": "Torna ai pacchetti",
+      "keepsGoing": "Puoi chiudere questa finestra. La configurazione continua."
+    },
+    "viewPack": {
+      "open": "Apri",
+      "openLabel": "Apri {name}",
+      "dashboard": "Dashboard",
+      "dashboards": "Dashboard",
+      "dashboardsMeta": "{count} dashboard | {count} dashboard",
+      "alerts": "Avvisi",
+      "alertsMeta": "{count} · {on} attivi · {silent} silenziati",
+      "alertsMetaFailed": "{count} · {on} attivi · {silent} silenziati · {failed} non creati",
+      "savedView": "Vista salvata · condivisa con tutti in questa organizzazione",
+      "savedViews": "Viste salvate",
+      "savedViewsMeta": "{count} vista salvata · condivisa con tutti in questa organizzazione | {count} viste salvate · condivise con tutti in questa organizzazione",
+      "on": "Attivo",
+      "silent": "Silenziato",
+      "notCreated": "Non creato",
+      "showMore": "Mostra altri {count}",
+      "showLess": "Mostra meno",
+      "ordinary": "Questi sono normali avvisi, dashboard e viste. Puoi modificarli o eliminarli nelle rispettive pagine.",
+      "setUpByYou": "Configurato da te {when}",
+      "setUpBy": "Configurato da {who} {when}",
+      "setUpWhen": "Configurato {when}",
+      "partialTitle": "Il monitoraggio di {title} è configurato, {count} elemento non è stato creato | Il monitoraggio di {title} è configurato, {count} elementi non sono stati creati",
+      "partialNote": "Il resto è pronto. Riprova un elemento qui sotto oppure riprovali tutti.",
+      "partialSubtitle": "{made} di {total} creati · {failed} non creati"
+    }
   },
   "alert_library": {
     "header": "Libreria di avvisi",

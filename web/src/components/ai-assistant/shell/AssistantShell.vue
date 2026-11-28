@@ -334,14 +334,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-else-if="state === 'empty' && welcome"
         :variant="density === 'roomy' ? 'roomy' : 'compact'"
         :scope="welcome.scope.value"
-        :starters="welcome.starters.value"
+        :starters="welcomeStarters"
         :loading="welcome.loading.value"
         :container="container"
         :sid="activeSid"
         :opening="opening"
         @select-starter="onStarter"
         @open-chat="onOpenChat"
-      />
+      >
+        <template v-if="packsOffered" #before-starters>
+          <StarterPackCatalogGate :org="org">
+            <StarterPackOffer
+              :key="org"
+              :org="org"
+              variant="compact"
+              @digest="(text) => (packDigest = text)"
+            />
+          </StarterPackCatalogGate>
+        </template>
+      </AssistantWelcome>
       <slot v-else-if="state === 'conversation'" name="transcript">
         <AssistantTranscript
           ref="transcript"
@@ -499,6 +510,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : undefined
           "
           :low-credits="lowCredits"
+          :send-chips="digestSendChips"
+          @remove-send-chip="dismissDigest(digestKey)"
+          @send-chips-withdrawn="onDigestWithdrawn"
           @show-running="openChats"
           @low-credits="onLowCredits"
         >
@@ -603,6 +617,7 @@ const focusServed = new WeakMap<object, number>();
 <script setup lang="ts">
 import {
   computed,
+  defineAsyncComponent,
   effectScope,
   inject,
   nextTick,
@@ -664,10 +679,22 @@ import AssistantTurnOutcome, {
 import AssistantNewChatBelow from "@/components/ai-assistant/welcome/AssistantNewChatBelow.vue";
 import AssistantWelcome from "@/components/ai-assistant/welcome/AssistantWelcome.vue";
 import {
+  adoptPendingDismissal,
+  clearPendingDismissal,
+  digestDismissed,
+  dismissDigest,
+  packDigestChip,
+  packStarter,
+  PACK_DIGEST_CHIP_ID,
+  PENDING_DIGEST,
+} from "@/components/ai-assistant/welcome/starterWelcome";
+import { STARTER_PACKS_ENABLED } from "@/constants/starterPacks";
+import {
   approvalOutcomeOf,
   assistantApprovals,
   orgDisplayName,
   isRunning,
+  MAX_CHIP_BYTES,
   MAX_FLOATING_CHATS,
   noteAssistantKeydown,
   markSignedIn,
@@ -692,6 +719,7 @@ import {
   type AssistantSession,
   type Container,
   type GateReason,
+  type ContextChip,
   type Starter,
 } from "@/composables/assistant";
 import {
@@ -1011,6 +1039,71 @@ watch(
 );
 onScopeDispose(() => welcomeScope.stop());
 
+// Pack code loads only where the offer can show: a panel's empty chat in an org with packs on.
+const StarterPackCatalogGate = defineAsyncComponent(
+  () => import("@/components/starterPacks/StarterPackCatalogGate.vue"),
+);
+const StarterPackOffer = defineAsyncComponent(
+  () => import("@/components/starterPacks/StarterPackOffer.vue"),
+);
+// Packs are offered on a general new chat in the main panel only: never in a dock, a window,
+// the full page, or a chat an editor or page opened about one of its objects.
+const packsOffered = computed(
+  () =>
+    STARTER_PACKS_ENABLED &&
+    !!org.value &&
+    props.placement === "sidebar" &&
+    !props.sid &&
+    (!session.value || session.value.origin.objectKind === "none"),
+);
+const packDigest = ref<string | null>(null);
+// While packs are offered, the first starter asks about them with their digest beside it.
+const welcomeStarters = computed<Starter[]>(() => {
+  const starters = welcome.value?.starters.value ?? [];
+  if (!packDigest.value) return starters;
+  return [packStarter(packDigest.value, t), ...starters].map((starter, index) => ({
+    ...starter,
+    dataTest: `assistant-starter-${index}` as const,
+  }));
+});
+// A new chat's first message carries the digest unless the user removes it; the draft itself stays empty.
+const digestKey = computed(() => activeSid.value ?? PENDING_DIGEST);
+const digestSendChips = computed<ContextChip[]>(() => {
+  const digest = packDigest.value;
+  if (!packsOffered.value || !digest || session.value?.messages.length) return [];
+  if (digestDismissed(digestKey.value)) return [];
+  const held = session.value?.composer.chips ?? [];
+  if (held.some((chip) => chip.id === PACK_DIGEST_CHIP_ID)) return [];
+  const chip = packDigestChip(digest, t);
+  // A digest the draft has no room for would be dropped at send, so it is not offered.
+  const bytes = held.reduce((sum, other) => sum + other.sizeBytes, 0);
+  return bytes + chip.sizeBytes > MAX_CHIP_BYTES ? [] : [chip];
+});
+// A removal before the chat existed belongs to the chat the first keystroke starts.
+watch(activeSid, (now, before) => {
+  if (now && !before) adoptPendingDismissal(now);
+});
+// One that never got a chat ends with the welcome or the panel, so the next empty chat offers it again.
+watch([packDigest, visible], ([digest, shown]) => {
+  if (!digest || !shown) clearPendingDismissal();
+});
+// A refused send takes back the chip it added; that is not the user removing it.
+const digestWithdrawn = new Set<string>();
+function onDigestWithdrawn(sid: string): void {
+  digestWithdrawn.add(sid);
+  void nextTick(() => digestWithdrawn.delete(sid));
+}
+// Removing a digest chip the pack starter staged removes the digest from that chat too.
+const digestStaged = computed(
+  () => !!session.value?.composer.chips.some((chip) => chip.id === PACK_DIGEST_CHIP_ID),
+);
+watch(
+  () => [activeSid.value, digestStaged.value] as const,
+  ([sid, staged], [wasSid, was]) => {
+    if (!sid || sid !== wasSid || staged || !was || session.value?.messages.length) return;
+    if (!digestWithdrawn.delete(sid)) dismissDigest(sid);
+  },
+);
 // The transcript imports no store (constraint 29); the shell hands it the session and the actions it may ask for.
 const messageSources = new Map<string, ComputedRef<ChatMessage[]>>();
 provide(assistantSessionSourceKey, (sid) => {

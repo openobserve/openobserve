@@ -17,7 +17,7 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { openobserveRum } from "@openobserve/browser-rum";
 import { closeSearchSocket } from "@/composables/useSearchWebSocket";
 import { dismissAll } from "@/lib/feedback/Toast/useToast";
-import { expireSession, stopSessionServices } from "./sessionServices";
+import { clearStarterPackKeys, expireSession, stopSessionServices } from "./sessionServices";
 
 vi.mock("@openobserve/browser-rum", () => ({
   openobserveRum: {
@@ -28,6 +28,22 @@ vi.mock("@openobserve/browser-rum", () => ({
 }));
 vi.mock("@/composables/useSearchWebSocket", () => ({ closeSearchSocket: vi.fn() }));
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ dismissAll: vi.fn() }));
+
+describe("clearStarterPackKeys", () => {
+  it("removes the starter pack keys of both storages, and nothing else", () => {
+    for (const storage of [localStorage, sessionStorage]) {
+      storage.setItem("o2.starterPacks.gate.org.me@x.io", "open");
+      storage.setItem("o2.unrelated", "1");
+    }
+
+    clearStarterPackKeys();
+
+    for (const storage of [localStorage, sessionStorage]) {
+      expect(Object.keys(storage)).toEqual(["o2.unrelated"]);
+      storage.clear();
+    }
+  });
+});
 
 describe("stopSessionServices", () => {
   afterEach(() => vi.clearAllMocks());
@@ -93,6 +109,23 @@ describe("expireSession", () => {
     expect(sessionStorage.getItem("searchState")).toBeNull();
     sessionStorage.clear();
   });
+
+  it.each([false, true])(
+    "removes this browser's starter pack keys whatever clearLocalStorage is (%s)",
+    (clearLocalStorage) => {
+      vi.stubGlobal("location", { ...window.location, reload: vi.fn() });
+      localStorage.setItem("o2.starterPacks.browserMatches.org.me@x.io", "{}");
+      localStorage.setItem("o2.starterPacks.browserMatches.other.you@x.io", "{}");
+      localStorage.setItem("o2_draft:function:o:f:me%40x.io", "{}");
+      const store = { state: { zoConfig: { rum: { enabled: false } } }, dispatch: vi.fn() };
+
+      expireSession(store, { clearLocalStorage });
+
+      const keys = Object.keys(localStorage);
+      expect(keys.filter((key) => key.startsWith("o2.starterPacks."))).toEqual([]);
+      expect(localStorage.getItem("o2_draft:function:o:f:me%40x.io")).toBe("{}");
+    },
+  );
 
   it("goes to the login page instead of reloading when asked, keeping the drafts", () => {
     const reload = vi.fn();

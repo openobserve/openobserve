@@ -69,6 +69,13 @@ export const alertsListQuery = (
     staleTime: LIVE_STALE_TIME,
   });
 
+export const alertsByTagsQuery = (org: string, tags: string[]) =>
+  queryOptions({
+    queryKey: alertKeys.byTags(org, tags),
+    queryFn: async (): Promise<any[]> => (await alerts.listByTags(org, tags)).data?.list ?? [],
+    staleTime: LIVE_STALE_TIME,
+  });
+
 /**
  * The dependency graph's alert read: every folder, with the destination and
  * template refs the default path omits. Cached so the graph shares one entry

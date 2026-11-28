@@ -27,6 +27,7 @@ import {
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { CREDIT_NOTICE_PREFIX } from "@/composables/assistant/useAssistantCredits";
+import { MAX_CHIP_BYTES } from "@/composables/assistant";
 import type { HistoryDeps } from "@/composables/assistant/useAssistantHistory";
 import { usePaidOverageConsent } from "@/composables/usePaidOverageConsent";
 import { raw } from "@/types/i18n";
@@ -51,6 +52,11 @@ import {
 import { setRuntimeHandle } from "@/composables/assistant/runtimeHandle";
 
 import brandLocale from "@/locales/languages/en-US.json";
+import {
+  packDigestChip,
+  PACK_DIGEST_CHIP_ID,
+  resetDigestDismissalsForTests,
+} from "@/components/ai-assistant/welcome/starterWelcome";
 
 const brandNames = brandLocale.brand;
 
@@ -91,6 +97,41 @@ vi.mock("@/composables/assistant", async (importOriginal) => ({
     };
   },
 }));
+// Packs stay off unless a spec turns them on; the offer is a double that hands the shell a digest.
+const packs = vi.hoisted(() => ({ enabled: false, digest: null as string | null }));
+vi.mock("@/constants/starterPacks", () => ({
+  get STARTER_PACKS_ENABLED() {
+    return packs.enabled;
+  },
+}));
+vi.mock("@/components/starterPacks/StarterPackCatalogGate.vue", async () => {
+  const { defineComponent } = await import("vue");
+  return {
+    __esModule: true,
+    default: defineComponent({
+      setup:
+        (_props, { slots }) =>
+        () =>
+          slots.default?.(),
+    }),
+  };
+});
+vi.mock("@/components/starterPacks/StarterPackOffer.vue", async () => {
+  const { defineComponent, h, onBeforeUnmount } = await import("vue");
+  return {
+    __esModule: true,
+    default: defineComponent({
+      name: "StarterPackOffer",
+      props: { org: String, variant: String },
+      emits: ["digest"],
+      setup(_props, { emit }) {
+        emit("digest", packs.digest);
+        onBeforeUnmount(() => emit("digest", null));
+        return () => h("div", { "data-test": "assistant-pack-offer" });
+      },
+    }),
+  };
+});
 vi.mock("@/lib/feedback/Toast/useToast", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/feedback/Toast/useToast")>()),
   toast: vi.fn(),
@@ -1865,5 +1906,198 @@ describe("AssistantShell history states", () => {
     notice.value = { sid: "gone-too", via: "server", opening: true };
     await flushPromises();
     expect(root(wrapper).attributes("data-state")).toBe("conversation");
+  });
+});
+
+describe("AssistantShell starter packs", () => {
+  const DIGEST = "Starter packs for your data: Kubernetes\n\nPack: Kubernetes (id: kubernetes)";
+  const ComposerStub = defineComponent({
+    name: "AssistantComposer",
+    props: { sid: { type: String, default: null }, sendChips: { type: Array, default: () => [] } },
+    emits: ["remove-send-chip"],
+    template: '<div data-test="assistant-composer" />',
+  });
+
+  beforeEach(() => {
+    packs.enabled = true;
+    packs.digest = DIGEST;
+    resetDigestDismissalsForTests();
+  });
+  afterEach(() => {
+    packs.enabled = false;
+    packs.digest = null;
+  });
+
+  // The real shell composer slot, with the composer itself a double that shows what it was handed.
+  const mountPanel = (props: Partial<AssistantShellProps> = {}) => {
+    fake.current = fakeAssistant("available", {}, {}, 80, false, {});
+    const wrapper = mount(AssistantShell, {
+      props: { placement: "sidebar", ...props },
+      slots: { transcript: '<div data-test="assistant-transcript">transcript</div>' },
+      global: { plugins: [fakeRouter(), fakeVuex()], stubs: { AssistantComposer: ComposerStub } },
+      attachTo: document.body,
+    });
+    return { wrapper, store: fake.current.store };
+  };
+  const sendChips = (wrapper: any) =>
+    wrapper.getComponent({ name: "AssistantComposer" }).props("sendChips") as {
+      id: string;
+      data: string;
+    }[];
+  const newChat = (store: any) =>
+    store.createSession({
+      origin: { entryKind: "empty_state", objectKind: "none", container: "sidebar" },
+    });
+
+  it("offers packs between the greeting and the starters, with the pack question first", async () => {
+    const { wrapper } = mountPanel();
+    await flushPromises();
+    const welcome = wrapper.get('[data-test="assistant-welcome"]');
+    expect(welcome.find('[data-test="assistant-pack-offer"]').exists()).toBe(true);
+    expect(wrapper.get('[data-test="assistant-starter-0"]').text()).toBe(
+      "Which starter packs fit my data, and what will each one create?",
+    );
+    expect(wrapper.get('[data-test="assistant-starter-1"]').text()).toBe("Why did errors spike?");
+  });
+
+  it("shows the digest by the composer before any chat exists, and keeps the chat's draft empty", async () => {
+    const { wrapper, store } = mountPanel();
+    await flushPromises();
+    expect(sendChips(wrapper).map((chip) => chip.data)).toEqual([DIGEST]);
+    const sid = newChat(store);
+    await flushPromises();
+    expect(store.state.shell.activeSid).toBe(sid);
+    expect(sendChips(wrapper)).toHaveLength(1);
+    expect(store.state.sessions[sid].composer.chips).toEqual([]);
+    expect(store.state.sessions[sid].composer.text).toBe("");
+  });
+
+  it("drops the digest from a chat once removed there, and offers it again in the next new chat", async () => {
+    const { wrapper, store } = mountPanel();
+    await flushPromises();
+    const first = newChat(store);
+    await flushPromises();
+    wrapper.getComponent({ name: "AssistantComposer" }).vm.$emit("remove-send-chip", "x");
+    await flushPromises();
+    expect(sendChips(wrapper)).toEqual([]);
+    // An empty chat is reused by New chat, so the first one is given a message before the next opens.
+    store.state.sessions[first].messages.push({ role: "user", content: "hi" });
+    const second = newChat(store);
+    await flushPromises();
+    expect(second).not.toBe(first);
+    expect(store.state.shell.activeSid).toBe(second);
+    expect(sendChips(wrapper)).toHaveLength(1);
+  });
+
+  it("keeps a removal made before the chat existed for the chat that then starts", async () => {
+    const { wrapper, store } = mountPanel();
+    await flushPromises();
+    wrapper.getComponent({ name: "AssistantComposer" }).vm.$emit("remove-send-chip", "x");
+    await flushPromises();
+    newChat(store);
+    await flushPromises();
+    expect(sendChips(wrapper)).toEqual([]);
+  });
+
+  it("drops the digest for a chat once its staged digest chip is removed", async () => {
+    const { wrapper, store } = mountPanel();
+    await flushPromises();
+    const sid = newChat(store);
+    store.stage(sid, { text: "q", chips: [packDigestChip(DIGEST)], mode: "replace" });
+    await flushPromises();
+    expect(sendChips(wrapper)).toEqual([]);
+    store.removeChip(sid, PACK_DIGEST_CHIP_ID);
+    await flushPromises();
+    expect(sendChips(wrapper)).toEqual([]);
+  });
+
+  it("keeps offering the digest after a refused send takes its chip back", async () => {
+    const { wrapper, store } = mountPanel();
+    await flushPromises();
+    const sid = newChat(store);
+    await flushPromises();
+    store.addChip(sid, packDigestChip(DIGEST));
+    await flushPromises();
+    store.removeChip(sid, PACK_DIGEST_CHIP_ID);
+    wrapper.getComponent({ name: "AssistantComposer" }).vm.$emit("send-chips-withdrawn", sid);
+    await flushPromises();
+    expect(sendChips(wrapper)).toHaveLength(1);
+  });
+
+  it("does not offer a digest the draft has no room for", async () => {
+    const { wrapper, store } = mountPanel();
+    await flushPromises();
+    const sid = newChat(store);
+    store.state.sessions[sid].composer.chips.push({
+      ...packDigestChip("x"),
+      id: "big",
+      kind: "query",
+      sizeBytes: MAX_CHIP_BYTES - 10,
+    });
+    await flushPromises();
+    expect(sendChips(wrapper)).toEqual([]);
+  });
+
+  it("forgets a removal made before any chat once the welcome goes", async () => {
+    const { wrapper } = mountPanel();
+    await flushPromises();
+    const composer = () => wrapper.getComponent({ name: "AssistantComposer" });
+    composer().vm.$emit("remove-send-chip", "x");
+    await flushPromises();
+    expect(sendChips(wrapper)).toEqual([]);
+    const offer = wrapper.findComponent({ name: "StarterPackOffer" });
+    offer.vm.$emit("digest", null);
+    await flushPromises();
+    offer.vm.$emit("digest", DIGEST);
+    await flushPromises();
+    expect(sendChips(wrapper)).toHaveLength(1);
+  });
+
+  it("offers no packs in a chat an editor opened about its object", async () => {
+    const { wrapper, store } = mountPanel();
+    await flushPromises();
+    store.createSession({
+      origin: { entryKind: "editor_toggle", objectKind: "function", container: "sidebar" },
+    });
+    await flushPromises();
+    expect(wrapper.find('[data-test="assistant-pack-offer"]').exists()).toBe(false);
+    expect(sendChips(wrapper)).toEqual([]);
+  });
+
+  it("stages the pack question with its digest chip and sends nothing", async () => {
+    const { wrapper, store } = setup();
+    await flushPromises();
+    const send = vi.spyOn(store, "send");
+    await wrapper.get('[data-test="assistant-starter-0"]').trigger("click");
+    await flushPromises();
+    const sid = store.state.shell.activeSid;
+    expect(store.state.sessions[sid].composer.text).toBe(
+      "Which starter packs fit my data, and what will each one create?",
+    );
+    expect(
+      store.state.sessions[sid].composer.chips.filter(
+        (chip: { id: string }) => chip.id === PACK_DIGEST_CHIP_ID,
+      ),
+    ).toHaveLength(1);
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["an editor dock", { placement: "docked" as const }],
+    ["a chat window", { placement: "window" as const, sid: "w1" }],
+    ["the full page", { placement: "full" as const, density: "roomy" as const }],
+  ])("offers no packs in %s", async (_where, props) => {
+    const { wrapper } = setup(props);
+    await flushPromises();
+    expect(wrapper.find('[data-test="assistant-pack-offer"]').exists()).toBe(false);
+    expect(wrapper.text()).not.toContain("Which starter packs fit my data");
+  });
+
+  it("keeps today's welcome when packs are not offered", async () => {
+    packs.digest = null;
+    const { wrapper } = mountPanel();
+    await flushPromises();
+    expect(wrapper.get('[data-test="assistant-starter-0"]').text()).toBe("Why did errors spike?");
+    expect(sendChips(wrapper)).toEqual([]);
   });
 });

@@ -50,6 +50,17 @@ vi.mock("./AssistantMessageActions.vue", () => ({
   },
 }));
 
+// Packs are on, and the pack rows are a double that shows which message they were handed.
+vi.mock("@/constants/starterPacks", () => ({ STARTER_PACKS_ENABLED: true }));
+vi.mock("@/components/starterPacks/StarterPackTurnRows.vue", () => ({
+  __esModule: true,
+  default: {
+    name: "PackRowsStub",
+    props: ["request", "org"],
+    template: '<div data-test="pack-rows-stub" :data-org="org">{{ request.content }}</div>',
+  },
+}));
+
 const COMPACTED = join(
   __dirname,
   "../../../composables/assistant/__fixtures__/record/compacted/frames.json",
@@ -784,5 +795,72 @@ describe("AssistantTranscript: agents (MULTI-AGENT-03, 04, 05)", () => {
       wrapper.find('[data-test="assistant-answer-t1"] [data-test="assistant-follow-ups"]').exists(),
     ).toBe(true);
     expect(wrapper.findAll('[data-test="assistant-follow-ups"]')).toHaveLength(1);
+  });
+});
+
+describe("AssistantTranscript starter pack rows", () => {
+  afterEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  const DIGEST = "Starter packs for your data: Kubernetes\n\nPack: Kubernetes (id: kubernetes)";
+  const packPrompt = (turnId: string): ChatMessage => ({
+    ...prompt("Which packs fit?", turnId),
+    chips: [
+      {
+        id: "starter-pack-digest",
+        kind: "pasted_text",
+        label: raw("Starter packs for your data"),
+        data: DIGEST,
+        sizeBytes: DIGEST.length,
+        provenance: "attach",
+        sent: "serialized",
+      },
+    ],
+  });
+
+  it("shows the pack rows under an answer to a message that sent the digest, and only there", async () => {
+    const session = liveSession([
+      packPrompt("t1"),
+      reply("Kubernetes fits."),
+      prompt("Thanks", "t2"),
+      reply("You're welcome."),
+    ]);
+    const { wrapper } = mountLive(session);
+    await flushPromises();
+    const rows = wrapper.findAll('[data-test="pack-rows-stub"]');
+    expect(rows).toHaveLength(1);
+    expect(rows[0].text()).toBe("Which packs fit?");
+    expect(rows[0].attributes("data-org")).toBe("acme");
+    expect(rows[0].element.closest('[data-test="assistant-answer-t1"]')).not.toBeNull();
+  });
+
+  it("waits for the answer to finish before showing them", async () => {
+    const session = liveSession([packPrompt("t2"), reply("Kubernetes")], {
+      state: "streaming",
+    } as unknown as TurnState);
+    const { wrapper } = mountLive(session);
+    await flushPromises();
+    expect(wrapper.find('[data-test="pack-rows-stub"]').exists()).toBe(false);
+  });
+
+  it("shows none under a failed or stopped turn", async () => {
+    const failed = liveSession([packPrompt("t1"), reply("")], {
+      state: "failed",
+      error: { code: "http_400" },
+    } as unknown as TurnState);
+    const { wrapper } = mountLive(failed);
+    await flushPromises();
+    expect(wrapper.find('[data-test="pack-rows-stub"]').exists()).toBe(false);
+
+    const stopped = liveSession([
+      packPrompt("t1"),
+      reply("Kuber", [{ type: "turn_outcome", outcome: { kind: "stopped", steps: 1 } }]),
+      prompt("Thanks", "t2"),
+      reply("You're welcome."),
+    ]);
+    const second = mountLive(stopped).wrapper;
+    await flushPromises();
+    expect(second.find('[data-test="pack-rows-stub"]').exists()).toBe(false);
   });
 });

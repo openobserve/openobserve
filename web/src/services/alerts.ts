@@ -15,6 +15,7 @@
 
 import type { AxiosRequestConfig } from "axios";
 import http from "./http";
+import { refreshOrgSummarySoon } from "./orgSummaryRefresh";
 import analytics from "./product_analytics";
 import type {
   AckAlertRequest,
@@ -97,11 +98,15 @@ const alerts = {
     }
     return options ? http().get(url, options) : http().get(url);
   },
+  /** Every folder's alerts carrying all the given tags; the backend ANDs them. */
+  listByTags: (org_identifier: string, tags: string[]) =>
+    http().get(`/api/v2/${org_identifier}/alerts`, { params: { tags: tags.join(",") } }),
   create: (org_identifier: string, stream_name: string, stream_type: string, data: any) => {
     return http()
       .post(`/api/${org_identifier}/${stream_name}/alerts?type=${stream_type}`, data)
       .then((res) => {
         analytics.track("alert_created");
+        refreshOrgSummarySoon(org_identifier);
         return res;
       });
   },
@@ -161,6 +166,7 @@ const alerts = {
     }
     return (options ? http().post(url, data, options) : http().post(url, data)).then((res) => {
       analytics.track("alert_created");
+      refreshOrgSummarySoon(org_identifier);
       return res;
     });
   },
@@ -387,6 +393,7 @@ const alerts = {
       .post(url, data)
       .then((res) => {
         analytics.track("alert_created");
+        refreshOrgSummarySoon(org_identifier);
         return res;
       });
   },

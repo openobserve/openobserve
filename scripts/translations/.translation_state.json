@@ -553,6 +553,7 @@
       "groups": "39bbb719fa2b9d22",
       "incidentIntegrations": "28df794d2558a7c3",
       "incidents": "bfe868931580fb3b",
+      "keyValues": "b0ab18a163b69ce7",
       "llmModelPricing": "794f915f46e1cc64",
       "llmProviders": "437dbe28117905aa",
       "metrics": "a58da793c7250f1b",
@@ -610,6 +611,7 @@
       "groups": "4ed379d418bb8629",
       "incidentIntegrations": "c04904d8df7467f6",
       "incidents": "a6d1765ab64d82a7",
+      "keyValues": "9a01505cdba9f367",
       "llmModelPricing": "794f915f46e1cc64",
       "llmProviders": "437dbe28117905aa",
       "metrics": "177a7ea3611fe6b1",
@@ -35253,6 +35255,376 @@
     },
     "hover": {
       "deprecated": "ea3b9aa6a78ad24c"
+    }
+  },
+  "starterPacks": {
+    "adapted": {
+      "change": "c0bf75bd78bf9572",
+      "choose": "c7f937836f5d82d5",
+      "dialogAllNote": "d7e60d90514e8725",
+      "dialogFieldLabel": "1bf3b6ca3da3186f",
+      "dialogFieldTitle": "4946003affb61748",
+      "dialogFields": "e96368d8515a1ac4",
+      "dialogFiltersOn": "5fd2e063b4616518",
+      "dialogNoValues": "b3c33c27ac6fa034",
+      "dialogPickFive": "f989787403dd1d80",
+      "dialogPickPlaceholder": "9ce54621444d0059",
+      "dialogPickStream": "2f7a4a493a168276",
+      "dialogSend": "b67f301cdd384e71",
+      "dialogUse": "fd11292e550bb4f2",
+      "dialogUseAll": "4e27fe6e527a9ca8",
+      "dialogUseChecked": "b77de8690b0e87dd",
+      "fieldCount": "9c330b6ded0e973b",
+      "fields": "616f48c1db195b6f",
+      "filterTitle": "ea2f16bf6774ba37",
+      "flavour": "f8db8f023d28e2df",
+      "lookRight": "c2ca5b6239cb2164",
+      "matchedBoth": "3d06db9b8258a689",
+      "matchedCount": "b563ab3ce2891113",
+      "matchedOne": "d0921ed9b8ae62d5",
+      "needsChoice": "5283ca0672983106",
+      "needsChoiceCount": "42997b69396508f8",
+      "noneFound": "608cac9ac0d6d53c",
+      "notFoundCount": "cfe7ec18bafa2981",
+      "oneMatch": "d70370bda354b725",
+      "or": "7175517a370b5cd2",
+      "severalMatch": "77033772c6bdb80c",
+      "sharedAsk": "c240b3eb4b6d6489",
+      "showFewer": "255beb6510e7827d",
+      "showMore": "e372f20a52883cff",
+      "someField": "f6ffefc739802a5c",
+      "streamCount": "6b316042014bb82b",
+      "streams": "bfd297afbf9e7430",
+      "values": "3e2e64cb777ee166",
+      "version": "dd167905de0defca",
+      "whichStream": "3e786bf8df721c68"
+    },
+    "alertStep": {
+      "chooseDestination": "ee63978fc3b6d11a",
+      "destinations": "1ad65d810c5f0911",
+      "destinationsFailed": "78a6d2114bf8f0d3",
+      "emailCreateNote": "ee0c1c2db819004a",
+      "noDestination": "3ac5b1846cc3f26c",
+      "pickDestination": "57707260af908336",
+      "sendTo": "9bcbb3bc11e28c33",
+      "sendToEmail": "4244599097a717b9",
+      "turnOn": "f3c1400b8bbf6cac"
+    },
+    "askAdmin": "0346afa1459acca1",
+    "busyBy": "09a0c9427dc487e4",
+    "busySomeone": "dd5f58bba0f6cdcc",
+    "busyYou": "f66e791e9f105bf4",
+    "card": {
+      "dashboards": "2e737eb9c60a16d4"
+    },
+    "countAlerts": "42c0f3db6ef90f50",
+    "drawer": {
+      "alerts": "8ff54e1da1e49db0",
+      "alertsMetaLine": "c0fbfe68df295658",
+      "allExist": "f5b0e5d414b7939d",
+      "continue": "31fbef162594de01",
+      "dashboard": "b829c867cb6891cc",
+      "dashboardNote": "e129bde246bd6002",
+      "error": "2585d6613b0004a0",
+      "folder": "74ccd43303847f26",
+      "folderValue": "e752bc09020a161b",
+      "loadingFit": "41e5664d03ceec03",
+      "notIncluded": "b665bfc292d96e31",
+      "noteForbidden": "cba55e5ebe020982",
+      "nothingToCreate": "fc738773bf02de43",
+      "openDashboard": "803f2313cdf44275",
+      "ordinaryNote": "46dca7264e7a82c3",
+      "packTitle": "f7d904c763586930",
+      "panelsFit": "2495e4295554c1b5",
+      "reach": "4257840e37902067",
+      "reachScoped": "3386d7ed5b80b3ae",
+      "reasonAlreadyHave": "f13d7eb1dc857603",
+      "reasonNeedsPlan": "e45083cb11bc5e36",
+      "reasonNoData": "bea1165a64440dcd",
+      "reasonNoFlavour": "0e858eb6d7cdb6cf",
+      "reasonUnavailable": "4869fe4208602043",
+      "savedViews": "f526842bd8d84513",
+      "savedViewsNote": "eda018fce632b37d",
+      "setUp": "4da10f1fbb17cac2",
+      "setUpCount": "1f21fb492ff765e4",
+      "source": "01e773c371d8f807",
+      "sourceOffline": "ceeb456e820f0081",
+      "view": "e6fb309292560677",
+      "viewPath": "719d08b65a4db9b7"
+    },
+    "guide": {
+      "rowSavedViews": "120a623aac9b5369"
+    },
+    "headerChip": {
+      "ariaLabel": "55e11e0d33aceba4",
+      "ariaLabelRunning": "85f1f1233326256b",
+      "label": "9456c8a6f907c914",
+      "progress": "8230817c16d4c16f"
+    },
+    "home": {
+      "askAdminLine": "b30641b7675ad634",
+      "bestStart": "54c29b008f89ec05",
+      "busyBy": "ff558132b2df8f96",
+      "busySomeone": "3af7ffec64bbb12e",
+      "busyYou": "3e147e40881ec366",
+      "cards": {
+        "andMore": "d4790acba0d9a942",
+        "default": {
+          "alerts": {
+            "fallback": "93413e603845e224",
+            "template": "fa8cea5fe1643611"
+          },
+          "dashboards": {
+            "fallback": "25ce2657810d0e28",
+            "template": "190afef4a42cc1ce"
+          },
+          "savedViews": {
+            "fallback": "151528b2bc0c7d0c",
+            "template": "2408ec8ea53fef11"
+          }
+        },
+        "hosts": {
+          "alerts": {
+            "fallback": "d6e9e8ea29ee890d",
+            "template": "c63dcd5545c54cd8"
+          },
+          "dashboards": {
+            "template": "294431593c4d825d"
+          }
+        },
+        "kubernetes": {
+          "alerts": {
+            "fallback": "f44888e58dbd44b5",
+            "plain": "d2fae32efcdc8eca",
+            "template": "25041913eeb759cc"
+          },
+          "dashboards": {
+            "fallback": "1c42abbca7913597",
+            "template": "302c22d85904f4d9"
+          },
+          "savedViews": {
+            "fallback": "cdad0dd2b5f5b1f9",
+            "template": "b9e51e04732f4e58"
+          }
+        },
+        "panels": "31bbca679806b213"
+      },
+      "clusterKind": "164cf1ca8391532e",
+      "connected": "22965568d22a14ee",
+      "error": "1c41eb71ed466f66",
+      "fromClusters": "b2173ae277bff6ac",
+      "heroLead": "54cdc8af251f28a5",
+      "heroTitle": "689e727abd180233",
+      "interrupted": "90bfd5e5c8670845",
+      "label": "9456c8a6f907c914",
+      "moreClusters": "f673b8344e479570",
+      "moreStreams": "dd61af233b905a79",
+      "moreStreamsChip": "ecccea94c62457a7",
+      "moreStreamsLabel": "348facf20a865a95",
+      "noAccessLine": "2ad0cdd08cf0465f",
+      "nothingFitsYet": "cdf808dd1cc750b3",
+      "previewFailed": "972ee81b33b1a731",
+      "railClusters": "ddd11cb99628110a",
+      "railCounts": "74266c1dbf970898",
+      "readyToAdd": "7cd86028abae2a83",
+      "reviewSetUp": "b3a27a48de846129",
+      "reviewSetUpLabel": "2eb8d7b0cc01408f",
+      "startedBy": "44c1ab0073d52c49",
+      "startedBySomeone": "73a5834a60231a0e",
+      "streamTypeLogs": "98f38f12db221a8c",
+      "streamTypeMetrics": "177a7ea3611fe6b1",
+      "streamTypeTraces": "b5ac69fc467c01f3",
+      "streamsUses": "b59968775a2c791f"
+    },
+    "installDialog": {
+      "attention": "8b3702ec3d8a3d32",
+      "failedReason": "c4b650c987d990ec",
+      "kindAlerts": "f62e9267d196c761",
+      "kindDashboards": "a53bcafb67d960df",
+      "rowFailed": "61c587547a3bb2fd",
+      "title": "a40902785cdae03e"
+    },
+    "manifest": {
+      "adapted": "486ff2844a3ad797",
+      "leftOut": "0bc9508cc8b998bf",
+      "tagEnterprise": "3fbe5ed156f14993",
+      "tagHaveIt": "47f5eaaad49f55d5",
+      "tagNeedsData": "f26370efccca1cff",
+      "tagUnavailable": "ca184496974204a0"
+    },
+    "matchCheck": {
+      "checked": "fd33a0f6d4cac3ae",
+      "checkedAt": "592d875de84f97c6",
+      "daysAgo": "c49aff4201091a5f",
+      "hoursAgo": "921c58d212da7c71",
+      "justNow": "7ddb44d8a533a753",
+      "minutesAgo": "6bf264f3fc92ac66"
+    },
+    "noPermission": "372d7fb44fe7b95a",
+    "packs": {
+      "argocd": {
+        "title": "e32af138eab22e99"
+      },
+      "aws-cloudwatch": {
+        "roles": {
+          "metrics": "ee60e6785bb910b3"
+        },
+        "title": "a0e5a850abbbeac7"
+      },
+      "docker": {
+        "title": "e6169e958b37ce86"
+      },
+      "genai": {
+        "title": "d284d0bb76cc44d6"
+      },
+      "github": {
+        "roles": {
+          "job_logs": "aba1618d033db762"
+        },
+        "title": "d0ddc3be76e87bee"
+      },
+      "hosts": {
+        "title": "bba9af131107680a"
+      },
+      "kubernetes": {
+        "fields": {
+          "k8s_cluster": "5e1da20e906fada1",
+          "k8s_container_name": "8d3a5415ee22e30f",
+          "k8s_namespace_name": "c4e4e7abda206b07",
+          "k8s_node_name": "e95984dd6ccbf408",
+          "k8s_pod_name": "e3529a56fbf24aca",
+          "kind": "7e047de1d8522fa3",
+          "message": "5d79b1c7b95654b5",
+          "reason": "43cbe7f5c67a5ce6"
+        },
+        "flavours": {
+          "opentelemetry": "ccc542051b196db0"
+        },
+        "roles": {
+          "events": "e5033fcb78fbd264"
+        },
+        "title": "a37d07fe30048d3a"
+      },
+      "postgresql": {
+        "title": "cc52d03280b7034c"
+      },
+      "traces": {
+        "title": "09da9954a0b8241f"
+      }
+    },
+    "popup": {
+      "back": "76900f1bfd16c8d4",
+      "backToPacks": "ca21f2bb07f43199",
+      "checkAgain": "32e60e730d2e6845",
+      "checkFailed": "1caca073d9e64d3f",
+      "chooseNext": "9c98746fc9c62632",
+      "emptyText": "5f3d0ddc2e1e15bd",
+      "emptyTitle": "56de5df2f6b2c315",
+      "items": "736ad44ae2e3ff21",
+      "keepsGoing": "dc19984fd0959acc",
+      "noneAlerts": "f62e9267d196c761",
+      "noneDashboards": "a53bcafb67d960df",
+      "noneInPack": "2334659ecf5c8deb",
+      "noneSavedViews": "8b4b9a23dfb5e991",
+      "reviewSetUp": "bb1f6c6f93570364",
+      "setUpAgo": "248b543b84cc9c8c",
+      "sevCritical": "97e8a7b9fe4cf2ae",
+      "sevInfo": "a84e3331299caa90",
+      "sevWarning": "ebb69fae92878897",
+      "stopped": "98cdbf824e0adf7e",
+      "subtitle": "132cbf69c7eab4d6",
+      "subtitleAllSetUp": "d6fbb78642695744",
+      "subtitleNone": "6b756e2731f7fcec",
+      "tileAlerts": "383d78b1646dc817",
+      "tileDashboards": "b27c7a0c92dee989",
+      "tileSavedViews": "6ccdd123c00166d3",
+      "title": "a95b7c1b85da1532",
+      "viewPack": "d1623d75eb8d36aa",
+      "whatGetsCreated": "f2e54cc89201a189"
+    },
+    "progress": {
+      "alertsOnTo": "6b2f10e116d4c82a",
+      "comeBack": "f8a2ec7134a8940e",
+      "created": "d70b9e24bca26b40",
+      "creating": "3b951ebd7c9647a1",
+      "creatingOn": "57d4ab8e4614edcf",
+      "emailMe": "6dbbd313cf808be4",
+      "finish": "a6c7a84baa6750fc",
+      "installError": "966158c7c914553a",
+      "interrupted": "58b9b2e9177b5e40",
+      "retry": "87c08032ad5598c2",
+      "rowAlerts": "3685638f9349d576",
+      "rowDashboards": "e791f65dea083285",
+      "rowViews": "1df7beb620c00efa",
+      "summary": "5fc28ca764e0c8b4",
+      "title": "5e9601af94a8842a",
+      "waiting": "6e293a8c009e0011"
+    },
+    "ready": {
+      "emailFailed": "c9ae58ed9ccf5a53",
+      "emailForbidden": "6fa1d5b948f570b0",
+      "title": "0bfe317a91b2e911"
+    },
+    "retryCheck": "9cda5bf2ede360c8",
+    "scope": "b0b658b862ebea51",
+    "scopeAll": "d56bd349b5d19023",
+    "scopeSeen": "a704b024fd9ebd94",
+    "severity": {
+      "critical": "427dd2969bd140be",
+      "info": "170322a32f3c35b2",
+      "warning": "e981ddae45d8f4ca"
+    },
+    "startedBy": "a62245001ed25f4c",
+    "startedBySomeone": "50c9ece1ee2959c0",
+    "stepper": {
+      "content": "da0f63e197417563",
+      "interrupted": "132d124d6bb3d811",
+      "noteAlertsOff": "c553dea7bff89cb0",
+      "noteAlertsOn": "7e4079e6abb7f800",
+      "noteAlreadyHere": "0b2be6ee2965749c",
+      "noteRunning": "55ac06047ca8a3a3",
+      "ready": "5fa7aac5375c5815",
+      "settingUp": "c894bba9c3e787e4",
+      "setup": "dbdf27e5db8d8cde"
+    },
+    "viewPack": {
+      "alerts": "f62e9267d196c761",
+      "alertsMeta": "08e1982b5e5ba638",
+      "alertsMetaFailed": "7280df9fca7069dc",
+      "dashboard": "67b696468610b879",
+      "dashboards": "a53bcafb67d960df",
+      "dashboardsMeta": "2e737eb9c60a16d4",
+      "notCreated": "1d1827745b69f605",
+      "on": "130011756125313c",
+      "open": "ed077f3d8125d60d",
+      "openLabel": "f687d18152a5b541",
+      "ordinary": "c3cee8013c44e29e",
+      "partialNote": "070ec5239787423c",
+      "partialSubtitle": "a0b75fd545d5d868",
+      "partialTitle": "c829d997e09d8043",
+      "savedView": "08a350151ad39d89",
+      "savedViews": "81184cb517eda985",
+      "savedViewsMeta": "e6176d9adfa342ec",
+      "setUpBy": "bf39f6e0c43125ed",
+      "setUpByYou": "4253dd10bc1756d3",
+      "setUpWhen": "248b543b84cc9c8c",
+      "showLess": "94ea9b1d33a02975",
+      "showMore": "e372f20a52883cff",
+      "silent": "ddbcf06726488a43"
+    },
+    "whatGetsCreated": {
+      "footprint": "161e54977dc26439",
+      "nameInUse": "bf69545e7044db8a",
+      "notSeenYet": "ae814fc1bee4782b",
+      "reachStarted": "f845cd286fdb7a48",
+      "reachStartedScoped": "5a23dfab284094a4",
+      "savedIn": "d66f6ec40f80a055",
+      "selectGroup": "04c7eb30365f4ee5",
+      "selectRow": "cbe2f0672d5fa312",
+      "skipped": "12698ce1ea5cd4ab",
+      "skippedNote": "2d4a295ed232b98b",
+      "subtitle": "0acb96c402275743",
+      "subtitleScoped": "8098970e0826b40c"
     }
   },
   "statusPages": {

@@ -631,8 +631,12 @@ defineExpose({
   /** Focus on arrival; skipped when the field is gated or the user is elsewhere. */
   focusAsk: () => focusWhenReady(() => input.value?.textarea),
   /** Puts an example prompt in the field, with the agent it is for when that one can answer, and focuses it. */
-  fill: (prompt: string, forAgent?: AgentId) => {
+  fill: (prompt: string, forAgent?: AgentId, chips: ContextChip[] = []) => {
     text.value = prompt;
+    // A chip with the same id is replaced, so a second fill carries its latest content.
+    const ids = new Set(chips.map((chip) => chip.id));
+    if (chips.length)
+      mentionChips.value = [...mentionChips.value.filter((held) => !ids.has(held.id)), ...chips];
     const usable = capability.value.agents?.some((row) => row.id === forAgent && row.available);
     if (forAgent && usable && !props.fixedAgent) agent.value = forAgent;
     void nextTick(() => input.value?.textarea?.focus());

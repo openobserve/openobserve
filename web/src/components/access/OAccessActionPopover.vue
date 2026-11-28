@@ -25,6 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :close-on-scroll="false"
     :side-offset="-1"
     :collision-padding="8"
+    :z-index="ABOVE_DIALOGS"
     content-class="border-0!"
     @update:open="onOpenChange"
     @open-auto-focus="keepFocus"
@@ -50,6 +51,9 @@ import { computed, ref, watch } from "vue";
 import OPopover from "@/lib/overlay/Popover/OPopover.vue";
 import OAccessDeniedCard from "@/components/access/OAccessDeniedCard.vue";
 import { useAccessBoundary, type AccessDenial } from "@/composables/useAccessStore";
+
+// The card's portal can sit before a dialog's in the page, so an equal layer would paint under it.
+const ABOVE_DIALOGS = 9000;
 
 const { actionNotice, dismissAction } = useAccessBoundary();
 const card = ref<{ focus: () => void; $el?: Element } | null>(null);

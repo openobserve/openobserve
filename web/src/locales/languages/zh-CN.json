@@ -700,6 +700,7 @@
       "cipherKeys": "加密密钥",
       "announcementBanners": "公告横幅",
       "regexPatterns": "正则表达式模式",
+      "keyValues": "键值",
       "evalJobs": "在线评估任务",
       "billingGroup": "账单组",
       "syntheticChecks": "合成监控检查",
@@ -757,6 +758,7 @@
       "cipherKeys": "加密密钥",
       "announcementBanners": "公告横幅",
       "regexPatterns": "正则表达式模式",
+      "keyValues": "键值",
       "unnamed": "此资源",
       "onCall": "值班",
       "incidentIntegrations": "事件集成",
@@ -15099,6 +15101,376 @@
     "countIncidentIntegration": "{count} 个事件集成 | {count} 个事件集成",
     "sectionOtherConsumers": "还被以下使用",
     "countDowntime": "{count} 个停机 | {count} 个停机"
+  },
+  "starterPacks": {
+    "packs": {
+      "kubernetes": {
+        "title": "Kubernetes",
+        "fields": {
+          "k8s_cluster": "集群名称",
+          "k8s_namespace_name": "命名空间",
+          "k8s_pod_name": "Pod 名称",
+          "k8s_node_name": "节点名称",
+          "k8s_container_name": "容器名称",
+          "kind": "事件类型",
+          "reason": "事件原因",
+          "message": "事件消息"
+        },
+        "roles": {
+          "events": "Kubernetes 事件"
+        },
+        "flavours": {
+          "opentelemetry": "OpenTelemetry"
+        }
+      },
+      "hosts": {
+        "title": "主机"
+      },
+      "traces": {
+        "title": "追踪 (APM)"
+      },
+      "postgresql": {
+        "title": "PostgreSQL"
+      },
+      "docker": {
+        "title": "Docker"
+      },
+      "aws-cloudwatch": {
+        "title": "AWS CloudWatch",
+        "roles": {
+          "metrics": "CloudWatch 指标"
+        }
+      },
+      "genai": {
+        "title": "AI（LLM 应用）"
+      },
+      "github": {
+        "title": "GitHub（Actions）",
+        "roles": {
+          "job_logs": "GitHub Actions 作业日志"
+        }
+      },
+      "argocd": {
+        "title": "Argo CD"
+      }
+    },
+    "retryCheck": "重试入门包检查",
+    "countAlerts": "{count} 个告警 | {count} 个告警",
+    "scope": "告警范围：{value}",
+    "scopeAll": "所有集群",
+    "scopeSeen": "所有集群 · 目前已发现 {count} 个：{clusters}",
+    "noPermission": "您无法在此组织中设置此包。请联系管理员。",
+    "askAdmin": "请管理员进行设置",
+    "busyBy": "{who} 正在设置此包。请稍后再查看。",
+    "busySomeone": "其他人正在设置此包。请稍后再查看。",
+    "busyYou": "您正在另一个标签页中设置此包。请稍后再查看。",
+    "startedBy": "{who} 已开始设置此包。",
+    "startedBySomeone": "其他人已开始设置此包。",
+    "card": {
+      "dashboards": "{count} 个仪表盘 | {count} 个仪表盘"
+    },
+    "manifest": {
+      "leftOut": "{count} 项已排除 | {count} 项已排除",
+      "tagEnterprise": "企业版",
+      "tagNeedsData": "需要数据",
+      "tagHaveIt": "已有数据",
+      "tagUnavailable": "不可用",
+      "adapted": "已适配您的数据"
+    },
+    "installDialog": {
+      "title": "已创建 {made}/{total} 项",
+      "attention": "{title} · {count} 项需要您关注 | {title} · {count} 项需要您关注",
+      "failedReason": "无法创建。请重试。",
+      "kindDashboards": "仪表盘",
+      "kindAlerts": "告警",
+      "rowFailed": "失败 · {name}"
+    },
+    "home": {
+      "label": "入门包",
+      "error": "无法检查您的数据以匹配入门包",
+      "fromClusters": "来自 {clusters}",
+      "moreStreams": "+{count} 个数据流 | +{count} 个数据流",
+      "moreStreamsLabel": "更多匹配的数据流",
+      "interrupted": "{title} 设置中途停止 · 已完成 {made}/{total}",
+      "startedBy": "{who} 开始设置 {title}。",
+      "startedBySomeone": "其他人开始设置 {title}。",
+      "busyBy": "{who} 正在设置 {title}。",
+      "busySomeone": "其他人正在设置 {title}。",
+      "busyYou": "您正在另一个标签页中设置 {title}。",
+      "askAdminLine": "入门包与您的数据匹配。请联系管理员添加。",
+      "noAccessLine": "您无权在此组织中使用入门包。请联系管理员。",
+      "heroTitle": "数据已实时接入。约一分钟即可完成现成仪表盘和告警的设置",
+      "heroLead": "来自 {count} 个匹配您数据的包 | 来自 {count} 个匹配您数据的包",
+      "readyToAdd": "可添加",
+      "clusterKind": "集群",
+      "connected": "已连接",
+      "moreClusters": "+{count} 个集群 | +{count} 个集群",
+      "railClusters": "{count} 个集群 | {count} 个集群",
+      "railCounts": "{clusters} · {streams}",
+      "streamsUses": "此包使用的数据流 · {count}",
+      "moreStreamsChip": "+{count} 个",
+      "streamTypeLogs": "日志",
+      "streamTypeMetrics": "指标",
+      "streamTypeTraces": "追踪",
+      "reviewSetUp": "查看入门包",
+      "reviewSetUpLabel": "查看 {title} 入门包",
+      "bestStart": "推荐从这里开始",
+      "cards": {
+        "andMore": "{list} 以及另外 {count} 个",
+        "panels": "{count} 个面板 | {count} 个面板",
+        "kubernetes": {
+          "dashboards": {
+            "template": "{title}：{panels}，用于 {clusters}。 | {title}：{panels}，用于 {clusters} 个集群。",
+            "fallback": "{title}：涵盖每个节点、Pod 和工作负载。"
+          },
+          "alerts": {
+            "template": "{alert_names}。对每个集群触发（{clusters}）。在您开启前处于关闭状态。",
+            "fallback": "{alert_names}。对每个集群触发。在您开启前处于关闭状态。",
+            "plain": "对每个集群触发。在您开启前处于关闭状态。"
+          },
+          "savedViews": {
+            "template": "Kubernetes 事件：{stream} 中的每个事件，可从日志一键查看。",
+            "fallback": "Kubernetes 事件，可从日志一键查看。"
+          }
+        },
+        "hosts": {
+          "dashboards": {
+            "template": "主机指标：每台主机的 CPU、内存和磁盘。"
+          },
+          "alerts": {
+            "template": "{alert_names}。对每台主机触发。在您开启前处于关闭状态。",
+            "fallback": "对每台主机触发。在您开启前处于关闭状态。"
+          }
+        },
+        "default": {
+          "dashboards": {
+            "template": "{title}：{panels}，用于您的数据。",
+            "fallback": "{title}，为你的数据流而构建。"
+          },
+          "alerts": {
+            "template": "{alert_names}。在你的所有匹配数据上触发。在你启用前保持关闭。",
+            "fallback": "在你的所有匹配数据上触发。在你启用前保持关闭。"
+          },
+          "savedViews": {
+            "template": "{stream}，在日志中一键可达。",
+            "fallback": "从日志一键到达。"
+          }
+        }
+      },
+      "previewFailed": "无法加载此包所设置的内容。请查看后重试。",
+      "nothingFitsYet": "此包中暂无适合你的数据的内容。待其数据到达后，相应条目会显示在这里。"
+    },
+    "whatGetsCreated": {
+      "subtitle": "{title} 入门包",
+      "subtitleScoped": "{title} 入门包 · 为 {scope} 构建",
+      "savedIn": "已保存在文件夹 {folder} 中",
+      "skippedNote": "跳过了 {count} 项 · 保留你现有的项 | 跳过了 {count} 项 · 保留你现有的项",
+      "nameInUse": "{name} 已存在 · 保留你的",
+      "skipped": "已跳过",
+      "notSeenYet": "尚未检测到",
+      "footprint": "影响范围",
+      "reachStarted": "后台查询：每个已启动的告警按各自的时间表运行",
+      "reachStartedScoped": "告警范围：{scope} · 后台查询：每个已启动的告警按各自的时间表运行",
+      "selectGroup": "全选 {group} 中的项",
+      "selectRow": "选择 {name}"
+    },
+    "drawer": {
+      "packTitle": "{title} 包",
+      "view": "Kubernetes 视图",
+      "viewPath": "基础设施 › Kubernetes",
+      "dashboard": "{title} 仪表盘",
+      "dashboardNote": "设置后打开",
+      "panelsFit": "{count} 个面板适合你的数据。设置后打开。 | {count} 个面板适合你的数据。设置后打开。",
+      "alerts": "告警，在你启用前保持关闭",
+      "savedViews": "日志中的已保存视图",
+      "savedViewsNote": "与此组织中的所有人共享",
+      "folder": "文件夹",
+      "folderValue": "{name}（入门包）",
+      "reach": "后台查询：暂无",
+      "reachScoped": "告警范围：{scope} · 后台查询：暂无",
+      "notIncluded": "未包含",
+      "reasonAlreadyHave": "{name}：你已拥有",
+      "reasonNoData": "{name}：尚未检测到相关数据",
+      "reasonUnavailable": "{name}：当前不在资源库中",
+      "reasonNeedsPlan": "{name}：需要企业版计划",
+      "source": "来自 {host} 的资源库。此版本内置的包可离线使用。",
+      "sourceOffline": "无法访问 {host}。正在使用此版本内置的包，该包可离线使用。",
+      "nothingToCreate": "你已拥有此包中的所有条目",
+      "openDashboard": "打开仪表盘",
+      "error": "无法加载此包创建的内容",
+      "reasonNoFlavour": "{name}：尚不适用于你的指标名称",
+      "loadingFit": "正在检查哪些条目适合你的数据",
+      "noteForbidden": "{title} · 你无权设置此包",
+      "setUp": "设置",
+      "allExist": "你已拥有此包中全部 {count} 个条目。现有告警保留其设置。",
+      "continue": "继续",
+      "setUpCount": "设置 {count} 个条目 | 设置 {count} 个条目",
+      "ordinaryNote": "添加普通仪表盘、告警和视图，列在包的页面上。可在各自的页面上编辑或删除它们。",
+      "alertsMetaLine": "{count} · {severity}"
+    },
+    "progress": {
+      "title": "正在设置 {title} 监控",
+      "summary": "已创建 {made}/{total}",
+      "created": "已创建",
+      "creating": "创建中",
+      "waiting": "等待中",
+      "rowAlerts": "告警 {made}/{total}",
+      "rowViews": "已保存视图 {made}/{total}",
+      "rowDashboards": "仪表盘 {made}/{total}",
+      "retry": "重试 {count} 项 | 重试 {count} 项",
+      "finish": "完成",
+      "interrupted": "设置已中断 · 已完成 {made}/{total}",
+      "installError": "设置未完成。请重试。",
+      "comeBack": "已创建 {made}/{total} · 您可以关闭此项并继续工作。可从顶部的入门包中再次找到。",
+      "alertsOnTo": "创建中 · 已开启，发送至 {destination}",
+      "emailMe": "发邮件给我（{email}）",
+      "creatingOn": "创建中 · 已开启"
+    },
+    "severity": {
+      "critical": "严重",
+      "warning": "警告",
+      "info": "信息"
+    },
+    "adapted": {
+      "someField": "某个字段",
+      "flavour": "使用 {name} 版本",
+      "change": "更改",
+      "streams": "数据流",
+      "fields": "字段",
+      "version": "版本",
+      "streamCount": "{count} 个数据流 | {count} 个数据流",
+      "fieldCount": "{count} 个字段 | {count} 个字段",
+      "matchedBoth": "{streams} 和 {fields} 已与您的数据匹配",
+      "matchedOne": "{what} 已与您的数据匹配",
+      "needsChoiceCount": "{count} 项需要您选择 | {count} 项需要您选择",
+      "notFoundCount": "未找到 {count} 项",
+      "matchedCount": "已匹配 {count} 项",
+      "whichStream": "{what} 是哪个数据流？",
+      "lookRight": "{count} 项看起来正确 | {count} 项看起来正确",
+      "noneFound": "未找到 {what}",
+      "showMore": "再显示 {count} 项",
+      "needsChoice": "需要选择",
+      "severalMatch": "{count} 个数据流看起来像 {what}",
+      "oneMatch": "{stream} 看起来像 {what}",
+      "sharedAsk": "哪些记录是 {what}？",
+      "choose": "选择",
+      "dialogFields": "{matched}/{total} 个字段",
+      "dialogUse": "使用 {stream}",
+      "dialogUseAll": "使用全部 {count} 个",
+      "dialogUseChecked": "使用这 {count} 个",
+      "dialogAllNote": "全部：仪表盘会有一个数据流选择器，每个使用此内容的告警都会按数据流分别设置一次。",
+      "dialogPickFive": "最多选择 {count} 个数据流。",
+      "dialogPickStream": "选择数据流",
+      "dialogPickPlaceholder": "选择数据流",
+      "dialogFiltersOn": "从 {stream} 读取，仅读取 {field} 为 {value} 的记录",
+      "dialogNoValues": "过去 24 小时内未找到此字段的任何值。",
+      "dialogSend": "或将它们发送到 {stream}：在采集器中设置此标头",
+      "dialogFieldTitle": "为 {what} 选择字段",
+      "dialogFieldLabel": "{stream} 中的字段",
+      "values": "出现过的值：{values}",
+      "or": "或",
+      "filterTitle": "添加过滤器，使入门包仅读取 {what}",
+      "showFewer": "显示更少"
+    },
+    "matchCheck": {
+      "checked": "上次检查：{when}",
+      "checkedAt": "上次检查：{time}（您的本地时间）",
+      "justNow": "刚刚",
+      "minutesAgo": "{count} 分钟前",
+      "hoursAgo": "{count} 小时前",
+      "daysAgo": "{count} 天前"
+    },
+    "headerChip": {
+      "label": "入门包",
+      "ariaLabel": "入门包，{count} 个适合您的数据 | 入门包，{count} 个适合您的数据",
+      "progress": "已完成 {made}/{total}",
+      "ariaLabelRunning": "入门包，正在设置 {made}/{total}"
+    },
+    "guide": {
+      "rowSavedViews": "{count} 个已保存视图 | {count} 个已保存视图"
+    },
+    "stepper": {
+      "content": "选择内容",
+      "setup": "正在设置",
+      "settingUp": "正在设置…",
+      "interrupted": "已中断",
+      "ready": "就绪",
+      "noteRunning": "正在设置 · 已创建 {made}/{total}",
+      "noteAlertsOn": "已创建 {made}/{total} · {count} 个告警已开启 | 已创建 {made}/{total} · {count} 个告警已开启",
+      "noteAlertsOff": "已创建 {made}/{total} · 告警已关闭",
+      "noteAlreadyHere": "已创建 {made}/{total} · 已有 {count} 个"
+    },
+    "alertStep": {
+      "turnOn": "开启 {count} 个入门包告警 | 开启 {count} 个入门包告警",
+      "sendTo": "发送到",
+      "sendToEmail": "发送到：{icon} 通过电子邮件发给我 — {email}",
+      "emailCreateNote": "此组织尚无目标。设置时会为您添加一个电子邮件目标（或复用仅向您发送的目标）。",
+      "noDestination": "尚无目标。请在告警 → 目标下添加一个。",
+      "destinationsFailed": "无法加载目标，因此“发送到”已关闭。之后可在告警 → 目标下为告警添加目标。",
+      "destinations": "此组织有 {count} 个目标 | 此组织有 {count} 个目标",
+      "chooseDestination": "选择目标",
+      "pickDestination": "为“发送到”选择目标，或取消勾选"
+    },
+    "ready": {
+      "title": "{title} 监控已就绪",
+      "emailFailed": "无法创建您的电子邮件目标，因此已添加的告警处于关闭状态。",
+      "emailForbidden": "您无法在此组织中添加告警目标，因此未创建您的电子邮件目标，已添加的告警处于关闭状态。"
+    },
+    "popup": {
+      "title": "入门包",
+      "subtitle": "{count} 个入门包适合您已发送的数据 | {count} 个入门包适合您已发送的数据",
+      "subtitleAllSetUp": "所有适合您数据的入门包均已设置",
+      "subtitleNone": "尚无匹配的入门包",
+      "items": "{count} 个项目 | {count} 个项目",
+      "setUpAgo": "设置于 {when}",
+      "stopped": "设置中途停止",
+      "whatGetsCreated": "将创建的内容",
+      "tileDashboards": "{count} 个仪表盘 | {count} 个仪表盘",
+      "tileAlerts": "{count} 个告警 | {count} 个告警",
+      "tileSavedViews": "{count} 个已保存视图 | {count} 个已保存视图",
+      "noneDashboards": "仪表盘",
+      "noneAlerts": "告警",
+      "noneSavedViews": "已保存视图",
+      "noneInPack": "此套件中无内容",
+      "sevCritical": "{count} 个严重",
+      "sevWarning": "{count} 个警告",
+      "sevInfo": "{count} 个信息",
+      "chooseNext": "选择要在下一步创建的项",
+      "reviewSetUp": "检查套件",
+      "viewPack": "查看套件",
+      "checkAgain": "再次检查",
+      "checkFailed": "无法检查。请重试",
+      "emptyTitle": "暂无与您的数据匹配的套件",
+      "emptyText": "当 OpenObserve 检测到来自已知来源（例如 Kubernetes、主机、Docker、PostgreSQL 或 AWS）的数据时，套件就会出现。发送数据后，请再次检查。",
+      "back": "返回",
+      "backToPacks": "返回套件列表",
+      "keepsGoing": "您可以关闭此窗口。设置会继续。"
+    },
+    "viewPack": {
+      "open": "打开",
+      "openLabel": "打开 {name}",
+      "dashboard": "仪表盘",
+      "dashboards": "仪表盘",
+      "dashboardsMeta": "{count} 个仪表盘 | {count} 个仪表盘",
+      "alerts": "告警",
+      "alertsMeta": "{count} · {on} 项启用 · {silent} 项静默",
+      "alertsMetaFailed": "{count} · {on} 项启用 · {silent} 项静默 · {failed} 项未创建",
+      "savedView": "已保存视图 · 与本组织所有人共享",
+      "savedViews": "已保存视图",
+      "savedViewsMeta": "{count} 个已保存视图 · 与本组织所有人共享 | {count} 个已保存视图 · 与本组织所有人共享",
+      "on": "启用",
+      "silent": "静默",
+      "notCreated": "未创建",
+      "showMore": "再显示 {count} 项",
+      "showLess": "收起",
+      "ordinary": "这些是普通告警、仪表盘和视图。可在各自的页面上编辑或删除它们。",
+      "setUpByYou": "由您设置于 {when}",
+      "setUpBy": "由 {who} 设置于 {when}",
+      "setUpWhen": "设置于 {when}",
+      "partialTitle": "{title} 监控已设置，{count} 项未创建 | {title} 监控已设置，{count} 项未创建",
+      "partialNote": "其余项已就绪。请在下方重试某一项，或重试全部。",
+      "partialSubtitle": "已创建 {made}/{total} · {failed} 项未创建"
+    }
   },
   "alert_library": {
     "header": "告警库",

@@ -28,6 +28,7 @@ import {
 } from "@/utils/drafts/draftSession";
 import { countAllDraftsFor, endEditorDraftSession } from "@/utils/drafts/editorDraftStore";
 import {
+  clearStarterPackKeys,
   silenceUnloadPrompts,
   stopSessionServices,
   type SessionServicesStore,
@@ -64,6 +65,7 @@ export const endSignedInSession = (
   localStorage.removeItem("isFirstTimeLogin");
   // the open sample tour is this user's; the full reload that follows drops its in-memory copy
   localStorage.removeItem("o2_sample_tour");
+  clearStarterPackKeys();
   if (keepDrafts) store.dispatch("logout");
   else {
     store.dispatch("logout", { draftsOf: userEmail });

@@ -68,6 +68,15 @@ export const clearLocalStorageKeepingDrafts = (): void => {
   keys.forEach((key) => localStorage.removeItem(key));
 };
 
+/** Removes every starter pack key, since its matches and choices describe this user's data. */
+export const clearStarterPackKeys = (): void => {
+  for (const storage of [localStorage, sessionStorage]) {
+    for (const key of Object.keys(storage)) {
+      if (key.startsWith("o2.starterPacks.")) storage.removeItem(key);
+    }
+  }
+};
+
 /** Ends a session the server rejected and reloads: the user's drafts stay, so the work survives the next login. */
 export const expireSession = (
   store: ExpiringStore,
@@ -85,6 +94,7 @@ export const expireSession = (
   useLocalCurrentUser("", true);
   useLocalUserInfo("", true);
   if (clearLocalStorage) clearLocalStorageKeepingDrafts();
+  clearStarterPackKeys();
   clearSessionStorageKeepingDrafts();
   // The session is gone, so an editor's "leave site?" prompt could only keep the user on a dead page.
   silenceUnloadPrompts();

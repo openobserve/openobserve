@@ -700,6 +700,7 @@
       "cipherKeys": "암호 키",
       "announcementBanners": "공지 배너",
       "regexPatterns": "정규식 패턴",
+      "keyValues": "키 값",
       "evalJobs": "온라인 평가 작업",
       "billingGroup": "결제 그룹",
       "syntheticChecks": "Synthetics 체크",
@@ -757,6 +758,7 @@
       "cipherKeys": "암호 키",
       "announcementBanners": "공지 배너",
       "regexPatterns": "정규식 패턴",
+      "keyValues": "키 값",
       "unnamed": "이 리소스",
       "onCall": "온콜",
       "incidentIntegrations": "인시던트 연동",
@@ -15099,6 +15101,376 @@
     "countIncidentIntegration": "{count}개의 인시던트 통합 | {count}개의 인시던트 통합",
     "sectionOtherConsumers": "다음에서도 사용",
     "countDowntime": "{count}개의 다운타임 | {count}개의 다운타임"
+  },
+  "starterPacks": {
+    "packs": {
+      "kubernetes": {
+        "title": "쿠버네티스",
+        "fields": {
+          "k8s_cluster": "클러스터 이름",
+          "k8s_namespace_name": "네임스페이스",
+          "k8s_pod_name": "파드 이름",
+          "k8s_node_name": "노드 이름",
+          "k8s_container_name": "컨테이너 이름",
+          "kind": "이벤트 종류",
+          "reason": "이벤트 사유",
+          "message": "이벤트 메시지"
+        },
+        "roles": {
+          "events": "쿠버네티스 이벤트"
+        },
+        "flavours": {
+          "opentelemetry": "OpenTelemetry"
+        }
+      },
+      "hosts": {
+        "title": "호스트"
+      },
+      "traces": {
+        "title": "트레이스 (APM)"
+      },
+      "postgresql": {
+        "title": "PostgreSQL"
+      },
+      "docker": {
+        "title": "Docker"
+      },
+      "aws-cloudwatch": {
+        "title": "AWS CloudWatch",
+        "roles": {
+          "metrics": "CloudWatch 메트릭"
+        }
+      },
+      "genai": {
+        "title": "AI (LLM 앱)"
+      },
+      "github": {
+        "title": "GitHub (Actions)",
+        "roles": {
+          "job_logs": "GitHub Actions 작업 로그"
+        }
+      },
+      "argocd": {
+        "title": "Argo CD"
+      }
+    },
+    "retryCheck": "팩 확인을 다시 시도하세요",
+    "countAlerts": "{count}개 알림 | {count}개 알림",
+    "scope": "알림 범위: {value}",
+    "scopeAll": "모든 클러스터",
+    "scopeSeen": "모든 클러스터 · 지금까지 확인된 {count}개: {clusters}",
+    "noPermission": "이 조직에서는 이 팩을 설정할 수 없습니다. 관리자에게 요청하세요.",
+    "askAdmin": "관리자에게 설정을 요청하세요",
+    "busyBy": "{who}님이 지금 이 팩을 설정하고 있습니다. 1분 후에 다시 확인해 주세요.",
+    "busySomeone": "다른 사람이 지금 이 팩을 설정하고 있습니다. 1분 후에 다시 확인해 주세요.",
+    "busyYou": "다른 탭에서 이 팩을 설정하고 있습니다. 1분 후에 다시 확인해 주세요.",
+    "startedBy": "{who}님이 이 팩 설정을 시작했습니다.",
+    "startedBySomeone": "다른 사람이 이 팩 설정을 시작했습니다.",
+    "card": {
+      "dashboards": "{count}개 대시보드 | {count}개 대시보드"
+    },
+    "manifest": {
+      "leftOut": "{count}개 항목 제외됨 | {count}개 항목 제외됨",
+      "tagEnterprise": "엔터프라이즈",
+      "tagNeedsData": "데이터 필요",
+      "tagHaveIt": "보유 중",
+      "tagUnavailable": "사용 불가",
+      "adapted": "데이터에 맞게 조정됨"
+    },
+    "installDialog": {
+      "title": "{total}개 항목 중 {made}개 생성됨",
+      "attention": "{title} · {count}개 확인 필요 | {title} · {count}개 확인 필요",
+      "failedReason": "생성할 수 없습니다. 다시 시도해 주세요.",
+      "kindDashboards": "대시보드",
+      "kindAlerts": "알림",
+      "rowFailed": "실패 · {name}"
+    },
+    "home": {
+      "label": "스타터 팩",
+      "error": "데이터에서 팩을 확인할 수 없습니다",
+      "fromClusters": "{clusters}에서",
+      "moreStreams": "+{count}개 스트림 | +{count}개 스트림",
+      "moreStreamsLabel": "일치하는 스트림 더 보기",
+      "interrupted": "{title} 설정이 중단됨 · {total}개 중 {made}개 완료",
+      "startedBy": "{who}님이 {title} 설정을 시작했습니다.",
+      "startedBySomeone": "다른 사람이 {title} 설정을 시작했습니다.",
+      "busyBy": "{who}님이 현재 {title} 설정 중입니다.",
+      "busySomeone": "다른 사람이 현재 {title} 설정 중입니다.",
+      "busyYou": "다른 탭에서 {title} 설정 중입니다.",
+      "askAdminLine": "스타터 팩이 데이터에 맞습니다. 관리자에게 추가를 요청하세요.",
+      "noAccessLine": "이 조직에서 스타터 팩에 액세스할 수 없습니다. 관리자에게 문의하세요.",
+      "heroTitle": "데이터가 실시간입니다. 약 1분 만에 바로 사용할 수 있는 대시보드와 알림을 설정하세요",
+      "heroLead": "데이터에 맞는 {count}개 팩 | 데이터에 맞는 {count}개 팩",
+      "readyToAdd": "추가 준비됨",
+      "clusterKind": "클러스터",
+      "connected": "연결됨",
+      "moreClusters": "+{count}개 클러스터 | +{count}개 클러스터",
+      "railClusters": "{count}개 클러스터 | {count}개 클러스터",
+      "railCounts": "{clusters} · {streams}",
+      "streamsUses": "이 팩이 사용하는 스트림 · {count}",
+      "moreStreamsChip": "+{count}개 더",
+      "streamTypeLogs": "로그",
+      "streamTypeMetrics": "메트릭",
+      "streamTypeTraces": "트레이스",
+      "reviewSetUp": "팩 검토",
+      "reviewSetUpLabel": "{title} 팩 검토",
+      "bestStart": "시작하기 가장 좋은 곳",
+      "cards": {
+        "andMore": "{list} 외 {count}개",
+        "panels": "{count}개 패널 | {count}개 패널",
+        "kubernetes": {
+          "dashboards": {
+            "template": "{title}: {clusters}개 클러스터용 {panels}. | {title}: {clusters}개 클러스터용 {panels}.",
+            "fallback": "{title}: 모든 노드, 파드, 워크로드."
+          },
+          "alerts": {
+            "template": "{alert_names}. 모든 클러스터({clusters})에 대해 발생합니다. 활성화할 때까지 꺼져 있습니다.",
+            "fallback": "{alert_names}. 모든 클러스터에 대해 발생합니다. 활성화할 때까지 꺼져 있습니다.",
+            "plain": "모든 클러스터에 대해 발생합니다. 활성화할 때까지 꺼져 있습니다."
+          },
+          "savedViews": {
+            "template": "쿠버네티스 이벤트: {stream}의 모든 이벤트를 로그에서 한 번의 클릭으로 확인할 수 있습니다.",
+            "fallback": "쿠버네티스 이벤트를 로그에서 한 번의 클릭으로 확인할 수 있습니다."
+          }
+        },
+        "hosts": {
+          "dashboards": {
+            "template": "호스트 메트릭: 각 호스트의 CPU, 메모리, 디스크."
+          },
+          "alerts": {
+            "template": "{alert_names}. 모든 호스트에 대해 발생합니다. 활성화할 때까지 꺼져 있습니다.",
+            "fallback": "모든 호스트에 대해 발생합니다. 활성화할 때까지 꺼져 있습니다."
+          }
+        },
+        "default": {
+          "dashboards": {
+            "template": "{title}: 데이터에 대한 {panels}.",
+            "fallback": "{title}, 스트림에 맞춰 구성되었습니다."
+          },
+          "alerts": {
+            "template": "{alert_names}. 일치하는 모든 데이터에 대해 발생합니다. 켤 때까지 꺼져 있습니다.",
+            "fallback": "일치하는 모든 데이터에 대해 발생합니다. 켤 때까지 꺼져 있습니다."
+          },
+          "savedViews": {
+            "template": "{stream}, 로그에서 한 번의 클릭으로 확인하세요.",
+            "fallback": "로그에서 한 번의 클릭으로."
+          }
+        }
+      },
+      "previewFailed": "이 팩에서 설정하는 항목을 불러오지 못했습니다. 검토한 후 다시 시도하세요.",
+      "nothingFitsYet": "아직 이 팩에서 데이터에 맞는 항목이 없습니다. 데이터가 도착하면 해당 항목이 여기에 표시됩니다."
+    },
+    "whatGetsCreated": {
+      "subtitle": "{title} 스타터 팩",
+      "subtitleScoped": "{title} 스타터 팩 · {scope}에 맞춰 구성되었습니다",
+      "savedIn": "{folder} 폴더에 저장됩니다",
+      "skippedNote": "{count}개 항목 건너뜀 · 기존 항목은 유지됩니다 | {count}개 항목 건너뜀 · 기존 항목은 유지됩니다",
+      "nameInUse": "{name} 항목이 이미 존재합니다 · 기존 항목은 유지됩니다",
+      "skipped": "건너뜀",
+      "notSeenYet": "아직 확인되지 않음",
+      "footprint": "적용 범위",
+      "reachStarted": "백그라운드 쿼리: 시작된 각 알림은 자체 일정에 따라 실행됩니다",
+      "reachStartedScoped": "알림 범위: {scope} · 백그라운드 쿼리: 시작된 각 알림은 자체 일정에 따라 실행됩니다",
+      "selectGroup": "{group}에서 모두 선택",
+      "selectRow": "{name} 선택"
+    },
+    "drawer": {
+      "packTitle": "{title} 팩",
+      "view": "쿠버네티스 뷰",
+      "viewPath": "인프라 › 쿠버네티스",
+      "dashboard": "{title} 대시보드",
+      "dashboardNote": "설정 후 열립니다",
+      "panelsFit": "{count}개 패널이 데이터에 맞습니다. 설정 후 열립니다. | {count}개 패널이 데이터에 맞습니다. 설정 후 열립니다.",
+      "alerts": "알림, 켤 때까지 꺼져 있음",
+      "savedViews": "로그의 저장된 뷰",
+      "savedViewsNote": "이 조직의 모든 사용자와 공유됩니다",
+      "folder": "폴더",
+      "folderValue": "{name} (스타터 팩)",
+      "reach": "백그라운드 쿼리: 현재 없음",
+      "reachScoped": "알림 범위: {scope} · 백그라운드 쿼리: 현재 없음",
+      "notIncluded": "포함되지 않음",
+      "reasonAlreadyHave": "{name}: 이미 보유 중입니다",
+      "reasonNoData": "{name}: 아직 관련 데이터가 확인되지 않았습니다",
+      "reasonUnavailable": "{name}: 현재 라이브러리에 없습니다",
+      "reasonNeedsPlan": "{name}: 엔터프라이즈 플랜이 필요합니다",
+      "source": "{host}의 라이브러리에서 가져옵니다. 이 버전에 내장된 팩은 오프라인에서도 작동합니다.",
+      "sourceOffline": "{host}에 연결할 수 없습니다. 오프라인에서도 작동하는 이 버전 내장 팩을 사용합니다.",
+      "nothingToCreate": "이 팩의 모든 항목을 이미 보유하고 있습니다",
+      "openDashboard": "대시보드 열기",
+      "error": "이 팩에서 생성하는 항목을 불러오지 못했습니다",
+      "reasonNoFlavour": "{name}: 현재 메트릭 이름에는 아직 사용할 수 없습니다",
+      "loadingFit": "데이터에 맞는 항목을 확인하는 중입니다",
+      "noteForbidden": "{title} · 이 팩을 설정할 권한이 없습니다",
+      "setUp": "설정하기",
+      "allExist": "이 팩의 {count}개 항목을 모두 이미 보유하고 있습니다. 기존 알림은 설정을 유지합니다.",
+      "continue": "계속",
+      "setUpCount": "{count}개 항목 설정하기 | {count}개 항목 설정하기",
+      "ordinaryNote": "팩 페이지에 나열된 일반 대시보드, 알림, 뷰를 추가합니다. 각 항목은 해당 페이지에서 편집하거나 삭제할 수 있습니다.",
+      "alertsMetaLine": "{count} · {severity}"
+    },
+    "progress": {
+      "title": "{title} 모니터링 설정 중",
+      "summary": "{total}개 중 {made}개 생성됨",
+      "created": "생성됨",
+      "creating": "생성 중",
+      "waiting": "대기 중",
+      "rowAlerts": "알림 {total}개 중 {made}개",
+      "rowViews": "저장된 뷰 {total}개 중 {made}개",
+      "rowDashboards": "대시보드 {total}개 중 {made}개",
+      "retry": "{count}개 항목 재시도 | {count}개 항목 재시도",
+      "finish": "완료",
+      "interrupted": "설정 중단됨 · {total}개 중 {made}개 완료",
+      "installError": "설정이 완료되지 않았습니다. 다시 시도하세요.",
+      "comeBack": "{total}개 중 {made}개 생성됨 · 이 창을 닫고 계속 작업할 수 있습니다. 헤더의 스타터 팩에서 다시 찾을 수 있습니다.",
+      "alertsOnTo": "생성 중 · 켜짐, {destination}(으)로 전송",
+      "emailMe": "이메일로 받기 ({email})",
+      "creatingOn": "생성 중 · 켜짐"
+    },
+    "severity": {
+      "critical": "심각",
+      "warning": "경고",
+      "info": "정보"
+    },
+    "adapted": {
+      "someField": "필드",
+      "flavour": "{name} 버전 사용",
+      "change": "변경",
+      "streams": "스트림",
+      "fields": "필드",
+      "version": "버전",
+      "streamCount": "{count}개 스트림 | {count}개 스트림",
+      "fieldCount": "{count}개 필드 | {count}개 필드",
+      "matchedBoth": "{streams} 및 {fields}이(가) 내 데이터와 일치",
+      "matchedOne": "{what}이(가) 내 데이터와 일치",
+      "needsChoiceCount": "선택이 필요한 항목 {count}개 | 선택이 필요한 항목 {count}개",
+      "notFoundCount": "{count}개 찾을 수 없음",
+      "matchedCount": "{count}개 일치",
+      "whichStream": "{what}은(는) 어느 스트림인가요?",
+      "lookRight": "{count}개 적합해 보임 | {count}개 적합해 보임",
+      "noneFound": "{what}을(를) 찾을 수 없음",
+      "showMore": "{count}개 더 보기",
+      "needsChoice": "선택 필요",
+      "severalMatch": "{count}개 스트림이 {what}으로 보임",
+      "oneMatch": "{stream}이(가) {what}으로 보임",
+      "sharedAsk": "어떤 레코드가 {what}인가요?",
+      "choose": "선택",
+      "dialogFields": "{total}개 필드 중 {matched}개",
+      "dialogUse": "{stream} 사용",
+      "dialogUseAll": "{count}개 모두 사용",
+      "dialogUseChecked": "이 {count}개 사용",
+      "dialogAllNote": "전체: 대시보드에 스트림 선택기가 추가되고, 이 필드를 읽는 각 알림은 스트림마다 한 번씩 설정됩니다.",
+      "dialogPickFive": "최대 {count}개 스트림을 선택하세요.",
+      "dialogPickStream": "스트림 선택",
+      "dialogPickPlaceholder": "스트림 선택",
+      "dialogFiltersOn": "{stream}에서 읽으며, {field} 값이 {value}인 레코드만 읽습니다",
+      "dialogNoValues": "지난 24시간 동안 이 필드의 값을 찾지 못했습니다.",
+      "dialogSend": "또는 {stream}으로 보내려면 수집기에서 이 헤더를 설정하세요",
+      "dialogFieldTitle": "{what}에 사용할 필드 선택",
+      "dialogFieldLabel": "{stream}의 필드",
+      "values": "확인된 값: {values}",
+      "or": "또는",
+      "filterTitle": "팩이 {what}만 읽도록 필터를 추가하세요",
+      "showFewer": "적게 표시"
+    },
+    "matchCheck": {
+      "checked": "{when} 확인함",
+      "checkedAt": "{time}에 확인함(현지 시간)",
+      "justNow": "방금",
+      "minutesAgo": "{count}분 전",
+      "hoursAgo": "{count}시간 전",
+      "daysAgo": "{count}일 전"
+    },
+    "headerChip": {
+      "label": "스타터 팩",
+      "ariaLabel": "스타터 팩, 데이터에 맞는 팩 {count}개 | 스타터 팩, 데이터에 맞는 팩 {count}개",
+      "progress": "{total}개 중 {made}개",
+      "ariaLabelRunning": "스타터 팩, {total}개 중 {made}개 설정 중"
+    },
+    "guide": {
+      "rowSavedViews": "저장된 뷰 {count}개 | 저장된 뷰 {count}개"
+    },
+    "stepper": {
+      "content": "콘텐츠 선택",
+      "setup": "설정 중",
+      "settingUp": "설정 중…",
+      "interrupted": "중단됨",
+      "ready": "준비됨",
+      "noteRunning": "설정 중 · {total}개 중 {made}개 생성됨",
+      "noteAlertsOn": "{total}개 중 {made}개 생성됨 · 알림 {count}개 켜짐 | {total}개 중 {made}개 생성됨 · 알림 {count}개 켜짐",
+      "noteAlertsOff": "{total}개 중 {made}개 생성됨 · 알림 꺼짐",
+      "noteAlreadyHere": "{total}개 중 {made}개 생성됨 · {count}개는 이미 있음"
+    },
+    "alertStep": {
+      "turnOn": "팩 알림 {count}개 켜기 | 팩 알림 {count}개 켜기",
+      "sendTo": "전송 대상",
+      "sendToEmail": "전송 대상: {icon} 이메일로 받기 — {email}",
+      "emailCreateNote": "이 조직에는 아직 대상이 없습니다. 설정 시 이메일 대상이 추가되며(또는 본인에게만 전송하는 기존 대상을 재사용합니다).",
+      "noDestination": "아직 대상이 없습니다. 알림 → 대상에서 추가하세요.",
+      "destinationsFailed": "대상을 불러오지 못해 전송 대상이 꺼져 있습니다. 나중에 알림 → 대상에서 대상을 추가할 수 있습니다.",
+      "destinations": "이 조직의 대상 {count}개 | 이 조직의 대상 {count}개",
+      "chooseDestination": "대상 선택",
+      "pickDestination": "전송 대상을 선택하거나 체크를 해제하세요"
+    },
+    "ready": {
+      "title": "{title} 모니터링이 준비되었습니다",
+      "emailFailed": "이메일 대상을 생성하지 못해 알림이 꺼진 상태로 추가되었습니다.",
+      "emailForbidden": "이 조직에서는 알림 대상을 추가할 수 없어 이메일 대상이 생성되지 않았고, 알림이 꺼진 상태로 추가되었습니다."
+    },
+    "popup": {
+      "title": "스타터 팩",
+      "subtitle": "이미 전송 중인 데이터에 맞는 팩 {count}개 | 이미 전송 중인 데이터에 맞는 팩 {count}개",
+      "subtitleAllSetUp": "데이터에 맞는 모든 팩이 설정되었습니다",
+      "subtitleNone": "아직 일치하는 팩이 없습니다",
+      "items": "항목 {count}개 | 항목 {count}개",
+      "setUpAgo": "{when} 설정됨",
+      "stopped": "설정이 중간에 중단되었습니다",
+      "whatGetsCreated": "생성되는 항목",
+      "tileDashboards": "대시보드 {count}개 | 대시보드 {count}개",
+      "tileAlerts": "{count} 알림 | {count} 알림",
+      "tileSavedViews": "{count} 저장된 뷰 | {count} 저장된 뷰",
+      "noneDashboards": "대시보드",
+      "noneAlerts": "알림",
+      "noneSavedViews": "저장된 뷰",
+      "noneInPack": "이 팩에 없음",
+      "sevCritical": "{count} 심각",
+      "sevWarning": "{count} 경고",
+      "sevInfo": "{count} 정보",
+      "chooseNext": "다음 단계에서 만들 항목을 선택하세요",
+      "reviewSetUp": "팩 검토",
+      "viewPack": "팩 보기",
+      "checkAgain": "다시 확인",
+      "checkFailed": "확인할 수 없습니다. 다시 시도하세요",
+      "emptyTitle": "아직 데이터와 일치하는 팩이 없습니다",
+      "emptyText": "OpenObserve가 쿠버네티스, 호스트, Docker, PostgreSQL, AWS 등 알고 있는 소스의 데이터를 확인하면 팩이 표시됩니다. 데이터를 보낸 후 다시 확인하세요.",
+      "back": "뒤로",
+      "backToPacks": "팩으로 돌아가기",
+      "keepsGoing": "이 창을 닫아도 됩니다. 설정은 계속 진행됩니다."
+    },
+    "viewPack": {
+      "open": "열기",
+      "openLabel": "{name} 열기",
+      "dashboard": "대시보드",
+      "dashboards": "대시보드",
+      "dashboardsMeta": "{count} 대시보드 | {count} 대시보드",
+      "alerts": "알림",
+      "alertsMeta": "{count} · {on} 켜짐 · {silent} 무음",
+      "alertsMetaFailed": "{count} · {on} 켜짐 · {silent} 무음 · {failed} 생성되지 않음",
+      "savedView": "저장된 뷰 · 이 조직의 모든 사용자와 공유됨",
+      "savedViews": "저장된 뷰",
+      "savedViewsMeta": "{count} 저장된 뷰 · 이 조직의 모든 사용자와 공유됨 | {count} 저장된 뷰 · 이 조직의 모든 사용자와 공유됨",
+      "on": "켜짐",
+      "silent": "무음",
+      "notCreated": "생성되지 않음",
+      "showMore": "{count}개 더 보기",
+      "showLess": "접기",
+      "ordinary": "이 항목은 일반 알림, 대시보드, 뷰입니다. 각 항목의 페이지에서 편집하거나 삭제하세요.",
+      "setUpByYou": "{when}에 직접 설정함",
+      "setUpBy": "{who}님이 {when}에 설정함",
+      "setUpWhen": "{when}에 설정함",
+      "partialTitle": "{title} 모니터링이 설정되었습니다. {count}개 항목이 생성되지 않았습니다 | {title} 모니터링이 설정되었습니다. {count}개 항목이 생성되지 않았습니다",
+      "partialNote": "나머지는 준비되었습니다. 아래 항목을 다시 시도하거나 모두 다시 시도하세요.",
+      "partialSubtitle": "{made} / {total} 생성됨 · {failed} 생성되지 않음"
+    }
   },
   "alert_library": {
     "header": "알림 라이브러리",

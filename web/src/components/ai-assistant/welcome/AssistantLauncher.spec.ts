@@ -210,6 +210,28 @@ describe("AssistantLauncher", () => {
     expect(open).not.toHaveBeenCalled();
   });
 
+  it("replaces a filled chip that has the same id, so the ask carries its latest content", async () => {
+    const { wrapper } = setupOn({});
+    await flushPromises();
+    const chip = (data: string) => ({
+      id: "starter-pack-digest",
+      kind: "pasted_text" as const,
+      label: raw("Starter packs for your data"),
+      data,
+      sizeBytes: data.length,
+      provenance: "attach" as const,
+      sent: "serialized" as const,
+    });
+    const vm = wrapper.vm as unknown as {
+      fill(prompt: string, agent?: string, chips?: unknown[]): void;
+    };
+    vm.fill("Which packs fit?", undefined, [chip("old")]);
+    vm.fill("Which packs fit?", undefined, [chip("new")]);
+    await flushPromises();
+    await input(wrapper).trigger("keydown", { key: "Enter" });
+    expect(open.mock.calls[0][0].payload.chips).toEqual([chip("new")]);
+  });
+
   it("picks the agent an example is for along with its prompt, when that agent can answer", async () => {
     const { wrapper } = setupOn({});
     fake.current.capability.value = { ...fake.current.capability.value, agents: ROSTER };
