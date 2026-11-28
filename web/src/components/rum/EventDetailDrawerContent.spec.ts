@@ -54,7 +54,7 @@ function createMockRawEvent(overrides: Record<string, any> = {}) {
 
 function createMockSessionDetails(overrides: Record<string, any> = {}) {
   return {
-    user_email: "test@example.com",
+    user_label: "Replay user",
     date: "Jan 01, 2024 12:00:00",
     browser: "Chrome",
     os: "MacOS",
@@ -399,9 +399,8 @@ describe("EventDetailDrawerContent", () => {
       expect(wrapper.text()).toContain("V 1.0.0");
     });
 
-    it("displays user email from sessionDetails", () => {
-      // Arrange & Assert
-      expect(wrapper.text()).toContain("test@example.com");
+    it("shows the session user label in the event overview", () => {
+      expect(wrapper.find('[data-test="event-session-meta-data"]').text()).toContain("Replay user");
     });
 
     it("displays browser name from sessionDetails", () => {
@@ -1248,7 +1247,7 @@ describe("EventDetailDrawerContent", () => {
     it.skip("shows Unknown User when service field is empty in sessionDetails", async () => {
       // Skip: unknown user fallback requires complex prop combination — not tested here
       await wrapper.setProps({
-        sessionDetails: createMockSessionDetails({ user_email: "", browser: "", os: "" }),
+        sessionDetails: createMockSessionDetails({ user_label: "", browser: "", os: "" }),
         rawEvent: createMockRawEvent({ service: "" }),
       });
       await flushPromises();

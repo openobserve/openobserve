@@ -834,11 +834,16 @@ describe("drop-off builders (G5, AC-16, AC-17, AC-59)", () => {
     expect(cohortSessionsSql(s, id, users, 0, sampled)).not.toContain("md5");
   });
 
-  it("Q19 probes one session and gates usr_email on the schema", () => {
-    expect(sessionEventsProbeSql("a'b", { usr_email: true, source: true })).toBe(
-      `SELECT MIN(date) AS start_time, MAX(date) AS end_time, MAX(usr_email) AS user_email, MIN(source) AS source FROM "_rumdata" WHERE session_id = 'a''b' LIMIT 1`,
+  it("Q19 probes one escaped session and projects only available identity columns", () => {
+    const sql = sessionEventsProbeSql("a'b", { usr_name: true, usr_id: true, source: true });
+    expect(sql).toContain("MIN(date) AS start_time, MAX(date) AS end_time");
+    expect(sql).toContain("CAST(usr_name AS VARCHAR)");
+    expect(sql).toContain("CAST(usr_id AS VARCHAR)");
+    expect(sql).toContain("CAST(NULL AS VARCHAR) AS user_email");
+    expect(sql).not.toContain("usr_email");
+    expect(sql).toContain(
+      `MIN(source) AS source FROM "_rumdata" WHERE session_id = 'a''b' LIMIT 1`,
     );
-    expect(sessionEventsProbeSql("x", {})).toContain("CAST(NULL AS VARCHAR) AS user_email");
   });
 });
 

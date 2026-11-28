@@ -33,7 +33,7 @@ const defaultProps = {
   rawEvent: { id: "raw-1" },
   sessionId: "session-123",
   sessionDetails: {
-    user_email: "user@test.com",
+    user_label: "Replay user",
     date: "2026-01-01",
     browser: "Chrome",
     os: "macOS",
@@ -192,7 +192,7 @@ describe("EventDetailDrawer", () => {
 
       // Assert
       expect(getContent(wrapper).props("sessionDetails")).toEqual({
-        user_email: "",
+        user_label: null,
         date: "",
         browser: "",
         os: "",

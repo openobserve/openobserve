@@ -21,10 +21,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-if="activeTab === 'tags'">
       <div data-test="event-metadata" class="sticky top-0 flex p-2 px-3">
         <div class="flex w-full flex-col">
-          <div class="w-full pb-2 text-xs">
-            <OIcon name="mail" size="sm" class="pe-1" />
-            {{ sessionDetails.user_email || t("common.unknownUser") }}
-          </div>
+          <OTruncatedText as="div" class="w-full pb-2 text-xs">
+            <OIcon name="person" size="sm" class="pe-1" />
+            {{ sessionDetails.user_label || t("common.unknownUser") }}
+          </OTruncatedText>
           <OTruncatedText as="div" class="mb-2 w-full pe-1 text-xs">
             <OIcon name="schedule" size="sm" class="pe-1" />
             {{ sessionDetails.date }}
