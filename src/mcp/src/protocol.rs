@@ -638,6 +638,19 @@ fn error_result(text: String) -> ToolsCallResult {
     }
 }
 
+fn default_list_dashboards_to_all_folders(tool_name: &str, arguments: &mut Value) {
+    if tool_name == "ListDashboards"
+        && let Some(arguments) = arguments.as_object_mut()
+        && arguments.get("folder").is_none_or(Value::is_null)
+        && arguments.get("title").is_none_or(Value::is_null)
+    {
+        // The REST default lists only the default folder; a null filter would fail string
+        // validation.
+        arguments.remove("folder");
+        arguments.insert("title".to_string(), json!(""));
+    }
+}
+
 /// Execute a tool through `client`; every failure comes back as an `isError` result.
 async fn execute_tool(
     client: &rmcp_openapi::HttpClient,
@@ -656,6 +669,7 @@ async fn execute_tool(
     // so the underlying HTTP API contract stays untouched.
     normalize_request_body_fields(&metadata.parameters, &mut arguments);
     bind_organization(&metadata.path, &mut arguments, org_id);
+    default_list_dashboards_to_all_folders(&metadata.name, &mut arguments);
     let ledger_plan = ledger::plan(org_id, metadata, &arguments, origin);
     if let Err(e) = encode_path_parameters(metadata, &mut arguments) {
         return error_result(format!("Tool execution failed: {e}"));
@@ -856,6 +870,30 @@ mod tests {
         assert_eq!(arguments, json!({"request_body": {"org_id": "body-org"}}));
     }
 
+    #[test]
+    fn list_dashboards_defaults_to_all_folders_without_filters() {
+        for (tool_name, arguments) in [
+            ("ListDashboards", json!({"folder": "production"})),
+            ("ListDashboards", json!({"title": "Latency"})),
+            ("ListAlerts", json!({})),
+        ] {
+            let mut actual = arguments.clone();
+            default_list_dashboards_to_all_folders(tool_name, &mut actual);
+            assert_eq!(actual, arguments, "{tool_name}");
+        }
+
+        for arguments in [
+            json!({}),
+            json!({"folder": null}),
+            json!({"title": null}),
+            json!({"folder": null, "title": null}),
+        ] {
+            let mut actual = arguments;
+            default_list_dashboards_to_all_folders("ListDashboards", &mut actual);
+            assert_eq!(actual, json!({"title": ""}));
+        }
+    }
+
     fn dashboard_tool() -> rmcp_openapi::ToolMetadata {
         let mapping = |name: &str| {
             (
@@ -888,10 +926,16 @@ mod tests {
     }
 
     async fn loopback_request_line(dashboard_id: &str) -> String {
+        let metadata = dashboard_tool();
+        let mut arguments = json!({"org_id": "acme", "dashboard_id": dashboard_id});
+        encode_path_parameters(&metadata, &mut arguments).unwrap();
+        tool_request_line(&metadata, &arguments).await
+    }
+
+    async fn tool_request_line(metadata: &rmcp_openapi::ToolMetadata, arguments: &Value) -> String {
         use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
-        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let base = url::Url::parse(&format!("http://{}/", listener.local_addr().unwrap())).unwrap();
+        let (listener, base) = loopback_listener().await;
         let server = tokio::spawn(async move {
             let (mut socket, _) = listener.accept().await.unwrap();
             let mut buf = Vec::new();
@@ -914,13 +958,10 @@ mod tests {
                 .to_string()
         });
 
-        let metadata = dashboard_tool();
-        let mut arguments = json!({"org_id": "acme", "dashboard_id": dashboard_id});
-        encode_path_parameters(&metadata, &mut arguments).unwrap();
         rmcp_openapi::HttpClient::new()
             .with_base_url(base)
             .unwrap()
-            .execute_tool_call(&metadata, &arguments)
+            .execute_tool_call(metadata, arguments)
             .await
             .unwrap();
         server.await.unwrap()
@@ -996,6 +1037,49 @@ mod tests {
         assert_eq!(
             loopback_request_line("{org_id}").await,
             "GET /api/acme/dashboards/%7Borg_id%7D HTTP/1.1"
+        );
+    }
+
+    #[tokio::test]
+    async fn list_dashboards_sends_empty_title_without_filters() {
+        let metadata = rmcp_openapi::ToolMetadata {
+            name: "ListDashboards".to_string(),
+            title: None,
+            description: None,
+            parameters: json!({
+                "type": "object",
+                "properties": {
+                    "org_id": {"type": "string"},
+                    "folder": {"type": "string"},
+                    "title": {"type": "string"}
+                },
+                "required": ["org_id"]
+            }),
+            output_schema: None,
+            method: "GET".to_string(),
+            path: "/api/{org_id}/dashboards".to_string(),
+            security: None,
+            parameter_mappings: [("org_id", "path"), ("folder", "query"), ("title", "query")]
+                .into_iter()
+                .map(|(name, location)| {
+                    (
+                        name.to_string(),
+                        rmcp_openapi::tool::ParameterMapping {
+                            sanitized_name: name.to_string(),
+                            original_name: name.to_string(),
+                            location: location.to_string(),
+                            explode: false,
+                        },
+                    )
+                })
+                .collect(),
+        };
+        let mut arguments = json!({"org_id": "acme"});
+        default_list_dashboards_to_all_folders(&metadata.name, &mut arguments);
+
+        assert_eq!(
+            tool_request_line(&metadata, &arguments).await,
+            "GET /api/acme/dashboards?title= HTTP/1.1"
         );
     }
 
