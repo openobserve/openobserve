@@ -415,9 +415,9 @@ pub struct ResourceContent {
 /// A simple list of field names to extract from each item in a list response.
 /// Supports dot notation for nested fields (e.g., "stats.storage_size").
 ///
-/// The response is automatically normalized to `{ "total": N, "items": [...] }`
-/// by detecting the array in the response (checking common keys like "list",
-/// "data", "dashboards", or root arrays).
+/// The response is automatically normalized to
+/// `{ "total"?: N, "returned_count": N, "items": [...] }` by detecting the array in the response
+/// (checking common keys like "list", "data", "dashboards", or root arrays).
 pub type SummaryFieldsConfig = Vec<String>;
 
 #[cfg(test)]

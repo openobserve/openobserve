@@ -46,7 +46,8 @@ const SEARCH_SQL_KEEP_FIELDS: &[&str] = &[
 /// Returns the (possibly filtered) response body as a string.
 ///
 /// For tools with `summary_fields` config, the response is always normalized to
-/// `{ "total": N, "items": [...] }` regardless of detail level. The difference:
+/// `{ "total"?: N, "returned_count": N, "items": [...] }` regardless of detail level.
+/// The difference:
 /// - `DetailLevel::Full`: normalize only (all fields per item, standard wrapper)
 /// - `DetailLevel::Summary`: normalize + extract declared fields
 ///
@@ -126,10 +127,10 @@ fn filter_search_response(response_body: &str) -> String {
     serde_json::to_string(&Value::Object(result)).unwrap_or_else(|_| response_body.to_string())
 }
 
-/// Normalize a list response to `{ "total": N, "items": [...] }`.
+/// Normalize a list response to `{ "total"?: N, "returned_count": N, "items": [...] }`.
 ///
 /// Detects the array in the response by:
-/// 1. If root is an array → items = root, total = len
+/// 1. If root is an array → items = root, no total
 /// 2. If root is an object: a. Look for "total" or "count" key → use as total b. Find the first
 ///    array-valued key → use as items c. If no array found → return None (not a list response)
 fn normalize_list_response(response_body: &str) -> Option<String> {
@@ -137,7 +138,10 @@ fn normalize_list_response(response_body: &str) -> Option<String> {
     let (items, total) = detect_list_and_total(&parsed)?;
 
     let mut result = Map::new();
-    result.insert("total".to_string(), json!(total));
+    if let Some(total) = total {
+        result.insert("total".to_string(), json!(total));
+    }
+    result.insert("returned_count".to_string(), json!(items.len()));
     result.insert("items".to_string(), json!(items));
 
     serde_json::to_string(&Value::Object(result)).ok()
@@ -145,8 +149,8 @@ fn normalize_list_response(response_body: &str) -> Option<String> {
 
 /// Apply declarative summary_fields extraction to a response body.
 ///
-/// Normalizes the response to `{ "total": N, "items": [...] }`, then extracts
-/// only the declared fields from each item (supporting dot notation).
+/// Normalizes the response to `{ "total"?: N, "returned_count": N, "items": [...] }`, then
+/// extracts only the declared fields from each item (supporting dot notation).
 ///
 /// No hard item cap is applied here — pagination limits are enforced upstream
 /// by the agent's poka-yoke layer (capping `limit`/`pageSize` params before
@@ -162,7 +166,10 @@ fn apply_summary_fields(response_body: &str, fields: &SummaryFieldsConfig) -> Op
         .collect();
 
     let mut result = Map::new();
-    result.insert("total".to_string(), json!(total));
+    if let Some(total) = total {
+        result.insert("total".to_string(), json!(total));
+    }
+    result.insert("returned_count".to_string(), json!(items.len()));
     result.insert("items".to_string(), json!(filtered_items));
 
     serde_json::to_string(&Value::Object(result)).ok()
@@ -170,17 +177,17 @@ fn apply_summary_fields(response_body: &str, fields: &SummaryFieldsConfig) -> Op
 
 /// Detect the list array and total count from a parsed JSON value.
 ///
-/// Returns (items_slice, total_count) or None if no array is found.
-fn detect_list_and_total(parsed: &Value) -> Option<(&[Value], usize)> {
+/// Returns (items_slice, upstream_total) or None if no array is found.
+fn detect_list_and_total(parsed: &Value) -> Option<(&[Value], Option<usize>)> {
     // Root array
     if let Some(arr) = parsed.as_array() {
-        return Some((arr.as_slice(), arr.len()));
+        return Some((arr.as_slice(), None));
     }
 
     let obj = parsed.as_object()?;
 
     // Look for explicit total/count
-    let explicit_total = obj
+    let total = obj
         .get("total")
         .or_else(|| obj.get("count"))
         .and_then(|v| v.as_u64())
@@ -189,7 +196,6 @@ fn detect_list_and_total(parsed: &Value) -> Option<(&[Value], usize)> {
     // Find the first array-valued key
     let items = obj.values().find_map(|v| v.as_array())?;
 
-    let total = explicit_total.unwrap_or(items.len());
     Some((items.as_slice(), total))
 }
 
@@ -606,7 +612,8 @@ mod tests {
         assert_eq!(items[0]["name"], "tmpl1");
         assert_eq!(items[0]["type"], "slack");
         assert!(items[0].get("body").is_none());
-        assert_eq!(parsed["total"], 2);
+        assert!(parsed.get("total").is_none());
+        assert_eq!(parsed["returned_count"], 2);
     }
 
     #[test]
@@ -641,7 +648,8 @@ mod tests {
         let result = normalize_list_response(body).unwrap();
         let parsed: Value = serde_json::from_str(&result).unwrap();
 
-        assert_eq!(parsed["total"], 2);
+        assert!(parsed.get("total").is_none());
+        assert_eq!(parsed["returned_count"], 2);
         assert_eq!(parsed["items"].as_array().unwrap().len(), 2);
     }
 
@@ -651,7 +659,8 @@ mod tests {
         let result = normalize_list_response(body).unwrap();
         let parsed: Value = serde_json::from_str(&result).unwrap();
 
-        assert_eq!(parsed["total"], 1);
+        assert!(parsed.get("total").is_none());
+        assert_eq!(parsed["returned_count"], 1);
         assert_eq!(parsed["items"][0]["title"], "d1");
     }
 

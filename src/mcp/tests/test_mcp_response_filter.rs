@@ -583,6 +583,42 @@ fn test_dashboards_token_reduction() {
 }
 
 #[test]
+fn test_dashboard_list_without_total_reports_returned_count() {
+    init_test_configs();
+    let fixture: Value = serde_json::from_str(&dashboards_fixture()).unwrap();
+    let body = json!({"list": &fixture["dashboards"]}).to_string();
+
+    for detail in [DetailLevel::Summary, DetailLevel::Full] {
+        let result = filter_response("ListDashboards", &body, &detail);
+        let parsed: Value = serde_json::from_str(&result).unwrap();
+        assert!(parsed.get("total").is_none(), "detail={detail}");
+        assert_eq!(parsed["returned_count"], 10, "detail={detail}");
+    }
+}
+
+#[test]
+fn test_dashboard_list_preserves_explicit_total_and_reports_returned_count() {
+    init_test_configs();
+    let fixture: Value = serde_json::from_str(&dashboards_fixture()).unwrap();
+
+    for key in ["total", "count"] {
+        let mut body = json!({"list": &fixture["dashboards"]});
+        body[key] = json!(150);
+        let body = body.to_string();
+
+        for detail in [DetailLevel::Summary, DetailLevel::Full] {
+            let result = filter_response("ListDashboards", &body, &detail);
+            let parsed: Value = serde_json::from_str(&result).unwrap();
+            assert_eq!(parsed["total"], 150, "detail={detail}, upstream {key}");
+            assert_eq!(
+                parsed["returned_count"], 10,
+                "detail={detail}, upstream {key}"
+            );
+        }
+    }
+}
+
+#[test]
 fn test_alerts_token_reduction() {
     init_test_configs();
     let full = alerts_fixture();
@@ -706,33 +742,30 @@ fn test_search_sql_summary_keeps_every_hit() {
 fn test_full_detail_normalizes_list_responses() {
     init_test_configs();
 
-    // Tools with summary config: full detail normalizes to { "total", "items" } but keeps all
-    // fields
-    let fixtures: Vec<(&str, String, usize)> = vec![
-        ("StreamList", streams_fixture(), 20),
-        ("ListDashboards", dashboards_fixture(), 10),
-        ("ListAlerts", alerts_fixture(), 15),
+    let fixtures = [
+        ("StreamList", streams_fixture(), 20, Some(20)),
+        ("ListDashboards", dashboards_fixture(), 10, None),
+        ("ListAlerts", alerts_fixture(), 15, None),
     ];
 
-    for (tool, full, expected_total) in fixtures {
+    for (tool, full, expected_count, expected_total) in fixtures {
         let result = filter_response(tool, &full, &DetailLevel::Full);
         let parsed: Value = serde_json::from_str(&result).unwrap();
         assert_eq!(
-            parsed["total"], expected_total,
-            "detail=full should normalize total for {}",
-            tool
+            parsed.get("total"),
+            expected_total.map(|total| json!(total)).as_ref(),
+            "detail=full should preserve explicit total for {tool}"
         );
-        assert!(
-            parsed["items"].is_array(),
-            "detail=full should normalize items for {}",
-            tool
+        assert_eq!(
+            parsed["returned_count"], expected_count,
+            "detail=full should report returned count for {tool}"
         );
         // All original fields per item should still be present
         let items = parsed["items"].as_array().unwrap();
-        assert!(
-            !items.is_empty(),
-            "detail=full should preserve all items for {}",
-            tool
+        assert_eq!(
+            items.len(),
+            expected_count,
+            "detail=full should preserve all items for {tool}"
         );
     }
 
