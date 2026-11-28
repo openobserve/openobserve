@@ -40,13 +40,15 @@ use {
         ai::{
             agent::meta::Role,
             chat::{
-                OwnerCancel, PersistSettings, TurnCaps, TurnEnd, TurnIdentity, TurnSpec, spawn_turn,
+                CancelReason, OwnerCancel, PersistSettings, TurnCaps, TurnEnd, TurnIdentity,
+                TurnSpec, spawn_turn,
             },
             client::{
-                CLIENT_ID_HEADER, DEFAULT_AGENT_TYPE, GENERATE_QUERY_AGENT_TYPE, ImageAttachment,
-                QueryRequest, RCA_AGENT_TYPE, SESSION_OWNER_UNAVAILABLE, SRE_CHAT_AGENT_TYPE,
-                TurnPolicy, get_agent_client, is_agent_unreachable, is_session_owner_unavailable,
-                upstream_error_code, upstream_error_status, upstream_retry_after,
+                CLIENT_ID_HEADER, CancelBy, DEFAULT_AGENT_TYPE, GENERATE_QUERY_AGENT_TYPE,
+                ImageAttachment, QueryRequest, RCA_AGENT_TYPE, SESSION_OWNER_UNAVAILABLE,
+                SRE_CHAT_AGENT_TYPE, TurnPolicy, get_agent_client, is_agent_unreachable,
+                is_session_owner_unavailable, upstream_error_code, upstream_error_status,
+                upstream_retry_after,
             },
         },
         common::{
@@ -4100,7 +4102,7 @@ async fn direct_turn(turn: StreamTurn) -> Response {
             auth_session_id.as_deref(),
         )
         .await;
-        match registered.and_then(refuse_if_signed_out) {
+        match registered.and_then(refuse_if_stopped) {
             Ok(registration) => Some(registration),
             Err(refusal) => {
                 end_span(&span);
@@ -4184,7 +4186,7 @@ async fn direct_turn(turn: StreamTurn) -> Response {
         ),
         None => (None, None),
     };
-    let mut sign_out = registration.as_ref().map(|r| r.signal());
+    let mut stop_signal = registration.as_ref().map(|r| r.signal());
     // Keep the OTel span alive for the full stream.
     let s = async_stream::stream! {
         let _registration = registration;
@@ -4193,18 +4195,24 @@ async fn direct_turn(turn: StreamTurn) -> Response {
         loop {
             let next = tokio::select! {
                 biased;
-                () = until_signed_out(sign_out.as_mut()) => None,
-                next = agent_stream.next() => Some(next),
+                reason = until_stopped(stop_signal.as_mut()) => Err(reason),
+                next = agent_stream.next() => Ok(next),
             };
-            let Some(next) = next else {
-                cancel_signed_out_upstream(&client, &org_id, session.as_deref(), &auth);
-                for chunk in meter.interrupt(signed_out_error().to_sse_frame()).await {
-                    yield Ok::<Bytes, std::io::Error>(chunk);
+            let chunk_result = match next {
+                Ok(Some(chunk_result)) => chunk_result,
+                Ok(None) => break,
+                Err(reason) => {
+                    let (by, error) = if reason == CancelReason::TurnedOff {
+                        (CancelBy::User, turned_off_error())
+                    } else {
+                        (CancelBy::SignedOut, signed_out_error())
+                    };
+                    cancel_direct_turn_upstream(&client, &org_id, session.as_deref(), &auth, by);
+                    for chunk in meter.interrupt(error.to_sse_frame()).await {
+                        yield Ok::<Bytes, std::io::Error>(chunk);
+                    }
+                    break;
                 }
-                break;
-            };
-            let Some(chunk_result) = next else {
-                break;
             };
             let out = match chunk_result {
                 Ok(bytes) => {
@@ -4304,64 +4312,64 @@ fn with_turn_session(
     headers
 }
 
-/// A turn of a login that already signed out never reaches o2-ai.
+/// Registration can race with sign-out or an org switch before the request reaches o2-ai.
 #[cfg(feature = "enterprise")]
-fn refuse_if_signed_out(
+fn refuse_if_stopped(
     registration: o2_enterprise::enterprise::ai::chat::registry::Registration,
 ) -> Result<o2_enterprise::enterprise::ai::chat::registry::Registration, Response> {
-    use o2_enterprise::enterprise::ai::chat::CancelReason;
-    if registration.signal().reason() == Some(CancelReason::SignedOut) {
-        return Err(signed_out_error().into_response());
+    match registration.signal().reason() {
+        Some(CancelReason::SignedOut) => Err(signed_out_error().into_response()),
+        Some(CancelReason::TurnedOff) => Err(turned_off_error().into_response()),
+        None | Some(CancelReason::User | CancelReason::Deleted) => Ok(registration),
     }
-    Ok(registration)
 }
 
-/// Resolves once the turn's sign-in ends; a Stop or a missing registration never resolves it.
+/// A user's Stop is forwarded separately, so the upstream stream can deliver its final frames.
 #[cfg(feature = "enterprise")]
-async fn until_signed_out(
+async fn until_stopped(
     signal: Option<&mut o2_enterprise::enterprise::ai::chat::registry::CancelSignal>,
-) {
-    use o2_enterprise::enterprise::ai::chat::CancelReason;
+) -> CancelReason {
     let Some(signal) = signal else {
         return std::future::pending().await;
     };
     let mut seen = None;
     loop {
         let reason = signal.cancelled_beyond(seen).await;
-        if reason == CancelReason::SignedOut {
-            return;
+        if matches!(reason, CancelReason::SignedOut | CancelReason::TurnedOff) {
+            return reason;
         }
         seen = Some(reason);
     }
 }
 
-/// Asks o2-ai to drop a signed-out direct turn; closing the stream alone may not stop its tools.
+/// Closing a direct turn's stream alone may leave its tools running in o2-ai.
 #[cfg(feature = "enterprise")]
-fn cancel_signed_out_upstream(
+fn cancel_direct_turn_upstream(
     client: &Arc<o2_enterprise::enterprise::ai::client::AiAgentClient>,
     org_id: &str,
     session_id: Option<&str>,
     auth: &str,
+    by: CancelBy,
 ) {
-    use o2_enterprise::enterprise::ai::client::CancelBy;
     let Some(session_id) = session_id else {
         return;
     };
     let (client, org_id) = (client.clone(), org_id.to_string());
     let (session_id, auth) = (session_id.to_string(), auth.to_string());
     tokio::spawn(async move {
-        let asked = client.cancel_session(&session_id, &org_id, &auth, CancelBy::SignedOut);
+        let asked = client.cancel_session(&session_id, &org_id, &auth, by);
+        let by = by.as_str();
         match tokio::time::timeout(UPSTREAM_CANCEL_WAIT, asked).await {
             Ok(Ok(resp)) if resp.status().is_success() => {}
             Ok(Ok(resp)) => log::warn!(
-                "[AI-CHAT] o2-ai refused the signed_out cancel of {org_id}/{session_id}: {}",
+                "[AI-CHAT] o2-ai refused the {by} cancel of {org_id}/{session_id}: {}",
                 resp.status()
             ),
             Ok(Err(e)) => log::warn!(
-                "[AI-CHAT] o2-ai did not take the signed_out cancel of {org_id}/{session_id}: {e}"
+                "[AI-CHAT] o2-ai did not take the {by} cancel of {org_id}/{session_id}: {e}"
             ),
             Err(_) => log::warn!(
-                "[AI-CHAT] o2-ai did not answer the signed_out cancel of {org_id}/{session_id}"
+                "[AI-CHAT] o2-ai did not answer the {by} cancel of {org_id}/{session_id}"
             ),
         }
     });
@@ -4372,6 +4380,14 @@ fn signed_out_error() -> AiErrorEnvelope {
     AiErrorEnvelope::new(
         AiErrorCode::SignedOut,
         "You signed out, so this answer was stopped.",
+    )
+}
+
+#[cfg(feature = "enterprise")]
+fn turned_off_error() -> AiErrorEnvelope {
+    AiErrorEnvelope::new(
+        AiErrorCode::NotEnabled,
+        "The AI assistant was turned off for this organization, so this answer was stopped.",
     )
 }
 
@@ -6853,7 +6869,7 @@ mod tests {
             register_ephemeral_turn("so-org", Some(&session), "t1", "a@x", "a@x", Some(&login))
                 .await
                 .unwrap();
-        let refusal = refuse_if_signed_out(turn)
+        let refusal = refuse_if_stopped(turn)
             .err()
             .expect("a signed-out turn was dispatched");
         assert_eq!(refusal.status(), StatusCode::UNAUTHORIZED);
@@ -6870,30 +6886,49 @@ mod tests {
         let turn =
             register_ephemeral_turn("so-org", Some(&session), "t1", "a@x", "a@x", Some(&login))
                 .await
-                .and_then(refuse_if_signed_out)
+                .and_then(refuse_if_stopped)
                 .unwrap();
         let mut signal = turn.signal();
         let wait = Duration::from_millis(50);
         assert!(
-            tokio::time::timeout(wait, until_signed_out(Some(&mut signal)))
+            tokio::time::timeout(wait, until_stopped(Some(&mut signal)))
                 .await
                 .is_err()
         );
         registry::cancel("so-org", &session, CancelReason::User);
         assert!(
-            tokio::time::timeout(wait, until_signed_out(Some(&mut signal)))
+            tokio::time::timeout(wait, until_stopped(Some(&mut signal)))
                 .await
                 .is_err()
         );
         registry::cancel_for_auth_session(&login);
-        let ended =
-            tokio::time::timeout(Duration::from_secs(1), until_signed_out(Some(&mut signal)));
-        assert!(ended.await.is_ok());
+        let ended = tokio::time::timeout(Duration::from_secs(1), until_stopped(Some(&mut signal)));
+        assert_eq!(ended.await.unwrap(), CancelReason::SignedOut);
         assert!(
-            tokio::time::timeout(wait, until_signed_out(None))
+            tokio::time::timeout(wait, until_stopped(None))
                 .await
                 .is_err()
         );
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn turning_ai_off_ends_a_streaming_ephemeral_turn() {
+        use std::time::Duration;
+
+        use o2_enterprise::enterprise::ai::chat::{CancelReason, registry};
+
+        let org_id = config::ider::uuid();
+        let session = uuid::Uuid::now_v7().to_string();
+        let turn = register_ephemeral_turn(&org_id, Some(&session), "t1", "a@x", "a@x", None)
+            .await
+            .unwrap();
+        let mut signal = turn.signal();
+        registry::org_switched(&org_id, false);
+        let ended =
+            tokio::time::timeout(Duration::from_secs(1), until_stopped(Some(&mut signal))).await;
+        registry::org_switched(&org_id, true);
+        assert_eq!(ended.unwrap(), CancelReason::TurnedOff);
     }
 
     #[cfg(feature = "enterprise")]
