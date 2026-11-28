@@ -1404,6 +1404,20 @@ describe("AlertList - router query behaviors", () => {
     expect(wrapper.vm.formData?.name).toBe("After apply");
   });
 
+  it("the editor fetches the alert with the folder its Edit link carries, not the sidebar's", async () => {
+    // The server checks folder-scoped grants against this folder; in the all-folders view the two differ.
+    const wrapper: any = await mountAlertList();
+    await flushPromises();
+    wrapper.vm.router.currentRoute.value.query = {
+      action: "update",
+      alert_id: "a7",
+      folder: "team-b",
+    };
+    await wrapper.vm.handleActionQuery("update");
+    await flushPromises();
+    expect(alertsSvc.get_by_alert_id).toHaveBeenCalledWith(expect.anything(), "a7", "team-b");
+  });
+
   // The editor opens an alert from its detail cache (getAlertById), and a save
   // reaches the list through update:list → refreshList.
   it("refreshList marks cached alert copies stale so reopening the editor shows the save", async () => {
@@ -3244,7 +3258,10 @@ describe("AlertList - ODialog/ODrawer migration", () => {
     const row = wrapper.vm.filteredResults.find(
       (r: any) => r.alert_type !== "Composite" && r.type !== "anomaly",
     );
-    const key = alertKeys.detail(store.state.selectedOrganization.identifier, row.alert_id);
+    const key = [
+      ...alertKeys.detail(store.state.selectedOrganization.identifier, row.alert_id),
+      "default",
+    ];
     queryClient.removeQueries({ queryKey: key, exact: true });
 
     try {
@@ -3311,7 +3328,44 @@ describe("AlertList - ODialog/ODrawer migration", () => {
     expect(alertsSvc.get_by_alert_id).toHaveBeenCalledWith(
       expect.anything(),
       row.alert_id,
-      undefined,
+      "default",
+    );
+  });
+
+  it("duplicateAlert fetches the alert with the row's own folder, not the sidebar's", async () => {
+    // The server checks folder-scoped grants against this folder; in the all-folders view the two differ.
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+
+    const row = { ...wrapper.vm.filteredResults[0], folder_name: { id: "team-b" } };
+    await wrapper.vm.duplicateAlert(row);
+    await flushPromises();
+
+    expect(alertsSvc.get_by_alert_id).toHaveBeenCalledWith(
+      expect.anything(),
+      row.alert_id,
+      "team-b",
+    );
+  });
+
+  it("duplicateAlert keeps the row's folder when the dialog's folder picker changes mid-load", async () => {
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+
+    const row = {
+      ...wrapper.vm.filteredResults[0],
+      folder_name: { id: "team-b" },
+      stream_type: "logs",
+    };
+    const pending = wrapper.vm.duplicateAlert(row);
+    wrapper.vm.folderIdToBeCloned = "destination";
+    await pending;
+    await flushPromises();
+
+    expect(alertsSvc.get_by_alert_id).toHaveBeenCalledWith(
+      expect.anything(),
+      row.alert_id,
+      "team-b",
     );
   });
 

@@ -300,8 +300,8 @@ describe("AddAlertView.vue", () => {
       template: '<div class="add-alert-stub"></div>',
     };
 
-    const mountEditing = async (alertId = "alert-1") => {
-      await router.push({ name: "editAlert", params: { alert_id: alertId } });
+    const mountEditing = async (alertId = "alert-1", query: Record<string, string> = {}) => {
+      await router.push({ name: "editAlert", params: { alert_id: alertId }, query });
       await router.isReady();
 
       const wrapper = mount(AddAlertView, {
@@ -332,6 +332,16 @@ describe("AddAlertView.vue", () => {
       expect(seeded.name).toBe("my-alert");
       expect(seeded.stream_name).toBe("k8s_logs");
       expect(seeded.stream_type).toBe("logs");
+    });
+
+    it("fetches the alert with the folder it was opened from", async () => {
+      // The server checks folder-scoped grants against this folder; without it they never match.
+      vi.mocked(destinationService.list).mockResolvedValue({ data: [{ id: 1 }] } as any);
+      vi.mocked(alertsService.get_by_alert_id).mockResolvedValue({ data: { name: "a" } } as any);
+
+      await mountEditing("alert-1", { folder: "team-a" });
+
+      expect(alertsService.get_by_alert_id).toHaveBeenCalledWith("test-org", "alert-1", "team-a");
     });
 
     it("does not fetch an alert when creating one", async () => {

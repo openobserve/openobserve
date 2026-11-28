@@ -92,7 +92,15 @@ export default defineComponent({
       isLoadingAlert.value = true;
       try {
         const org = store.state.selectedOrganization.identifier;
-        editedAlert.value = await fetchAlertRead(queryClient, org, alertDetailQuery(org, alertId));
+        editedAlert.value = await fetchAlertRead(
+          queryClient,
+          org,
+          alertDetailQuery(
+            org,
+            alertId,
+            typeof route.query.folder === "string" ? route.query.folder : undefined,
+          ),
+        );
         isUpdated.value = true;
       } catch (error) {
         loadFailed.value = true;
