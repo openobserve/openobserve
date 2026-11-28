@@ -45,12 +45,42 @@ const JSONRPC_UNSUPPORTED_PROTOCOL_VERSION: i32 = -32022;
 const JSONRPC_METHOD_NOT_FOUND: i32 = -32601;
 const JSONRPC_INVALID_REQUEST: i32 = -32600;
 
-/// A run token reads only, whatever the agent in front of the server lets through.
-fn tool_access(caller: Option<&Extension<DelegatedCaller>>) -> ToolAccess {
-    match caller {
-        Some(Extension(caller)) if caller.is_autoresolve_run() => ToolAccess::ReadOnly,
-        _ => ToolAccess::Any,
+fn access_of(
+    autoresolve_run: bool,
+    assistant_origin: bool,
+    assistant_on: Option<bool>,
+) -> ToolAccess {
+    if autoresolve_run {
+        ToolAccess::ReadOnly
+    } else if assistant_origin && assistant_on != Some(true) {
+        ToolAccess::AssistantOff
+    } else {
+        ToolAccess::Any
     }
+}
+
+/// Unreadable settings fail closed: the org may have turned the assistant off mid-turn.
+async fn tool_access(
+    org_id: &str,
+    caller: Option<&Extension<DelegatedCaller>>,
+    origin: Option<&Origin>,
+) -> ToolAccess {
+    let autoresolve_run = caller.is_some_and(|Extension(caller)| caller.is_autoresolve_run());
+    let assistant_origin = origin.is_some();
+    let assistant_on = if assistant_origin && !autoresolve_run {
+        match db::organization::get_org_ai_settings(org_id).await {
+            Ok(settings) => Some(settings.unwrap_or_default().enabled),
+            Err(e) => {
+                log::error!(
+                    "[org_id:{org_id}] assistant settings unreadable, MCP access is read-only: {e}"
+                );
+                None
+            }
+        }
+    } else {
+        None
+    };
+    access_of(autoresolve_run, assistant_origin, assistant_on)
 }
 
 /// Build an HTTP response carrying a JSON-RPC error body.
@@ -240,7 +270,6 @@ pub async fn handle_mcp_post(
     caller: Option<Extension<DelegatedCaller>>,
     Json(mcp_request): Json<MCPRequest>,
 ) -> Response {
-    let access = tool_access(caller.as_ref());
     // Extract auth token from Authorization header
     let auth_token = headers
         .get(header::AUTHORIZATION)
@@ -258,6 +287,7 @@ pub async fn handle_mcp_post(
         Ok(origin) => origin,
         Err(problem) => return refused_origin(mcp_request.id.as_ref(), problem),
     };
+    let access = tool_access(&org_id, caller.as_ref(), origin.as_ref()).await;
 
     // JSON-RPC notifications (no `id`) require HTTP 202, no response body.
     // Process the notification but return 202.
@@ -437,7 +467,7 @@ pub async fn handle_mcp_get(
         Ok(origin) => origin,
         Err(problem) => return refused_origin(mcp_request.id.as_ref(), problem),
     };
-    let access = tool_access(caller.as_ref());
+    let access = tool_access(&org_id, caller.as_ref(), origin.as_ref()).await;
     let stream =
         match handle_mcp_request_stream(&org_id, mcp_request, auth_token, origin.as_ref(), access)
             .await
@@ -709,6 +739,48 @@ mod tests {
             headers.insert(MCP_NAME_HEADER, name.parse().unwrap());
         }
         headers
+    }
+
+    #[test]
+    fn an_autoresolve_run_always_reads_only() {
+        for assistant_origin in [false, true] {
+            for assistant_on in [Some(false), Some(true), None] {
+                assert_eq!(
+                    access_of(true, assistant_origin, assistant_on),
+                    ToolAccess::ReadOnly,
+                    "assistant_origin={assistant_origin}, assistant_on={assistant_on:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn an_assistant_call_reads_only_while_the_org_has_it_off() {
+        assert_eq!(
+            access_of(false, true, Some(false)),
+            ToolAccess::AssistantOff
+        );
+    }
+
+    #[test]
+    fn an_assistant_call_reads_only_when_the_setting_is_unreadable() {
+        assert_eq!(access_of(false, true, None), ToolAccess::AssistantOff);
+    }
+
+    #[test]
+    fn an_assistant_call_may_change_while_on() {
+        assert_eq!(access_of(false, true, Some(true)), ToolAccess::Any);
+    }
+
+    #[test]
+    fn other_mcp_callers_ignore_the_assistant_switch() {
+        for assistant_on in [Some(false), Some(true), None] {
+            assert_eq!(
+                access_of(false, false, assistant_on),
+                ToolAccess::Any,
+                "assistant_on={assistant_on:?}"
+            );
+        }
     }
 
     #[tokio::test]

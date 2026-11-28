@@ -258,14 +258,10 @@ pub async fn org_settings_watch() -> Result<(), anyhow::Error> {
                         continue;
                     }
                 };
-                ORGANIZATION_SETTING
-                    .clone()
-                    .write()
-                    .await
-                    .insert(item_key, json_val);
+                cache_org_setting(&item_key, Some(json_val)).await;
             }
             db::Event::Delete(ev) => {
-                ORGANIZATION_SETTING.write().await.remove(&ev.key);
+                cache_org_setting(&ev.key, None).await;
             }
             db::Event::Empty => {}
         }
@@ -592,8 +588,30 @@ where
     let Some((settings, value)) = written.lock().unwrap().take() else {
         return Ok(None);
     };
-    ORGANIZATION_SETTING.write().await.insert(key, settings);
+    cache_org_setting(&key, Some(settings)).await;
     Ok(Some(value))
+}
+
+async fn cache_org_setting(key: &str, settings: Option<OrganizationSetting>) {
+    // Local writes and watch events must apply to the registry in cache update order.
+    let mut cache = ORGANIZATION_SETTING.write().await;
+    #[cfg(feature = "enterprise")]
+    let enabled = settings
+        .as_ref()
+        .and_then(|settings| settings.ai.as_ref())
+        .is_none_or(|ai| ai.enabled);
+    if let Some(settings) = settings {
+        cache.insert(key.to_owned(), settings);
+    } else {
+        cache.remove(key);
+    }
+    #[cfg(feature = "enterprise")]
+    if let Some(org_id) = key
+        .strip_prefix(ORG_SETTINGS_KEY_PREFIX)
+        .and_then(|suffix| suffix.strip_prefix('/'))
+    {
+        o2_enterprise::enterprise::ai::chat::registry::org_switched(org_id, enabled);
+    }
 }
 
 async fn apply_event(ev: db::Event) {
@@ -1046,6 +1064,35 @@ mod tests {
             .unwrap();
         assert!(unchanged.is_none(), "a no-op apply has nothing to sync");
         assert!(!store.wrote.load(Ordering::SeqCst), "a no-op apply wrote");
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[tokio::test]
+    async fn test_disabling_ai_stops_only_the_updated_orgs_turn() {
+        use o2_enterprise::enterprise::ai::chat::registry::{CancelReason, node};
+
+        let org_id = config::ider::uuid();
+        let other_org_id = config::ider::uuid();
+        let registry = node();
+        let turn = registry.register(&org_id, "session", "turn", "a@x", None);
+        let other_turn = registry.register(&other_org_id, "session", "turn", "a@x", None);
+        let store = NatsShapedStore::default();
+        let updated = update_org_setting_in(&store, &org_id, |settings| {
+            settings.ai = Some(OrgAiSettings {
+                enabled: false,
+                ..Default::default()
+            });
+            true
+        })
+        .await;
+        let reason = turn.signal().reason();
+        registry.set_org_enabled(&org_id, true);
+        let key = format!("{ORG_SETTINGS_KEY_PREFIX}/{org_id}");
+        ORGANIZATION_SETTING.write().await.remove(&key);
+
+        assert!(updated.unwrap().is_some());
+        assert_eq!(reason, Some(CancelReason::TurnedOff));
+        assert_eq!(other_turn.signal().reason(), None);
     }
 
     #[tokio::test]
