@@ -20,7 +20,7 @@ test("release review runs only for release-relevant files", () => {
     "Cargo.lock",
     "web/package.json",
     "rust-toolchain.toml",
-    "src/config/src/config.rs",
+    "src/config/src/config/mod.rs",
     ".github/workflows/ai-code-review.yml",
     "deploy/build/Dockerfile",
     "cross/Dockerfile.oss.musl",

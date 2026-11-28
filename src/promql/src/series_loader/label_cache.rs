@@ -17,7 +17,11 @@
 
 use std::sync::{Arc, LazyLock as Lazy};
 
-use config::{meta::promql::value::Labels, utils::hash::key_sum64};
+use config::{
+    memory::{MemoryConsumer, memory_budget},
+    meta::promql::value::Labels,
+    utils::hash::key_sum64,
+};
 use hashbrown::HashSet;
 use hashlink::lru_cache::LruCache;
 use parking_lot::Mutex;
@@ -29,11 +33,6 @@ use super::{PartitionedMetrics, labels::LoadedLabelsObserver, with_hash_label};
 // so lock contention stays low on large queriers; clamped to a sane range.
 const MIN_SHARDS: usize = 32;
 const MAX_SHARDS: usize = 256;
-// Auto budget when ZO_METRICS_LABEL_CACHE_MAX_SIZE is 0: 5% of total memory,
-// clamped to [100 MB, 1 GiB] (a typical series costs ~1KB per label set).
-const AUTO_MEM_PERCENT: usize = 5;
-const AUTO_MIN_BYTES: usize = 8 * 1024 * 1024;
-const AUTO_MAX_BYTES: usize = 1024 * 1024 * 1024;
 // Fixed per-entry overhead: key + LRU node bookkeeping + Arc header.
 const ENTRY_OVERHEAD: usize = 96;
 // Fixed per-label overhead: Arc counters + the two String headers + the
@@ -65,11 +64,7 @@ struct Shard {
 
 static LABEL_CACHE: Lazy<LabelCache> = Lazy::new(|| {
     let cfg = config::get_config();
-    let max_bytes = if cfg.limit.metrics_label_cache_max_size > 0 {
-        cfg.limit.metrics_label_cache_max_size * 1024 * 1024
-    } else {
-        (cfg.limit.mem_total * AUTO_MEM_PERCENT / 100).clamp(AUTO_MIN_BYTES, AUTO_MAX_BYTES)
-    };
+    let max_bytes = memory_budget().quota(MemoryConsumer::LabelCache);
     let shard_count = (cfg.limit.cpu_num * 4)
         .next_power_of_two()
         .clamp(MIN_SHARDS, MAX_SHARDS);
@@ -253,6 +248,10 @@ impl LabelCache {
         series_count.saturating_mul(est_entry) <= self.max_bytes * ADMIT_MAX_PERCENT / 100
     }
 
+    fn used_bytes(&self) -> usize {
+        self.shards.iter().map(|shard| shard.lock().bytes).sum()
+    }
+
     fn shard(&self, series_hash: u64) -> &Mutex<Shard> {
         &self.shards[(series_hash & self.shard_mask) as usize]
     }
@@ -286,6 +285,11 @@ impl LabelCache {
             shard.bytes -= old_size;
         }
     }
+}
+
+/// Accounted bytes the label cache holds across all shards.
+pub fn label_cache_used_bytes() -> usize {
+    LABEL_CACHE.used_bytes()
 }
 
 #[cfg(test)]
@@ -328,6 +332,22 @@ mod tests {
         assert!(Arc::ptr_eq(&got, &labels));
         // different context fingerprint must miss
         assert!(cache.get(2, 42).is_none());
+    }
+
+    #[test]
+    fn test_used_bytes_follows_inserts_and_evictions() {
+        let labels = make_labels(4, 32);
+        let per_entry = entry_size(&labels);
+        let cache = LabelCache::new(per_entry * 2 * TEST_SHARDS, TEST_SHARDS);
+        assert_eq!(cache.used_bytes(), 0);
+        // shard 1 holds two entries, so three more in it evict down to two
+        cache.put(1, 1, Arc::clone(&labels));
+        cache.put(1, 2, Arc::clone(&labels));
+        assert_eq!(cache.used_bytes(), 2 * per_entry);
+        for i in 1..=3 {
+            cache.put(2, 1 + i * TEST_SHARDS as u64, Arc::clone(&labels));
+        }
+        assert_eq!(cache.used_bytes(), 3 * per_entry);
     }
 
     #[test]

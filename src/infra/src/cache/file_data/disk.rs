@@ -1181,7 +1181,7 @@ pub async fn public_dashboards_memory_get(key: &str, incarnation: u64) -> Option
 
 /// Keeps a memory copy of one written version; every write or eviction of the key drops it.
 pub async fn public_dashboards_memory_put(key: &str, incarnation: u64, data: Bytes) {
-    if !get_config().memory_cache.enabled {
+    if !get_config().memory.file_cache.enabled {
         return;
     }
     track_public_dashboard_body(key, incarnation);

@@ -374,6 +374,7 @@ mod tests {
     }
 
     #[test]
+    #[expect(clippy::disallowed_methods, reason = "tests the function itself")]
     fn test_get_memory_limit_positive() {
         let limit = get_memory_limit();
         assert!(limit > 0, "memory limit should be positive");

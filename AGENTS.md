@@ -117,6 +117,17 @@ Applies to every NEW table and column (SQLite and PostgreSQL alike):
 - Existing columns that break these rules are legacy; do not add new ones next
   to them, and do not migrate them as part of an unrelated change.
 
+## Memory budget
+
+- Node memory is split once at startup by `src/config/src/config/memory/`: a
+  `ZO_MEMORY_BUDGET_PERCENT` budget divided between `MemoryConsumer`s by their
+  `ZO_MEMORY_RATIO_*` values.
+- A new in-memory cache or buffer must register a `MemoryConsumer`, be configured
+  only by a ratio (no byte, MB or entry-count env), and hold its bytes under
+  `memory_budget().quota(..)`. Reject it in review otherwise.
+- Never size memory from `cfg.limit.mem_total` or `sysinfo::get_memory_limit`.
+  clippy `disallowed-methods` blocks `get_memory_limit`; review blocks `mem_total` readers.
+
 ## Feature-owned internal streams
 
 - Any new feature that uses OpenObserve itself to ingest and query its own

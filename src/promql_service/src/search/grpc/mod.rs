@@ -20,6 +20,7 @@ use std::{
 
 use async_trait::async_trait;
 use config::{
+    memory::{MemoryConsumer, memory_budget},
     meta::{
         promql::value,
         search::{ScanStats, SearchEventType},
@@ -193,7 +194,7 @@ pub async fn search(
         } else {
             None
         };
-        let memory_limit = cfg.memory_cache.datafusion_max_size; // bytes
+        let memory_limit = memory_budget().quota(MemoryConsumer::DataFusionPool);
         let group_step = grouping_step(step, query.query_exemplars);
         let group = match generate_search_groups(
             memory_limit,
@@ -262,7 +263,6 @@ pub async fn data(
     query_tracker: &QueryTracker,
     tx: mpsc::Sender<Result<cluster_rpc::MetricsQueryResponse, tonic::Status>>,
 ) -> Result<()> {
-    let cfg = config::get_config();
     let query = req.query.as_ref().unwrap();
 
     let start = query.start;
@@ -342,7 +342,7 @@ pub async fn data(
 
     // 2. generate search group with max records stream
     let start_ts = std::time::Instant::now();
-    let memory_limit = cfg.memory_cache.datafusion_max_size; // bytes
+    let memory_limit = memory_budget().quota(MemoryConsumer::DataFusionPool);
     let group_step = grouping_step(step, query.query_exemplars);
     let group = match generate_search_group(memory_limit, plan.files, start, end, group_step).await
     {
