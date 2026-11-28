@@ -6,7 +6,7 @@
 
 import * as crypto from "crypto";
 import { setupTestDashboard, deleteDashboard } from "./dashCreation.js";
-import { ingestionForMaps, ingestionForStateTimeline } from "./dashIngestion.js";
+import { ingestionForMaps, ingestionForStateTimeline, LOGS_PANEL_STREAM, logsPanelStarterSql } from "./dashIngestion.js";
 import testLogger from '../../utils/test-logger.js';
 
 // ---------------------------------------------------------------------------
@@ -379,6 +379,29 @@ export async function setupBoxplotPanelWithConfig(page, pm, dashboardName, {
   await pm.dashboardPanelActions.applyDashboardBtn();
   await pm.dashboardPanelConfigs.openConfigPanel();
   testLogger.info("Box plot panel with config ready", { dashboardName, panelName, valueField, categoryField });
+}
+
+// Logs panel with the config sidebar open. The stream is chosen before the type, because the starter query is
+// seeded from the stream selected when Logs is picked. sql = null keeps that starter; any other SQL replaces it.
+export async function setupLogsPanelWithConfig(page, pm, dashboardName, {
+  panelName = "Test Panel",
+  streamName = LOGS_PANEL_STREAM,
+  sql = null,
+} = {}) {
+  await setupTestDashboard(page, pm, dashboardName);
+  await pm.dashboardCreate.addPanel();
+  await pm.chartTypeSelector.selectStreamType("logs");
+  await pm.chartTypeSelector.selectStream(streamName);
+  await pm.chartTypeSelector.selectChartType("logs");
+  await pm.chartTypeSelector.expectQueryEditorText(logsPanelStarterSql(streamName));
+  if (sql) {
+    await pm.chartTypeSelector.enterCustomSQL(sql);
+    await pm.chartTypeSelector.expectQueryEditorText(sql);
+  }
+  await pm.dashboardPanelActions.addPanelName(panelName);
+  await pm.dashboardPanelActions.applyDashboardBtn();
+  await pm.dashboardPanelConfigs.openConfigPanel();
+  testLogger.info("Logs panel with config ready", { dashboardName, panelName, streamName, sql });
 }
 
 // Sunburst panel with the config sidebar open; Size keeps the seeded count. The editor opens as a bar and

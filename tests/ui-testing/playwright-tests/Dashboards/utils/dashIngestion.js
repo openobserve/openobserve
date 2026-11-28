@@ -149,6 +149,86 @@ export const ingestionHighCardinality = async (
   return await fetchResponse.json();
 };
 
+// Runs this worker ingested, keyed by org:stream. Reused for 8 minutes, well inside a panel's default 15-minute range.
+const logsPanelRuns = new Map();
+const LOGS_PANEL_RUN_MAX_AGE_MS = 8 * 60 * 1000;
+export const LOGS_PANEL_STREAM = "e2e_logs_panel";
+export const LOGS_PANEL_LEVELS = ["info", "warn", "error", "debug"];
+export const LOGS_PANEL_ROW_COUNT = 30;
+
+// Seed rows tagged with one run_id so a spec's SQL only sees this ingestion. kind "row": seq 0 (newest) to 29, 1 s apart;
+// kind "special" (older): XSS payloads (seq 100-102), a JSON message (103) and a 2,000-character line (104).
+export const ingestionForLogsPanel = async (page, streamName = LOGS_PANEL_STREAM) => {
+  if (!process.env["INGESTION_URL"]) {
+    throw new Error("Required environment variables are not set");
+  }
+  const key = `${getOrgIdentifier()}:${streamName}`;
+  const cached = logsPanelRuns.get(key);
+  if (cached && Date.now() - cached.baseMs < LOGS_PANEL_RUN_MAX_AGE_MS) return cached;
+
+  const runId = `lp_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+  const baseMs = Date.now() - 2000;
+  const records = [];
+  for (let seq = 0; seq < LOGS_PANEL_ROW_COUNT; seq++) {
+    const ms = baseMs - seq * 1000;
+    records.push({
+      _timestamp: ms * 1000,
+      run_id: runId,
+      kind: "row",
+      seq,
+      level: LOGS_PANEL_LEVELS[seq % LOGS_PANEL_LEVELS.length],
+      lvl: seq % 2 === 0 ? "err" : "warn",
+      message: `logs-panel row ${seq}`,
+      svc: `svc-${seq % 3}`,
+      status: seq % 5 === 0 ? 500 : 200,
+      ts_ms: ms,
+      ts_ns: `${ms}000000`,
+    });
+  }
+  const specials = [
+    '<img src=x onerror="window.__lpXss=1">XSS-IMG',
+    '"><svg onload="window.__lpXss=2">XSS-SVG',
+    "<script>window.__lpXss=3</script>XSS-SCRIPT",
+    '{"nested":{"a":1},"msg":"json in message"}',
+    `LONG ${"x".repeat(2000)} END`,
+  ];
+  specials.forEach((message, i) => {
+    records.push({
+      _timestamp: (baseMs - (LOGS_PANEL_ROW_COUNT + 10 + i) * 1000) * 1000,
+      run_id: runId,
+      kind: "special",
+      seq: 100 + i,
+      level: "info",
+      message,
+    });
+  });
+
+  const fetchResponse = await postWithRetry(page, streamName, records, "Logs panel ingestion");
+  if (!fetchResponse.ok) {
+    const body = await fetchResponse.text().catch(() => "");
+    throw new Error(`HTTP error! status: ${fetchResponse.status}, response: ${body.slice(0, 200)}`);
+  }
+  const run = { runId, baseMs };
+  logsPanelRuns.set(key, run);
+  testLogger.info("Logs panel stream ingested", { streamName, runId, rows: records.length });
+  return run;
+};
+
+// SQL and expected values for the rows ingestionForLogsPanel writes.
+export const logsPanelStarterSql = (stream = LOGS_PANEL_STREAM, order = "DESC") =>
+  `SELECT * FROM "${stream}" ORDER BY _timestamp ${order} LIMIT 100`;
+export const logsPanelRowsSql = (runId, { limit = 10, order = "DESC" } = {}) =>
+  `SELECT * FROM "${LOGS_PANEL_STREAM}" WHERE run_id = '${runId}' AND kind = 'row' ORDER BY _timestamp ${order} LIMIT ${limit}`;
+export const logsPanelSeqSql = (runId, seqs) =>
+  `SELECT * FROM "${LOGS_PANEL_STREAM}" WHERE run_id = '${runId}' AND (${seqs.map((seq) => `seq = ${seq}`).join(" OR ")}) ORDER BY _timestamp DESC LIMIT 10`;
+export const logsPanelNoRowsSql = () => `SELECT * FROM "${LOGS_PANEL_STREAM}" WHERE run_id = 'no_such_run' LIMIT 10`;
+export const logsPanelInvalidSql = () => `SELEC * FRM "${LOGS_PANEL_STREAM}"`;
+export const LOGS_PANEL_XSS_SEQS = [100, 101, 102];
+export const LOGS_PANEL_LONG_SEQ = 104;
+/** Messages of plain rows `from`..`to` in that order (either direction). */
+export const logsPanelMessages = (from, to) =>
+  Array.from({ length: Math.abs(to - from) + 1 }, (_, i) => `logs-panel row ${from <= to ? from + i : from - i}`);
+
 // Dashboard maps ingestion
 
 // Ingestion function for Geomap and Maps chart

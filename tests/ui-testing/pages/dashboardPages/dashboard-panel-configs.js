@@ -210,6 +210,19 @@ export default class DashboardPanelConfigs {
     this.boxplotWhisker = page.locator(`[data-test="${this.boxplotWhiskerId}"]`);
     this.boxplotWhiskerTrigger = page.locator(`[data-test="${this.boxplotWhiskerId}-trigger"]`);
 
+    //Logs panel locators: the three field pickers are OCombobox, Order an OSelect, the rest OSwitch
+    this.logsFieldIds = {
+      message: "dashboard-config-logs_message_field",
+      level: "dashboard-config-logs_level_field",
+      time: "dashboard-config-logs_time_field",
+    };
+    this.logsOrderId = "dashboard-config-logs_order";
+    this.logsOrder = page.locator(`[data-test="${this.logsOrderId}"]`);
+    this.logsOrderTrigger = page.locator(`[data-test="${this.logsOrderId}-trigger"]`);
+    this.logsShowTime = page.locator('[data-test="dashboard-config-logs_show_time"]');
+    this.logsWrap = page.locator('[data-test="dashboard-config-logs_wrap"]');
+    this.logsPrettifyJson = page.locator('[data-test="dashboard-config-logs_prettify_json"]');
+
     //Map locators
     this.mapType = page.locator('[data-test="dashboard-config-map-type"]');
 
@@ -2421,6 +2434,53 @@ export default class DashboardPanelConfigs {
   async getBoxplotWhiskerOptionLabels() {
     await this.scrollSidebarToElement(this.boxplotWhisker);
     return this.getConfigSelectOptionLabels(this.boxplotWhiskerId);
+  }
+
+  /** Input of a Logs panel field picker; `field` is "message", "level" or "time". */
+  logsFieldInput(field) {
+    return this.page.locator(`[data-test="${this.logsFieldIds[field]}-input"]`);
+  }
+
+  // Set a Logs field picker ("message" | "level" | "time") to `column`; "" clears it back to Default.
+  // A name the list does not offer is committed as typed.
+  async setLogsField(field, column) {
+    const id = this.logsFieldIds[field];
+    const input = this.logsFieldInput(field);
+    await this.scrollSidebarToElement(input);
+    await input.click();
+    // Select-all then type replaces the whole value; fill() can append to a value the combobox re-renders.
+    await input.press("ControlOrMeta+a");
+    await input.press("Backspace");
+    if (column) {
+      await input.pressSequentially(column, { delay: 20 });
+      const option = this.page.locator(`[data-test="${id}-option"][data-test-value="${column}"]`);
+      if (await option.first().isVisible({ timeout: 3000 }).catch(() => false)) {
+        await option.first().click();
+      } else {
+        await input.press("Enter");
+      }
+    }
+    await input.press("Tab");
+    await expect(input).toHaveValue(column ?? "", { timeout: 5000 });
+  }
+
+  /** Assert a Logs panel field picker's value; "" means it is left on Default. */
+  async expectLogsField(field, column) {
+    const input = this.logsFieldInput(field);
+    await this.scrollSidebarToElement(input);
+    await expect(input).toHaveValue(column, { timeout: 15000 });
+  }
+
+  /** Pick a Logs panel Order option by its label, e.g. "Oldest first" or "Default (Newest first)". */
+  async selectLogsOrder(label) {
+    await this.scrollSidebarToElement(this.logsOrder);
+    await this.selectConfigOption(this.logsOrderId, label);
+  }
+
+  /** Labels of the Logs panel Order options, the Default entry first. */
+  async getLogsOrderOptionLabels() {
+    await this.scrollSidebarToElement(this.logsOrder);
+    return this.getConfigSelectOptionLabels(this.logsOrderId);
   }
 
   /** Pick a funnel Orientation item by its label; `value` is what the group then reports ("__auto__" for Default). */

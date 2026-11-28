@@ -415,6 +415,21 @@ export default class DashboardactionPage {
     return response;
   }
 
+  // Apply, then wait for its _search_stream query: Apply stays enabled briefly after the click,
+  // so waitForChartToRender alone can pass before the query even starts.
+  async applyAndWaitForSqlQuery() {
+    const searchRequest = this.page
+      .waitForRequest((req) => new URL(req.url()).pathname.endsWith("/_search_stream"), { timeout: 5000 })
+      .catch(() => null);
+    await this.applyDashboardBtn();
+    const request = await searchRequest;
+    if (request) {
+      await request.response().catch(() => null);
+    }
+    await this.waitForChartToRender();
+    return Boolean(request);
+  }
+
   /** Resolves with the URL of the next PromQL query_range request; call before the action that fires it. */
   nextPromQLQueryRangeRequest() {
     return this.page
