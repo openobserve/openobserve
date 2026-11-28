@@ -18,6 +18,7 @@ import { routeGuard } from "@/utils/zincutils";
 import { withLicenseFeature } from "@/utils/featureGate";
 
 import { aiCategories } from "@/components/ingestion/ai/data";
+import { aiLandingCategory } from "@/components/ingestion/ai/landing";
 
 const SplunkHec = () => import("@/components/ingestion/logs/SplunkHec.vue");
 const DatadogAgent = () => import("@/components/ingestion/logs/DatadogAgent.vue");
@@ -114,6 +115,10 @@ const Heroku = () => import("@/components/ingestion/others/Heroku.vue");
 const AIIntegrations = () => import("@/components/ingestion/AIIntegrations.vue");
 const AIIntegrationDetail = () => import("@/components/ingestion/ai/AIIntegrationDetail.vue");
 const McpCrossLink = () => import("@/components/ingestion/McpCrossLink.vue");
+
+/** First integration of the stored pick's AI category, else of the first category. */
+export const aiLandingRouteName = (org: unknown): string =>
+  aiLandingCategory(org).integrations[0].routeName;
 
 const useIngestionRoutes = () => {
   // One route per AI integration across all tabs. `aiCategories` is already
@@ -918,10 +923,7 @@ const useIngestionRoutes = () => {
               // exists only to land /ai-integrations on the first integration.
               name: "ai-integrations-default",
               path: "",
-              redirect: () => {
-                const first = aiCategories[0].integrations[0];
-                return { name: first.routeName };
-              },
+              redirect: (to: any) => ({ name: aiLandingRouteName(to.query?.org_identifier) }),
             },
             ...aiIntegrationRoutes,
           ],

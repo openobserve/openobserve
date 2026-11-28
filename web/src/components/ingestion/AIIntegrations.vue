@@ -114,14 +114,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="bg-surface-panel border-border-default h-full border-e">
           <div class="h-full overflow-y-auto pt-1.5">
             <OTabs v-model="selectedCategory" orientation="vertical" dense class="px-1">
-              <FirstSourcePickGroup
-                v-if="pickTab"
-                rail="ai"
-                :tab="pickTab"
-                :rest-label="t('ingestion.firstSource.categories')"
-              />
               <OTab
-                v-for="cat in railCategories"
+                v-for="cat in aiCategories"
                 :key="cat.slug"
                 :name="cat.slug"
                 :label="raw(cat.name)"
@@ -213,6 +207,7 @@ import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import { useRouter, useRoute } from "vue-router";
 import { aiCategories } from "./ai/data";
+import { aiLandingCategory } from "./ai/landing";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
@@ -221,11 +216,6 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
-import FirstSourcePickGroup, {
-  type FirstSourcePickTab,
-} from "@/components/ingestion/FirstSourcePickGroup.vue";
-import { firstSourceOption, readFirstSource } from "@/components/login/firstSourceOptions";
-import { getImageURL } from "@/utils/zincutils";
 
 export default defineComponent({
   name: "AIIntegrationsPage",
@@ -237,7 +227,6 @@ export default defineComponent({
     ODrawer,
     OButton,
     OIcon,
-    FirstSourcePickGroup,
   },
   setup() {
     const { lgUp } = useBreakpoint();
@@ -249,7 +238,10 @@ export default defineComponent({
     const router = useRouter();
     const route = useRoute();
 
-    const selectedCategory = ref(aiCategories[0].slug);
+    // pushing the parent route name skips its empty-child redirect, so the page lands the pick itself
+    const selectedCategory = ref(
+      aiLandingCategory(store.state.selectedOrganization.identifier).slug,
+    );
     const selectedIntegration = ref(aiCategories[0].integrations[0].routeName);
     const integrationFilter = ref("");
 
@@ -308,7 +300,7 @@ export default defineComponent({
     onBeforeMount(() => {
       const routeName = router.currentRoute.value.name as string;
       if (routeName === "ai-integrations") {
-        navigateToFirstIntegration(aiCategories[0].slug);
+        navigateToFirstIntegration(selectedCategory.value);
       } else {
         // Sync selectedCategory and selectedIntegration from current route
         for (const cat of aiCategories) {
@@ -335,27 +327,6 @@ export default defineComponent({
       },
     );
 
-    // The LLM pick's guide is this page's landing category, so the pick row stands in for that category.
-    const pickTab = computed<FirstSourcePickTab | undefined>(() => {
-      const option = firstSourceOption(
-        readFirstSource(store.state.selectedOrganization.identifier),
-      );
-      const landing = aiCategories[0];
-      if (option?.route !== "ai-integrations" || !landing) return undefined;
-      return {
-        name: landing.slug,
-        to: {
-          name: landing.integrations[0]?.routeName ?? "ai-integrations",
-          query: { org_identifier: store.state.selectedOrganization.identifier },
-        },
-        label: t(option.labelKey),
-        icon: option.logo ? "img:" + getImageURL(option.logo) : option.icon,
-      };
-    });
-    const railCategories = computed(() =>
-      aiCategories.filter((cat) => cat.slug !== pickTab.value?.name),
-    );
-
     const selectedIntegrationName = computed(
       () => filteredIntegrations.value.find((i) => i.routeName === selectedIntegration.value)?.name,
     );
@@ -374,8 +345,6 @@ export default defineComponent({
       store,
       isDark,
       aiCategories,
-      pickTab,
-      railCategories,
       selectedCategory,
       selectedIntegration,
       integrationFilter,
