@@ -436,6 +436,7 @@ test.describe("Logs J/K navigation (item 4a)", () => {
       await openResults(page);
       await openRow(page, logs, 17);
       await page.keyboard.press("Escape");
+      await expect(page.locator(logs.logDetailDialog)).toBeHidden();
       await logs.expectActiveLogRow(17);
       const schemaReads = [];
       page.on("request", (req) => {
