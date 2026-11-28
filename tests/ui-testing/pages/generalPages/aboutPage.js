@@ -15,7 +15,9 @@ export class AboutPage {
     }
     async gotoAboutPage() {
         await this.aboutPageMenu.click();
-
+        // Wait for the route change and the help menu close, or the next popover gets dismissed.
+        await expect(this.page).toHaveURL(/\/about/, { timeout: 15000 });
+        await expect(this.aboutPageMenu).toBeHidden({ timeout: 5000 });
     }
 
 
