@@ -16,7 +16,6 @@
 use std::sync::{Arc, LazyLock};
 
 use config::metrics::QUERY_AGGREGATION_CACHE_ITEMS;
-use dashmap::DashMap;
 use datafusion::{common::Result, error::DataFusionError};
 use hashlink::lru_cache::LruCache;
 
@@ -91,78 +90,34 @@ pub fn get_owner(id: &str) -> Option<Option<String>> {
     GLOBAL_CACHE.id_cache.get(id).map(|item| item.owner)
 }
 
-/// Collected statistics for files
-/// Cache is invalided when file size or last modification has changed
+/// Streaming aggs cache state keyed by streaming id, bounded by bytes in LRU order.
 pub struct StreamingAggsCache {
-    data: DashMap<String, Vec<Arc<String>>>, // streaming_id -> files
-    max_entries: usize,
     pub id_cache: StreamingIdCache,
 }
 
 impl StreamingAggsCache {
-    pub fn new(max_entries: usize) -> Self {
+    pub fn new(max_size: usize) -> Self {
         Self {
-            data: DashMap::new(),
-            max_entries,
-            id_cache: StreamingIdCache::new(max_entries),
+            id_cache: StreamingIdCache::new(max_size),
         }
     }
 
     pub fn get(&self, k: &str) -> Option<Vec<Arc<String>>> {
-        self.data.get(k).map(|v| v.value().clone())
+        self.id_cache.files(k)
     }
 
     pub fn insert(&self, k: String, v: String) {
-        let streaming_id = k.clone(); // Clone for logging before k is moved
-        let item_len = self.data.len();
-        if item_len >= self.max_entries {
-            log::info!(
-                "[StreamingAggs streaming_id: {streaming_id}] remove the oldest 1% entries: max_entries={}, current_entries={item_len}",
-                self.max_entries,
+        if !self.id_cache.add_file(&k, &v) {
+            log::warn!(
+                "[StreamingAggs streaming_id: {k}] streaming_id is not cached, skip cache file: {v}"
             );
-            let gc_keys = self.id_cache.gc(item_len / 100);
-            for gc_key in gc_keys {
-                self.remove(&gc_key);
-                log::info!(
-                    "[StreamingAggs streaming_id: {streaming_id}] old streaming_id removed: {gc_key}"
-                );
-            }
-        }
-        let mut entry = self.data.entry(k).or_default();
-
-        // Deduplicate: only add if file path doesn't already exist
-        let file_arc = Arc::new(v.clone());
-        if !entry.iter().any(|existing| existing.as_ref() == v.as_str()) {
-            entry.push(file_arc);
-            log::debug!("[StreamingAggs streaming_id: {streaming_id}] Added cache file: {v}");
-        } else {
-            log::debug!(
-                "[StreamingAggs streaming_id: {streaming_id}] Skipped duplicate cache file: {v}"
-            );
+            remove_tmp_files(std::iter::once(v.as_str()));
         }
     }
 
     pub fn remove(&self, k: &str) {
-        self.id_cache.remove(k);
-        let Some((_, files)) = self.data.remove(k) else {
-            return;
-        };
-        self.data.shrink_to_fit();
-        for file in files {
-            // remove the temporary file when the streaming is done
-            if file.contains("_tmp") {
-                let Some(file_path) = infra::cache::file_data::disk::get_file_path(&file) else {
-                    continue;
-                };
-                let Ok(metadata) = std::fs::metadata(&file_path) else {
-                    continue;
-                };
-                if metadata.is_file()
-                    && let Err(e) = std::fs::remove_file(&file_path)
-                {
-                    log::error!("Error removing temporary file: {e}");
-                }
-            }
+        if let Some(item) = self.id_cache.remove(k) {
+            remove_tmp_files(item.files.iter().map(|f| f.as_str()));
         }
     }
 
@@ -179,19 +134,24 @@ impl Default for StreamingAggsCache {
         Self::new(
             config::get_config()
                 .limit
-                .datafusion_streaming_aggs_cache_max_entries,
+                .datafusion_streaming_aggs_cache_max_size,
         )
     }
 }
 
 pub struct StreamingIdCache {
-    data: parking_lot::RwLock<LruCache<String, StreamingIdItem>>,
+    data: parking_lot::RwLock<IdLru>,
+    max_size: usize,
 }
 
 impl StreamingIdCache {
-    pub fn new(max_entries: usize) -> Self {
+    pub fn new(max_size: usize) -> Self {
         Self {
-            data: parking_lot::RwLock::new(LruCache::new(max_entries)),
+            data: parking_lot::RwLock::new(IdLru {
+                items: LruCache::new_unbounded(),
+                size: 0,
+            }),
+            max_size,
         }
     }
 
@@ -204,84 +164,140 @@ impl StreamingIdCache {
         cache_interval_mins: i64,
     ) {
         let mut w = self.data.write();
-        if w.get(&k).is_some() {
+        if w.items.get(&k).is_some() {
             return; // trigger the key as last recently used
         }
-        w.insert(
-            k,
-            StreamingIdItem::new(start_time, end_time, cache_file_path, cache_interval_mins),
-        );
+        let item = StreamingIdItem::new(start_time, end_time, cache_file_path, cache_interval_mins);
+        let size = entry_size(&k, &item);
+        if size > self.max_size {
+            log::warn!(
+                "[StreamingAggs streaming_id: {k}] entry of {size} bytes exceeds the cache max size {}, skip",
+                self.max_size
+            );
+            return;
+        }
+        w.items.insert(k, item);
+        w.size += size;
         QUERY_AGGREGATION_CACHE_ITEMS
             .with_label_values::<&str>(&[])
             .inc();
+        let evicted = w.evict_to(self.max_size);
+        drop(w);
+        remove_evicted(evicted);
     }
 
     pub fn exists(&self, k: &str) -> bool {
-        self.data.read().contains_key(k)
+        self.data.read().items.contains_key(k)
     }
 
     pub fn check_time(&self, k: &str, start_time: i64, end_time: i64) -> bool {
-        match self.data.write().get_mut(k) {
+        match self.data.write().items.get_mut(k) {
             Some(v) => v.check_time(start_time, end_time),
             None => false,
         }
     }
 
-    pub fn remove(&self, k: &str) {
-        if self.data.write().remove(k).is_some() {
-            QUERY_AGGREGATION_CACHE_ITEMS
-                .with_label_values::<&str>(&[])
-                .dec();
-        }
-    }
-
-    pub fn gc(&self, len: usize) -> Vec<String> {
-        let len = std::cmp::max(1, len);
+    pub fn remove(&self, k: &str) -> Option<StreamingIdItem> {
         let mut w = self.data.write();
-        let mut remove_keys = Vec::new();
-        for _ in 0..len {
-            let Some((k, _)) = w.remove_lru() else {
-                break;
-            };
-            remove_keys.push(k);
-            QUERY_AGGREGATION_CACHE_ITEMS
-                .with_label_values::<&str>(&[])
-                .dec();
-        }
-        remove_keys
+        let (key, item) = w.items.remove_entry(k)?;
+        w.size -= entry_size(&key, &item);
+        QUERY_AGGREGATION_CACHE_ITEMS
+            .with_label_values::<&str>(&[])
+            .dec();
+        Some(item)
     }
 
     pub fn get(&self, k: &str) -> Option<StreamingIdItem> {
-        self.data.read().peek(k).cloned()
+        self.data.read().items.peek(k).cloned()
     }
 
     pub fn get_cache_file_path(&self, k: &str) -> Option<String> {
-        self.data.read().peek(k).map(|v| v.get_cache_file_path())
+        self.data
+            .read()
+            .items
+            .peek(k)
+            .map(|v| v.get_cache_file_path())
     }
 
     pub fn set_partition_strategy(&self, k: &str, strategy: StreamingAggsPartitionStrategy) {
-        if let Some(item) = self.data.write().get_mut(k) {
-            item.set_partition_strategy(strategy);
-        }
+        self.update(k, |item| item.set_partition_strategy(strategy));
     }
 
     pub fn get_partition_strategy(&self, k: &str) -> Option<StreamingAggsPartitionStrategy> {
         self.data
             .read()
+            .items
             .peek(k)
             .and_then(|v| v.get_partition_strategy())
     }
 
     pub fn set_redaction_digest(&self, k: &str, digest: Option<String>) {
-        if let Some(item) = self.data.write().get_mut(k) {
-            item.redaction_digest = digest;
-        }
+        self.update(k, |item| item.redaction_digest = digest);
     }
 
     pub fn set_owner(&self, k: &str, owner: Option<String>) {
-        if let Some(item) = self.data.write().get_mut(k) {
-            item.owner = owner;
+        self.update(k, |item| item.owner = owner);
+    }
+
+    /// Total bytes held by the cached items.
+    pub fn memory_size(&self) -> usize {
+        self.data.read().size
+    }
+
+    fn files(&self, k: &str) -> Option<Vec<Arc<String>>> {
+        self.data.read().items.peek(k).map(|v| v.files.clone())
+    }
+
+    /// Returns false when the id is not cached, so the caller owns the file.
+    fn add_file(&self, k: &str, file: &str) -> bool {
+        self.update(k, |item| {
+            if item.files.iter().any(|existing| existing.as_str() == file) {
+                log::debug!(
+                    "[StreamingAggs streaming_id: {k}] Skipped duplicate cache file: {file}"
+                );
+            } else {
+                item.files.push(Arc::new(file.to_string()));
+                log::debug!("[StreamingAggs streaming_id: {k}] Added cache file: {file}");
+            }
+        })
+    }
+
+    /// Applies `f` to a cached item, then evicts until the cache fits again.
+    fn update(&self, k: &str, f: impl FnOnce(&mut StreamingIdItem)) -> bool {
+        let mut w = self.data.write();
+        let Some(item) = w.items.get_mut(k) else {
+            return false;
+        };
+        let before = entry_size(k, item);
+        f(item);
+        let after = entry_size(k, item);
+        w.size = w.size - before + after;
+        let evicted = w.evict_to(self.max_size);
+        drop(w);
+        remove_evicted(evicted);
+        true
+    }
+}
+
+struct IdLru {
+    items: LruCache<String, StreamingIdItem>,
+    size: usize,
+}
+
+impl IdLru {
+    fn evict_to(&mut self, max_size: usize) -> Vec<(String, StreamingIdItem)> {
+        let mut evicted = Vec::new();
+        while self.size > max_size {
+            let Some((key, item)) = self.items.remove_lru() else {
+                break;
+            };
+            self.size -= entry_size(&key, &item);
+            QUERY_AGGREGATION_CACHE_ITEMS
+                .with_label_values::<&str>(&[])
+                .dec();
+            evicted.push((key, item));
         }
+        evicted
     }
 }
 
@@ -296,6 +312,7 @@ pub struct StreamingIdItem {
     partition_strategy: Option<StreamingAggsPartitionStrategy>,
     redaction_digest: Option<String>,
     owner: Option<String>,
+    files: Vec<Arc<String>>,
 }
 
 impl StreamingIdItem {
@@ -315,6 +332,7 @@ impl StreamingIdItem {
             partition_strategy: None,
             redaction_digest: None,
             owner: None,
+            files: Vec::new(),
         }
     }
 
@@ -346,6 +364,25 @@ impl StreamingIdItem {
     pub fn get_cache_interval(&self) -> i64 {
         self.cache_interval
     }
+
+    /// Bytes held by the item, inline fields plus heap.
+    pub fn memory_size(&self) -> usize {
+        let file_size = size_of::<String>() + 2 * size_of::<usize>(); // Arc header + String
+        size_of::<Self>()
+            + self.cache_file_path.capacity()
+            + self.redaction_digest.as_ref().map_or(0, String::capacity)
+            + self.owner.as_ref().map_or(0, String::capacity)
+            + self
+                .partition_strategy
+                .as_ref()
+                .map_or(0, StreamingAggsPartitionStrategy::heap_size)
+            + self.files.capacity() * size_of::<Arc<String>>()
+            + self
+                .files
+                .iter()
+                .map(|f| file_size + f.capacity())
+                .sum::<usize>()
+    }
 }
 
 pub(crate) fn get_cache_file_path_from_streaming_id(streaming_id: &str) -> Result<String> {
@@ -359,6 +396,40 @@ pub(crate) fn get_cache_file_path_from_streaming_id(streaming_id: &str) -> Resul
         Err(DataFusionError::External(
             format!("[streaming_id {streaming_id}] get_cache_file_path_from_streaming_id: No cached file path found").into(),
         ))
+    }
+}
+
+// Key bytes plus the LRU node's links and hash slot.
+fn entry_size(key: &str, item: &StreamingIdItem) -> usize {
+    size_of::<String>() + key.len() + 4 * size_of::<usize>() + item.memory_size()
+}
+
+fn remove_evicted(evicted: Vec<(String, StreamingIdItem)>) {
+    for (key, item) in evicted {
+        log::info!(
+            "[StreamingAggs streaming_id: {key}] evicted to keep the cache under its max size"
+        );
+        remove_tmp_files(item.files.iter().map(|f| f.as_str()));
+    }
+}
+
+// Query-local `_tmp` files are useless once their streaming id is gone.
+fn remove_tmp_files<'a>(files: impl IntoIterator<Item = &'a str>) {
+    for file in files {
+        if !file.contains("_tmp") {
+            continue;
+        }
+        let Some(file_path) = infra::cache::file_data::disk::get_file_path(file) else {
+            continue;
+        };
+        let Ok(metadata) = std::fs::metadata(&file_path) else {
+            continue;
+        };
+        if metadata.is_file()
+            && let Err(e) = std::fs::remove_file(&file_path)
+        {
+            log::error!("Error removing temporary file: {e}");
+        }
     }
 }
 
@@ -377,116 +448,32 @@ mod tests {
     };
 
     use super::*;
-    use crate::datafusion::physical_plan::streaming_aggs_exec::exec::StreamingAggsExec;
+    use crate::datafusion::physical_plan::streaming_aggs_exec::{
+        exec::StreamingAggsExec, partition::partition_optimizer::UncachedPartition,
+    };
+
+    const TEST_MAX_SIZE: usize = 1024 * 1024;
+
+    fn new_item_size(key: &str) -> usize {
+        entry_size(key, &StreamingIdItem::new(1, 2, "path".to_string(), 60))
+    }
+
+    fn init(cache: &StreamingAggsCache, key: &str) {
+        cache
+            .id_cache
+            .insert(key.to_string(), 1, 2, "path".to_string(), 60);
+    }
+
+    fn tracked_size(cache: &StreamingIdCache) -> usize {
+        let r = cache.data.read();
+        r.items.iter().map(|(k, v)| entry_size(k, v)).sum()
+    }
 
     // DataFusion rejects an AggregateExec with neither grouping nor aggregates.
     fn group_by_col1(schema: &Schema) -> PhysicalGroupBy {
         let col1 = col("col1", schema).unwrap();
         PhysicalGroupBy::new_single(vec![(col1, "col1".to_string())])
     }
-
-    #[test]
-    fn test_streaming_aggs_cache_insert_max_entries() {
-        // Create a cache with max_entries = 2
-        let cache = StreamingAggsCache::new(2);
-
-        // Create test schema and record batches
-        let file1 = "test_file1.arrow";
-        let file2 = "test_file2.arrow";
-        let file3 = "test_file3.arrow";
-
-        // Insert first entry
-        cache.insert("key1".to_string(), file1.to_string());
-        cache
-            .id_cache
-            .insert("key1".to_string(), 1, 2, "path1".to_string(), 60);
-        assert!(cache.get("key1").is_some());
-        assert_eq!(cache.data.len(), 1);
-
-        // Insert second entry
-        cache.insert("key2".to_string(), file2.to_string());
-        cache
-            .id_cache
-            .insert("key2".to_string(), 1, 2, "path2".to_string(), 60);
-        assert!(cache.get("key1").is_some());
-        assert!(cache.get("key2").is_some());
-        assert_eq!(cache.data.len(), 2);
-
-        // Insert third entry - should evict the first (oldest) entry
-        cache.insert("key3".to_string(), file3.to_string());
-        cache
-            .id_cache
-            .insert("key3".to_string(), 1, 2, "path3".to_string(), 60);
-        assert!(cache.get("key1").is_none()); // Should be evicted
-        assert!(cache.get("key2").is_some());
-        assert!(cache.get("key3").is_some());
-        assert_eq!(cache.data.len(), 2); // Should still be 2 (max_entries)
-
-        // Verify that the cacher queue length matches max_entries
-        let cacher_len = cache.data.len();
-        assert_eq!(cacher_len, 2);
-    }
-
-    #[test]
-    fn test_streaming_aggs_cache_deduplication() {
-        let cache = StreamingAggsCache::new(10);
-
-        // Insert same file path multiple times (simulating multiple partitions)
-        cache.insert(
-            "streaming_id_1".to_string(),
-            "cache_file_1.arrow".to_string(),
-        );
-        cache.insert(
-            "streaming_id_1".to_string(),
-            "cache_file_2.arrow".to_string(),
-        );
-        cache.insert(
-            "streaming_id_1".to_string(),
-            "cache_file_1.arrow".to_string(),
-        ); // Duplicate
-        cache.insert(
-            "streaming_id_1".to_string(),
-            "cache_file_3.arrow".to_string(),
-        );
-        cache.insert(
-            "streaming_id_1".to_string(),
-            "cache_file_2.arrow".to_string(),
-        ); // Duplicate
-
-        let files = cache.get("streaming_id_1").unwrap();
-
-        // Should only have 3 unique files, not 5
-        assert_eq!(files.len(), 3, "Should deduplicate cache files");
-
-        // Verify the files are the unique ones
-        let file_paths: Vec<String> = files.iter().map(|f| f.as_ref().to_string()).collect();
-        assert!(file_paths.contains(&"cache_file_1.arrow".to_string()));
-        assert!(file_paths.contains(&"cache_file_2.arrow".to_string()));
-        assert!(file_paths.contains(&"cache_file_3.arrow".to_string()));
-    }
-
-    #[test]
-    fn test_streaming_aggs_cache_id_cache_gc() {
-        let cache = StreamingIdCache::new(10);
-        cache.insert("key1".to_string(), 1, 2, "path1".to_string(), 60);
-        cache.insert("key2".to_string(), 1, 2, "path2".to_string(), 60);
-        cache.insert("key3".to_string(), 1, 2, "path3".to_string(), 60);
-        cache.insert("key4".to_string(), 1, 2, "path4".to_string(), 60);
-        cache.insert("key5".to_string(), 1, 2, "path5".to_string(), 60);
-        // trigger the key as last recently used
-        cache.insert("key1".to_string(), 1, 2, "path1".to_string(), 60);
-        assert_eq!(cache.data.read().len(), 5);
-        let gc_keys = cache.gc(2);
-        assert_eq!(gc_keys, vec!["key2", "key3"]);
-        assert_eq!(cache.data.read().len(), 3);
-        assert!(cache.exists("key4"));
-        assert!(cache.exists("key5"));
-        assert!(cache.exists("key1"));
-    }
-
-    // Note: StreamingAggsExec::new() tests are complex due to DataFusion dependencies
-    // The constructor logic is indirectly tested through the integration tests
-    // Testing getter methods only since they have simple behavior
 
     #[test]
     fn test_streaming_id_item_check_time() {
@@ -524,46 +511,8 @@ mod tests {
     }
 
     #[test]
-    fn test_streaming_aggs_cache_get_exists_remove() {
-        let cache = StreamingAggsCache::new(10);
-
-        // Test non-existent key
-        assert!(cache.get("nonexistent").is_none());
-        assert!(!cache.id_cache.exists("nonexistent"));
-
-        // Insert a key
-        cache.insert("test_key".to_string(), "file1.arrow".to_string());
-        cache.id_cache.insert(
-            "test_key".to_string(),
-            1000,
-            2000,
-            "test_path".to_string(),
-            60,
-        );
-
-        // Test exists
-        assert!(cache.id_cache.exists("test_key"));
-
-        // Test get
-        let files = cache.get("test_key");
-        assert!(files.is_some());
-        assert_eq!(files.unwrap().len(), 1);
-
-        // Insert another file for the same key
-        cache.insert("test_key".to_string(), "file2.arrow".to_string());
-        let files = cache.get("test_key");
-        assert!(files.is_some());
-        assert_eq!(files.unwrap().len(), 2);
-
-        // Test remove
-        cache.remove("test_key");
-        assert!(!cache.id_cache.exists("test_key"));
-        assert!(cache.get("test_key").is_none());
-    }
-
-    #[test]
     fn test_streaming_id_cache_check_time() {
-        let cache = StreamingIdCache::new(10);
+        let cache = StreamingIdCache::new(TEST_MAX_SIZE);
         cache.insert(
             "test_key".to_string(),
             1000,
@@ -597,7 +546,7 @@ mod tests {
 
     #[test]
     fn test_streaming_id_cache_get_and_get_cache_file_path() {
-        let cache = StreamingIdCache::new(10);
+        let cache = StreamingIdCache::new(TEST_MAX_SIZE);
         cache.insert(
             "test_key".to_string(),
             1000,
@@ -832,90 +781,6 @@ mod tests {
     }
 
     #[test]
-    fn test_streaming_aggs_cache_max_entries_behavior() {
-        // Test the max_entries behavior more thoroughly
-        let cache = StreamingAggsCache::new(3); // Small max for testing
-
-        // Fill to capacity
-        for i in 0..3 {
-            let key = format!("key{i}");
-            cache.insert(key.clone(), format!("file{i}.arrow"));
-            cache
-                .id_cache
-                .insert(key, i as i64, (i + 1) as i64, format!("path{i}"), 60);
-        }
-
-        // Verify all are present
-        assert!(cache.id_cache.exists("key0"));
-        assert!(cache.id_cache.exists("key1"));
-        assert!(cache.id_cache.exists("key2"));
-
-        // Add one more - should trigger GC
-        cache.insert("key3".to_string(), "file3.arrow".to_string());
-        cache
-            .id_cache
-            .insert("key3".to_string(), 3, 4, "path3".to_string(), 60);
-
-        // Some old entries should be gone after GC
-        let remaining_count = ["key0", "key1", "key2", "key3"]
-            .iter()
-            .filter(|&k| cache.id_cache.exists(k))
-            .count();
-
-        // Should have at most max_entries (3) after GC
-        assert!(remaining_count <= 3);
-    }
-
-    #[test]
-    fn test_streaming_aggs_cache_get_cache_interval() {
-        let cache = StreamingAggsCache::new(10);
-
-        // Test with non-existent key
-        let interval = cache.get_cache_interval("nonexistent");
-        assert_eq!(interval, 0); // Default value
-
-        // Test with existing key that has a valid cache file path
-        cache.insert("test_interval".to_string(), "test_file.arrow".to_string());
-        cache.id_cache.insert(
-            "test_interval".to_string(),
-            1000,
-            2000,
-            "org/stream/1h".to_string(),
-            60,
-        );
-
-        let interval = cache.get_cache_interval("test_interval");
-        assert_eq!(interval, 60);
-    }
-
-    #[test]
-    fn test_streaming_id_cache_new_with_capacity() {
-        let cache = StreamingIdCache::new(5);
-
-        // Test that new cache is empty
-        assert!(!cache.exists("any_key"));
-
-        // Add entries up to capacity
-        for i in 0..5 {
-            let key = format!("key{i}");
-            cache.insert(
-                key.clone(),
-                i as i64,
-                (i + 1) as i64,
-                format!("path{i}"),
-                60,
-            );
-            assert!(cache.exists(&key));
-        }
-
-        // Add one more to test LRU eviction
-        cache.insert("key5".to_string(), 5, 6, "path5".to_string(), 60);
-
-        // Should still work (LRU will handle the overflow)
-        assert!(cache.exists("key5"));
-    }
-
-    #[test]
     fn test_streaming_aggs_exec_constructor_variations() {
         use std::sync::Arc;
 
@@ -1091,27 +956,6 @@ mod tests {
     }
 
     #[test]
-    fn test_streaming_aggs_cache_edge_cases() {
-        let cache = StreamingAggsCache::new(0); // Zero capacity
-
-        // Test with zero capacity
-        cache.insert("key1".to_string(), "file1.arrow".to_string());
-        // Should still work even with 0 capacity (implementation dependent)
-
-        // Test remove on non-existent key
-        cache.remove("nonexistent");
-        // Should not panic
-
-        // Test get_cache_interval with zero capacity cache
-        // When capacity is 0, LRU cache cannot store any items (immediate eviction)
-        cache
-            .id_cache
-            .insert("empty_path".to_string(), 1000, 2000, "".to_string(), 60);
-        let interval = cache.get_cache_interval("empty_path");
-        assert_eq!(interval, 0); // Returns default because item was immediately evicted from zero-capacity LRU
-    }
-
-    #[test]
     fn test_streaming_id_cache_edge_cases() {
         let cache = StreamingIdCache::new(1); // Very small capacity
 
@@ -1127,8 +971,9 @@ mod tests {
             );
         }
 
-        // Should handle this without panicking
-        assert!(cache.data.read().len() <= 1); // Should be at most capacity
+        // Every item is larger than the 1 byte cap, so none is stored.
+        assert!(cache.data.read().items.is_empty());
+        assert_eq!(cache.memory_size(), 0);
 
         // Test get_cache_file_path with non-existent key
         let result = cache.get_cache_file_path("nonexistent");
@@ -1270,45 +1115,172 @@ mod tests {
     }
 
     #[test]
-    fn test_streaming_aggs_cache_concurrent_operations() {
-        use std::{sync::Arc, thread};
+    fn test_streaming_aggs_cache_evicts_lru_by_bytes() {
+        let cache = StreamingAggsCache::new(3 * new_item_size("key0"));
+        for i in 0..3 {
+            init(&cache, &format!("key{i}"));
+        }
+        assert!(cache.id_cache.exists("key0"));
+        // trigger key0 as last recently used
+        init(&cache, "key0");
+        init(&cache, "key3");
 
-        let cache = Arc::new(StreamingAggsCache::new(10));
-        let mut handles = vec![];
+        assert!(!cache.id_cache.exists("key1"));
+        assert!(cache.id_cache.exists("key0"));
+        assert!(cache.id_cache.exists("key2"));
+        assert!(cache.id_cache.exists("key3"));
+        assert_eq!(cache.id_cache.memory_size(), 3 * new_item_size("key0"));
+    }
 
-        // Test concurrent insertions
-        for i in 0..5 {
-            let cache_clone = cache.clone();
-            let handle = thread::spawn(move || {
-                for j in 0..10 {
-                    let key = format!("thread_{i}_key_{j}");
-                    cache_clone.insert(key.clone(), format!("file_{j}.arrow"));
-                    cache_clone.id_cache.insert(
-                        key,
-                        i as i64,
-                        j as i64,
-                        format!("path_{i}_{j}"),
-                        60,
-                    );
-                }
-            });
-            handles.push(handle);
+    #[test]
+    fn test_streaming_aggs_cache_growth_evicts_older_entries() {
+        let cache = StreamingAggsCache::new(4 * new_item_size("key0"));
+        for i in 0..4 {
+            init(&cache, &format!("key{i}"));
+        }
+        let partitions = (0..8).map(|i| UncachedPartition::new(i, i + 1)).collect();
+        cache.id_cache.set_partition_strategy(
+            "key3",
+            StreamingAggsPartitionStrategy::NoCacheAvailable { partitions },
+        );
+
+        assert!(!cache.id_cache.exists("key0"));
+        assert!(cache.id_cache.exists("key3"));
+        assert!(cache.id_cache.memory_size() <= cache.id_cache.max_size);
+        assert_eq!(cache.id_cache.memory_size(), tracked_size(&cache.id_cache));
+    }
+
+    #[test]
+    fn test_streaming_aggs_cache_oversized_entry_is_evicted_at_once() {
+        let cache = StreamingAggsCache::new(2 * new_item_size("key0"));
+        init(&cache, "key0");
+        init(&cache, "key1");
+        let partitions = (0..64).map(|i| UncachedPartition::new(i, i + 1)).collect();
+        cache.id_cache.set_partition_strategy(
+            "key1",
+            StreamingAggsPartitionStrategy::NoCacheAvailable { partitions },
+        );
+
+        assert!(!cache.id_cache.exists("key1"), "oversized entry kept");
+        assert!(!cache.id_cache.exists("key0"));
+        assert_eq!(cache.id_cache.memory_size(), 0);
+
+        let tiny = StreamingIdCache::new(new_item_size("key0") - 1);
+        tiny.insert("key0".to_string(), 1, 2, "path".to_string(), 60);
+        assert!(!tiny.exists("key0"));
+        assert_eq!(tiny.memory_size(), 0);
+    }
+
+    #[test]
+    fn test_streaming_aggs_cache_remove_then_insert_keeps_byte_count() {
+        let cache = StreamingAggsCache::new(TEST_MAX_SIZE);
+        init(&cache, "key0");
+        init(&cache, "key1");
+        cache.insert("key0".to_string(), "file0.arrow".to_string());
+        cache
+            .id_cache
+            .set_owner("key0", Some("user@example.com".to_string()));
+        assert_eq!(cache.id_cache.memory_size(), tracked_size(&cache.id_cache));
+
+        cache.remove("key0");
+        assert_eq!(cache.id_cache.memory_size(), new_item_size("key1"));
+        init(&cache, "key0");
+        assert_eq!(cache.id_cache.memory_size(), 2 * new_item_size("key0"));
+        cache.remove("key0");
+        cache.remove("key1");
+        assert_eq!(cache.id_cache.memory_size(), 0);
+    }
+
+    #[test]
+    fn test_streaming_aggs_cache_deduplication() {
+        let cache = StreamingAggsCache::new(TEST_MAX_SIZE);
+        init(&cache, "streaming_id_1");
+        for file in ["f1.arrow", "f2.arrow", "f1.arrow", "f3.arrow", "f2.arrow"] {
+            cache.insert("streaming_id_1".to_string(), file.to_string());
         }
 
-        // Wait for all threads to complete
+        let files = cache.get("streaming_id_1").unwrap();
+        let file_paths: Vec<&str> = files.iter().map(|f| f.as_str()).collect();
+        assert_eq!(file_paths, vec!["f1.arrow", "f2.arrow", "f3.arrow"]);
+        assert_eq!(cache.id_cache.memory_size(), tracked_size(&cache.id_cache));
+    }
+
+    #[test]
+    fn test_streaming_aggs_cache_skips_file_for_unknown_id() {
+        let cache = StreamingAggsCache::new(TEST_MAX_SIZE);
+        cache.insert("unknown".to_string(), "file1.arrow".to_string());
+        assert!(cache.get("unknown").is_none());
+        assert_eq!(cache.id_cache.memory_size(), 0);
+    }
+
+    #[test]
+    fn test_streaming_aggs_cache_get_exists_remove() {
+        let cache = StreamingAggsCache::new(TEST_MAX_SIZE);
+        assert!(cache.get("test_key").is_none());
+        assert!(!cache.id_cache.exists("test_key"));
+
+        init(&cache, "test_key");
+        assert!(cache.id_cache.exists("test_key"));
+        assert_eq!(cache.get("test_key").unwrap().len(), 0);
+        cache.insert("test_key".to_string(), "file1.arrow".to_string());
+        cache.insert("test_key".to_string(), "file2.arrow".to_string());
+        assert_eq!(cache.get("test_key").unwrap().len(), 2);
+
+        cache.remove("test_key");
+        assert!(!cache.id_cache.exists("test_key"));
+        assert!(cache.get("test_key").is_none());
+    }
+
+    #[test]
+    fn test_streaming_aggs_cache_get_cache_interval() {
+        let cache = StreamingAggsCache::new(TEST_MAX_SIZE);
+        assert_eq!(cache.get_cache_interval("nonexistent"), 0);
+        cache.id_cache.insert(
+            "test_interval".to_string(),
+            1000,
+            2000,
+            "org/stream/1h".to_string(),
+            60,
+        );
+        assert_eq!(cache.get_cache_interval("test_interval"), 60);
+    }
+
+    #[test]
+    fn test_streaming_aggs_cache_zero_max_size_stores_nothing() {
+        let cache = StreamingAggsCache::new(0);
+        init(&cache, "key1");
+        cache.insert("key1".to_string(), "file1.arrow".to_string());
+        cache.remove("nonexistent");
+        assert!(!cache.id_cache.exists("key1"));
+        assert_eq!(cache.get_cache_interval("key1"), 0);
+    }
+
+    #[test]
+    fn test_streaming_aggs_cache_concurrent_operations() {
+        use std::thread;
+
+        let cache = Arc::new(StreamingAggsCache::new(
+            20 * new_item_size("thread_0_key_0"),
+        ));
+        let handles = (0..5)
+            .map(|i| {
+                let cache = cache.clone();
+                thread::spawn(move || {
+                    for j in 0..10 {
+                        let key = format!("thread_{i}_key_{j}");
+                        init(&cache, &key);
+                        cache.insert(key, format!("file_{j}.arrow"));
+                    }
+                })
+            })
+            .collect::<Vec<_>>();
         for handle in handles {
             handle.join().unwrap();
         }
 
-        // Verify cache still works after concurrent operations
-        cache.insert("final_test".to_string(), "final.arrow".to_string());
-        cache.id_cache.insert(
-            "final_test".to_string(),
-            999,
-            1000,
-            "final_path".to_string(),
-            60,
-        );
+        assert!(cache.id_cache.memory_size() <= cache.id_cache.max_size);
+        assert_eq!(cache.id_cache.memory_size(), tracked_size(&cache.id_cache));
+        init(&cache, "final_test");
         assert!(cache.id_cache.exists("final_test"));
     }
 }

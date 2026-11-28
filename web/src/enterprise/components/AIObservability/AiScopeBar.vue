@@ -108,6 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OSkeleton type="text" v-if="agentSkeleton && !agentsLoaded" class="h-8.5 w-44" />
       <AgentScopeCascade
         v-else
+        ref="cascadeRef"
         :prefix="dataTest"
         :envs="envs"
         :agent-names="agentNames"
@@ -135,7 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { raw, type I18nText } from "@/types/i18n";
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -243,6 +244,9 @@ const props = withDefaults(
     selectedAgentStream: "",
   },
 );
+
+const cascadeRef = ref<{ openAgentPicker: () => void } | null>(null);
+defineExpose({ openAgentPicker: () => cascadeRef.value?.openAgentPicker() });
 
 // Stream mode is also the only mode once the Agent toggle is hidden — there's
 // no way for filterMode to legitimately be "agent" then.

@@ -16,9 +16,9 @@
 //! Management routes of a workflow's HTTP endpoint: config, credentials, reveal and test runs.
 
 use axum::{
-    Json,
+    Extension, Json,
     extract::Path,
-    http::{HeaderValue, StatusCode, header},
+    http::{HeaderMap, HeaderValue, StatusCode, header},
     response::{IntoResponse, Response},
 };
 use infra::table::workflow_http_triggers::AuthMode;
@@ -341,6 +341,8 @@ pub async fn revoke_http_credential(
 )]
 pub async fn reveal_http_credential_secret(
     Headers(user): Headers<UserEmail>,
+    headers: HeaderMap,
+    real_ip: Option<Extension<config::axum::middlewares::RealIp>>,
     Path((org_id, id, cred_id)): Path<(String, String, String)>,
 ) -> Response {
     if let Err(denied) = require_credential_access(&org_id, &user.user_id, REVEAL_ACTION).await {
@@ -359,8 +361,13 @@ pub async fn reveal_http_credential_secret(
         view.kind.as_str(),
         view.state.as_str(),
     );
-    enqueue::write_audit(|| enqueue::reveal_audit_message(&org_id, &user.user_id, &path, body))
-        .await;
+    enqueue::write_audit(|| {
+        let mut message = enqueue::reveal_audit_message(&org_id, &user.user_id, &path, body);
+        message.login_ip = real_ip.map(|Extension(ip)| ip.0.to_string());
+        message.user_agent = crate::request::audit_user_agent(&headers);
+        message
+    })
+    .await;
     no_store((StatusCode::OK, Json(view)).into_response())
 }
 

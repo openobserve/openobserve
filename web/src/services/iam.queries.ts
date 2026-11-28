@@ -29,6 +29,8 @@ import {
 } from "./iam";
 import { iamKeys } from "./iam.querykeys";
 import { userKeys } from "./users.querykeys";
+import { autoresolveKeys } from "./autoresolve.querykeys";
+import { aiToolsetKeys } from "./ai_toolsets.querykeys";
 import { NORMAL_STALE_TIME } from "@/composables/query/cachePolicy";
 
 export const groupsQuery = (org: string) =>
@@ -67,19 +69,28 @@ export const updateGroupMutation = (org: string) =>
   mutationOptions({
     mutationFn: (vars: { group_name: string; payload: any }) =>
       updateGroup({ group_name: vars.group_name, org_identifier: org, payload: vars.payload }),
-    meta: { invalidates: [iamKeys.groupsAll(org)], silentError: true },
+    meta: {
+      invalidates: [iamKeys.groupsAll(org), autoresolveKeys.all(org), aiToolsetKeys.all(org)],
+      silentError: true,
+    },
   });
 
 export const deleteGroupMutation = (org: string) =>
   mutationOptions({
     mutationFn: (name: string) => deleteGroup(name, org),
-    meta: { invalidates: [iamKeys.groupsAll(org)], silentError: true },
+    meta: {
+      invalidates: [iamKeys.groupsAll(org), autoresolveKeys.all(org), aiToolsetKeys.all(org)],
+      silentError: true,
+    },
   });
 
 export const bulkDeleteGroupsMutation = (org: string) =>
   mutationOptions({
     mutationFn: (names: string[]) => bulkDeleteGroups(org, { ids: names }),
-    meta: { invalidates: [iamKeys.groupsAll(org)], silentError: true },
+    meta: {
+      invalidates: [iamKeys.groupsAll(org), autoresolveKeys.all(org), aiToolsetKeys.all(org)],
+      silentError: true,
+    },
   });
 
 export const createRoleMutation = (org: string) =>
@@ -89,12 +100,18 @@ export const createRoleMutation = (org: string) =>
   });
 
 // Role membership lives under the users scope, which the roles prefix does not reach.
+// Role and group grants also decide who may approve AutoResolve changes and which MCPs one may use.
 export const updateRoleMutation = (org: string) =>
   mutationOptions({
     mutationFn: (vars: { role_id: string; payload: any }) =>
       updateRole({ role_id: vars.role_id, org_identifier: org, payload: vars.payload }),
     meta: {
-      invalidates: [iamKeys.rolesAll(org), userKeys.allUserRoles(org)],
+      invalidates: [
+        iamKeys.rolesAll(org),
+        userKeys.allUserRoles(org),
+        autoresolveKeys.all(org),
+        aiToolsetKeys.all(org),
+      ],
       silentError: true,
     },
   });
@@ -103,7 +120,12 @@ export const deleteRoleMutation = (org: string) =>
   mutationOptions({
     mutationFn: (roleId: string) => deleteRole(roleId, org),
     meta: {
-      invalidates: [iamKeys.rolesAll(org), userKeys.allUserRoles(org)],
+      invalidates: [
+        iamKeys.rolesAll(org),
+        userKeys.allUserRoles(org),
+        autoresolveKeys.all(org),
+        aiToolsetKeys.all(org),
+      ],
       silentError: true,
     },
   });
@@ -112,7 +134,12 @@ export const bulkDeleteRolesMutation = (org: string) =>
   mutationOptions({
     mutationFn: (names: string[]) => bulkDeleteRoles(org, { ids: names }),
     meta: {
-      invalidates: [iamKeys.rolesAll(org), userKeys.allUserRoles(org)],
+      invalidates: [
+        iamKeys.rolesAll(org),
+        userKeys.allUserRoles(org),
+        autoresolveKeys.all(org),
+        aiToolsetKeys.all(org),
+      ],
       silentError: true,
     },
   });

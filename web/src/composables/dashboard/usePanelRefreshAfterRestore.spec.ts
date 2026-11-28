@@ -16,7 +16,11 @@
 import { describe, expect, it } from "vitest";
 import { defineComponent, h, provide, reactive, ref } from "vue";
 import { mount } from "@vue/test-utils";
-import { cachedWindowDiffers, usePanelRefreshAfterRestore } from "./usePanelRefreshAfterRestore";
+import {
+  cachedWindowDiffers,
+  hasResultRows,
+  usePanelRefreshAfterRestore,
+} from "./usePanelRefreshAfterRestore";
 import { createDashboardFreshOnOpen, DASHBOARD_FRESH_ON_OPEN } from "./dashboardFreshOnOpen";
 
 const restoredState = () =>
@@ -92,6 +96,16 @@ describe("cachedWindowDiffers", () => {
   });
 });
 
+describe("hasResultRows", () => {
+  it("is true only when some query has SQL hits or a PromQL result", () => {
+    expect(hasResultRows([])).toBe(false);
+    expect(hasResultRows([[], null])).toBe(false);
+    expect(hasResultRows([{ result: [] }])).toBe(false);
+    expect(hasResultRows([[], [{ x: 1 }]])).toBe(true);
+    expect(hasResultRows([{ result: [{ metric: {} }] }])).toBe(true);
+  });
+});
+
 describe("usePanelRefreshAfterRestore", () => {
   it("never queues outside a dashboard view", () => {
     const state = restoredState();
@@ -127,6 +141,71 @@ describe("usePanelRefreshAfterRestore", () => {
     state.loading = false;
     expect(refresh.shownResult.data.value).toEqual([["fresh"]]);
     expect(refresh.shownResult.errorDetail.value.message).toBe("");
+  });
+
+  it("keeps the restored result until the run has rows of its own", () => {
+    const { state, refresh } = setup();
+    refresh.queueRefresh();
+    startRun(state, refresh);
+
+    state.data = [[]];
+    expect(refresh.shownResult.data.value).toEqual([["restored"]]);
+  });
+
+  it("hands over to the run's rows as they stream in, before it settles", () => {
+    const { state, refresh } = setup();
+    refresh.queueRefresh();
+    startRun(state, refresh);
+
+    state.data = [["chunk 1"]];
+    expect(state.loading).toBe(true);
+    expect(refresh.shownResult.data.value).toEqual([["chunk 1"]]);
+
+    state.data = [["chunk 1", "chunk 2"]];
+    expect(refresh.shownResult.data.value).toEqual([["chunk 1", "chunk 2"]]);
+  });
+
+  it("puts the complete restored result back when cancelled after the hand-over", () => {
+    const { state, refresh } = setup();
+    refresh.queueRefresh();
+    startRun(state, refresh);
+    state.data = [["chunk 1"]];
+
+    expect(refresh.release(true)).toBe(true);
+    expect(refresh.shownResult.data.value).toEqual([["restored"]]);
+  });
+
+  it("stays on the live result when a superseding run clears its rows after the hand-over", () => {
+    const { state, refresh } = setup();
+    refresh.queueRefresh();
+    startRun(state, refresh);
+    state.data = [["chunk 1"]];
+
+    state.data = [];
+    expect(refresh.shownResult.data.value).toEqual([]);
+    state.data = [["next run"]];
+    expect(refresh.shownResult.data.value).toEqual([["next run"]]);
+  });
+
+  it("keeps the restored annotations and sparkline until the run fills its own", () => {
+    const { state, refresh } = setup();
+    state.annotations = [{ text: "deploy" }];
+    state.sparklineData = [[1, 2]];
+    refresh.queueRefresh();
+    startRun(state, refresh);
+    state.annotations = [];
+    state.sparklineData = [];
+
+    state.data = [["chunk 1"]];
+    expect(refresh.shownResult.data.value).toEqual([["chunk 1"]]);
+    expect(refresh.shownResult.annotations.value).toEqual([{ text: "deploy" }]);
+    expect(refresh.shownResult.sparklineData.value).toEqual([[1, 2]]);
+
+    state.annotations = [{ text: "fresh deploy" }];
+    expect(refresh.shownResult.annotations.value).toEqual([{ text: "fresh deploy" }]);
+    state.loading = false;
+    state.sparklineData = [];
+    expect(refresh.shownResult.sparklineData.value).toEqual([]);
   });
 
   it("puts the restored result back when released early", () => {

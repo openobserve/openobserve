@@ -2,20 +2,34 @@ import { describe, it, expect } from "vitest";
 import { buildPrefillFromPatterns, type PatternsPrefillInput } from "./fromPatterns";
 import { isPrefillBlocked, normalizePrefill } from "../alertPrefill";
 import enUS from "@/locales/languages/en-US.json";
+import {
+  extractConstantsFromPattern,
+  type PatternTerms,
+} from "@/plugins/logs/patterns/patternUtils";
 
 const ERROR_PATTERN = "Connection refused to upstream <*>";
 const TIMEOUT_PATTERN = "Request deadline exceeded after <*>";
 const NOISY_PATTERN = "Health probe succeeded for endpoint <*>";
 const WILDCARD_ONLY = "<*> <*>";
 
-const patterns = (overrides: Partial<PatternsPrefillInput> = {}): PatternsPrefillInput => ({
-  streamName: "k8s_logs",
-  streamType: "logs",
-  templates: [ERROR_PATTERN, NOISY_PATTERN],
-  totalCount: 2,
-  datetime: { type: "relative", relativeTimePeriod: "15m" },
-  ...overrides,
-});
+// As the extractor returns them: long constants as terms, none for a template with no text.
+const extracted = (templates: string[]): PatternTerms[] =>
+  templates.map((template) => {
+    const terms = extractConstantsFromPattern(template);
+    return terms.length ? { template, match_terms: terms } : { template, match_block: "no_text" };
+  });
+
+const patterns = (overrides: Partial<PatternsPrefillInput> = {}): PatternsPrefillInput => {
+  const input: PatternsPrefillInput = {
+    streamName: "k8s_logs",
+    streamType: "logs",
+    templates: [ERROR_PATTERN, NOISY_PATTERN],
+    totalCount: 2,
+    datetime: { type: "relative", relativeTimePeriod: "15m" },
+    ...overrides,
+  };
+  return { ...input, patterns: input.patterns ?? extracted(input.templates ?? []) };
+};
 
 const keys = (p: ReturnType<typeof buildPrefillFromPatterns>) => p.warnings.map((w) => w.key);
 
@@ -248,12 +262,16 @@ describe("buildPrefillFromPatterns", () => {
 
   describe("patterns that share a long prefix", () => {
     const A = "core event seq=<:NUM> info from <*> status 500";
-    const B = "core event seq=<:NUM> warn from <*> status 404";
     const SHARED = "core event seq=<:NUM> info from <*>";
+    const EXTRACTED: PatternTerms[] = [
+      { template: A, match_terms: ["core event seq=", "info from", "status 500"] },
+      { template: SHARED, match_block: "shared" },
+      { template: "<*> <*>", match_block: "no_text" },
+    ];
 
     it("builds the include query from every distinguishing term", () => {
       const p = buildPrefillFromPatterns(
-        patterns({ templates: [A], allTemplates: [A, B], mode: "include" }),
+        patterns({ templates: [A], patterns: EXTRACTED, mode: "include" }),
       );
 
       expect(p.sql).toBe(
@@ -261,9 +279,9 @@ describe("buildPrefillFromPatterns", () => {
       );
     });
 
-    it("checks against all templates, not only the visible ones", () => {
+    it("excludes by the same terms", () => {
       const p = buildPrefillFromPatterns(
-        patterns({ templates: [A], allTemplates: [A, B], mode: "exclude" }),
+        patterns({ templates: [A], patterns: EXTRACTED, mode: "exclude" }),
       );
 
       expect(p.sql).toBe(
@@ -275,7 +293,7 @@ describe("buildPrefillFromPatterns", () => {
       const p = buildPrefillFromPatterns(
         patterns({
           templates: [SHARED],
-          allTemplates: [SHARED, A],
+          patterns: EXTRACTED,
           mode: "include",
           requirePatterns: true,
         }),
@@ -298,7 +316,7 @@ describe("buildPrefillFromPatterns", () => {
       const p = buildPrefillFromPatterns(
         patterns({
           templates: [A, SHARED, "<*> <*>"],
-          allTemplates: [A, B, SHARED, "<*> <*>"],
+          patterns: EXTRACTED,
           mode: "exclude",
         }),
       );

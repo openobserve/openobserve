@@ -75,6 +75,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </span>
       </div>
     </section>
+    <IncidentAutoResolve
+      v-if="view === 'analysis'"
+      :key="incidentId"
+      class="max-w-215"
+      :org-id="orgId"
+      :incident-id="incidentId"
+    />
   </div>
 
   <div
@@ -271,8 +278,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @open-hypothesis="hypothesesSection?.showHypothesis($event)"
       />
 
+      <RcaProposedActions v-if="proposedActions.length" :actions="proposedActions" />
+      <IncidentAutoResolve :key="incidentId" :org-id="orgId" :incident-id="incidentId" />
       <template v-if="recordSummary">
-        <RcaProposedActions v-if="proposedActions.length" :actions="proposedActions" />
         <RcaWhatHappened
           v-if="cardState === 'investigating' || cardState === 'analyzed'"
           :timeline="recordSummary.timeline"
@@ -493,6 +501,7 @@ import RcaBlindSpots from "./rca/RcaBlindSpots.vue";
 import RcaEvidenceList from "./rca/RcaEvidenceList.vue";
 import RcaHypotheses from "./rca/RcaHypotheses.vue";
 import RcaProposedActions from "./rca/RcaProposedActions.vue";
+import IncidentAutoResolve from "./IncidentAutoResolve.vue";
 import RcaThreadColumn from "./rca/RcaThreadColumn.vue";
 import RcaCancelRunDialog from "./rca/RcaCancelRunDialog.vue";
 import RcaGuidanceDialog from "./rca/RcaGuidanceDialog.vue";

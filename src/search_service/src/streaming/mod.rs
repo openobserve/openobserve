@@ -765,7 +765,7 @@ pub async fn process_search_stream_request(
                 SearchResultType::Search(r) => r,
                 SearchResultType::Cached(r) => r,
             };
-            accumulator.add_hits(&response.hits);
+            accumulator.add_slice(&response.hits, response.total);
             total_scan_records += response.scan_records;
         }
 

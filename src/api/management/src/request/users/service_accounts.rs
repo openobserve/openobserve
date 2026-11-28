@@ -22,7 +22,8 @@ use axum::{
 use {
     crate::common::utils::jwt::verify_decode_token,
     audit::audit,
-    config::utils::time::now_micros,
+    axum::{Extension, http::HeaderMap},
+    config::{axum::middlewares::RealIp, utils::time::now_micros},
     o2_dex::{config::get_config as get_dex_config, service::auth::get_dex_jwks},
     o2_enterprise::enterprise::common::auditor::{AuditMessage, Protocol, ResponseMeta},
     openobserve_api_common::auth::jwt::process_token,
@@ -70,13 +71,15 @@ struct TokenExchangeResponseBody {
     )
 )]
 pub async fn exchange_token(
+    headers: HeaderMap,
+    real_ip: Option<Extension<RealIp>>,
     Json(body): Json<o2_dex::meta::auth::TokenExchangeRequest>,
 ) -> Response {
     let result = o2_dex::service::token_exchange::exchange_token(&body).await;
 
     let mut audit_message = AuditMessage {
-        login_ip: None,
-        user_agent: None,
+        login_ip: real_ip.map(|Extension(ip)| ip.0.to_string()),
+        user_agent: crate::request::audit_user_agent(&headers),
         user_email: "".to_string(),
         org_id: "".to_string(),
         _timestamp: now_micros(),

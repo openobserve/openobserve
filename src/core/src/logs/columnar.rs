@@ -74,8 +74,8 @@ impl JsonColumnar {
         flatten_level: u32,
         time_range: (i64, i64),
     ) -> Option<Self> {
-        // pattern associations rewrite the JSON records after they are prepared
-        if cfg!(feature = "enterprise") {
+        #[cfg(feature = "enterprise")]
+        if super::ingest::sdr_acts_on(org_id, stream_name).await {
             return None;
         }
         let schema = infra::schema::get_cache(org_id, stream_name, StreamType::Logs)

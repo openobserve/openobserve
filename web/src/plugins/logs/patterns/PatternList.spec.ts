@@ -30,6 +30,7 @@ describe("PatternList", () => {
       template: "User * logged in from IP *",
       description: "User login pattern",
       frequency: 1234,
+      estimated_count: 50000,
       percentage: 45.67,
       is_anomaly: false,
     },
@@ -38,6 +39,7 @@ describe("PatternList", () => {
       template: "Error: Connection timeout to server *",
       description: "Connection timeout error",
       frequency: 567,
+      estimated_count: 2000,
       percentage: 20.32,
       is_anomaly: true,
     },
@@ -46,6 +48,7 @@ describe("PatternList", () => {
       template: "Request processed in * ms",
       description: "Request processing time",
       frequency: 890,
+      estimated_count: 30000,
       percentage: 31.89,
       is_anomaly: false,
     },
@@ -95,6 +98,40 @@ describe("PatternList", () => {
     expect(analytics.track).toHaveBeenCalledWith("log_patterns_severity_filtered", { count: 1 });
     // The filter is module-scoped, so clear it before the next test mounts.
     await group.vm.$emit("update:modelValue", []);
+  });
+
+  describe("severity chips", () => {
+    const mountWith = (windowTotal: number | null) =>
+      mount(PatternList, {
+        props: {
+          patterns: [
+            { ...mockPatterns[0], level: "error", percentage: 2, estimated_count: 1000 },
+            { ...mockPatterns[1], level: "info", percentage: 98, estimated_count: 55000 },
+          ],
+          loading: false,
+          totalLogsAnalyzed: 2791,
+          windowTotal,
+        },
+        global: {
+          plugins: [i18n],
+          provide: { store },
+          stubs: { PatternCard: true, OVirtualScroll: OVirtualScrollStub, OSpinner: OSpinnerStub },
+        },
+      });
+
+    it("scales each severity's weighted share by the window total", () => {
+      const w = mountWith(200_000);
+      expect(w.text()).toContain("~4.0K");
+      expect(w.text()).toContain("~196K");
+      w.unmount();
+    });
+
+    it("shows the weighted estimates when the window total is unknown", () => {
+      const w = mountWith(null);
+      expect(w.text()).toContain("~1.0K");
+      expect(w.text()).toContain("~55K");
+      w.unmount();
+    });
   });
 
   describe("Pattern Display", () => {

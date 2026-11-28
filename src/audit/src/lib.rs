@@ -20,6 +20,9 @@ pub trait AuditPublisher: Send + Sync + 'static {
         &self,
         request: cluster_rpc::IngestionRequest,
     ) -> Result<cluster_rpc::IngestionResponse, anyhow::Error>;
+
+    /// Waits for writes `publish` left running, so a flush has sent everything when it returns.
+    async fn wait_for_pending(&self) {}
 }
 
 static AUDIT_PUBLISHER: OnceLock<Arc<dyn AuditPublisher>> = OnceLock::new();
@@ -115,6 +118,9 @@ pub async fn report_with_protocol(
 
 pub async fn flush() {
     auditor::flush_audit(META_ORG_ID, publish_audit).await;
+    if let Some(publisher) = AUDIT_PUBLISHER.get() {
+        publisher.wait_for_pending().await;
+    }
 }
 
 pub fn run_publish_job() -> Option<tokio::task::JoinHandle<()>> {

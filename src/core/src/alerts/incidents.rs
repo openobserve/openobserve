@@ -466,6 +466,46 @@ impl FindingPager for OncallPager {
     }
 }
 
+/// How an external alert's new incident reaches on-call, behind a seam so routing can be tested.
+#[cfg(feature = "enterprise")]
+#[async_trait::async_trait]
+pub(crate) trait ExternalPager: Send + Sync {
+    fn enabled(&self) -> bool;
+    async fn route(
+        &self,
+        org_id: &str,
+        incident_id: &str,
+        title: &str,
+        priority: config::meta::alerts::priority::AlertPriority,
+        team: Option<&str>,
+        dimensions: &HashMap<String, String>,
+    ) -> RoutedIncident;
+}
+
+/// The production [ExternalPager]: the on-call routing internal alerts page through.
+#[cfg(feature = "enterprise")]
+pub(crate) struct OncallExternalPager;
+
+#[cfg(feature = "enterprise")]
+#[async_trait::async_trait]
+impl ExternalPager for OncallExternalPager {
+    fn enabled(&self) -> bool {
+        o2_enterprise::enterprise::oncall::is_enabled()
+    }
+
+    async fn route(
+        &self,
+        org_id: &str,
+        incident_id: &str,
+        title: &str,
+        priority: config::meta::alerts::priority::AlertPriority,
+        team: Option<&str>,
+        dimensions: &HashMap<String, String>,
+    ) -> RoutedIncident {
+        route_new_incident(org_id, incident_id, title, priority, team, dimensions).await
+    }
+}
+
 /// Where a finding's incident work takes turns, behind a seam so two nodes can be tested.
 #[cfg(feature = "enterprise")]
 #[async_trait::async_trait]
@@ -1890,6 +1930,11 @@ async fn correlate_rows(
             {
                 log::error!("[INCIDENTS::RCA] {e:#}");
             }
+            crate::autoresolve::triggers::on_incident_created(
+                &alert.org_id,
+                incident_id,
+                &subject.id,
+            );
         } else {
             start_unmuted_incident_rca(&alert.org_id, incident_id, routed_origin.as_ref()).await;
         }
@@ -2069,10 +2114,33 @@ pub async fn open_manual_incident(
 /// The `#[cfg(feature = "cloud")]` AI-credit deduction from the internal path is
 /// intentionally NOT replicated here: it is structurally coupled to `&Alert` and
 /// P1 external events do not consume incident credits.
+///
+/// A set `oncall_team` is paged on a new incident instead of the routed team; a join pages no one.
+#[cfg(feature = "enterprise")]
 pub async fn correlate_external_event(
     org_id: &str,
     external: &infra::table::external_alerts::ExternalAlertRecord,
     base_destinations: Vec<String>,
+    oncall_team: Option<&str>,
+) -> Result<Option<IncidentCorrelationOutcome>, anyhow::Error> {
+    correlate_external_event_with(
+        org_id,
+        external,
+        base_destinations,
+        oncall_team,
+        &OncallExternalPager,
+    )
+    .await
+}
+
+/// [correlate_external_event] with its paging seam; `oncall_team` wins over routing.
+#[cfg(feature = "enterprise")]
+async fn correlate_external_event_with(
+    org_id: &str,
+    external: &infra::table::external_alerts::ExternalAlertRecord,
+    base_destinations: Vec<String>,
+    oncall_team: Option<&str>,
+    pager: &dyn ExternalPager,
 ) -> Result<Option<IncidentCorrelationOutcome>, anyhow::Error> {
     use config::meta::alerts::incidents::{IncidentSeverity, KeyType};
 
@@ -2120,6 +2188,8 @@ pub async fn correlate_external_event(
         parallel_result.semantic_extraction.is_some()
     );
 
+    // Unparsable is P3, the severity the incident itself gets, so the page matches it.
+    let severity = external.severity.parse().unwrap_or(IncidentSeverity::P3);
     // Build the correlation subject for the external path.
     let subject = CorrelationSubject {
         id: external.id.clone(),
@@ -2127,7 +2197,7 @@ pub async fn correlate_external_event(
         org_id: org_id.to_string(),
         kind: AlertKind::External,
         base_destinations,
-        severity: Some(external.severity.parse().unwrap_or(IncidentSeverity::P3)),
+        severity: Some(severity),
         evaluated_severity: None,
         title_inputs: None,
         labels: config::meta::alerts::incidents::firing_labels_json(&labels),
@@ -2164,25 +2234,61 @@ pub async fn correlate_external_event(
     }
 
     // A new external alert is new evidence too, so an unanswered page may page again.
-    #[cfg(feature = "enterprise")]
     if let Some(incident_id) = outcome.joined_by_new_alert()
         && o2_enterprise::enterprise::oncall::is_enabled()
     {
         page_again_after_new_alert(org_id, incident_id).await;
     }
 
-    // No on-call routing on this path, so nothing decides L0 and the run starts.
-    #[cfg(feature = "enterprise")]
-    if let IncidentCorrelationOutcome::NewIncidentCreated { incident_id, .. } = &outcome {
-        start_automatic_rca(
-            org_id,
-            incident_id,
-            config::meta::alerts::rca_runs::RunTrigger::AutoNewIncident,
-            config::meta::alerts::rca_runs::AutoRunOpts::for_trigger(
-                config::meta::alerts::rca_runs::RunTrigger::AutoNewIncident,
-            ),
-        )
-        .await;
+    // Only on creation: an alert joining an existing incident must not open a second record.
+    if let IncidentCorrelationOutcome::NewIncidentCreated {
+        incident_id,
+        service_name,
+    } = &outcome
+    {
+        let routed_origin = if pager.enabled() {
+            // `is_some_and`, not `is_none_or`, or every unidentifiable alert routes on `unknown`.
+            let names_a_service = parallel_result
+                .service_discovery
+                .as_ref()
+                .is_some_and(|sd| !sd.service_name_from_stream);
+            let dimensions = external_paging_dimensions(
+                &semantic_groups,
+                &labels,
+                names_a_service.then_some(service_name.as_str()),
+            );
+            // The stored title, so a templated or reopened incident pages under the name it shows.
+            let title = match infra::table::alert_incidents::get(org_id, incident_id).await {
+                Ok(Some(incident)) => incident.title.unwrap_or_else(|| external.title.clone()),
+                _ => external.title.clone(),
+            };
+            let routed = pager
+                .route(
+                    org_id,
+                    incident_id,
+                    &title,
+                    severity.into(),
+                    oncall_team,
+                    &dimensions,
+                )
+                .await;
+            if let Some(e) = routed.error {
+                log::error!("[incidents] {e:#}");
+            }
+            routed.record
+        } else {
+            None
+        };
+        // Starts after routing decides L0; an un-mute keeps an already stored off decision.
+        if created {
+            if let Err(e) =
+                start_new_incident_rca(org_id, incident_id, routed_origin.as_ref()).await
+            {
+                log::error!("[INCIDENTS::RCA] {e:#}");
+            }
+        } else {
+            start_unmuted_incident_rca(org_id, incident_id, routed_origin.as_ref()).await;
+        }
     }
 
     // Send incident notification unless the outcome is a repeated alert (suppressed
@@ -5290,6 +5396,7 @@ async fn start_removed_member_incident(
     if let Err(error) = start_new_incident_rca(org_id, incident_id, routed.as_ref()).await {
         log::error!("[INCIDENTS::RCA] {error:#}");
     }
+    crate::autoresolve::triggers::on_incident_created(org_id, incident_id, &firing.alert_id);
     let destinations =
         collect_incident_destinations(org_id, incident_id, &subject.base_destinations).await;
     if let Some(alert) = definition {
@@ -6143,6 +6250,33 @@ async fn route_new_incident(
     )
     .await;
     routed_from(org_id, incident_id, dimensions, started).await
+}
+
+/// An external alert's routing dimensions: its labels, else the service discovery named. [pure]
+#[cfg(feature = "enterprise")]
+fn external_paging_dimensions(
+    semantic_groups: &[FieldAlias],
+    labels: &HashMap<String, String>,
+    discovered_service: Option<&str>,
+) -> HashMap<String, String> {
+    let row: Map<String, Value> = labels
+        .iter()
+        .map(|(k, v)| (k.clone(), Value::String(v.clone())))
+        .collect();
+    let mut dimensions =
+        o2_enterprise::enterprise::oncall::routing::dimensions_of_row(semantic_groups, &row);
+    // The not-found value is a plain `String` that could otherwise reach routing.
+    if dimensions.is_empty()
+        && let Some(service) = discovered_service
+        && !service.trim().is_empty()
+        && service != UNKNOWN_SERVICE
+    {
+        dimensions.insert(
+            config::meta::oncall::SERVICE_DIMENSION.to_string(),
+            service.to_string(),
+        );
+    }
+    dimensions
 }
 
 /// Links the record a start opened and pages its blast radius; a failed start is the error.
@@ -10117,6 +10251,204 @@ mod tests {
             let resolved = resolve_finding_firing(&org, &subject, ONSET, BACK).await;
             assert!(resolved.unwrap());
             assert_eq!(status(&org, &id).await, "resolved");
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    mod external {
+        use std::{collections::HashMap, sync::Mutex};
+
+        use config::meta::{alerts::priority::AlertPriority, correlation::FieldAlias};
+
+        use super::super::*;
+        use crate::alerts::rca_runs::tests::db;
+
+        type Routed = (
+            String,
+            AlertPriority,
+            Option<String>,
+            HashMap<String, String>,
+        );
+
+        /// Stands in for on-call: records each route, and refuses or is off on demand.
+        struct Pager {
+            enabled: bool,
+            refuse: bool,
+            routed: Mutex<Vec<Routed>>,
+        }
+
+        impl Pager {
+            fn new(enabled: bool, refuse: bool) -> Self {
+                Self {
+                    enabled,
+                    refuse,
+                    routed: Mutex::new(Vec::new()),
+                }
+            }
+
+            fn routed(&self) -> Vec<Routed> {
+                self.routed.lock().unwrap().clone()
+            }
+        }
+
+        #[async_trait::async_trait]
+        impl ExternalPager for Pager {
+            fn enabled(&self) -> bool {
+                self.enabled
+            }
+
+            async fn route(
+                &self,
+                _org_id: &str,
+                _incident_id: &str,
+                title: &str,
+                priority: AlertPriority,
+                team: Option<&str>,
+                dimensions: &HashMap<String, String>,
+            ) -> RoutedIncident {
+                self.routed.lock().unwrap().push((
+                    title.to_string(),
+                    priority,
+                    team.map(str::to_string),
+                    dimensions.clone(),
+                ));
+                RoutedIncident {
+                    record: None,
+                    error: self.refuse.then(|| anyhow::anyhow!("paging refused")),
+                }
+            }
+        }
+
+        fn event(
+            org: &str,
+            id: &str,
+            severity: &str,
+        ) -> infra::table::external_alerts::ExternalAlertRecord {
+            infra::table::external_alerts::ExternalAlertRecord {
+                id: id.to_string(),
+                org_id: org.to_string(),
+                integration_id: "grafana".to_string(),
+                detected_source: "grafana".to_string(),
+                dedup_key: id.to_string(),
+                title: format!("{id} is failing"),
+                severity: severity.to_string(),
+                state: "firing".to_string(),
+                labels: serde_json::json!({"service_name": "checkout"}),
+                source_url: None,
+                last_payload: serde_json::json!({}),
+                first_seen_at: 1,
+                last_seen_at: config::utils::time::now_micros(),
+                resolved_at: None,
+            }
+        }
+
+        async fn correlate(
+            org: &str,
+            id: &str,
+            severity: &str,
+            team: Option<&str>,
+            pager: &Pager,
+        ) -> anyhow::Result<IncidentCorrelationOutcome> {
+            let e = event(org, id, severity);
+            let outcome = correlate_external_event_with(org, &e, vec![], team, pager).await?;
+            Ok(outcome.expect("an external event always correlates"))
+        }
+
+        fn new_org() -> String {
+            format!("ext_{}", config::ider::generate().to_lowercase())
+        }
+
+        #[test]
+        fn an_external_alert_routes_on_its_labels_else_on_a_named_service() {
+            let groups = [FieldAlias::new("service", "Service", &["service_name"])];
+            let checkout = HashMap::from([("service_name".to_string(), "checkout".to_string())]);
+            let unrelated = HashMap::from([("team".to_string(), "web".to_string())]);
+            let service = |s: &str| HashMap::from([("service".to_string(), s.to_string())]);
+            for (case, labels, discovered, want) in [
+                (
+                    "labels win",
+                    &checkout,
+                    Some("billing"),
+                    service("checkout"),
+                ),
+                (
+                    "named service",
+                    &unrelated,
+                    Some("billing"),
+                    service("billing"),
+                ),
+                (
+                    "not found",
+                    &unrelated,
+                    Some(UNKNOWN_SERVICE),
+                    HashMap::new(),
+                ),
+                ("blank", &unrelated, Some("  "), HashMap::new()),
+                ("from the stream", &unrelated, None, HashMap::new()),
+            ] {
+                let got = external_paging_dimensions(&groups, labels, discovered);
+                assert_eq!(got, want, "{case}");
+            }
+        }
+
+        #[tokio::test]
+        async fn a_new_external_incident_pages_once_and_a_join_pages_no_one() {
+            let _db = db().await;
+            for (team, severity, priority) in [
+                (Some("sre"), "P1", AlertPriority::P1),
+                (None, "critical", AlertPriority::P3),
+            ] {
+                let (org, pager) = (new_org(), Pager::new(true, false));
+                let opened = correlate(&org, "a1", severity, team, &pager).await.unwrap();
+                assert!(
+                    matches!(
+                        opened,
+                        IncidentCorrelationOutcome::NewIncidentCreated { .. }
+                    ),
+                    "{opened:?}"
+                );
+                let stored = infra::table::alert_incidents::get(&org, opened.incident_id())
+                    .await
+                    .unwrap()
+                    .unwrap();
+                let routed = pager.routed();
+                assert_eq!(routed.len(), 1, "{team:?}");
+                let (title, got_priority, got_team, _) = &routed[0];
+                assert_eq!(Some(title), stored.title.as_ref(), "the stored title");
+                assert_eq!(*got_priority, priority, "{severity}");
+                assert_eq!(
+                    got_team.as_deref(),
+                    team,
+                    "the integration's team, else routing"
+                );
+
+                let joined = correlate(&org, "a2", severity, team, &pager).await.unwrap();
+                assert_eq!(joined.incident_id(), opened.incident_id(), "{joined:?}");
+                let again = correlate(&org, "a1", severity, team, &pager).await.unwrap();
+                assert_eq!(again.incident_id(), opened.incident_id(), "{again:?}");
+                assert_eq!(pager.routed().len(), 1, "joining opens no second page");
+            }
+        }
+
+        #[tokio::test]
+        async fn a_paging_failure_or_paging_off_still_correlates() {
+            let _db = db().await;
+            for (case, pager, routes) in [
+                ("refused", Pager::new(true, true), 1),
+                ("off", Pager::new(false, false), 0),
+            ] {
+                let org = new_org();
+                let outcome = correlate(&org, "a1", "P2", Some("sre"), &pager).await;
+                let outcome = outcome.unwrap_or_else(|e| panic!("{case}: {e:#}"));
+                assert!(
+                    matches!(
+                        outcome,
+                        IncidentCorrelationOutcome::NewIncidentCreated { .. }
+                    ),
+                    "{case}: {outcome:?}"
+                );
+                assert_eq!(pager.routed().len(), routes, "{case}");
+            }
         }
     }
 

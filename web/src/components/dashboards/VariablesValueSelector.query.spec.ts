@@ -20,11 +20,15 @@ import i18n from "@/locales";
 import { b64DecodeUnicode } from "@/utils/zincutils";
 import { qLayoutInjections } from "@/test/unit/helpers/layout-injections";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
-import { useVariablesManager } from "@/composables/dashboard/useVariablesManager";
+import {
+  useVariablesManager,
+  type VariableConfig,
+} from "@/composables/dashboard/useVariablesManager";
 import {
   QUERY_VARIABLE_NO_VALUES,
   resolveQueryVariableValue,
 } from "@/utils/dashboard/variables/queryVariableUtils";
+import { clearMetricScanCache } from "@/utils/dashboard/variables/queryVariableLoader";
 
 const { labelValues, streamMock } = vi.hoisted(() => ({
   labelValues: vi.fn(),
@@ -102,6 +106,7 @@ describe("VariablesValueSelector — custom and PromQL query_values variables", 
   beforeEach(() => {
     streamMock.mockReset();
     labelValues.mockReset();
+    clearMetricScanCache();
   });
 
   it("runs the SQL with the parent value and shows the label of the selected option", async () => {
@@ -486,6 +491,38 @@ describe("VariablesValueSelector — custom and PromQL query_values variables", 
       wrapper.unmount();
     });
 
+    it("shows the unchecked-metrics hint alongside the 'All' hint on a capped scan", async () => {
+      const names = Array.from({ length: 201 }, (_, i) => `m${i}`);
+      labelValues.mockImplementation(
+        async ({ label, match }: { label: string; match?: string }) => {
+          if (label === "__name__") return promValues(names);
+          if (!match) return { data: { status: "error", error: "match[] must specify a metric" } };
+          return promValues([`ns-${match}`]);
+        },
+      );
+      const { wrapper } = await mountWith([
+        {
+          ...promNamespace,
+          multiSelect: true,
+          selectAllValueForMultiSelect: "all",
+          query_data: {
+            ...promNamespace.query_data,
+            query: "label_values(namespace)",
+            max_record_size: 2,
+          },
+        },
+      ]);
+      await vi.waitFor(() =>
+        expect(wrapper.find('[data-test="variable-query-all-capped-namespace"]').exists()).toBe(
+          true,
+        ),
+      );
+      const truncated = wrapper.find('[data-test="variable-query-metrics-truncated-namespace"]');
+      expect(truncated.exists()).toBe(true);
+      expect(truncated.classes()).toContain("text-text-secondary");
+      wrapper.unmount();
+    });
+
     it("fetches a URL-restored query variable so its label shows, keeping the URL value", async () => {
       streamReturns([
         { svc: "svc-0", display: "checkout" },
@@ -757,5 +794,39 @@ describe("VariablesValueSelector — custom and PromQL query_values variables", 
       expect(manager.isLoading.value).toBe(false);
       wrapper.unmount();
     });
+  });
+});
+
+describe("VariablesValueSelector — variables in a dependency loop", () => {
+  const loopVariable = (name: string, query: string): VariableConfig => ({
+    name,
+    type: "query_values",
+    scope: "global",
+    value: null,
+    query_data: { stream_type: "logs", stream: "app", field: "", query, filter: [] },
+  });
+
+  it("shows the loop under each variable in it, naming both", async () => {
+    const manager = useVariablesManager(i18n.global.t);
+    await manager
+      .initialize(
+        [
+          loopVariable("a", "SELECT x FROM app WHERE y = '$b'"),
+          loopVariable("b", "SELECT y FROM app WHERE x = '$a'"),
+          { ...regionVariable, type: "custom", scope: "global", value: "eu" },
+        ],
+        { tabs: [] },
+      )
+      .catch(() => undefined);
+    const wrapper = mountSelector({ variablesManager: manager, scope: "global" });
+    await flushPromises();
+
+    for (const name of ["a", "b"]) {
+      const message = wrapper.find(`[data-test="variable-cycle-error-${name}"]`);
+      expect(message.isVisible()).toBe(true);
+      expect(message.text()).toBe("a and b depend on each other.");
+    }
+    expect(wrapper.find('[data-test="variable-cycle-error-region"]').exists()).toBe(false);
+    wrapper.unmount();
   });
 });

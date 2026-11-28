@@ -22,19 +22,10 @@ use std::{
 use axum::{body::Body, http::Request, middleware::Next, response::Response};
 use config::axum::middlewares::RealIp;
 use http_body_util::BodyExt;
-use maxminddb::geoip2::city::Location;
 use serde::{Deserialize, Serialize};
 use uaparser::{Parser, UserAgentParser};
 
 use crate::{USER_AGENT_REGEX_FILE, infra::config::MAXMIND_DB_CLIENT};
-
-#[derive(Serialize, Deserialize, Clone, Debug, Default)]
-pub struct GeoInfoData<'a> {
-    pub city: Option<&'a str>,
-    pub country: Option<&'a str>,
-    pub country_iso_code: Option<&'a str>,
-    pub location: Option<Location<'a>>,
-}
 
 /// This is a global cache for user agent parser. This is lazily initialized only when
 /// the first request comes in.
@@ -180,29 +171,10 @@ impl RumExtraData {
             user_agent_hashmap.insert("ip".into(), ip.to_string().into());
 
             let maxminddb_client = MAXMIND_DB_CLIENT.read().await;
-            let geo_info = if let Some(client) = maxminddb_client.as_ref() {
-                if let Some(city_info) = client
-                    .city_reader
-                    .lookup(ip)
-                    .ok()
-                    .and_then(|r| r.decode::<maxminddb::geoip2::City>().ok())
-                    .flatten()
-                {
-                    let country = city_info.country.names.english;
-                    let city = city_info.city.names.english;
-                    let country_iso_code = city_info.country.iso_code;
-                    GeoInfoData {
-                        city,
-                        country,
-                        country_iso_code,
-                        location: Some(city_info.location),
-                    }
-                } else {
-                    GeoInfoData::default()
-                }
-            } else {
-                GeoInfoData::default()
-            };
+            let geo_info = maxminddb_client
+                .as_ref()
+                .and_then(|client| client.city_geo_info(ip))
+                .unwrap_or_default();
 
             let geo_info = serde_json::to_value(geo_info).unwrap_or_default();
             drop(maxminddb_client);
@@ -286,22 +258,6 @@ mod tests {
             assert!(data.get("service").unwrap() == "web-application");
             assert!(data.get("version").unwrap() == "1.0.1");
         }
-    }
-
-    #[test]
-    fn test_geo_info_data_creation_and_properties() {
-        // Test GeoInfoData struct creation and property access
-        let geo_info = GeoInfoData {
-            city: Some("New York"),
-            country: Some("United States"),
-            country_iso_code: Some("US"),
-            location: None,
-        };
-
-        assert_eq!(geo_info.city, Some("New York"));
-        assert_eq!(geo_info.country, Some("United States"));
-        assert_eq!(geo_info.country_iso_code, Some("US"));
-        assert!(geo_info.location.is_none());
     }
 
     #[test]

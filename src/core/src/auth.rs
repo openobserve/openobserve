@@ -41,7 +41,7 @@ use {
 
 pub const V2_API_PREFIX: &str = "v2";
 /// Modules routed as `/v2/{org_id}/{module}`; any other path names its org in the first segment.
-pub const V2_ORG_MODULES: [&str; 11] = [
+pub const V2_ORG_MODULES: [&str; 12] = [
     "alerts",
     "alert_leases",
     "folders",
@@ -53,6 +53,7 @@ pub const V2_ORG_MODULES: [&str; 11] = [
     "alert_calibration",
     "fleets",
     "autoobserve",
+    "autoresolve",
 ];
 pub const SESSION_AUTH_MARKER: &str = "Session::";
 const PASSWORD_HASH_CACHE_CAPACITY: NonZeroUsize = NonZeroUsize::new(10_000).unwrap();

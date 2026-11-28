@@ -125,7 +125,7 @@ export const processData = (
     if (topKeys.includes(breakdownValue.toString())) {
       resultArray.push({ ...item, [breakdownKey]: breakdownValue });
     } else if (top_results_others) {
-      const xAxisValue = String(getDataValue(item, xAxisKey));
+      const xAxisValue = String(breakdownValueOf(item, xAxisKey));
       othersObj[xAxisValue] = (othersObj[xAxisValue] || 0) + (+getDataValue(item, yAxisKey) || 0);
     }
   });

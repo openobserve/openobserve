@@ -252,7 +252,7 @@ test.describe("dashboard Import testcases", () => {
     // render the singular plural form of `filesFailedToImport`.
     await pm.dashboardImport.expectFileRejectedWithToast(
       "1 File Failed to Import",
-      "Request failed with status code 422"
+      "unknown variant"
     );
   });
 
