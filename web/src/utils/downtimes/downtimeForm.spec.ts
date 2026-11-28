@@ -395,6 +395,30 @@ describe("prefill and the mute-all rule", () => {
     };
     expect(unnarrowedModules(values)).toEqual([]);
   });
+
+  it("sends the alerts' tags, which narrow the alerts module", () => {
+    const values: DowntimeFormValues = defaultDowntimeValues(NOW, "UTC");
+    values.targets.alerts.tags_open = true;
+    values.targets.alerts.tags = ["component:payments"];
+    expect(unnarrowedModules(values)).toEqual([]);
+    expect(buildDowntimeRequest(values).targets).toEqual([
+      { module: "alerts", folders: { kind: "all" }, tags: ["component:payments"] },
+    ]);
+    const tagged: Downtime = {
+      ...flow1,
+      targets: [{ module: "alerts", folders: { kind: "all" }, tags: ["component:payments"] }],
+    };
+    expect(buildDowntimeRequest(downtimeToFormValues(tagged)).targets).toEqual(tagged.targets);
+  });
+
+  it("sends no tags for a module whose items carry none", () => {
+    const values: DowntimeFormValues = defaultDowntimeValues(NOW, "UTC");
+    values.modules = ["slos"];
+    values.targets.slos.tags_open = true;
+    values.targets.slos.tags = ["team:core"];
+    const slo = buildDowntimeRequest(values).targets.find((t) => t.module === "slos");
+    expect(slo?.tags).toBeUndefined();
+  });
 });
 
 describe("schedule defaults", () => {

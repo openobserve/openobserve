@@ -347,6 +347,22 @@ describe("DowntimeList", () => {
     wrapper.unmount();
   });
 
+  it("shows the tags of an alerts target on its chip", async () => {
+    vi.mocked(downtimes.list).mockResolvedValue(
+      page([
+        row({
+          targets: [{ module: "alerts", folders: { kind: "all" }, tags: ["component:payments"] }],
+        }),
+      ]) as never,
+    );
+
+    const wrapper = await mountList();
+    const chip = '[data-test="downtime-list-dt-1-targets-alerts"]';
+    await vi.waitFor(() => expect(wrapper.find(chip).exists()).toBe(true));
+    expect(wrapper.get(chip).text()).toContain("tag component:payments");
+    wrapper.unmount();
+  });
+
   it("keeps the user's folder narrowing when the status filter changes after a banner link", async () => {
     vi.mocked(downtimes.list).mockResolvedValue(
       page([

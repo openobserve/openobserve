@@ -64,7 +64,8 @@ pub async fn alert_message_view(
     let state = infra::table::alert_states::get(alert_id, group_key).await?;
     let ack = infra::table::alert_acks::get(org_id, alert_id, group_key).await?;
     let now = config::utils::time::now_micros();
-    let mute = live_mute(org_id, alert_id, &folder_id, group_key, now);
+    let tags = alert.as_ref().map_or(&[][..], |a| a.tags.as_slice());
+    let mute = live_mute(org_id, alert_id, &folder_id, tags, group_key, now);
     let other_groups_unacked = other_groups_unacked(org_id, alert_id, group_key).await;
     let incident = live_incident(org_id, alert_id).await;
     let page = live_page(org_id, alert_id).await;
@@ -190,6 +191,7 @@ fn live_mute(
     org_id: &str,
     alert_id: &str,
     folder_id: &str,
+    tags: &[String],
     group_key: &str,
     now: i64,
 ) -> Option<MuteView> {
@@ -199,6 +201,7 @@ fn live_mute(
         alert_id,
         folder_id,
         &Default::default(),
+        tags,
         key,
         now,
     )?;
@@ -341,6 +344,7 @@ fn live_mute(
     _org_id: &str,
     _alert_id: &str,
     _folder_id: &str,
+    _tags: &[String],
     _group_key: &str,
     _now: i64,
 ) -> Option<MuteView> {

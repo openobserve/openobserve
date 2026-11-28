@@ -9,6 +9,7 @@ import { ALL_FOLDERS, defaultDowntimeValues } from "@/utils/downtimes/downtimeFo
 import store from "@/test/unit/helpers/store";
 import common from "@/services/common";
 import { queryClient } from "@/composables/query/queryClient";
+import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import DowntimeTargetCard from "./DowntimeTargetCard.vue";
 
 const toast = vi.fn();
@@ -18,8 +19,13 @@ vi.mock("@/composables/downtimes/useDowntimeItems", async (importOriginal) => ({
   ...(await importOriginal<object>()),
   useDowntimeItems: () => ({
     items: ref([
-      { id: "a1", name: "payments-db-replica-lag", folderId: "payments", tags: [] },
-      { id: "a2", name: "ops-disk", folderId: "ops", tags: [] },
+      {
+        id: "a1",
+        name: "payments-db-replica-lag",
+        folderId: "payments",
+        tags: ["component:payments", "team:core"],
+      },
+      { id: "a2", name: "ops-disk", folderId: "ops", tags: ["team:core"] },
     ]),
     query: { isPending: ref(false) },
   }),
@@ -110,6 +116,34 @@ describe("DowntimeTargetCard", () => {
       ).toBe(false);
       other.wrapper.unmount();
     }
+  });
+
+  it("offers a tag block on the alerts card, suggesting the alerts' own tags", async () => {
+    const { wrapper, form } = mountCard("alerts", false);
+    await flushPromises();
+    const add = wrapper.find('[data-test="downtime-target-alerts-add-tags"]');
+    expect(add.exists()).toBe(true);
+    await add.trigger("click");
+    await flushPromises();
+    expect(form().state.values.targets.alerts.tags_open).toBe(true);
+    expect(wrapper.find('[data-test="downtime-target-alerts-tags-block"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="downtime-target-alerts-add-tags"]').exists()).toBe(false);
+    expect(wrapper.text()).toContain("Every tag must be on the alert.");
+    const picker = wrapper
+      .findAllComponents(OFormSelect)
+      .find((select) => select.props("name") === "targets.alerts.tags");
+    expect(picker?.props("options")).toEqual([
+      { label: "component:payments", value: "component:payments" },
+      { label: "team:core", value: "team:core" },
+    ]);
+    wrapper.unmount();
+  });
+
+  it("offers no tag block on a module whose items carry no tags", async () => {
+    const { wrapper } = mountCard("slos", false);
+    await flushPromises();
+    expect(wrapper.find('[data-test="downtime-target-slos-add-tags"]').exists()).toBe(false);
+    wrapper.unmount();
   });
 
   it("disables the folder picker with a hint when the module's folders answer 403", async () => {

@@ -1082,6 +1082,7 @@ async fn realtime_downtime(
             &alert_id,
             &folder.folder_id,
             dims,
+            &alert.tags,
             now,
         )
     })
