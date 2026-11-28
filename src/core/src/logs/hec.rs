@@ -88,11 +88,8 @@ pub async fn ingest(
     body: Bytes,
     user_email: &str,
 ) -> Result<HecResponse> {
-    if check_ingestion_allowed(org_id, StreamType::Logs, None)
-        .await
-        .is_err()
-    {
-        return Ok(HecStatus::InvalidIndex.into());
+    if let Err(e) = check_ingestion_allowed(org_id, StreamType::Logs, None).await {
+        return refusal_response(e, HecStatus::InvalidIndex);
     }
 
     let cfg = get_config();
@@ -108,23 +105,21 @@ pub async fn ingest(
 
     let user = IngestUser::from_user_email(user_email.to_string());
     let streams: Vec<(String, Vec<json::Value>)> = parsed.streams.into_iter().collect();
-    // Admission checks for every group before the first write; the response shape
-    // for a rejection is unchanged (still `Custom(_, 400)`).
     if let Err(e) = preflight_streams(org_id, &streams, &user).await {
-        // A 503 error, not a `Custom(_, 400)` status: HEC clients drop a 400 and retry a 503.
-        #[cfg(feature = "enterprise")]
-        if crate::ingestion::is_sdr_fail_closed_refusal(&e) {
-            return Err(e);
-        }
-        return Ok(HecStatus::Custom(e.to_string(), 400).into());
+        let status = HecStatus::Custom(e.to_string(), 400);
+        return refusal_response(e, status);
     }
-    if let Err(e) = ingest_prepared(thread_id, org_id, streams, user).await {
-        // Fail-closed refusal is a 503 so HEC clients retry; written groups are re-sent.
-        #[cfg(feature = "enterprise")]
-        if crate::ingestion::is_sdr_fail_closed_refusal(&e) {
-            return Err(e);
+    let written = match ingest_prepared(thread_id, org_id, streams, user).await {
+        Ok(written) => written,
+        Err(e) => {
+            // A 503 is retried, so the groups written before it are sent again.
+            let status = HecStatus::Custom(e.to_string(), 400);
+            return refusal_response(e, status);
         }
-        return Ok(HecStatus::Custom(e.to_string(), 400).into());
+    };
+    // nothing was stored, so a 500 that senders retry, like the 503 above
+    if let Some(reason) = undelivered(&written) {
+        return Ok(HecStatus::Custom(reason.to_string(), 500).into());
     }
 
     Ok(HecStatus::Success.into())
@@ -342,6 +337,29 @@ fn stream_rejection(stream: &str, user: &IngestUser) -> Option<String> {
         return Some(format!(
             "stream '{stream}' is an internal rollup stream and cannot be ingested into"
         ));
+    }
+    None
+}
+
+/// HEC clients drop a 400 and retry a 503, so a `ResourceError` (an overload or the SDR refusal)
+/// is returned as the error for the handler to answer 503; any other refusal gets `status`.
+fn refusal_response(e: Error, status: HecStatus) -> Result<HecResponse> {
+    if matches!(e, Error::ResourceError(_)) {
+        return Err(e);
+    }
+    Ok(status.into())
+}
+
+/// A failed write or a stream deleted mid-write still leaves `code` at 200, so only these flags
+/// say the batch was not stored.
+fn undelivered(written: &[IngestionResponse]) -> Option<&'static str> {
+    for resp in written {
+        if resp.write_failed {
+            return Some("write to storage failed");
+        }
+        if resp.stream_skipped {
+            return Some("stream is being deleted");
+        }
     }
     None
 }
@@ -989,6 +1007,25 @@ mod tests {
             preflight_streams("test-org", &streams, &user)
                 .await
                 .is_err()
+        );
+    }
+
+    // cloud builds reject the unknown test org at the trial check
+    #[cfg(not(feature = "cloud"))]
+    #[tokio::test]
+    async fn a_batch_whose_write_fails_is_answered_500_not_success() {
+        // each event fits the columns limit but the two together do not, which fails the write
+        let half = get_config().limit.req_cols_per_record_limit / 2 + 1;
+        let event = |p: &str| {
+            let fields: json::Map<_, _> =
+                (0..half).map(|i| (format!("{p}{i}"), 1.into())).collect();
+            json::json!({"event": fields, "index": "hec_write_fails"}).to_string()
+        };
+        let body = Bytes::from(event("a") + &event("b"));
+        let resp = ingest(0, "test_org_id", body, "a@a.com").await.unwrap();
+        assert_eq!(
+            (resp.code, resp.text.as_str()),
+            (500, "write to storage failed")
         );
     }
 }

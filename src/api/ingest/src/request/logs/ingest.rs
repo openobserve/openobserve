@@ -671,7 +671,9 @@ pub async fn otlp_logs_write(
     request_body(content = String, description = "Ingest data (hec)"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = inline(HecResponse), example = json!({"text":"Success","code": 200})),
-        (status = 200, description = "Failure", content_type = "application/json", body = inline(HecResponse), example = json!({"text":"Invalid data format","code": 400})),
+        (status = 400, description = "Request rejected", content_type = "application/json", body = inline(HecResponse), example = json!({"text":"Invalid data format","code": 400})),
+        (status = 500, description = "Write to storage failed, or the stream started deleting mid-write; retry", content_type = "application/json", body = inline(HecResponse), example = json!({"text":"write to storage failed","code": 500})),
+        (status = 503, description = "Ingester overloaded; retry", content_type = "application/json", body = inline(HecResponse), example = json!({"text":"Error# DiskCircuitBreakerError","code": 503})),
     ),
     extensions(
         ("x-o2-mcp" = json!({"enabled": false}))
@@ -695,23 +697,30 @@ pub async fn hec(
 
     let mut resp = match logs::hec::ingest(thread_id, &org_id, body, user_email).await {
         Ok(v) => {
-            if v.code > 299 {
+            if v.code >= 500 {
+                (StatusCode::INTERNAL_SERVER_ERROR, Json(v)).into_response()
+            } else if v.code > 299 {
                 (StatusCode::BAD_REQUEST, Json(v)).into_response()
             } else {
                 MetaHttpResponse::json(v)
             }
         }
         Err(e) => {
+            let overload = matches!(e, infra::errors::Error::ResourceError(_));
+            // an overload refuses every request until it clears, so it is a warn, not an error;
             // we do not want to log trial period expired errors
-            if !matches!(e, infra::errors::Error::TrialPeriodExpired) {
+            if overload {
+                log::warn!("Error processing request {org_id}/_hec: {e}");
+            } else if !matches!(e, infra::errors::Error::TrialPeriodExpired) {
                 log::error!("Error processing request {org_id}/_hec: {e}");
             }
-            let res = HecResponse::from(HecStatus::Custom(e.to_string(), 400));
-            if matches!(e, infra::errors::Error::ResourceError(_)) {
-                (StatusCode::SERVICE_UNAVAILABLE, Json(res)).into_response()
+            let status = if overload {
+                StatusCode::SERVICE_UNAVAILABLE
             } else {
-                (StatusCode::BAD_REQUEST, Json(res)).into_response()
-            }
+                StatusCode::BAD_REQUEST
+            };
+            let res = HecResponse::from(HecStatus::Custom(e.to_string(), status.as_u16()));
+            (status, Json(res)).into_response()
         }
     };
 
@@ -831,5 +840,37 @@ mod tests {
         assert_eq!(body["code"], 3);
         let message = body["message"].as_str().unwrap();
         assert!(message.contains(CONTENT_TYPE_JSON) && message.contains(CONTENT_TYPE_PROTO));
+    }
+
+    #[tokio::test]
+    async fn hec_answers_an_overload_with_503_and_a_blocked_org_with_its_400() {
+        use common::{infra::config::ORG_STATUS_CACHE, meta::organization::OrgStatus};
+        async fn call(org: &str) -> (StatusCode, json::Value) {
+            let user = Headers(UserEmail {
+                user_id: "a@a.com".into(),
+            });
+            let resp = hec(
+                Path(org.into()),
+                user,
+                Bytes::from_static(br#"{"event":"x"}"#),
+            )
+            .await;
+            let status = resp.status();
+            let body = axum::body::to_bytes(resp.into_body(), usize::MAX).await;
+            (status, json::from_slice(&body.unwrap()).unwrap())
+        }
+        ORG_STATUS_CACHE.insert("hec_blocked_org".to_string(), OrgStatus::Blocked);
+        let blocked = call("hec_blocked_org").await;
+        ORG_STATUS_CACHE.remove("hec_blocked_org");
+        let refused = json::json!({"text": "Incorrect index", "code": 400});
+        assert_eq!(blocked, (StatusCode::BAD_REQUEST, refused));
+
+        let full = config::get_config().limit.mem_table_max_size as i64;
+        let memtable = config::metrics::INGEST_MEMTABLE_ARROW_BYTES.with_label_values::<&str>(&[]);
+        memtable.add(full);
+        let overloaded = call("default").await;
+        memtable.sub(full);
+        let busy = json::json!({"text": "Error# MemoryTableOverflowError", "code": 503});
+        assert_eq!(overloaded, (StatusCode::SERVICE_UNAVAILABLE, busy));
     }
 }
