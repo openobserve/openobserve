@@ -387,6 +387,7 @@ pub(crate) async fn record_confirm(
     user_id: &str,
     request: &[u8],
     response: &Value,
+    fallback: (Option<&str>, Option<&str>),
 ) -> Vec<Option<ai_actions::Model>> {
     if user_id.is_empty() {
         return Vec::new();
@@ -400,7 +401,15 @@ pub(crate) async fn record_confirm(
     let mut taken = Vec::new();
     for item in items {
         let approval = (approval_id.as_str(), user_id);
-        let row = confirmed_action(org_id, session_id, approval, item, (since, &taken)).await;
+        let row = confirmed_action(
+            org_id,
+            session_id,
+            approval,
+            item,
+            (since, &taken),
+            fallback,
+        )
+        .await;
         taken.extend(row.as_ref().map(|row| row.id.clone()));
         rows.push(row_of_done(item, row));
     }
@@ -439,6 +448,7 @@ async fn confirmed_action(
     approval: (&str, &str),
     item: &Value,
     (since, taken): (i64, &[String]),
+    fallback: (Option<&str>, Option<&str>),
 ) -> Option<ai_actions::Model> {
     let (kind, id, name) = card_target(item)?;
     let card = ai_actions::ConfirmedTarget {
@@ -463,7 +473,7 @@ async fn confirmed_action(
         Ok(Some(_)) => {}
         Ok(None) => {
             let (approval_id, user_id) = approval;
-            let row = confirmed_row(org_id, session_id, user_id, approval_id, item);
+            let row = confirmed_row(org_id, session_id, user_id, approval_id, item, fallback);
             if let Err(e) = ai_actions::insert(row).await {
                 log::error!("[org_id:{org_id}] cannot store a confirmed action: {e}");
             }
@@ -608,8 +618,10 @@ fn confirmed_row(
     user_id: &str,
     approval_id: &str,
     item: &Value,
+    fallback: (Option<&str>, Option<&str>),
 ) -> ai_actions::Model {
     let (status, message, skip_code) = confirmed_outcome(item);
+    let (fallback_tool, fallback_operation) = fallback;
     ai_actions::Model {
         id: String::new(),
         org_id: org_id.to_string(),
@@ -620,10 +632,17 @@ fn confirmed_row(
         approved_by: Some(user_id.to_string()),
         approval_scope: None,
         user_email: user_id.to_string(),
-        tool: text(item, "tool").unwrap_or_else(|| "confirm".to_string()),
-        op: Op::parse(text(item, "operation").as_deref().unwrap_or_default())
-            .as_str()
-            .to_string(),
+        tool: text(item, "tool")
+            .or_else(|| fallback_tool.map(str::to_string))
+            .unwrap_or_else(|| "confirm".to_string()),
+        op: Op::parse(
+            text(item, "operation")
+                .as_deref()
+                .or(fallback_operation)
+                .unwrap_or_default(),
+        )
+        .as_str()
+        .to_string(),
         resource_type: text(item, "type").unwrap_or_default(),
         resource_id: text(item, "id"),
         resource_name: text(item, "name"),
@@ -1308,7 +1327,7 @@ mod tests {
     #[test]
     fn a_confirmed_item_the_executor_missed_is_approved_and_not_undoable() {
         let item = json!({"type": "alert", "id": "a1", "name": "cpu", "status": "done", "operation": "delete"});
-        let row = confirmed_row("o", "s", "a@x", "ap1", &item);
+        let row = confirmed_row("o", "s", "a@x", "ap1", &item, (None, None));
         assert_eq!(
             (row.approval_kind.as_str(), row.approved_by.as_deref()),
             (APPROVAL_APPROVED, Some("a@x"))
@@ -1324,8 +1343,27 @@ mod tests {
             "a@x",
             "ap1",
             &json!({"type": "alert", "id": "a1", "status": "failed"}),
+            (None, None),
         );
         assert_eq!(failed.status, STATUS_FAILED);
+    }
+
+    #[test]
+    fn a_confirmed_rest_delete_takes_its_tool_and_operation_from_the_card() {
+        let item =
+            json!({"key": "k1", "type": "dashboard", "id": "d1", "name": "cpu", "status": "done"});
+        let row = confirmed_row(
+            "o",
+            "s",
+            "a@x",
+            "ap1",
+            &item,
+            (Some("o2_delete"), Some("delete")),
+        );
+        assert_eq!(row.tool, "o2_delete");
+        assert_eq!(row.op, "delete");
+        assert_eq!(action_label(&row, false), "Deleted dashboard");
+        assert!(ActivityRow::new(row, NOW).target.deleted);
     }
 
     #[test]
@@ -1337,6 +1375,7 @@ mod tests {
                 "a@x",
                 "ap1",
                 &json!({"type": "alert", "id": "a1", "status": "skipped", "code": code, "message": "x"}),
+                (None, None),
             )
         };
         let changed = skipped("changed_since");
@@ -1360,6 +1399,7 @@ mod tests {
             "a@x",
             "ap1",
             &json!({"type": "alert", "status": "error"}),
+            (None, None),
         );
         assert_eq!(failed.status, STATUS_FAILED);
         assert_eq!(

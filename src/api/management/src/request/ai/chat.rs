@@ -1883,8 +1883,26 @@ async fn relay_confirm_answer(answered: &Answered<'_>, response_body: &str) -> R
         return (StatusCode::OK, axum::Json(answer)).into_response();
     }
     if !extends_only(request) {
-        let rows =
-            super::activity::record_confirm(org_id, session_id, caller, request, &answer).await;
+        let resolved = &answer["resolved"];
+        let tool = resolved["tool"]
+            .as_str()
+            .or_else(|| stored.and_then(|row| row.tool.as_deref()));
+        let operation = resolved["operation"]
+            .as_str()
+            .map(str::to_owned)
+            .or_else(|| {
+                let card = serde_json::from_str::<Value>(&stored?.card).ok()?;
+                card["operation"].as_str().map(str::to_owned)
+            });
+        let rows = super::activity::record_confirm(
+            org_id,
+            session_id,
+            caller,
+            request,
+            &answer,
+            (tool, operation.as_deref()),
+        )
+        .await;
         let now = config::utils::time::now_micros();
         super::activity::with_ledger_ids(&mut answer, &rows, now);
         // The stored decision keeps each target's ledger row, so a reload offers its Undo.
