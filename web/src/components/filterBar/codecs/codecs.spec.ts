@@ -27,6 +27,7 @@ import {
   type FilterGroup,
 } from "@/utils/query/filterBar";
 import {
+  alertGroupsCodec,
   anomalyCodec,
   dashboardFilterCodec,
   dashboardVariableCodec,
@@ -819,6 +820,29 @@ describe("flat codecs", () => {
       { field: "url", op: "prefix", values: ["/a", "/b"] },
     ]);
     expectRoundTrip(rumExclusionCodec(), [{ field: "browser", op: "regex", values: ["bot"] }]);
+  });
+});
+
+describe("alert groups codec", () => {
+  const codec = alertGroupsCodec();
+  const saved = [
+    { field: "cluster", operator: "in" as const, values: ["prod-eu", "prod-us"] },
+    { field: "", operator: "match_all" as const, values: ["web"] },
+  ];
+
+  it("writes an untouched filter back as loaded, free text included", () => {
+    expectRoundTrip(codec, saved);
+  });
+
+  it("writes an edited condition as the condition, sharing no arrays with the tree", () => {
+    const tree = codec.parse(clone(saved), context);
+    const out = codec.serialize(edit(tree, 0, { operator: "not_in" }), context);
+    expect(out[0]).toEqual({
+      field: "cluster",
+      operator: "not_in",
+      values: ["prod-eu", "prod-us"],
+    });
+    expect(out[0].values).not.toBe(leaves(tree)[0].values);
   });
 });
 

@@ -42,13 +42,16 @@
     data-test="alerts-alertgroupstable-table"
   >
     <template #toolbar>
-      <div class="flex flex-1 items-center gap-2 max-md:contents">
-        <OSearchInput
-          v-model="search"
-          class="flex-1"
+      <div class="flex w-full min-w-0 items-center gap-2 max-md:contents">
+        <FilterBuilder
+          :model-value="filters"
+          class="min-w-0 flex-1 max-md:min-w-40"
+          profile="alert-groups"
+          :fields="labelFields"
+          :load-values="loadLabelValues"
           :placeholder="t('alerts.groups.searchPlaceholder')"
-          clearable
           data-test="alerts-alertgroupstable-search"
+          @update:model-value="(next) => (filters = next as GroupFilterCondition[])"
         />
       </div>
     </template>
@@ -249,7 +252,7 @@
         size="hero"
         :title="t('alerts.groups.emptyTitle')"
         :description="t('alerts.groups.emptyDescription')"
-        :filtered="!!search"
+        :filtered="filters.length > 0"
         data-test="alerts-alertgroupstable-empty"
         @action="onEmptyAction"
       />
@@ -287,6 +290,13 @@ import { useViewerTimezone } from "@/composables/downtimes/useViewerTimezone";
 import { ackShortName, downtimeForGroup } from "@/utils/alerts/ackState";
 import { isFiringOutcome } from "@/utils/alerts/runOutcome";
 import {
+  groupLabelNames,
+  groupLabelValues,
+  matchesGroupFilter,
+  type GroupFilterCondition,
+} from "@/utils/alerts/groupFilter";
+import type { FilterField } from "@/utils/query/filterBar";
+import {
   groupOptionOf,
   type AlertMuteEnd,
   type QuickMuteAlertContext,
@@ -296,6 +306,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
+import FilterBuilder from "@/components/filterBar/FilterBuilder.vue";
 import MuteMenuItems from "./downtimes/MuteMenuItems.vue";
 import MutedChip from "./downtimes/MutedChip.vue";
 import RowMuteMenu from "./downtimes/RowMuteMenu.vue";
@@ -305,7 +316,6 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -345,7 +355,7 @@ const emit = defineEmits<{
 
 const { t } = useI18nTyped();
 const store = useStore();
-const search = ref("");
+const filters = ref<GroupFilterCondition[]>([]);
 const actions = useAlertActions();
 const viewerZone = useViewerTimezone();
 
@@ -499,13 +509,19 @@ const firingDoor = (row: AlertGroup, verb: "troubleshoot" | "add_to_chat") => ({
 // Filtering is client-side because the whole group set is already bounded by
 // the M-6 cap — there is no page to fetch beyond it.
 const rows = computed<AlertGroup[]>(() => {
-  const term = search.value.trim().toLowerCase();
-  if (!term) return props.groups;
-  return props.groups.filter((g) => (g.group_labels || "").toLowerCase().includes(term));
+  if (!filters.value.length) return props.groups;
+  return props.groups.filter((g) => matchesGroupFilter(g, filters.value));
 });
 
+const labelFields = computed<FilterField[]>(() =>
+  groupLabelNames(props.groups).map((name) => ({ name, type: "string" })),
+);
+
+const loadLabelValues = async (name: string, search: string) =>
+  groupLabelValues(props.groups, name, search);
+
 const onEmptyAction = (id?: string) => {
-  if (id === "clear-filters") search.value = "";
+  if (id === "clear-filters") filters.value = [];
 };
 
 // The label pairs hold no separators in their text, so the cut-cell tooltip spells them out.
