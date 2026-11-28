@@ -34,6 +34,8 @@ use super::{
 /// Answer given to tool calls when the MCP tool registry was never built.
 const MCP_DISABLED_MESSAGE: &str = "MCP is disabled on this node (ZO_MCP_ENABLED=false)";
 const READ_ONLY_REFUSAL: &str = "OpenObserve changes are not available to AutoResolve.";
+const ASSISTANT_OFF_REFUSAL: &str =
+    "The AI assistant is turned off for this organization; changes are not available.";
 
 /// Largest upstream text a tool result carries; more would swamp most models' context windows.
 const MAX_TOOL_RESULT_BYTES: usize = 1024 * 1024;
@@ -348,14 +350,17 @@ fn refuse_change(
     access: ToolAccess,
     metadata: &rmcp_openapi::ToolMetadata,
 ) -> Result<(), RpcError> {
-    if access == ToolAccess::ReadOnly && !is_read_only(metadata) {
-        return Err(RpcError {
-            code: MCPErrorCode::InvalidRequest,
-            message: READ_ONLY_REFUSAL.to_string(),
-            data: None,
-        });
-    }
-    Ok(())
+    let message = match access {
+        ToolAccess::Any => return Ok(()),
+        _ if is_read_only(metadata) => return Ok(()),
+        ToolAccess::ReadOnly => READ_ONLY_REFUSAL,
+        ToolAccess::AssistantOff => ASSISTANT_OFF_REFUSAL,
+    };
+    Err(RpcError {
+        code: MCPErrorCode::InvalidRequest,
+        message: message.to_string(),
+        data: None,
+    })
 }
 
 /// Handle tools_call - execute a tool directly by name
@@ -1680,7 +1685,7 @@ mod tests {
 
     #[tokio::test]
     async fn a_read_only_caller_runs_only_reads() {
-        use ToolAccess::{Any, ReadOnly};
+        use ToolAccess::{Any, AssistantOff, ReadOnly};
         let search = crate::streaming::route_through_streams(vec![
             operation("SearchSQL", "POST", "/api/{org_id}/_search"),
             operation("SearchStreamHttp2", "POST", "/api/{org_id}/_search_stream"),
@@ -1690,17 +1695,35 @@ mod tests {
         let change = operation("CreateDashboard", "POST", "/api/{org_id}/dashboards");
         let list = operation("StreamList", "GET", "/api/{org_id}/streams");
         let cases = [
-            ("run token, change", ReadOnly, &change, false),
-            ("run token, GET read", ReadOnly, &list, true),
-            ("run token, streamed search", ReadOnly, &search, true),
-            ("person, change", Any, &change, true),
+            (
+                "run token, change",
+                ReadOnly,
+                &change,
+                Some(READ_ONLY_REFUSAL),
+            ),
+            ("run token, GET read", ReadOnly, &list, None),
+            ("run token, streamed search", ReadOnly, &search, None),
+            ("person, change", Any, &change, None),
+            (
+                "assistant off, change",
+                AssistantOff,
+                &change,
+                Some(ASSISTANT_OFF_REFUSAL),
+            ),
+            ("assistant off, GET read", AssistantOff, &list, None),
+            (
+                "assistant off, streamed search",
+                AssistantOff,
+                &search,
+                None,
+            ),
         ];
-        for (case, access, tool, runs) in cases {
+        for (case, access, tool, refusal) in cases {
             match refuse_change(access, tool) {
-                Ok(()) => assert!(runs, "{case}: ran"),
+                Ok(()) => assert!(refusal.is_none(), "{case}: ran"),
                 Err(e) => assert_eq!(
-                    (runs, e.code, e.message.as_str()),
-                    (false, MCPErrorCode::InvalidRequest, READ_ONLY_REFUSAL),
+                    (Some(e.message.as_str()), e.code),
+                    (refusal, MCPErrorCode::InvalidRequest),
                     "{case}"
                 ),
             }

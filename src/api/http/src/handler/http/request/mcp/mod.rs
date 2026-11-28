@@ -50,15 +50,16 @@ fn access_of(
     assistant_origin: bool,
     assistant_on: Option<bool>,
 ) -> ToolAccess {
-    if autoresolve_run || (assistant_origin && assistant_on != Some(true)) {
+    if autoresolve_run {
         ToolAccess::ReadOnly
+    } else if assistant_origin && assistant_on != Some(true) {
+        ToolAccess::AssistantOff
     } else {
         ToolAccess::Any
     }
 }
 
-/// Run tokens always read only. Assistant calls also read only while the org has the assistant off
-/// or its settings cannot be read.
+/// Unreadable settings fail closed: the org may have turned the assistant off mid-turn.
 async fn tool_access(
     org_id: &str,
     caller: Option<&Extension<DelegatedCaller>>,
@@ -755,12 +756,15 @@ mod tests {
 
     #[test]
     fn an_assistant_call_reads_only_while_the_org_has_it_off() {
-        assert_eq!(access_of(false, true, Some(false)), ToolAccess::ReadOnly);
+        assert_eq!(
+            access_of(false, true, Some(false)),
+            ToolAccess::AssistantOff
+        );
     }
 
     #[test]
     fn an_assistant_call_reads_only_when_the_setting_is_unreadable() {
-        assert_eq!(access_of(false, true, None), ToolAccess::ReadOnly);
+        assert_eq!(access_of(false, true, None), ToolAccess::AssistantOff);
     }
 
     #[test]

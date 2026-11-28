@@ -109,6 +109,8 @@ impl FromStr for MCPMethod {
 pub enum ToolAccess {
     Any,
     ReadOnly,
+    /// Reads only because the org turned the assistant off, refused with its own message.
+    AssistantOff,
 }
 
 // MCP Error Codes with discriminant values
