@@ -18,12 +18,13 @@ import { createMemoryHistory, createRouter } from "vue-router";
 
 import appStore from "@/stores";
 import { armHomeReturn, decodeHomeReturn } from "@/composables/goto/homeReturn";
+import { b64DecodeUnicode } from "@/utils/formatters";
 import { decodeAssistantSet } from "../../chatHelpers";
 import { timeWindowOf } from "../../context/contextChips";
 import { pageContext } from "../../context/pageContext";
 import { makeEnv } from "../__tests__/actionEnv";
 import { buildNavigationRoute } from "../../navigationRoutes";
-import { navigationApplier } from "./navigation";
+import { explorerApplier, navigationApplier } from "./navigation";
 
 const lastQuery = (push: { mock: { calls: unknown[][] } }) =>
   (push.mock.calls[0][0] as { query: Record<string, string> }).query;
@@ -393,5 +394,61 @@ describe("navigation applier", () => {
       expect(await open("logs")).toMatchObject({ ok: true });
       expect(router.push).toHaveBeenCalledTimes(1);
     });
+  });
+});
+
+describe("explorer applier", () => {
+  // Session ids are deterministic and home_return arming is module state, so use ids no earlier test armed.
+  const freshEnv = () => {
+    let n = 0;
+    return makeEnv({
+      deps: { uuid: () => `0190f3a0-0000-7000-8000-e${String((n += 1)).padStart(11, "0")}` },
+    });
+  };
+  const query = {
+    language: "sql" as const,
+    text: 'SELECT * FROM "default"',
+    stream: "default",
+    from: 1_760_000_000_000,
+    to: 1_760_000_900_000,
+    org: "other",
+  };
+
+  it("opens Logs with the exact SQL, stream and absolute range, applied and never run", async () => {
+    const { env, sid, router } = freshEnv();
+    await expect(
+      explorerApplier(sid, { kind: "open_in_explorer", query, explorer: "logs" }, env),
+    ).resolves.toEqual({
+      ok: true,
+      detail: { newTab: false },
+    });
+    const pushed = router.push.mock.calls[0][0] as { name: string; query: Record<string, string> };
+    expect(pushed.name).toBe("logs");
+    expect(pushed.query).toMatchObject({
+      org_identifier: "org1",
+      stream: "default",
+      from: "1760000000000000",
+      to: "1760000900000000",
+      type: "ai_chat_query",
+      t: "2000000",
+    });
+    expect(b64DecodeUnicode(pushed.query.query)).toBe(query.text);
+    expect(pushed.query).not.toHaveProperty("run");
+  });
+
+  it("opens Logs from the full-page thread with that thread floating over it", async () => {
+    const { env, sid, store, router } = freshEnv();
+    store.open({ kind: "full" }, { sid, focus: "none" });
+    router.push.mockImplementation(async () => store.close("route"));
+    await explorerApplier(sid, { kind: "open_in_explorer", query, explorer: "logs" }, env);
+    expect(store.windowOf(sid)?.state).toBe("open");
+  });
+
+  it("opens a new tab with noopener from a docked container", async () => {
+    const { env, sid, store, router } = freshEnv();
+    store.state.shell.placement = { kind: "docked", hostId: "alert_query" };
+    await explorerApplier(sid, { kind: "open_in_explorer", query, explorer: "metrics" }, env);
+    expect(router.push).not.toHaveBeenCalled();
+    expect(env.openTab).toHaveBeenCalledWith("/web/metrics");
   });
 });

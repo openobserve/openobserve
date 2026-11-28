@@ -26,7 +26,7 @@ import assistantService, {
 import { raw } from "@/types/i18n";
 import type { ChatMessage } from "@/ts/interfaces/chat";
 
-import { decisionsAfterProposal } from "@/components/ai-assistant/approvals/approvalPlacement";
+import { decisionsAfterProposal } from "@/components/ai-assistant/approvals/approvalText";
 
 import { parseFrame } from "./frames";
 import type { HistoryCtx } from "./historyContext";
@@ -41,18 +41,22 @@ import {
 import { reduce, type StreamState } from "./reducer";
 import { projectRecord, type StoredTurn } from "./record";
 
-// The chat read the server answered for a reopened chat whose update was skipped as changed since asked.
-const DETAIL = join(__dirname, "__fixtures__/history/decided-approval.json");
+const HISTORY = join(__dirname, "__fixtures__/history.json");
 const CARD_ID = "apr_010996298bcfefd727f5";
 const ALERT_ID = "3LrpP3S4OgYZjmWhBm5Isxoi8vI";
 
+function readHistory(name: string) {
+  return JSON.parse(readFileSync(HISTORY, "utf8"))[name];
+}
+
+// The chat read the server answered for a reopened chat whose update was skipped as changed since asked.
 function readDetail(): ChatDetail {
-  return parseChatDetail(JSON.parse(readFileSync(DETAIL, "utf8")));
+  return parseChatDetail(readHistory("decided-approval"));
 }
 
 // The same chat had the approve written: the row says approved with no skip, and the gated call succeeded.
 function doneDetail(): ChatDetail {
-  const raw = JSON.parse(readFileSync(DETAIL, "utf8"));
+  const raw = readHistory("decided-approval");
   delete raw.approvals[0].resolved.outcome;
   delete raw.approvals[0].resolved.code;
   delete raw.approvals[0].resolved.detail;
@@ -169,12 +173,11 @@ describe("historyRecords: decided approvals after a reload (N1)", () => {
   });
 });
 
-// A gathered pause of two alerts, approved "Always", where one alert was already muted: the real chat read and its ledger rows.
-const MULTI = join(__dirname, "__fixtures__/history/multi-target-approval.json");
 const MULTI_ID = "apr_1e36dce0a948709edf81";
 
+// A gathered pause of two alerts, approved "Always", where one alert was already muted: the real chat read and its ledger rows.
 function readMulti(): { detail: ChatDetail; rows: ChatActivityRow[] } {
-  const raw = JSON.parse(readFileSync(MULTI, "utf8"));
+  const raw = readHistory("multi-target-approval");
   return { detail: parseChatDetail(raw.detail), rows: raw.activity };
 }
 
@@ -233,12 +236,11 @@ describe("historyRecords: a multi-target record after a reload (P2-3, P3-2)", ()
   });
 });
 
-// A reopened chat whose pause ran under an Always grant: the real chat read and its `standing` ledger row.
-const STANDING = join(__dirname, "__fixtures__/history/standing-grant-write.json");
 const GRANT_ID = "3LsFZCR8P0P3phihr81MOm7u4HX";
 
+// A reopened chat whose pause ran under an Always grant: the real chat read and its `standing` ledger row.
 function readStanding(done: boolean): { detail: ChatDetail; rows: ChatActivityRow[] } {
-  const raw = JSON.parse(readFileSync(STANDING, "utf8"));
+  const raw = readHistory("standing-grant-write");
   const row = raw.rows[0];
   // The live row was written while the grant was active and the alert already paused.
   row.approval.grant_id = GRANT_ID;
@@ -303,9 +305,7 @@ describe("historyRecords: a write an Always grant let run, after a reload (P2-2)
   });
 
   it("names the paused alert as the server stored it and keeps the grant's scope (P2-2 gaps 2, 3)", () => {
-    const raw = JSON.parse(
-      readFileSync(join(__dirname, "__fixtures__/history/standing-grant-named.json"), "utf8"),
-    );
+    const raw = readHistory("standing-grant-named");
     const messages = reopened(parseChatDetail(raw.detail));
     const [entry] = withGrantedRecords(messages, raw.rows);
     const resolved = messages
@@ -337,10 +337,8 @@ describe("historyRecords: a write an Always grant let run, after a reload (P2-2)
 });
 
 // The live stream of a pause an Always grant let run, and the ledger row it wrote, as the browser got them.
-const LIVE = join(__dirname, "__fixtures__/history/granted-write-live.json");
-
 function liveGrantedWrite(): { messages: ChatMessage[]; rows: ChatActivityRow[]; frame: any } {
-  const wire = JSON.parse(readFileSync(LIVE, "utf8"));
+  const wire = readHistory("granted-write-live");
   const state: StreamState = {
     messages: [
       { role: "user", content: raw("Pause the alert"), turnId: "t1" },

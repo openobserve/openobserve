@@ -100,7 +100,7 @@ declare module "@/ts/interfaces/chat" {
   }
 }
 
-/** Every frame type `frames.ts` parses; `projectRecord.spec.ts` pins the two lists together. */
+/** Every frame type `frames.ts` parses; `record.spec.ts` pins the two lists together. */
 export const KNOWN_FRAME_TYPES: ReadonlySet<string> = new Set([
   "status",
   "title",
