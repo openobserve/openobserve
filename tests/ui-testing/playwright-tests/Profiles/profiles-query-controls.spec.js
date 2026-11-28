@@ -87,7 +87,7 @@ test.describe('Profiles query controls', () => {
     await expect.poll(() => calls.meta.filter((call) => call.url.includes('service_name=payments')).length).toBeGreaterThan(0);
     await expect
       .poll(() => pm.profilesPage.selectOptionLabels(pm.profilesPage.typeSelect), { timeout: 15000 })
-      .toEqual(['alloc_space (bytes)', 'CPU time', 'inuse_space (bytes)']);
+      .toEqual(['Allocated memory (bytes)', 'CPU time', 'Memory in use (bytes)']);
   });
 
   test('With Auto Run off a change marks Run as pending without querying', { tag: ['@all', '@profiles', '@P1'] }, async () => {
@@ -120,6 +120,16 @@ test.describe('Profiles query controls', () => {
     await pm.profilesPage.gotoRef(ref);
     await pm.profilesPage.expectRunDisabled();
     await pm.profilesPage.hoverRunAndExpectTooltip('Pick a stream and a profile type with data in this time range');
+  });
+
+  test('A disabled Run stays keyboard focusable and announces why it is unavailable', { tag: ['@all', '@profiles', '@P2'] }, async () => {
+    await pm.profilesPage.mockApi('meta', {
+      json: { data_sources: [], services: ['checkout'], profile_types: [], label_names: [], took: 1 },
+    });
+    await pm.profilesPage.gotoRef(ref);
+    await pm.profilesPage.expectRunDisabled();
+    await pm.profilesPage.focusRunButton();
+    await pm.profilesPage.expectRunReasonAnnounced('Pick a stream and a profile type with data in this time range');
   });
 
   test('With Auto Run on a change runs at once, and the switch turns it off', { tag: ['@all', '@profiles', '@P1'] }, async () => {

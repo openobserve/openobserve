@@ -28,6 +28,36 @@ describe("OSelect", () => {
     expect(wrapper.find("button").classes()).toContain(expected);
   });
 
+  it("keeps the xs value text xs and the default value text sm", () => {
+    wrapper = mount(OSelect, {
+      props: { size: "xs", modelValue: "a", options: [{ label: "A", value: "a" }] },
+    });
+    const xs = wrapper.find("button span.truncate");
+    expect(xs.classes()).toContain("text-xs");
+    expect(xs.classes()).not.toContain("text-sm");
+    wrapper.unmount();
+    wrapper = mount(OSelect, { props: { modelValue: "a", options: [{ label: "A", value: "a" }] } });
+    expect(wrapper.find("button span.truncate").classes()).toContain("text-sm");
+  });
+
+  it.each([
+    ["xs", "text-xs", "text-sm"],
+    ["md", "text-sm", "text-xs"],
+  ] as const)("sizes the multi-select all-selected label for %s", (size, has, lacks) => {
+    wrapper = mount(OSelect, {
+      props: {
+        size,
+        multiple: true,
+        allSelectedLabel: "Everything",
+        modelValue: ["a"],
+        options: [{ label: "A", value: "a" }],
+      },
+    });
+    const label = wrapper.findAll("button span.truncate").find((e) => e.text() === "Everything");
+    expect(label?.classes()).toContain(has);
+    expect(label?.classes()).not.toContain(lacks);
+  });
+
   it("renders a label when prop is provided", () => {
     wrapper = mount(OSelect, { props: { label: "Country" } });
     expect(wrapper.find("label").text()).toBe("Country");

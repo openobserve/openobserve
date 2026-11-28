@@ -67,14 +67,46 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
+      <div
+        v-if="showZoomHint || zoomHintSpace"
+        class="text-text-secondary mb-1.5 flex flex-wrap items-center justify-end gap-2 text-xs"
+        :class="{ invisible: !showZoomHint }"
+        data-test="flame-graph-zoom-hint"
+      >
+        <span>{{ t("profiles.zoomHint", { key: zoomKey }) }}</span>
+        <OButton
+          variant="ghost"
+          size="xs"
+          data-test="flame-graph-zoom-hint-never"
+          @click="dismissZoomHint(true)"
+        >
+          {{ t("profiles.dontShowAgain") }}
+        </OButton>
+        <OButton
+          variant="ghost"
+          size="icon-xs"
+          icon-left="close"
+          :aria-label="t('common.close')"
+          data-test="flame-graph-zoom-hint-close"
+          @click="dismissZoomHint(false)"
+        />
+      </div>
+
       <div class="overflow-auto">
         <!-- eslint-disable-next-line local/no-hardcoded-px -- echarts custom series lays out in canvas device pixels -->
         <div
           ref="plotEl"
           :style="{ height: `${chartHeight}px`, minWidth: '100%' }"
-          class="relative"
+          class="focus-visible:outline-focus-ring-accent relative outline-none focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-solid"
           :class="{ 'cursor-grab': zoomed }"
+          tabindex="0"
+          role="group"
+          :aria-label="plotLabel"
+          :aria-describedby="helpId"
           data-test="flame-graph-plot"
+          @keydown="onPlotKeydown"
+          @focus="onPlotFocus"
+          @blur="onPlotBlur"
           @contextmenu="onPlotContextMenu"
           @wheel.capture="onWheel"
           @pointerdown.capture="onPointerDown"
@@ -89,6 +121,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="chartLabel"
             class="h-full w-full"
             @click="onChartClick"
+            @painted="rehighlightFocused"
+          />
+          <span
+            v-if="focusMarker"
+            ref="focusMarkerEl"
+            class="pointer-events-none absolute w-px"
+            :style="focusMarker"
+            aria-hidden="true"
+            data-test="flame-graph-focus-marker"
           />
           <div v-if="moreButton" class="absolute z-10" :style="moreButton.style">
             <OButton
@@ -104,134 +145,80 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
       </div>
-      <div
-        v-if="showZoomHint"
-        class="border-border-default bg-surface-panel rounded-default absolute bottom-3 left-1/2 z-10 flex -translate-x-1/2 items-center gap-3 border px-3 py-1.5 text-xs whitespace-nowrap"
-        data-test="flame-graph-zoom-hint"
-      >
-        <span class="text-text-body">{{ t("profiles.zoomHint", { key: zoomKey }) }}</span>
-        <OButton
-          variant="ghost"
-          size="xs"
-          data-test="flame-graph-zoom-hint-never"
-          @click="hideZoomHint(true)"
-        >
-          {{ t("profiles.dontShowAgain") }}
-        </OButton>
-        <OButton
-          variant="ghost"
-          size="icon-xs"
-          icon-left="close"
-          :aria-label="t('common.close')"
-          data-test="flame-graph-zoom-hint-close"
-          @click="hideZoomHint(false)"
-        />
-      </div>
+      <span :id="helpId" class="sr-only">{{ t("profiles.keyboardHelp") }}</span>
+      <span class="sr-only" aria-live="polite" data-test="flame-graph-announce">{{
+        announcement
+      }}</span>
     </div>
 
-    <div
+    <ODropdown
       v-if="menu"
-      ref="menuEl"
-      class="border-border-default bg-surface-panel rounded-default absolute z-20 flex min-w-40 flex-col border p-1 shadow-none"
-      data-test="flame-graph-frame-menu"
-      :style="menuStyle"
+      v-model:open="menuOpen"
+      side="bottom"
+      align="start"
+      @close-auto-focus="restoreFocus"
     >
-      <div class="flex min-w-0 items-start gap-1 px-2 pt-1 pb-1.5">
-        <div class="min-w-0 flex-1">
+      <template #trigger>
+        <span
+          class="pointer-events-none absolute size-px"
+          :style="menuStyle"
+          aria-hidden="true"
+          data-test="flame-graph-frame-menu-anchor"
+        />
+      </template>
+      <div
+        class="contents"
+        role="group"
+        :aria-label="menu.block.name"
+        data-test="flame-graph-frame-menu"
+      >
+        <div class="px-2 pt-1 pb-1.5" role="presentation">
           <div class="text-text-secondary text-2xs">{{ t("profiles.function") }}</div>
           <OTruncatedText class="text-text-body max-w-64 font-mono text-xs font-medium">{{
             menu.block.name
           }}</OTruncatedText>
         </div>
-        <OButton
-          variant="ghost"
-          size="icon-xs"
-          icon-left="content-copy"
-          :aria-label="t('profiles.copyFunctionName')"
-          data-test="flame-graph-copy-name"
-          @click="copyFunctionName"
+        <FlameFunctionMenuItems
+          :name="menu.block.name"
+          :test-ids="FRAME_MENU_TEST_IDS"
+          :hide-profile-actions="hideProfileActions"
+          @copy="copyFunctionName"
+          @search="searchFunction"
+          @details="showDetails"
+          @sandwich="showSandwich"
         >
-          <OTooltip :content="t('profiles.copyFunctionName')" />
-        </OButton>
+          <!-- The zoom item follows where the frame sits: below the zoomed frame, on it, or above it. -->
+          <ODropdownItem
+            v-if="menu.block.id === focusPath"
+            icon-left="zoom-out"
+            data-test="flame-graph-zoom-out"
+            @select="zoomTo(parentPath(menu.block.id))"
+            >{{ t("profiles.zoomOut") }}</ODropdownItem
+          >
+          <ODropdownItem
+            v-else-if="menu.block.ancestor && menu.block.id !== 'root'"
+            icon-left="zoom-out"
+            data-test="flame-graph-zoom-out-here"
+            @select="zoomTo(menu.block.id)"
+            >{{ t("profiles.zoomOutHere") }}</ODropdownItem
+          >
+          <ODropdownItem
+            v-else-if="menu.block.id !== 'root'"
+            icon-left="zoom-in"
+            data-test="flame-graph-zoom-in"
+            @select="zoomTo(menu.block.id)"
+            >{{ t("profiles.zoomIn") }}</ODropdownItem
+          >
+          <ODropdownItem
+            v-if="focusPath"
+            icon-left="fit-screen"
+            data-test="flame-graph-zoom-reset"
+            @select="zoomTo(null)"
+            >{{ t("profiles.resetZoom") }}</ODropdownItem
+          >
+        </FlameFunctionMenuItems>
       </div>
-      <!-- The zoom item follows where the frame sits: below the zoomed frame, on it, or above it. -->
-      <OButton
-        v-if="menu.block.id === focusPath"
-        variant="ghost"
-        size="sm"
-        icon-left="zoom-out"
-        class="w-full justify-start"
-        data-test="flame-graph-zoom-out"
-        @click="zoomTo(parentPath(menu.block.id))"
-      >
-        {{ t("profiles.zoomOut") }}
-      </OButton>
-      <OButton
-        v-else-if="menu.block.ancestor && menu.block.id !== 'root'"
-        variant="ghost"
-        size="sm"
-        icon-left="zoom-out"
-        class="w-full justify-start"
-        data-test="flame-graph-zoom-out-here"
-        @click="zoomTo(menu.block.id)"
-      >
-        {{ t("profiles.zoomOutHere") }}
-      </OButton>
-      <OButton
-        v-else-if="menu.block.id !== 'root'"
-        variant="ghost"
-        size="sm"
-        icon-left="zoom-in"
-        class="w-full justify-start"
-        data-test="flame-graph-zoom-in"
-        @click="zoomTo(menu.block.id)"
-      >
-        {{ t("profiles.zoomIn") }}
-      </OButton>
-      <OButton
-        v-if="focusPath"
-        variant="ghost"
-        size="sm"
-        icon-left="fit-screen"
-        class="w-full justify-start"
-        data-test="flame-graph-zoom-reset"
-        @click="zoomTo(null)"
-      >
-        {{ t("profiles.resetZoom") }}
-      </OButton>
-      <OButton
-        variant="ghost"
-        size="sm"
-        icon-left="search"
-        class="w-full justify-start"
-        data-test="flame-graph-search-function"
-        @click="searchFunction"
-      >
-        {{ t("profiles.highlight") }}
-      </OButton>
-      <OButton
-        v-if="!hideProfileActions"
-        variant="ghost"
-        size="sm"
-        class="w-full justify-start"
-        icon-left="swap-vert"
-        data-test="flame-graph-sandwich"
-        @click="showSandwich"
-      >
-        {{ t("profiles.showCallersAndCallees") }}
-      </OButton>
-      <OButton
-        v-if="!hideProfileActions"
-        variant="ghost"
-        size="sm"
-        class="w-full justify-start"
-        icon-left="info-outline"
-        data-test="flame-graph-details"
-        @click="showDetails"
-      >
-        {{ t("profiles.functionDetails") }}
-      </OButton>
-    </div>
+    </ODropdown>
   </div>
 </template>
 
@@ -243,6 +230,7 @@ import {
   onBeforeUnmount,
   onMounted,
   ref,
+  useId,
   watch,
 } from "vue";
 import type {
@@ -254,6 +242,9 @@ import type {
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import FlameFunctionMenuItems from "./FlameFunctionMenuItems.vue";
 import { copyToClipboard } from "@/utils/clipboard";
 import OTruncatedText from "@/lib/core/Typography/OTruncatedText.vue";
 import { escapeHtml } from "@/utils/html";
@@ -349,7 +340,7 @@ const props = withDefaults(
     hideViewOptions?: boolean;
     /** Grow the rows so the graph fills its container's height, for a host of fixed size such as a dashboard panel. */
     fillHeight?: boolean;
-    /** Leave out the wheel-zoom hint, for a host too small to keep a toast over the graph. */
+    /** Leave out the wheel-zoom hint row, for a host too small for it or one that must keep graphs aligned. */
     noZoomHint?: boolean;
     /** Accessible name for the graph; without one ECharts describes it by its series type. */
     chartLabel?: I18nText;
@@ -370,7 +361,6 @@ const labelAlign = ref<LabelAlign>("left");
 // Only flips the drawing; it does not regroup stacks by leaf function (a bottom-up view).
 const rootAtBottom = ref(props.initialRootAtBottom ?? false);
 const menu = ref<FrameMenu | null>(null);
-const menuEl = ref<HTMLElement | null>(null);
 const chartRendererRef = ref<{
   chart?: {
     setOption: (option: object) => void;
@@ -384,6 +374,10 @@ const chartRendererRef = ref<{
 
 const BLOCK_HEIGHT = 24;
 const BLOCK_PADDING = 2;
+// A 1000-frame stack would draw a canvas about 26,000 px tall; deeper rows wait for a zoom.
+const MAX_DRAWN_ROWS = 250;
+// Bounds the dimmed caller rows so the drawn rows per view stay bounded at any focus depth.
+const MAX_ANCESTOR_ROWS = 25;
 const tokenColor = (token: string, fallbackToken: string) =>
   cssToken(token, cssToken(fallbackToken, ""));
 
@@ -519,7 +513,9 @@ const collectBlocks = (root: FlameGraphNode | null): FlameBlock[] => {
   if (!root || (root.total || 0) <= 0) return [];
   const blocks: FlameBlock[] = [];
   // Zoomed in, the callers stay on screen above the zoomed frame, full width and dimmed.
-  const ancestors = focusLine.value.slice(0, -1);
+  const allAncestors = focusLine.value.slice(0, -1);
+  const firstShown = Math.max(0, allAncestors.length - MAX_ANCESTOR_ROWS);
+  const ancestors = allAncestors.slice(firstShown);
   const rootDepth = ancestors.length;
   const { palette, textColor, groupedFill, diffMore, diffLess } = colors.value;
 
@@ -541,12 +537,12 @@ const collectBlocks = (root: FlameGraphNode | null): FlameBlock[] => {
     width: 100,
     total: node.total,
     self: node.self ?? 0,
-    callerTotal: depth > 0 ? ancestors[depth - 1].node.total : 0,
-    fill: depth === 0 ? groupedFill : colorFor(node.name),
+    callerTotal: firstShown + depth > 0 ? allAncestors[firstShown + depth - 1].node.total : 0,
+    fill: firstShown + depth === 0 ? groupedFill : colorFor(node.name),
     textColor,
     matched: false,
     grouped: false,
-    hint: depth === 0 ? "" : t("profiles.ancestorHint"),
+    hint: firstShown + depth === 0 ? "" : t("profiles.ancestorHint"),
     ancestor: true,
   }));
 
@@ -572,6 +568,7 @@ const collectBlocks = (root: FlameGraphNode | null): FlameBlock[] => {
   ) => {
     const isDiff = props.diffBaselineTotal != null;
     const hint = depth === rootDepth ? "" : hintFor(node.name);
+    const capped = depth - rootDepth >= MAX_DRAWN_ROWS - 1 && (node.children?.length ?? 0) > 0;
     const matched =
       !hint &&
       searchNeedle.value.length > 0 &&
@@ -591,9 +588,9 @@ const collectBlocks = (root: FlameGraphNode | null): FlameBlock[] => {
       textColor,
       matched,
       grouped: !!hint,
-      hint,
+      hint: hint || (capped ? t("profiles.deeperFramesHint") : ""),
     });
-    if (node.total <= 0) return;
+    if (node.total <= 0 || capped) return;
     let offset = left;
     // Children are sorted by total, so the ones too thin to draw sit together at the end.
     const small = { count: 0, total: 0, left: 0 };
@@ -674,6 +671,25 @@ const menuStyle = computed(() => {
 
 const closeMenu = () => {
   menu.value = null;
+};
+const menuOpen = computed({
+  get: () => !!menu.value,
+  set: (open: boolean) => {
+    if (!open) closeMenu();
+  },
+});
+const FRAME_MENU_TEST_IDS = {
+  copy: "flame-graph-copy-name",
+  search: "flame-graph-search-function",
+  details: "flame-graph-details",
+  sandwich: "flame-graph-sandwich",
+};
+// The anchor is not focusable, so a menu opened by keyboard hands focus back to the plot.
+let plotHadFocus = false;
+const restoreFocus = (event: Event) => {
+  if (!plotHadFocus) return;
+  event.preventDefault();
+  plotEl.value?.focus({ preventScroll: true });
 };
 
 /** The path one level up: "root/0/2" gives "root/0". */
@@ -771,7 +787,9 @@ const onWheel = (event: WheelEvent) => {
 // A drag pans the zoomed view; a release after a real move does not count as a click.
 let dragStart: { x: number; start: number; end: number } | null = null;
 let dragged = false;
+let pointerFocus = false;
 const onPointerDown = (event: PointerEvent) => {
+  pointerFocus = true;
   dragged = false;
   if (event.button !== 0 || !zoomed.value) return;
   dragStart = { x: event.clientX, ...zoomWindow };
@@ -789,6 +807,7 @@ const onPointerMove = (event: PointerEvent) => {
   setZoom(dragStart.start + shift, dragStart.end + shift);
 };
 const onPointerUp = () => {
+  pointerFocus = false;
   dragStart = null;
 };
 const onPointerLeave = () => {
@@ -827,12 +846,147 @@ const openMenuFromButton = (event: MouseEvent) => {
   chartRendererRef.value?.chart?.dispatchAction({ type: "hideTip" });
   const rect = root.getBoundingClientRect();
   const box = button.getBoundingClientRect();
+  plotHadFocus = plotFocused.value;
   menu.value = { x: box.left - rect.left, y: box.bottom - rect.top + 2, block };
-  nextTick(fitMenu);
+};
+
+const helpId = `flame-graph-help-${useId()}`;
+const plotLabel = computed(() => props.chartLabel ?? t("dashboard.chartSelection.flameGraph"));
+const plotFocused = ref(false);
+const focusedId = ref<string | null>(null);
+const focusedBlock = computed(() => blocks.value.find((b) => b.id === focusedId.value) ?? null);
+const zoomTick = ref(0);
+const focusMarkerEl = ref<HTMLElement | null>(null);
+// A 1px stand-in for the focused frame, so the browser can scroll it into view.
+const focusMarker = computed(() => {
+  const block = focusedBlock.value;
+  if (!plotFocused.value || !block) return null;
+  return { top: `${block.depth * rowStep.value}px`, height: `${blockHeight.value}px`, left: "0" };
+});
+const announcement = computed(() => {
+  const block = focusedBlock.value;
+  if (!plotFocused.value || !block) return "";
+  // A zero-width suffix changes the text on a zoom, so a live region that kept the same frame still re-announces.
+  return `${block.name}, ${t("profiles.total")} ${props.valueFormatter(block.total)}${zoomTick.value % 2 ? "\u200b" : ""}`;
+});
+
+const highlightFocused = (previous: string | null, next: string | null) => {
+  const chart = chartRendererRef.value?.chart;
+  if (!chart) return;
+  const indexOf = (id: string | null) => blocks.value.findIndex((b) => b.id === id);
+  const prevIndex = indexOf(previous);
+  if (prevIndex >= 0)
+    chart.dispatchAction({ type: "downplay", seriesIndex: 0, dataIndex: prevIndex });
+  const nextIndex = indexOf(next);
+  if (nextIndex >= 0)
+    chart.dispatchAction({ type: "highlight", seriesIndex: 0, dataIndex: nextIndex });
+};
+// Search, data and zoom rebuild the blocks; a focused id that vanished would announce nothing.
+watch(blocks, (list) => {
+  if (focusedId.value && !list.some((b) => b.id === focusedId.value))
+    focusedId.value = list[0]?.id ?? null;
+});
+watch(focusPath, () => (zoomTick.value += 1));
+// A rebuild shifts every dataIndex and drops the chart's highlight, so it is applied again by id.
+const rehighlightFocused = () => {
+  if (plotFocused.value) highlightFocused(null, focusedId.value);
+};
+watch([focusedId, plotFocused], () =>
+  nextTick(() => focusMarkerEl.value?.scrollIntoView?.({ block: "nearest" })),
+);
+watch(focusedId, (next, previous) => highlightFocused(previous, plotFocused.value ? next : null));
+watch(plotFocused, (focused) =>
+  highlightFocused(focused ? null : focusedId.value, focused ? focusedId.value : null),
+);
+
+const onPlotFocus = (event: FocusEvent) => {
+  if (event.target !== plotEl.value) return;
+  // A click focuses the plot too, but only the keyboard enters the highlight and announce state.
+  if (pointerFocus) return;
+  plotFocused.value = true;
+  if (!focusedBlock.value) focusedId.value = blocks.value[0]?.id ?? null;
+};
+const onPlotBlur = (event: FocusEvent) => {
+  if (event.target !== plotEl.value) return;
+  plotFocused.value = false;
+  pointerFocus = false;
+};
+
+const revealBlock = (block: FlameBlock) => {
+  const { start, end } = zoomWindow;
+  if (block.left >= start && block.left + block.width <= end) return;
+  const span = end - start;
+  const centre = block.left + block.width / 2;
+  setZoom(centre - span / 2, centre + span / 2);
+};
+
+const neighbourOf = (current: FlameBlock, key: string) => {
+  const row = (depth: number) =>
+    blocks.value.filter((b) => b.depth === depth).sort((a, b) => a.left - b.left);
+  if (key === "ArrowLeft" || key === "ArrowRight") {
+    const sameRow = row(current.depth);
+    return sameRow[sameRow.indexOf(current) + (key === "ArrowRight" ? 1 : -1)] ?? null;
+  }
+  const target = row(current.depth + (key === "ArrowDown" ? 1 : -1));
+  const middle = current.left + current.width / 2;
+  const distance = (b: FlameBlock) =>
+    middle < b.left ? b.left - middle : Math.max(0, middle - (b.left + b.width));
+  return target.reduce<FlameBlock | null>(
+    (best, b) => (!best || distance(b) < distance(best) ? b : best),
+    null,
+  );
+};
+
+const openMenuForBlock = (block: FlameBlock) => {
+  const root = rootEl.value;
+  const plot = plotEl.value;
+  if (!root || !plot || block.grouped) return;
+  chartRendererRef.value?.chart?.dispatchAction({ type: "hideTip" });
+  const rect = root.getBoundingClientRect();
+  const box = plot.getBoundingClientRect();
+  const span = Math.max(ZOOM_MIN_SPAN, zoomWindow.end - zoomWindow.start);
+  const left = PLOT_INSET + ((block.left - zoomWindow.start) / span) * plotWidth();
+  plotHadFocus = true;
+  menu.value = {
+    x: box.left - rect.left + Math.max(left, PLOT_INSET) + 8,
+    y: box.top - rect.top + block.depth * rowStep.value + blockHeight.value + 2,
+    block,
+  };
+};
+
+const ARROWS = ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"];
+const onPlotKeydown = (event: KeyboardEvent) => {
+  if (event.target !== plotEl.value) return;
+  const current = focusedBlock.value ?? blocks.value[0];
+  if (!current) return;
+  if (!plotFocused.value) {
+    plotFocused.value = true;
+    focusedId.value = current.id;
+  }
+  if (ARROWS.includes(event.key)) {
+    event.preventDefault();
+    const next = neighbourOf(current, event.key);
+    if (!next) return;
+    focusedId.value = next.id;
+    revealBlock(next);
+  } else if (event.key === "Enter" || event.key === " ") {
+    event.preventDefault();
+    if (!current.grouped) zoomTo(current.id);
+  } else if (event.key === "ContextMenu" || (event.key === "F10" && event.shiftKey)) {
+    event.preventDefault();
+    openMenuForBlock(current);
+  }
 };
 
 const zoomKey = /Mac|iPhone|iPad/.test(navigator.platform) ? "⌘" : "Ctrl";
 const { showZoomHint, hideZoomHint } = useFlameZoomHint(() => hasData.value && !props.noZoomHint);
+// Wheel use hides the hint but keeps its row, so the graph does not jump under the pointer.
+const zoomHintSpace = ref(false);
+watch(showZoomHint, (shown) => shown && (zoomHintSpace.value = true), { immediate: true });
+const dismissZoomHint = (forever: boolean) => {
+  zoomHintSpace.value = false;
+  hideZoomHint(forever);
+};
 
 // A new frame to zoom to, or new data, starts at the full width of the view.
 watch([focusPath, () => props.root], () => {
@@ -848,39 +1002,15 @@ const onPlotContextMenu = (event: MouseEvent) => {
   event.preventDefault();
   chartRendererRef.value?.chart?.dispatchAction({ type: "hideTip" });
   const rect = root.getBoundingClientRect();
+  plotHadFocus = plotFocused.value;
   menu.value = {
     x: event.clientX - rect.left - root.clientLeft,
     y: event.clientY - rect.top - root.clientTop,
     block,
   };
-  nextTick(fitMenu);
 };
 
-/** The box the menu must stay inside: the nearest ancestor that clips it, else the window. */
-const clipBox = (el: HTMLElement) => {
-  for (let node = el.parentElement; node; node = node.parentElement) {
-    const { overflowX, overflowY } = getComputedStyle(node);
-    if (/auto|scroll|hidden/.test(`${overflowX} ${overflowY}`)) return node.getBoundingClientRect();
-  }
-  return { top: 0, left: 0, right: window.innerWidth, bottom: window.innerHeight };
-};
-
-/** Opens the menu above or to the left of the pointer when it would be cut off below or on the right. */
-const fitMenu = () => {
-  const current = menu.value;
-  const el = menuEl.value;
-  if (!current || !el) return;
-  const box = el.getBoundingClientRect();
-  const clip = clipBox(el);
-  let { x, y } = current;
-  if (box.bottom > clip.bottom) y = Math.max(y - box.height, y - (box.top - clip.top));
-  if (box.right > clip.right) x = Math.max(x - box.width, x - (box.left - clip.left));
-  if (x !== current.x || y !== current.y) menu.value = { ...current, x, y };
-};
-
-const copyFunctionName = async () => {
-  const name = menu.value?.block.name;
-  if (!name) return;
+const copyFunctionName = async (name: string) => {
   await copyToClipboard(name, t, { successMessage: t("common.copiedToClipboard") });
   closeMenu();
 };
@@ -892,21 +1022,18 @@ const emit = defineEmits<{
   focus: [path: string | null];
 }>();
 
-const searchFunction = () => {
-  const name = menu.value?.block.name;
-  if (name) emit("search", name);
+const searchFunction = (name: string) => {
+  emit("search", name);
   closeMenu();
 };
 
-const showSandwich = () => {
-  const name = menu.value?.block.name;
-  if (name) emit("sandwich", name);
+const showSandwich = (name: string) => {
+  emit("sandwich", name);
   closeMenu();
 };
 
-const showDetails = () => {
-  const name = menu.value?.block.name;
-  if (name) emit("details", name);
+const showDetails = (name: string) => {
+  emit("details", name);
   closeMenu();
 };
 
@@ -919,15 +1046,6 @@ const focus = (path: string) => {
 };
 defineExpose({ focus });
 watch(focusPath, (path) => emit("focus", path));
-
-// Any click outside the menu closes it, the graph included; a click on a frame then opens the menu there.
-const onDocumentClick = (event: MouseEvent) => {
-  if (!menu.value || menuEl.value?.contains(event.target as Node)) return;
-  closeMenu();
-};
-const onDocumentKeydown = (event: KeyboardEvent) => {
-  if (menu.value && event.key === "Escape") closeMenu();
-};
 
 // At lg+ ChartRenderer only follows window resizes, so a side panel opening would leave the graph stale; below lg it observes its own box.
 const { lgUp } = useBreakpoint();
@@ -947,8 +1065,6 @@ const resizeChart = () => {
 };
 
 onMounted(() => {
-  document.addEventListener("click", onDocumentClick, true);
-  document.addEventListener("keydown", onDocumentKeydown);
   if (props.fillHeight) measureFillable();
   if (!rootEl.value || typeof ResizeObserver === "undefined") return;
   resizeObserver = new ResizeObserver(() => {
@@ -959,8 +1075,6 @@ onMounted(() => {
   resizeObserver.observe(rootEl.value);
 });
 onBeforeUnmount(() => {
-  document.removeEventListener("click", onDocumentClick, true);
-  document.removeEventListener("keydown", onDocumentKeydown);
   resizeObserver?.disconnect();
   resizeObserver = null;
   cancelAnimationFrame(resizeFrame);

@@ -22,6 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :subtitle="t('profiles.subtitle')"
     icon="memory"
     title-data-test="profiles-page-title"
+    title-overflow="visible"
     bleed
   >
     <template #title>
@@ -41,6 +42,85 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="h-8"
         data-test="profiles-date-picker"
       />
+      <!-- Run, Cancel and the Auto Run switch, as on RUM Performance and Dashboards (shared useAutoRunToggle). -->
+      <span class="inline-flex" data-test="profiles-run-wrap">
+        <OButtonGroup>
+          <!-- All labels share one grid cell, so the button keeps the widest label's width in every language. -->
+          <OButton
+            :variant="queryLoading ? 'cancel-query' : runPending ? 'warning' : 'primary'"
+            size="sm-toolbar"
+            :disabled="!queryLoading && !canQuery"
+            focusable-unavailable
+            description-id="profiles-run-reason"
+            :data-run-pending="runPending && !queryLoading ? 'true' : undefined"
+            :data-test="queryLoading ? 'profiles-cancel-query' : 'profiles-run-query'"
+            :class="[isAutoRunAvailable ? 'border-y-0! border-s-0! border-e!' : 'border-0!']"
+            @click="queryLoading ? cancelQuery() : runQuery(true)"
+          >
+            <span class="grid">
+              <span
+                class="invisible col-start-1 row-start-1 flex items-center gap-1"
+                aria-hidden="true"
+              >
+                <OIcon name="autorenew" size="xs" />{{ t("profiles.runQuery") }}
+              </span>
+              <span class="invisible col-start-1 row-start-1" aria-hidden="true">{{
+                t("search.cancel")
+              }}</span>
+              <span class="col-start-1 row-start-1 flex items-center justify-center gap-1">
+                <OIcon v-if="!queryLoading && isAutoRunOn" name="autorenew" size="xs" />
+                {{ queryLoading ? t("search.cancel") : t("profiles.runQuery") }}
+              </span>
+            </span>
+            <OTooltip
+              v-if="!queryLoading && (!canQuery || runPending || isAutoRunOn)"
+              :content="runButtonTooltip"
+            />
+          </OButton>
+          <ODropdown
+            v-if="isAutoRunAvailable"
+            v-model:open="runOptionsOpen"
+            align="end"
+            side="bottom"
+          >
+            <template #trigger>
+              <OButton
+                :variant="queryLoading ? 'cancel-query' : runPending ? 'warning' : 'primary'"
+                size="sm-toolbar"
+                icon-left="arrow-drop-down"
+                class="px-1"
+                :disabled="!queryLoading && !canQuery"
+                :aria-label="t('profiles.runOptions')"
+                data-test="profiles-run-options"
+              />
+            </template>
+            <ODropdownItem data-test="profiles-auto-run-toggle" @select="toggleAutoRun">
+              <template #icon-left>
+                <OIcon
+                  :name="isAutoRunOn ? 'autorenew' : 'sync-disabled'"
+                  size="sm"
+                  :class="isAutoRunOn ? 'text-accent' : ''"
+                />
+              </template>
+              <span>
+                <div class="font-medium">
+                  {{ isAutoRunOn ? t("search.turnOffLiveMode") : t("search.turnOnLiveMode") }}
+                </div>
+                <div class="text-text-secondary text-xs">
+                  {{ t("search.liveModeTooltip") }}
+                </div>
+              </span>
+            </ODropdownItem>
+          </ODropdown>
+        </OButtonGroup>
+        <span
+          v-if="!queryLoading && !canQuery"
+          id="profiles-run-reason"
+          class="sr-only"
+          data-test="profiles-run-reason"
+          >{{ runButtonTooltip }}</span
+        >
+      </span>
       <ShareButton
         :url="shareUrl"
         variant="outline"
@@ -49,74 +129,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="h-8"
         data-test="profiles-share-btn"
       />
-      <!-- Run, Cancel and the Auto Run switch, as on RUM Performance and Dashboards (shared useAutoRunToggle). -->
-      <OButtonGroup>
-        <!-- All labels share one grid cell, so the button keeps the widest label's width in every language. -->
-        <OButton
-          :variant="queryLoading ? 'cancel-query' : runPending ? 'warning' : 'primary'"
-          size="sm-toolbar"
-          :disabled="!queryLoading && !canQuery"
-          :data-run-pending="runPending && !queryLoading ? 'true' : undefined"
-          :data-test="queryLoading ? 'profiles-cancel-query' : 'profiles-run-query'"
-          :class="isAutoRunAvailable ? 'border-y-0! border-s-0! border-e!' : 'border-0!'"
-          @click="queryLoading ? cancelQuery() : runQuery(true)"
-        >
-          <span class="grid">
-            <span
-              class="invisible col-start-1 row-start-1 flex items-center gap-1"
-              aria-hidden="true"
-            >
-              <OIcon name="autorenew" size="xs" />{{ t("profiles.runQuery") }}
-            </span>
-            <span class="invisible col-start-1 row-start-1" aria-hidden="true">{{
-              t("search.cancel")
-            }}</span>
-            <span class="col-start-1 row-start-1 flex items-center justify-center gap-1">
-              <OIcon v-if="!queryLoading && isAutoRunOn" name="autorenew" size="xs" />
-              {{ queryLoading ? t("search.cancel") : t("profiles.runQuery") }}
-            </span>
-          </span>
-          <OTooltip
-            v-if="!queryLoading && (!canQuery || runPending || isAutoRunOn)"
-            :content="runButtonTooltip"
-          />
-        </OButton>
-        <ODropdown
-          v-if="isAutoRunAvailable"
-          v-model:open="runOptionsOpen"
-          align="end"
-          side="bottom"
-        >
-          <template #trigger>
-            <OButton
-              :variant="queryLoading ? 'cancel-query' : runPending ? 'warning' : 'primary'"
-              size="sm-toolbar"
-              icon-left="arrow-drop-down"
-              class="px-1"
-              :disabled="!queryLoading && !canQuery"
-              :aria-label="t('profiles.runOptions')"
-              data-test="profiles-run-options"
-            />
-          </template>
-          <ODropdownItem data-test="profiles-auto-run-toggle" @select="toggleAutoRun">
-            <template #icon-left>
-              <OIcon
-                :name="isAutoRunOn ? 'autorenew' : 'sync-disabled'"
-                size="sm"
-                :class="isAutoRunOn ? 'text-accent' : ''"
-              />
-            </template>
-            <span>
-              <div class="font-medium">
-                {{ isAutoRunOn ? t("search.turnOffLiveMode") : t("search.turnOnLiveMode") }}
-              </div>
-              <div class="text-text-secondary text-xs">
-                {{ t("search.liveModeTooltip") }}
-              </div>
-            </span>
-          </ODropdownItem>
-        </ODropdown>
-      </OButtonGroup>
     </template>
 
     <template #subnav>
@@ -320,7 +332,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="bg-surface-panel border-border-default rounded-default overflow-hidden border md:flex md:min-h-0 md:flex-1 md:flex-col"
         >
           <header
-            class="border-border-default flex shrink-0 flex-wrap items-center justify-between gap-2 border-b px-3 py-2"
+            class="border-border-default flex shrink-0 flex-wrap items-center justify-between gap-2 border-b px-3 py-2 max-md:flex-nowrap"
           >
             <OToggleGroup
               :model-value="activeView"
@@ -369,7 +381,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t("profiles.viewCompare") }}
               </OToggleGroupItem>
             </OToggleGroup>
-            <div class="min-w-0 flex-1 max-md:min-w-40">
+            <div class="min-w-0 flex-1">
               <OSearchInput
                 v-model="searchQuery"
                 :placeholder="t('profiles.searchFunctions')"
@@ -378,7 +390,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <span
               v-if="searchSummary && activeView !== 'compare'"
-              class="text-text-secondary text-xs whitespace-nowrap tabular-nums"
+              class="text-text-secondary min-w-0 truncate text-xs tabular-nums"
               data-test="profiles-search-summary"
               >{{ searchSummary }}</span
             >
@@ -387,6 +399,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :icon-left="resultsExpanded ? 'fullscreen-exit' : 'fullscreen'"
               variant="ghost"
               size="icon-toolbar"
+              class="shrink-0"
               :aria-label="resultsExpanded ? t('search.collapse') : t('search.expand')"
               data-test="profiles-results-expand"
               @click="resultsExpanded = !resultsExpanded"
@@ -407,227 +420,247 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OBanner>
           <!-- Views on the left, Function details beside them (below them on phones). -->
           <div class="md:flex md:min-h-0 md:flex-1">
-            <div class="md:flex md:min-h-0 md:min-w-0 md:flex-1 md:flex-col">
-              <OTable
-                v-if="activeView === 'top'"
-                :data="topRows"
-                :loading="showSkeleton"
-                :loading-reset-key="selectedProfileType"
-                :columns="profileColumns"
-                :default-columns="false"
-                row-key="name"
-                sorting="client"
-                sort-by="self"
-                sort-order="desc"
-                pagination="none"
-                virtual-scroll
-                :overscan="isMobile ? 100 : 20"
-                :scroll-el="isMobile ? resultsScrollEl : null"
-                :scroll-margin="0"
-                :show-global-filter="false"
-                :frame="false"
-                :fill-height="!isMobile"
-                class="md:min-h-0 md:flex-1"
-                :row-height="28"
-                :enable-column-resize="true"
-                data-test="profiles-top-table"
-              >
-                <template #cell-name="{ row, index }">
-                  <span class="flex min-w-0 items-center gap-1">
-                    <ProfilesFunctionMenu
-                      :name="row.name"
-                      :data-test="`profiles-top-row-${index}`"
-                      @copy="copyFunctionName"
-                      @search="searchForFunction"
-                      @show="showInFlameGraph(row.name)"
-                      @sandwich="showSandwich"
-                      @details="showDetails"
-                    />
-                    <span
-                      class="text-text-body min-w-0 truncate font-mono text-xs"
-                      v-html="highlightName(row.name)"
-                    />
-                  </span>
-                </template>
-                <template v-for="cell in VALUE_CELLS" :key="cell.id" #[`cell-${cell.id}`]="{ row }">
-                  <ODataBarCell
-                    v-if="cell.bar"
-                    :value="shareOf(row[cell.field])"
-                    :max="100"
-                    :display="formatPercent(row[cell.field], mergeResult?.total ?? 0)"
-                    class="text-text-body font-mono text-xs"
-                    :class="{ 'pt-1.5': shareOf(row[cell.field]) > 0 }"
-                  />
-                  <span v-else class="text-text-body font-mono text-xs">{{
-                    formatTableValue(row[cell.field])
-                  }}</span>
-                </template>
-              </OTable>
-
+            <div class="relative md:contents">
               <div
-                v-else-if="activeView === 'flame'"
-                class="overflow-auto p-3 md:min-h-0 md:flex-1"
+                ref="viewBodyEl"
+                class="max-md:overflow-x-auto md:flex md:min-h-0 md:min-w-0 md:flex-1 md:flex-col"
+                data-test="profiles-view-body"
+                @scroll.capture.passive="updateScrollFade"
               >
-                <!-- Same skeleton idea as the tables: bars that narrow as they go down, like a flame graph. -->
-                <div
-                  v-if="showSkeleton"
-                  class="flex flex-col gap-1.5"
-                  data-test="profiles-flame-skeleton"
+                <OTable
+                  v-if="activeView === 'top'"
+                  :data="topRows"
+                  :loading="showSkeleton"
+                  :loading-reset-key="selectedProfileType"
+                  :columns="profileColumns"
+                  :default-columns="false"
+                  row-key="name"
+                  sorting="client"
+                  sort-by="self"
+                  sort-order="desc"
+                  pagination="none"
+                  virtual-scroll
+                  :overscan="isMobile ? 100 : 20"
+                  :scroll-el="isMobile ? resultsScrollEl : null"
+                  :scroll-margin="0"
+                  :show-global-filter="false"
+                  :frame="false"
+                  :fill-height="!isMobile"
+                  class="md:min-h-0 md:flex-1"
+                  :row-height="28"
+                  :enable-column-resize="true"
+                  data-test="profiles-top-table"
                 >
-                  <OSkeleton
-                    v-for="width in FLAME_SKELETON_WIDTHS"
-                    :key="width"
-                    type="rect"
-                    class="rounded-default h-6"
-                    :class="width"
-                  />
-                </div>
-                <CommonFlameGraph
-                  v-else
-                  ref="flameGraphRef"
-                  :root="mergeResult?.root ?? null"
-                  @focus="flameFocus = $event"
-                  :summary-label="t('profiles.total')"
-                  :summary-value="formatTableValue(mergeResult?.total ?? 0)"
-                  v-bind="flameGraphProps"
-                  v-on="flameGraphEvents"
-                />
-              </div>
+                  <template #cell-name="{ row, index }">
+                    <span class="flex min-w-0 items-center gap-1">
+                      <ProfilesFunctionMenu
+                        :name="row.name"
+                        :data-test="`profiles-top-row-${index}`"
+                        @copy="copyFunctionName"
+                        @search="searchForFunction"
+                        @show="showInFlameGraph(row.name)"
+                        @sandwich="showSandwich"
+                        @details="showDetails"
+                      />
+                      <span
+                        class="text-text-body min-w-0 truncate font-mono text-xs"
+                        v-html="highlightName(row.name)"
+                      />
+                    </span>
+                  </template>
+                  <template
+                    v-for="cell in VALUE_CELLS"
+                    :key="cell.id"
+                    #[`cell-${cell.id}`]="{ row }"
+                  >
+                    <ODataBarCell
+                      v-if="cell.bar"
+                      :value="shareOf(row[cell.field])"
+                      :max="100"
+                      :display="formatPercent(row[cell.field], mergeResult?.total ?? 0)"
+                      class="text-text-body font-mono text-xs"
+                      :class="{ 'pt-1.5': shareOf(row[cell.field]) > 0 }"
+                    />
+                    <span v-else class="text-text-body font-mono text-xs">{{
+                      formatTableValue(row[cell.field])
+                    }}</span>
+                  </template>
+                </OTable>
 
-              <!-- Sandwich: who calls the function (root at the bottom) above what it calls. -->
-              <div
-                v-else-if="activeView === 'sandwich'"
-                class="flex flex-col gap-3 overflow-auto p-3 md:min-h-0 md:flex-1"
-                data-test="profiles-sandwich"
-              >
-                <div class="flex flex-wrap items-center gap-2">
-                  <div class="max-w-120 min-w-0 flex-1 max-md:min-w-full">
-                    <OSelect
-                      :model-value="sandwichName"
-                      :label="t('profiles.function')"
-                      label-position="inside"
-                      :options="functionOptions"
-                      searchable
-                      class="w-full"
-                      data-test="profiles-sandwich-function"
-                      @update:model-value="sandwichFunction = $event ? String($event) : null"
+                <div
+                  v-else-if="activeView === 'flame'"
+                  class="overflow-auto p-3 md:min-h-0 md:flex-1"
+                >
+                  <!-- Same skeleton idea as the tables: bars that narrow as they go down, like a flame graph. -->
+                  <div
+                    v-if="showSkeleton"
+                    class="flex flex-col gap-1.5"
+                    data-test="profiles-flame-skeleton"
+                  >
+                    <OSkeleton
+                      v-for="width in FLAME_SKELETON_WIDTHS"
+                      :key="width"
+                      type="rect"
+                      class="rounded-default h-6"
+                      :class="width"
                     />
                   </div>
-                  <span
-                    v-if="sandwichCoverage"
-                    class="text-text-secondary text-xs"
-                    data-test="profiles-sandwich-coverage"
-                    >{{ t("profiles.treeCoverage", { percent: sandwichCoverage }) }}</span
-                  >
-                </div>
-                <div
-                  v-if="showSkeleton"
-                  class="flex flex-col gap-1.5"
-                  data-test="profiles-sandwich-skeleton"
-                >
-                  <OSkeleton
-                    v-for="width in FLAME_SKELETON_WIDTHS"
-                    :key="width"
-                    type="rect"
-                    class="rounded-default h-6"
-                    :class="width"
-                  />
-                </div>
-                <section v-if="!showSkeleton" data-test="profiles-sandwich-callers">
                   <CommonFlameGraph
-                    :key="`callers-${sandwichName}`"
-                    :root="sandwichCallers"
-                    :summary-label="t('profiles.callers')"
-                    :summary-value="formatTableValue(sandwichCallers?.total ?? 0)"
-                    v-bind="flameGraphProps"
-                    initial-root-at-bottom
-                    v-on="flameGraphEvents"
-                  />
-                </section>
-                <section v-if="!showSkeleton" data-test="profiles-sandwich-callees">
-                  <CommonFlameGraph
-                    :key="`callees-${sandwichName}`"
-                    :root="sandwichCallees"
-                    :summary-label="t('profiles.callees')"
-                    :summary-value="formatTableValue(sandwichCallees?.total ?? 0)"
+                    v-else
+                    ref="flameGraphRef"
+                    :root="mergeResult?.root ?? null"
+                    @focus="flameFocus = $event"
+                    :summary-label="t('profiles.total')"
+                    :summary-value="formatTableValue(mergeResult?.total ?? 0)"
                     v-bind="flameGraphProps"
                     v-on="flameGraphEvents"
                   />
-                </section>
-              </div>
+                </div>
 
-              <ProfilesCompare
-                v-else-if="activeView === 'compare' && lastRun && orgIdentifier"
-                v-model:state="compareState"
-                :org-identifier="orgIdentifier"
-                :stream="lastRun.query.stream"
-                :payload="lastRun.payload"
-                :labels="compareLabels"
-                :search-query="searchQuery"
-                :unit-label="tableUnitLabel"
-                :value-formatter="formatTableValue"
-                @search="searchForFunction"
-              />
-              <OTable
-                v-else-if="activeView === 'tree'"
-                v-model:expanded-ids="expandedStackIds"
-                :data="stackTree"
-                :loading="showSkeleton"
-                :loading-reset-key="selectedProfileType"
-                :columns="profileColumns"
-                :default-columns="false"
-                row-key="id"
-                tree
-                tree-column-id="name"
-                sorting="none"
-                pagination="none"
-                :show-global-filter="false"
-                :frame="false"
-                :fill-height="!isMobile"
-                class="md:min-h-0 md:flex-1"
-                :row-height="28"
-                :enable-column-resize="true"
-                data-test="profiles-stack-table"
-              >
-                <template #cell-name="{ row, index }">
-                  <span class="flex min-w-0 items-center gap-1">
-                    <ProfilesFunctionMenu
-                      :name="row.name"
-                      focusable
-                      :data-test="`profiles-tree-row-${index}`"
-                      @copy="copyFunctionName"
-                      @search="searchForFunction"
-                      @show="focusInFlameGraph(row.id)"
-                      @sandwich="showSandwich"
-                      @details="showDetails"
-                    />
+                <!-- Sandwich: who calls the function (root at the bottom) above what it calls. -->
+                <div
+                  v-else-if="activeView === 'sandwich'"
+                  class="flex flex-col gap-3 overflow-auto p-3 md:min-h-0 md:flex-1"
+                  data-test="profiles-sandwich"
+                >
+                  <div class="flex flex-wrap items-center gap-2">
+                    <div class="max-w-120 min-w-0 flex-1 max-md:min-w-full">
+                      <OSelect
+                        :model-value="sandwichName"
+                        :label="t('profiles.function')"
+                        label-position="inside"
+                        :options="functionOptions"
+                        searchable
+                        class="w-full"
+                        data-test="profiles-sandwich-function"
+                        @update:model-value="sandwichFunction = $event ? String($event) : null"
+                      />
+                    </div>
                     <span
-                      class="text-text-body min-w-0 truncate font-mono text-xs"
-                      v-html="highlightName(row.name)"
-                    />
-                    <span
-                      v-if="row.childCount"
-                      class="text-text-secondary shrink-0 text-xs whitespace-nowrap"
-                      :data-test="`profiles-tree-row-${index}-counts`"
-                      >{{ t("profiles.childCount", { count: row.childCount }, row.childCount) }} ·
-                      {{ t("profiles.nodeCount", { count: row.nodeCount }, row.nodeCount) }}</span
+                      v-if="sandwichCoverage"
+                      class="text-text-secondary text-xs"
+                      data-test="profiles-sandwich-coverage"
+                      >{{ t("profiles.treeCoverage", { percent: sandwichCoverage }) }}</span
                     >
-                  </span>
-                </template>
-                <template v-for="cell in VALUE_CELLS" :key="cell.id" #[`cell-${cell.id}`]="{ row }">
-                  <ODataBarCell
-                    v-if="cell.bar"
-                    :value="shareOf(row[cell.field])"
-                    :max="100"
-                    :display="formatPercent(row[cell.field], mergeResult?.total ?? 0)"
-                    class="text-text-body font-mono text-xs"
-                    :class="{ 'pt-1.5': shareOf(row[cell.field]) > 0 }"
-                  />
-                  <span v-else class="text-text-body font-mono text-xs">{{
-                    formatTableValue(row[cell.field])
-                  }}</span>
-                </template>
-              </OTable>
+                  </div>
+                  <div
+                    v-if="showSkeleton"
+                    class="flex flex-col gap-1.5"
+                    data-test="profiles-sandwich-skeleton"
+                  >
+                    <OSkeleton
+                      v-for="width in FLAME_SKELETON_WIDTHS"
+                      :key="width"
+                      type="rect"
+                      class="rounded-default h-6"
+                      :class="width"
+                    />
+                  </div>
+                  <section v-if="!showSkeleton" data-test="profiles-sandwich-callers">
+                    <CommonFlameGraph
+                      :key="`callers-${sandwichName}`"
+                      :root="sandwichCallers"
+                      :summary-label="t('profiles.callers')"
+                      :summary-value="formatTableValue(sandwichCallers?.total ?? 0)"
+                      v-bind="flameGraphProps"
+                      initial-root-at-bottom
+                      v-on="flameGraphEvents"
+                    />
+                  </section>
+                  <section v-if="!showSkeleton" data-test="profiles-sandwich-callees">
+                    <CommonFlameGraph
+                      :key="`callees-${sandwichName}`"
+                      :root="sandwichCallees"
+                      :summary-label="t('profiles.callees')"
+                      :summary-value="formatTableValue(sandwichCallees?.total ?? 0)"
+                      v-bind="flameGraphProps"
+                      v-on="flameGraphEvents"
+                    />
+                  </section>
+                </div>
+
+                <ProfilesCompare
+                  v-else-if="activeView === 'compare' && lastRun && orgIdentifier"
+                  v-model:state="compareState"
+                  :org-identifier="orgIdentifier"
+                  :stream="lastRun.query.stream"
+                  :payload="lastRun.payload"
+                  :labels="compareLabels"
+                  :search-query="searchQuery"
+                  :unit-label="tableUnitLabel"
+                  :value-formatter="formatTableValue"
+                  @search="searchForFunction"
+                />
+                <OTable
+                  v-else-if="activeView === 'tree'"
+                  v-model:expanded-ids="expandedStackIds"
+                  :data="stackTree"
+                  :loading="showSkeleton"
+                  :loading-reset-key="selectedProfileType"
+                  :columns="profileColumns"
+                  :default-columns="false"
+                  row-key="id"
+                  tree
+                  tree-column-id="name"
+                  sorting="none"
+                  pagination="none"
+                  :show-global-filter="false"
+                  :frame="false"
+                  :fill-height="!isMobile"
+                  class="md:min-h-0 md:flex-1"
+                  :row-height="28"
+                  :enable-column-resize="true"
+                  data-test="profiles-stack-table"
+                >
+                  <template #cell-name="{ row, index }">
+                    <span class="flex min-w-0 items-center gap-1">
+                      <ProfilesFunctionMenu
+                        :name="row.name"
+                        focusable
+                        :data-test="`profiles-tree-row-${index}`"
+                        @copy="copyFunctionName"
+                        @search="searchForFunction"
+                        @show="focusInFlameGraph(row.id)"
+                        @sandwich="showSandwich"
+                        @details="showDetails"
+                      />
+                      <span
+                        class="text-text-body min-w-0 truncate font-mono text-xs"
+                        v-html="highlightName(row.name)"
+                      />
+                      <span
+                        v-if="row.childCount"
+                        class="text-text-secondary shrink-0 text-xs whitespace-nowrap"
+                        :data-test="`profiles-tree-row-${index}-counts`"
+                        >{{ t("profiles.childCount", { count: row.childCount }, row.childCount) }} ·
+                        {{ t("profiles.nodeCount", { count: row.nodeCount }, row.nodeCount) }}</span
+                      >
+                    </span>
+                  </template>
+                  <template
+                    v-for="cell in VALUE_CELLS"
+                    :key="cell.id"
+                    #[`cell-${cell.id}`]="{ row }"
+                  >
+                    <ODataBarCell
+                      v-if="cell.bar"
+                      :value="shareOf(row[cell.field])"
+                      :max="100"
+                      :display="formatPercent(row[cell.field], mergeResult?.total ?? 0)"
+                      class="text-text-body font-mono text-xs"
+                      :class="{ 'pt-1.5': shareOf(row[cell.field]) > 0 }"
+                    />
+                    <span v-else class="text-text-body font-mono text-xs">{{
+                      formatTableValue(row[cell.field])
+                    }}</span>
+                  </template>
+                </OTable>
+              </div>
+              <div
+                v-if="(activeView === 'top' || activeView === 'tree') && showScrollFade"
+                class="from-text-secondary/30 pointer-events-none absolute inset-y-0 end-0 w-6 to-transparent md:hidden ltr:bg-linear-to-l rtl:bg-linear-to-r"
+                data-test="profiles-scroll-fade"
+              />
             </div>
             <ProfilesFunctionDetails
               v-if="detailsRow && activeView !== 'compare'"
@@ -655,7 +688,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, defineAsyncComponent, nextTick, onMounted, ref, watch, type Ref } from "vue";
+import {
+  computed,
+  defineAsyncComponent,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  watch,
+  type Ref,
+} from "vue";
 import { useStore } from "vuex";
 import { useThemeRevision } from "@/composables/useTheme";
 import { useRoute, useRouter, type LocationQuery } from "vue-router";
@@ -711,7 +753,7 @@ import { niceStep } from "@/utils/slos/chartScale";
 import { formatUnitValue, getUnitValue } from "@/utils/dashboard/convertDataIntoUnitValue";
 import { formatEventCount } from "@/utils/formatters";
 import { dataZoomBrushStyle } from "@/utils/chartTheme";
-import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
 import useBreakpoint from "@/composables/useBreakpoint";
 
 const ChartRenderer = defineAsyncComponent(
@@ -797,6 +839,18 @@ const setView = (value: unknown) => {
 const expandedStackIds = ref<string[]>([]);
 // On phones the page body is the one scroller and the Top Table virtualizes against it; from md up each table scrolls itself.
 const resultsScrollEl = ref<HTMLElement | null>(null);
+const viewBodyEl = ref<HTMLElement | null>(null);
+const showScrollFade = ref(false);
+// The Tree table scrolls inside its own box, so the page body and that box are both measured.
+const hasMoreToScroll = (el: HTMLElement | null) =>
+  !!el &&
+  el.scrollWidth > el.clientWidth &&
+  Math.abs(el.scrollLeft) + el.clientWidth < el.scrollWidth - 1;
+const updateScrollFade = () => {
+  const body = viewBodyEl.value;
+  const inner = body?.querySelector<HTMLElement>('[data-test="o2-table-scroll-container"]') ?? null;
+  showScrollFade.value = hasMoreToScroll(body) || hasMoreToScroll(inner);
+};
 const resultsExpanded = ref(false);
 const flameGraphRef = ref<{ focus: (path: string) => void } | null>(null);
 // The function the Sandwich view shows; null means the one with the most self samples.
@@ -908,6 +962,9 @@ let initRunSeq = 0;
 let seeding = false;
 // The inputs the user picked while seeding held the watchers; replayed when it ends, so the latest change wins.
 let heldChanges: Partial<HeldInputs> = {};
+// A search typed while seeding would be overwritten by the seed, so it is held and replayed after.
+let heldSearch: string | null = null;
+let applyingSeedSearch = false;
 // Open while the picker echoes a window the page set (on mount, after setSavedDate), rounding it to its seconds and zone.
 let pickerEchoes = 1;
 let lastRunSeeded = false;
@@ -1047,6 +1104,12 @@ const seriesLines = computed<SeriesLine[]>(() => {
   }));
 });
 
+// Bytes and nanoseconds already carry their unit in every tick label (2.5 GiB, 3 ms).
+const yAxisName = computed(() => {
+  const label = seriesUnitLabel(currentType.value, currentUnit.value);
+  return isBytesUnit.value || label === "nanoseconds" ? undefined : label;
+});
+
 const seriesChartData = computed(() => {
   const lines = seriesLines.value;
   // In-use memory is a snapshot, so an empty bucket is missing data, not 0 B.
@@ -1075,7 +1138,7 @@ const seriesChartData = computed(() => {
         axisPointer: { type: "cross", label: { show: true, fontSize: 12 } },
         valueFormatter: (v: number | null | undefined) => formatSeriesValue(v),
       },
-      grid: { containLabel: true, left: 20, right: 20, top: 8, bottom: 5 },
+      grid: { containLabel: true, left: 20, right: 20, top: yAxisName.value ? 22 : 8, bottom: 5 },
       // Drag across the chart to pick a time range, as on the Logs histogram; the toolbox itself stays hidden.
       toolbox: {
         show: true,
@@ -1097,6 +1160,8 @@ const seriesChartData = computed(() => {
       },
       yAxis: {
         type: "value",
+        name: yAxisName.value,
+        nameTextStyle: { align: "left", fontSize: 11 },
         axisLine: { show: true },
         axisPointer: {
           label: { formatter: ({ value }: { value: number }) => formatSeriesAxisLabel(value) },
@@ -1243,7 +1308,7 @@ const profileColumns = computed<OTableColumnDef[]>(() => {
       accessorKey: "self",
       sortable: true,
       size: 120,
-      meta: right,
+      meta: { ...right, headerTooltip: t("profiles.selfTooltip") },
     },
     {
       id: "selfPercent",
@@ -1251,7 +1316,7 @@ const profileColumns = computed<OTableColumnDef[]>(() => {
       accessorKey: "self",
       sortable: true,
       size: 110,
-      meta: right,
+      meta: { ...right, headerTooltip: t("profiles.selfPercentTooltip") },
     },
     {
       id: "total",
@@ -1259,7 +1324,7 @@ const profileColumns = computed<OTableColumnDef[]>(() => {
       accessorKey: "total",
       sortable: true,
       size: 120,
-      meta: right,
+      meta: { ...right, headerTooltip: t("profiles.totalTooltip") },
     },
     {
       id: "totalPercent",
@@ -1267,7 +1332,7 @@ const profileColumns = computed<OTableColumnDef[]>(() => {
       accessorKey: "total",
       sortable: true,
       size: 110,
-      meta: right,
+      meta: { ...right, headerTooltip: t("profiles.totalPercentTooltip") },
     },
   ];
 });
@@ -1280,12 +1345,24 @@ const seriesUnitLabel = (profileType: string, unit: string) => {
   return unit;
 };
 
+const PROFILE_TYPE_NAME_KEYS: Record<string, I18nKey> = {
+  alloc_objects: "profiles.typeAllocObjects",
+  alloc_space: "profiles.typeAllocSpace",
+  inuse_objects: "profiles.typeInuseObjects",
+  inuse_space: "profiles.typeInuseSpace",
+  goroutine: "profiles.typeGoroutine",
+  contention: "profiles.typeContention",
+  contentions: "profiles.typeContention",
+  delay: "profiles.typeDelay",
+};
+
 const profileTypeLabel = (profileType: ProfileTypeMeta) => {
   const { type, unit } = profileType;
   if (isCpuTime(type, unit)) return t("profiles.cpuTime", { cpu: raw("CPU") });
   if (type === "samples" && unit === "count")
     return t("profiles.cpuSamples", { cpu: raw("CPU"), unit: raw("count") });
-  return raw(`${type} (${seriesUnitLabel(type, unit)})`);
+  const friendly = PROFILE_TYPE_NAME_KEYS[type];
+  return raw(`${friendly ? t(friendly) : type} (${seriesUnitLabel(type, unit)})`);
 };
 
 const timeSeriesTitle = computed(() =>
@@ -1649,6 +1726,25 @@ const loadStreams = async () => {
   }
 };
 
+const serviceMemoryKey = (org: string, stream: string) => `profiles_service_${org}_${stream}`;
+const rememberedService = (org: string, stream: string) => {
+  try {
+    return localStorage.getItem(serviceMemoryKey(org, stream));
+  } catch {
+    return null;
+  }
+};
+const rememberService = (service: string | null) => {
+  const org = orgIdentifier.value;
+  const stream = selectedStream.value;
+  if (!org || !stream || !service) return;
+  try {
+    localStorage.setItem(serviceMemoryKey(org, stream), service);
+  } catch {
+    // Storage can be blocked; the pick still applies for this visit.
+  }
+};
+
 const loadMeta = async () => {
   const org = orgIdentifier.value;
   const stream = selectedStream.value;
@@ -1665,10 +1761,13 @@ const loadMeta = async () => {
       ...(service ? { service_name: service } : {}),
     });
   try {
-    let service = selectedService.value;
+    const remembered = selectedService.value ? null : rememberedService(org, stream);
+    let service = selectedService.value ?? remembered;
     let response = await fetchMeta(service);
     if (isStale()) return;
     const services: string[] = response.data.services ?? [];
+    // A remembered service the stream no longer lists is dropped; a user pick survives an empty window.
+    if (remembered && !services.includes(remembered)) service = null;
     // An empty window lists no services; keep the chosen one for when data comes back.
     if (services.length && (!service || !services.includes(service))) {
       service = services[0];
@@ -1961,9 +2060,12 @@ const initPage = async () => {
   // Always hold the watchers: loadStreams picks a stream, and the stream watcher must not run a second query.
   seeding = true;
   heldChanges = {};
+  heldSearch = null;
   initializing.value = true;
   try {
+    applyingSeedSearch = true;
     resetProfilesState();
+    applyingSeedSearch = false;
     if (seed) applyRouteSeed(seed);
     if (unseed) {
       selectedStream.value = null;
@@ -1975,7 +2077,9 @@ const initPage = async () => {
     if (seed) {
       appliedFilters.value = seed.filters;
       if (seed.view) activeView.value = seed.view;
+      applyingSeedSearch = true;
       searchQuery.value = seed.search;
+      applyingSeedSearch = false;
       sandwichFunction.value = seed.sandwichFunction;
       detailsName.value = seed.details;
       flameFocus.value = seed.focus;
@@ -2054,8 +2158,10 @@ const pickInput = <K extends keyof HeldInputs>(key: K, value: HeldInputs[K]) => 
   target.value = value;
 };
 
-const pickSelect = (key: "stream" | "service" | "profileType", value: SelectModelValue) =>
+const pickSelect = (key: "stream" | "service" | "profileType", value: SelectModelValue) => {
+  if (key === "service" && typeof value === "string") rememberService(value);
   pickInput(key, typeof value === "string" ? value : null);
+};
 
 // Children mount first, so the picker's mount replay has been emitted by now.
 onMounted(() =>
@@ -2064,9 +2170,30 @@ onMounted(() =>
   }),
 );
 
+let scrollFadeObserver: ResizeObserver | undefined;
+// The results section mounts only once there is data, so the observer follows the element.
+watch(
+  viewBodyEl,
+  (el) => {
+    scrollFadeObserver?.disconnect();
+    if (!el || typeof ResizeObserver === "undefined") return;
+    scrollFadeObserver = new ResizeObserver(updateScrollFade);
+    scrollFadeObserver.observe(el);
+    nextTick(updateScrollFade);
+  },
+  { flush: "post" },
+);
+onBeforeUnmount(() => scrollFadeObserver?.disconnect());
+watch(
+  [activeView, () => topRows.value.length, () => stackTree.value.length, expandedStackIds],
+  () => nextTick(updateScrollFade),
+);
+
 const finishSeeding = async () => {
   const held = heldChanges;
   heldChanges = {};
+  if (heldSearch !== null) searchQuery.value = heldSearch;
+  heldSearch = null;
   if (!Object.keys(held).length) {
     seeding = false;
     return;
@@ -2084,6 +2211,14 @@ const finishSeeding = async () => {
   else if (held.date) await onDateChange();
   else await onSelectionChange("service" in held);
 };
+
+watch(
+  searchQuery,
+  (value) => {
+    if (seeding && !applyingSeedSearch) heldSearch = value;
+  },
+  { flush: "sync" },
+);
 
 watch([selectedService, selectedProfileType], async ([service], [previousService]) => {
   if (seeding || reloadingMeta) return;
