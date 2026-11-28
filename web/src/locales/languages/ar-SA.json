@@ -527,7 +527,9 @@
       "linkedDomains": "النطاقات المرتبطة",
       "domainMappings": "تعيينات النطاقات",
       "domainRequests": "طلبات الربط",
-      "blockedUsers": "المستخدمون المحظورون"
+      "blockedUsers": "المستخدمون المحظورون",
+      "autoresolveRuns": "عمليات التشغيل",
+      "savedAutoResolve": "عمليات AutoResolve المحفوظة"
     },
     "demo": {
       "pageTitle": "الولايات الفارغة — المجموعة الكاملة للمراجعة",
@@ -652,6 +654,23 @@
     "noOncallUnrouted": {
       "title": "لا شيء يحتاج إلى مسؤول",
       "description": "كل تنبيه أُطلق وصل إلى فريق."
+    },
+    "noAutoResolveRuns": {
+      "title": "لا توجد عمليات تشغيل بعد",
+      "description": "تظهر هنا عمليات التشغيل التي تبدأها أنت وفريقك."
+    },
+    "noAutoResolveConnections": {
+      "title": "أضف MCP أولًا",
+      "description": "تعمل AutoResolve عبر MCPs التي أضافتها مؤسستك، مثل مضيف الشيفرة أو أداة نشر أو عنقود. لا تملك هذه المؤسسة أيًا منها بعد."
+    },
+    "noUsable": {
+      "mcps": "لا توجد MCPs يمكنك استخدامها",
+      "aiToolsets": "لا توجد مجموعات أدوات ذكاء اصطناعي يمكنك استخدامها",
+      "askAdmin": "اطلب من أحد المسؤولين منحك حق الوصول في IAM › الأدوار."
+    },
+    "noSavedAutoResolve": {
+      "title": "لا توجد عمليات AutoResolve محفوظة بعد",
+      "description": "افتح عملية تشغيل منتهية واختر حفظ باسم AutoResolve لإعادة تشغيل هدفها، أو لبدئها عند إطلاق تنبيه."
     }
   },
   "accessBoundary": {
@@ -2075,6 +2094,7 @@
   },
   "menu": {
     "alertCalibration": "معايرة التنبيهات",
+    "autoresolve": "AutoResolve",
     "autoobserve": "AutoObserve",
     "upgradeToProPlan": "الترقية إلى خطة PRO",
     "home": "الرئيسية",
@@ -9224,6 +9244,9 @@
     "logsMessageField": "حقل الرسالة",
     "logsLevelField": "حقل المستوى",
     "logsTimeField": "حقل الوقت",
+    "logsTimeFieldNoValues": "حقل الوقت \"{field}\" لا يحتوي على طوابع زمنية صالحة",
+    "logsLevelFieldNoValues": "حقل المستوى \"{field}\" لا يحتوي على قيم في النتائج",
+    "logsMessageFieldNoValues": "حقل الرسالة \"{field}\" لا يحتوي على قيم في النتائج",
     "htmlPanelFieldTooltip": "اتركه فارغًا لاكتشاف العمود من نتائج الاستعلام",
     "logsOrder": "الترتيب",
     "logsOrderNewest": "الأحدث أولًا",
@@ -18531,7 +18554,16 @@
     "panelTimeSeriesFor": "سلاسل زمنية {stream}",
     "panelTimeSeriesForWithType": "السلاسل الزمنية ل {stream} ({type})",
     "logsPanelTitle": "السجلات - {stream}",
-    "logsPanelDescription": "سجلات مرتبطة بالخدمة {service}"
+    "logsPanelDescription": "سجلات مرتبطة بالخدمة {service}",
+    "noDataInScope": "لا توجد بيانات في هذا النطاق",
+    "noDataInScopeReason": "لا توجد صفوف تطابق عوامل التصفية هذه في هذا النطاق الزمني.",
+    "droppedCount": "+{count} مستبعد | +{count} مستبعدة",
+    "droppedTitle": "غير مستخدمة كعوامل تصفية",
+    "droppedNoRows": "لا توجد صفوف تحتوي على {value}",
+    "droppedNoField": "الحقل غير موجود في هذه التدفقات",
+    "allNoDataTitle": "لا يوجد مقياس به بيانات في هذا النطاق",
+    "allNoDataScope": "{scope}، {window}",
+    "allNoDataAction": "عرض المقاييس التي لا تحتوي على بيانات"
   },
   "search_scheduler_job": {
     "title": "مُجدول مهام البحث",
@@ -20597,6 +20629,13 @@
       "sampleExpected": "الإنتاج المتوقع",
       "fromTrace": "من امتداد التتبع {id}",
       "openInPlaygroundFailed": "تعذّر فتح هذا الامتداد في ساحة التجربة"
+    },
+    "largeStream": {
+      "notice": "{stream}: حوالي {size} في هذا النطاق، بدون عامل تصفية للوكيل. قد يستغرق ذلك دقائق.",
+      "pickAgent": "اختر وكيلًا",
+      "addFilter": "إضافة عامل تصفية",
+      "runAnyway": "تشغيل على أي حال",
+      "notRun": "لم يتم التشغيل"
     }
   },
   "onlineEvals": {
@@ -21894,7 +21933,10 @@
       "excludeFromQuery": "استبعاد",
       "createAlertAction": "إنشاء تنبيه",
       "noMatchTerms": "هذا النمط لا يحتوي على نص مميز للتصفية.",
-      "noDistinctTextTooltip": "كل نص ثابت في هذا النمط يظهر أيضًا في نمط آخر، لذلك سيطابق المرشح سجلاته أيضًا.",
+      "noDistinctTextTooltip": "يظهر نص هذا النمط أيضًا في سجلات نمط آخر، غالبًا الرسالة نفسها بمستوى سجل مختلف، لذا لا يمكن للفلتر عدّه بمفرده.",
+      "volumeUnsupported": "الحجم غير متاح لعمليات البحث التي تستخدم WITH أو JOIN أو UNION أو اسمًا مستعارًا لجدول أو استعلامًا فرعيًا.",
+      "volumeFailedRetry": "تعذّر تحميل الحجم. قد يكون الخادم مشغولًا، حاول مرة أخرى.",
+      "volumeFailed": "تعذّر تحميل حجم هذا النمط.",
       "noStreamSelected": "لم يتم اختيار تدفق. يرجى اختيار تدفق قبل إنشاء تنبيه.",
       "alertBroadMatch": "هذا النمط لا يحتوي على نص ثابت مميز — استعلام التنبيه سيطابق بشكل واسع. ضع في اعتبارك إضافة فلاتر يدوية."
     },
@@ -34659,6 +34701,464 @@
     "fixedToNow": "ينتهي الآن، ولن يتغيّر",
     "gateOrder": "يجب أن تكون البداية قبل النهاية.",
     "gateInvalid": "ليس نطاقًا صالحًا."
+  },
+  "autoresolve": {
+    "title": "AutoResolve",
+    "runTitle": "تشغيل AutoResolve",
+    "runNotFound": "لم يتم العثور على هذا التشغيل",
+    "runNotFoundHint": "ربما تمت إزالته، أو ربما الرابط غير صحيح.",
+    "runForbidden": "ليس لديك حق الوصول إلى هذا التشغيل",
+    "namesMore": "{count} إضافي | {count} إضافي",
+    "mcp": {
+      "count": "{count} MCP | {count} MCP",
+      "the": "‏MCP {names} | ‏MCP {names}",
+      "theDescribed": "‏MCP {name} ({description})",
+      "described": "{name} ({description})"
+    },
+    "stage": {
+      "investigate": "التحقيق",
+      "ask": "السؤال",
+      "proceed": "المتابعة",
+      "check": "الفحص",
+      "outcome": "النتيجة"
+    },
+    "state": {
+      "investigating": "جارٍ التحقيق",
+      "waitingApproval": "بانتظار الموافقة",
+      "proceeding": "جارٍ المتابعة",
+      "checking": "جارٍ الفحص",
+      "worked": "نجح",
+      "noChange": "لا تغيير",
+      "cantFix": "يتعذر الإصلاح باستخدام MCPs هذه",
+      "notNeeded": "لم تعد هناك حاجة",
+      "worse": "أسوأ",
+      "declined": "مرفوض",
+      "lapsed": "منقضٍ",
+      "stepFailed": "فشلت الخطوة",
+      "outcomeUnknown": "النتيجة غير معروفة",
+      "failed": "فشل",
+      "proposed": "مقترح",
+      "approved": "تمت الموافقة",
+      "running": "قيد التشغيل",
+      "done": "تم",
+      "held": "معلّق",
+      "notRun": "لم يتم التشغيل",
+      "superseded": "مستبدل"
+    },
+    "subtitle": "اكتب ما تريد إنجازه. يتحقق ويسأل قبل أي تغيير، ثم يتابع ويفحص.",
+    "tabs": {
+      "home": "الرئيسية",
+      "runs": "عمليات التشغيل",
+      "saved": "المحفوظة"
+    },
+    "home": {
+      "examplesTitle": "جرّب أحد هذه الأمثلة",
+      "examples": {
+        "checkout": "اكتشف سبب إرجاع خدمة إتمام الطلب لأخطاء 5xx وأصلحه",
+        "payment": "ما التغييرات الأخيرة التي طالت خدمة الدفع؟",
+        "ingestion": "لماذا ارتفع تأخر الاستيعاب في الساعة الأخيرة؟"
+      },
+      "startFailed": "تعذّر بدء التشغيل. حاول مرة أخرى."
+    },
+    "goalBox": {
+      "heading": "ما الذي ينبغي فعله؟",
+      "placeholder": "صِف النتيجة التي تريدها، على سبيل المثال: اكتشف سبب فشل خدمة وأصلحه",
+      "productData": "بيانات {product}",
+      "canUse": "{mcps} و{data} | {mcps}، و{data}",
+      "start": "ابدأ",
+      "asksFirst": "يمكنه البحث بحرية. يسألك قبل أن يغيّر أي شيء.",
+      "addConnection": "أضف MCP",
+      "connectionsLabel": "MCPs التي يمكن لهذا التشغيل استخدامها"
+    },
+    "connectionPicker": {
+      "chooseOne": "اختر MCP واحدًا على الأقل.",
+      "upTo": "بحد أقصى {mcps}",
+      "noneYouCanUse": "لا توجد MCPs يمكنك استخدامها. اطلب من مسؤول الوصول في IAM › الأدوار.",
+      "noneYet": "لا تحتوي هذه المؤسسة على أي MCPs بعد. أضف واحدًا في الإعدادات › أدوات الذكاء الاصطناعي أولًا."
+    },
+    "runs": {
+      "regionNote": "تنتمي عمليات التشغيل و AutoResolves المحفوظة إلى المنطقة التي أُنشئت فيها.",
+      "recent": "عمليات التشغيل الأخيرة",
+      "viewAll": "اعرض جميع عمليات التشغيل",
+      "search": "ابحث عن الأهداف",
+      "stateGroup": {
+        "live": "مباشر",
+        "waiting": "قيد الانتظار",
+        "ended": "منتهية"
+      },
+      "startedBy": "بدأه",
+      "anyone": "أي شخص",
+      "me": "أنا",
+      "connection": "MCP",
+      "column": {
+        "lastRun": "آخر تشغيل",
+        "goal": "الهدف",
+        "state": "الحالة",
+        "startedBy": "بدأه",
+        "connections": "MCPs",
+        "took": "استغرق"
+      },
+      "tookSoFar": "{time} حتى الآن"
+    },
+    "orgAdmins": "مسؤولو المؤسسة",
+    "approvers": {
+      "roles": "الدور {names} | الأدوار {names}",
+      "groups": "المجموعة {names} | المجموعات {names}",
+      "separator": "؛ "
+    },
+    "connection": {
+      "removeConnection": "أزل {name}",
+      "removedChip": "{name} (تمت الإزالة)",
+      "moreRemoved": "و{count} أخرى تمت إزالتها | و{count} أخرى تمت إزالتها",
+      "writeCredential": "بيانات اعتماد للتغييرات المعتمدة (اختياري)",
+      "writeCredentialHelp": "تُستخدم فقط للخطوات التي وافق عليها شخص. عند تركها فارغة، تستخدم الخطوات المعتمدة ترويسات MCP أعلاه.",
+      "writeValueSet": "تم التعيين. اكتب قيمة جديدة لاستبدالها.",
+      "writeValueRequired": "أدخل قيمة",
+      "addWriteHeader": "أضف ترويسة اعتماد",
+      "draftWriteHeader": "ترويسة التغيير المعتمد {name}"
+    },
+    "duration": {
+      "minutesSeconds": "{minutes} دقيقة {seconds} ثانية"
+    },
+    "run": {
+      "reconnecting": "إعادة الاتصال…",
+      "working": "جارٍ العمل…",
+      "investigating": "جارٍ التحقيق",
+      "investigatingNote": "الاستدعاءات التي تكتفي بالقراءة تمر مباشرة. يسألك التشغيل قبل أول تغيير.",
+      "investigated": "تم التحقيق",
+      "investigatedMeta": "{count} استدعاء، {duration} | {count} استدعاءات، {duration}",
+      "investigatedWithEvidence": "{calls} · {cited}",
+      "steps": "الخطوات",
+      "passCorrected": "تم التصحيح بواسطة {name} في {time}",
+      "passNotFixed": "تم وضع علامة «غير مُصلح» بواسطة {name} في {time}",
+      "passPlannedAgain": "أُعيد التخطيط في {time}",
+      "calls": "الاستدعاءات",
+      "approvedBy": "تمت الموافقة بواسطة {name} في {time}",
+      "stepCount": "{count} خطوة | {count} خطوات",
+      "stepLabel": "الخطوة {seq}",
+      "proceedingNote": "تمر الاستدعاءات المعتمدة فقط، بالترتيب، مرة واحدة لكل منها. وأي تغيير آخر يوقف التشغيل مؤقتًا ويسأل مرة أخرى.",
+      "checking": "جارٍ التحقق من النتيجة منذ {elapsed}",
+      "checkingAgain": "جارٍ إعادة التحقق من النتيجة منذ {elapsed}",
+      "investigatingFor": "جارٍ التحقيق منذ {elapsed}",
+      "proceedingFor": "جارٍ المتابعة منذ {elapsed}",
+      "silent": "لم يُجب نموذج الذكاء الاصطناعي منذ {quiet}. سيُعيد المحاولة أو يتوقف عند {time}.",
+      "silentOn": "لم يُجب نموذج الذكاء الاصطناعي منذ {quiet}. سيُعيد المحاولة أو يتوقف في {time}.",
+      "revertHint": "طلب التراجع يتطلب الموافقة مجددًا قبل حدوث أي تغيير.",
+      "raiseRevert": "رفع طلب تراجع",
+      "revertNote": "يشير الفحص إلى أن الوضع أسوأ. اقترح تغييرًا يتراجع عن الخطوات المعتمدة.",
+      "planChanged": "تغيّرت الخطة؛ راجعها مجددًا",
+      "approveFailed": "تعذّر حفظ الموافقة. حاول مرة أخرى.",
+      "declineFailed": "تعذّر رفض الطلب. حاول مرة أخرى.",
+      "replanFailed": "تعذّر طلب خطة جديدة. حاول مرة أخرى.",
+      "notice": {
+        "stepFailed": "فشلت الخطوة {step}. تم تنفيذ: {ran}. لم يتم تنفيذ: {notRun}.",
+        "noSteps": "لا شيء",
+        "outcomeUnknown": "أُرسلت خطوة لكن لم تصل أي إجابة. لن تُعاد المحاولة.",
+        "failed": "فشل التشغيل وتوقف.",
+        "failedWith": "فشل التشغيل وتوقف. {reason}",
+        "stepFailedWith": "{reason} تم تنفيذ: {ran}. لم يتم تنفيذ: {notRun}.",
+        "stepFailedAlone": "فشلت الخطوة {step}.",
+        "outcomeUnknownWith": "أُرسلت خطوة لكن لم تصل أي إجابة. لن تُعاد المحاولة. {reason}",
+        "held": "توقف التشغيل مؤقتًا: حاول تنفيذ استدعاء غير معتمد، لذا تم تعليق ذلك الاستدعاء."
+      },
+      "outcome": {
+        "checkedAt": "تم التحقق في {time}",
+        "endedAt": "انتهى في {time}",
+        "error": "أبلغ التشغيل عن خطأ: {reason}"
+      },
+      "timeline": {
+        "title": "الخط الزمني",
+        "planned": "اقترح الوكيل خطة",
+        "optionBand": "{title} ({band})",
+        "correctionOn": "تم إرسال تصحيح بواسطة {name} بشأن {option}: {kind}",
+        "notFixedOn": "{option} لم يُصلح المشكلة: {note}",
+        "attemptEnded": "انتهى: {result}"
+      },
+      "evidence": {
+        "started": "بدأ بواسطة {name}",
+        "approved": "وافق {name} على {option}",
+        "approvedPlan": "وافق {name} على الخطة",
+        "stepSent": "تم إرسال الخطوة {seq}: {tool}",
+        "stepDone": "اكتملت الخطوة {seq}: {tool}",
+        "stepDoneWith": "اكتملت الخطوة {seq}: {detail}",
+        "stepFailed": "فشلت الخطوة {seq}: {tool}",
+        "stepFailedWith": "فشلت الخطوة {seq}: {detail}",
+        "span": "من {from} إلى {to}",
+        "ended": "انتهى التشغيل",
+        "correction": "تم إرسال تصحيح من {name}: {kind}",
+        "planAgain": "طلب {name} إعادة التخطيط",
+        "notFixedNote": "لم يتم إصلاحه: {note}",
+        "remembered": "{time} · تم تذكّره للتشغيلات المستقبلية",
+        "connectionAdded": "أضاف {name} {mcp} إلى AutoResolve هذا وطلب خطة جديدة",
+        "connectionAddedRun": "أضاف {name} {mcp} إلى هذا التشغيل وطلب خطة جديدة",
+        "triggerOff": "مُشغِّل التنبيه معطّل حتى يعيد شخص ما الموافقة عليه.",
+        "planningAgain": "إعادة التخطيط",
+        "markedFixed": "وضع {name} علامة الإصلاح"
+      },
+      "facts": {
+        "title": "هذا التشغيل",
+        "startedBy": "بدأ بواسطة",
+        "started": "بدأ",
+        "canUse": "يمكنه الاستخدام",
+        "canApprove": "يمكنه الموافقة",
+        "option": "الخيار",
+        "approval": "الموافقة",
+        "check": "الفحص",
+        "outcome": "النتيجة",
+        "notChosen": "لم يتم اختياره بعد",
+        "noneChosen": "لم يتم اختيار أي منها",
+        "notAsked": "لم يُطلب بعد",
+        "notAskedEnded": "لم يُطلب",
+        "correctedNotApproved": "تم التصحيح، ولم تتم الموافقة عليه أبدًا",
+        "waitingForYou": "بانتظارك. ينتهي في {time}",
+        "waitingForYouOn": "بانتظارك. ينتهي {time}",
+        "waitingFor": "بانتظار {names}. ينتهي في {time}",
+        "waitingForOn": "بانتظار {names}. ينتهي {time}",
+        "lapsedAt": "انتهى في {time}",
+        "lapsedOn": "انتهى {time}",
+        "checkNotRun": "لم يتم التشغيل بعد",
+        "checkRunning": "قيد التقدم",
+        "checkMet": "مُستوفى",
+        "checkNotMet": "غير مُستوفى",
+        "checkDidNotRun": "لم يتم تشغيله",
+        "notKnown": "غير معروف بعد",
+        "evidenceNote": "يُحتفظ بكل استدعاء كدليل، مع وسائطه ونتيجته.",
+        "notInAutoResolve": "غير موجود في AutoResolve هذا: {mcps}"
+      }
+    },
+    "approval": {
+      "optionsLabel": "الخيارات",
+      "recommended": "موصى به",
+      "ruledOut": "مستبعد: {list}",
+      "evidenceSummary": "{count} قراءة مُستشهد بها، {decisive} حاسمة | {count} قراءات مُستشهد بها، {decisive} حاسمة",
+      "unverified": "لم يتم التحقق من {count} مرجع | لم يتم التحقق من {count} مراجع",
+      "viewEvidence": "عرض الأدلة",
+      "stepSummary": "{count} خطوة عبر {mcps} | {count} خطوات عبر {mcps}",
+      "omitted": "تم استبعاد {count} خيار آخر: {reason} | تم استبعاد {count} خيارات أخرى: {reason}",
+      "omittedNoReason": "تم استبعاد {count} خيار آخر. | تم استبعاد {count} خيارات أخرى.",
+      "missingCapability": "لا يمكن لأي من MCPs الخاصة بهذا التشغيل تنفيذ ذلك: {capability}",
+      "inFull": "{title} بالكامل",
+      "changes": "جارٍ الموافقة على تغييرات {mcps}.",
+      "canApprove": "المخوّلون بالموافقة: {names}",
+      "lapsesAt": "ينتهي عند {time}",
+      "lapsesOn": "ينتهي {time}",
+      "decline": "رفض",
+      "askDifferent": "طلب خطة مختلفة",
+      "approve": "الموافقة والمتابعة",
+      "noteLabel": "ما الذي يجب أن تفعله الخطة الجديدة بشكل مختلف؟",
+      "notePlaceholder": "على سبيل المثال: أبقِ التغيير في طلب سحب",
+      "sendNote": "طلب خطة جديدة",
+      "cannotApprove": "لا يمكنك الموافقة على التغييرات عبر {mcps}. المخوّلون بالموافقة: {approvers}.",
+      "connectionRemoved": "أُزيل {mcps} بعد إنشاء هذه الخطة، لذا لا يمكن الموافقة على هذا الخيار. | أُزيلت {mcps} بعد إنشاء هذه الخطة، لذا لا يمكن الموافقة على هذا الخيار.",
+      "connectionRemovedOther": "أُزيل {mcps} بعد إنشاء هذه الخطة، لذا لا يمكن الموافقة على هذا الخيار. اختر خيارًا آخر أو اطلب خطة مختلفة. | أُزيلت {mcps} بعد إنشاء هذه الخطة، لذا لا يمكن الموافقة على هذا الخيار. اختر خيارًا آخر أو اطلب خطة مختلفة.",
+      "aRemovedConnection": "أحد MCPs هذا الخيار",
+      "removedNote": "أنشئ خطة لا تستخدم {mcps}؛ فقد أُزيل. | أنشئ خطة لا تستخدم {mcps}؛ فقد أُزيلت.",
+      "lapsedAt": "انتهت صلاحية هذا الطلب عند {time}.",
+      "lapsedOn": "انتهت صلاحية هذا الطلب في {time}.",
+      "lapsed": "انتهت صلاحية هذا الطلب.",
+      "lapsedBody": "لم يوافق عليه أحد في الوقت المناسب، لذا لم يتم تغيير أي شيء. ربما تغيّر الهدف منذ ذلك الحين؛ ابدأ من جديد للحصول على خطة حالية.",
+      "startAgain": "البدء من جديد",
+      "startAgainFailed": "تعذّر بدء التشغيل من جديد. حاول مرة أخرى.",
+      "connectionsGone": "تمت إزالة MCP الذي استخدمه هذا التشغيل. | تمت إزالة MCPs التي استخدمها هذا التشغيل.",
+      "chooseConnections": "اختيار MCPs",
+      "heldCall": "{tool} عبر {mcp}",
+      "changedSincePlan": "غيّر تشغيل آخر {mcps} منذ إنشاء هذه الخطة. تحقق من أن التغيير لا يزال مطلوبًا قبل الموافقة. | غيّرت {count} تشغيلات أخرى {mcps} منذ إنشاء هذه الخطة. تحقق من أن التغيير لا يزال مطلوبًا قبل الموافقة.",
+      "viewChangedRun": "عرض ذلك التشغيل | عرض أحدث تشغيل",
+      "heldWhilePlanning": "أثناء التحقيق حاول إجراء تغيير، لذا تم تعليق ذلك الاستدعاء ولم يُنفّذ: {tools}. | أثناء التحقيق حاول إجراء {count} تغييرات، لذا تم تعليق تلك الاستدعاءات ولم تُنفّذ: {tools}.",
+      "declined": "تم رفض هذا الطلب. لم يتم تغيير أي شيء.",
+      "correctPlan": "صحّح هذه الخطة",
+      "partialFix": "إصلاح جزئي",
+      "partialFixLeaves": "يترك دون إنجاز: {text}"
+    },
+    "step": {
+      "runningFor": "قيد التشغيل منذ {elapsed}",
+      "reason": "سبب الوكيل",
+      "arguments": "الوسائط",
+      "preview": "معاينة",
+      "dryRunAfter": "يُنفّذ التشغيل التجريبي بعد موافقتك؛ يتوقف التشغيل إذا فشل.",
+      "result": "النتيجة",
+      "error": "خطأ",
+      "held": "ليس ضمن الخطة المعتمدة",
+      "showAll": "عرض الوسائط كاملة",
+      "showFullResult": "عرض النتيجة كاملة",
+      "showLess": "عرض أقل",
+      "refChip": "{arg} من الخطوة {step}",
+      "refNote": "يملؤه النظام من نتيجة الخطوة {steps}، وليس بواسطة الوكيل. | يملؤه النظام من نتائج الخطوات {steps}، وليس بواسطة الوكيل."
+    },
+    "savedTitle": "AutoResolve المحفوظ",
+    "saved": {
+      "back": "AutoResolves المحفوظة",
+      "newTitle": "حفظ باسم AutoResolve",
+      "saveAsAutoResolve": "حفظ باسم AutoResolve",
+      "runNow": "تشغيل الآن",
+      "deleteTitle": "هل تريد حذف AutoResolve هذا؟",
+      "deleteMessage": "سيتوقف مُشغِّله ولن يعود قابلاً للتشغيل. تبقى عمليات التشغيل السابقة.",
+      "deleted": "تم حذف AutoResolve",
+      "deleteFailed": "لم يتم حذف AutoResolve. حاول مرة أخرى.",
+      "runFailed": "تعذّر بدء AutoResolve. حاول مرة أخرى.",
+      "saveFailed": "لم يتم حفظ AutoResolve. حاول مرة أخرى.",
+      "notFoundHint": "ربما تم حذفه.",
+      "runNotLoaded": "تعذّر تحميل التشغيل المطلوب حفظه.",
+      "field": {
+        "goal": "الهدف",
+        "connections": "MCPs",
+        "runsWhen": "يعمل عندما",
+        "trigger": "المُشغِّل",
+        "approval": "الموافقة",
+        "savedBy": "حفظه"
+      },
+      "kind": {
+        "person": "يبدأه شخص",
+        "alert": "يُطلَق تنبيه",
+        "incident": "يُفتح حادث"
+      },
+      "runsWhenAlert": "عند إطلاق تنبيه: {alert}",
+      "runsWhenIncident": "عند فتح حادث من {alert}",
+      "runsWhenAlertGone": "يُطلَق تنبيه، لكن التنبيه المرتبط به حُذف",
+      "runsWhenIncidentGone": "يُفتح حادث، لكن التنبيه المرتبط به حُذف",
+      "triggerSwitch": "بدء عمليات التشغيل من هذا المُشغِّل",
+      "triggerApproved": "تمت الموافقة بواسطة {name} في {time}",
+      "paused": "متوقف مؤقتًا حتى إعادة الموافقة: أدى تعديل إلى إيقاف هذا المُشغِّل. تشغيله يعني الموافقة عليه باسمك.",
+      "approval": "طُلبت الموافقات في قناة {slack}.",
+      "savedBy": "{name} في {time}",
+      "openSourceRun": "افتح التشغيل الذي حُفظ منه",
+      "regionNotice": "هذه المنطقة لا تشغّل التنبيهات والحوادث، لذا لن يُطلق هذا المُشغِّل هنا.",
+      "connectionsRemoved": "تمت إزالة {mcps}. أزله من AutoResolve هذا أو أضفه مرة أخرى. | تمت إزالة {mcps}. أزلها من AutoResolve هذا أو أضفها مرة أخرى.",
+      "slackUnavailable": "الموافقة عبر Slack غير متاحة في هذا النشر، لذا لا يمكن تفعيل مُشغِّلات التنبيهات والحوادث.",
+      "slackUnavailableOn": "الموافقة عبر Slack غير متاحة في هذا النشر، لذا لا يمكن الموافقة على عمليات تشغيل هذا المُشغِّل في Slack. أوقفه أو وافق عليها على الشاشة.",
+      "lastRuns": "عمليات التشغيل الأخيرة",
+      "lastRunsMore": "عرض أحدث {shown} من أصل {total} عملية تشغيل.",
+      "lastRunsEmpty": "تظهر هنا عمليات تشغيل AutoResolve هذا، سواء بدأها شخص أو بدأها المُشغِّل الخاص به.",
+      "triggerState": {
+        "on": "مفعّل",
+        "off": "غير مفعّل",
+        "paused": "متوقف مؤقتًا حتى إعادة الموافقة"
+      },
+      "form": {
+        "name": "الاسم",
+        "goal": "الهدف",
+        "connections": "MCPs",
+        "connectionsHelp": "لا يمكن لعمليات تشغيله استخدام سوى هذه الـ MCPs.",
+        "connectionsPlaceholder": "إضافة MCPs",
+        "connectionsNotFilled": "استخدم هذا التشغيل {mcps}، ولكن تمت إزالته، لذا لم يتم ملؤه. | استخدم هذا التشغيل {mcps}، ولكن تمت إزالتها، لذا لم يتم ملؤها.",
+        "runsWhen": "يعمل عندما",
+        "alert": "التنبيه",
+        "incidentAlert": "التنبيه الذي يفتح الحادث",
+        "alertPlaceholder": "اختر تنبيهًا",
+        "alertGone": "تنبيه محذوف",
+        "alertsForbidden": "ليس لديك صلاحية الوصول إلى التنبيهات، لذا لا يمكن عرض أي منها هنا.",
+        "alertsFailed": "تعذّر تحميل التنبيهات. أعد فتح هذا النموذج للمحاولة مرة أخرى.",
+        "connectionsFailed": "تعذّر تحميل MCPs. أعد فتح هذا النموذج للمحاولة مرة أخرى.",
+        "alertsNone": "لا تحتوي هذه المؤسسة على أي تنبيهات بعد. أنشئ تنبيهًا في التنبيهات أولًا.",
+        "createTriggerHelp": "يؤدي الحفظ إلى تشغيل هذا المُشغِّل. يطلب كل تشغيل الموافقة في قناة {slack} للموافقات.",
+        "editPausesHelp": "يؤدي تغيير الهدف أو MCPs أو المُشغِّل إلى إيقاف المُشغِّل حتى يقوم شخص لديه صلاحية الموافقة بتشغيله مرة أخرى.",
+        "nameRequired": "أدخل اسمًا.",
+        "goalRequired": "أدخل هدفًا.",
+        "tooLong": "استخدم {max} حرفًا أو أقل.",
+        "alertRequired": "اختر تنبيهًا.",
+        "save": "حفظ AutoResolve",
+        "saveChanges": "حفظ التغييرات"
+      },
+      "list": {
+        "search": "ابحث في AutoResolve المحفوظة",
+        "column": {
+          "name": "الاسم",
+          "runsWhen": "يعمل عندما",
+          "trigger": "المُشغِّل",
+          "connections": "MCPs",
+          "savedBy": "حفظه",
+          "updated": "آخر تحديث"
+        }
+      },
+      "loadFailed": "تعذّر تحميل AutoResolve"
+    },
+    "andMore": "و{count} إضافي | و{count} إضافي",
+    "correction": {
+      "title": "ما الخطأ في هذه الخطة؟",
+      "kindsLabel": "ما الخطأ",
+      "kind": {
+        "wrongCause": "سبب خاطئ",
+        "wrongFix": "إصلاح خاطئ",
+        "outOfScope": "يتجاوز نطاق AutoResolve هذه",
+        "notFixed": "لم يصلح المشكلة"
+      },
+      "help": {
+        "none": "اختر ما هو الخطأ، ثم اذكره في الملاحظة.",
+        "wrongCause": "سبب خاطئ: ألقى الوكيل اللوم على شيء خاطئ، لذا يستهدف إصلاحه المكان الخطأ.",
+        "wrongFix": "إصلاح خاطئ: السبب صحيح، لكن التغيير ليس ما تريده.",
+        "outOfScope": "يتجاوز نطاق AutoResolve هذه: تغيّر الخطة أشياء كان ينبغي أن تتركها AutoResolve هذه."
+      },
+      "draft": {
+        "wrongCause": "\"{option}\" يستهدف سببًا خاطئًا.",
+        "wrongFix": "\"{option}\" ليس التغيير الذي أريده.",
+        "outOfScope": "\"{option}\" يغيّر أكثر مما ينبغي لـ AutoResolve هذه."
+      },
+      "noteLabel": "ملاحظة",
+      "noteHelp": "يقرأ الوكيل هذه الملاحظة قبل أن يخطط مرة أخرى.",
+      "notePickFirst": "اختر ما هو الخطأ أولًا",
+      "remember": "تذكّر لتشغيلات \"{name}\" المستقبلية",
+      "rememberHelp": "ترى التشغيلات اللاحقة هذه الملاحظة. يمكنك إزالتها من AutoResolve.",
+      "send": "إرسال التصحيح"
+    },
+    "correctionsUsed": {
+      "chip": "استُخدم تصحيح {count} | استُخدمت {count} تصحيحات",
+      "title": "التصحيحات التي استخدمتها هذه الخطة",
+      "thisRun": "{name}، هذا التشغيل، {time}",
+      "earlierRun": "{name}، تشغيل سابق، {time}",
+      "manage": "إدارة التصحيحات في AutoResolve"
+    },
+    "missing": {
+      "title": "يحتاج هذا الإصلاح إلى {mcp}، وهو غير متاح في AutoResolve هذه",
+      "titleRun": "يحتاج هذا الإصلاح إلى {mcp}، وهو غير متوفر في هذا التشغيل.",
+      "add": "أضف {mcp} وأعد التخطيط",
+      "orPartial": "أو اعتمد الإصلاح الجزئي أدناه. | أو اعتمد أحد الإصلاحات الجزئية أدناه.",
+      "cannotAdd": "يمكن فقط للأشخاص الذين يستطيعون اعتماد التغييرات عبر {mcp} إضافته.",
+      "dialogAutoResolve": "AutoResolve",
+      "dialogConnection": "MCP المطلوب إضافته",
+      "dialogTriggerOff": "تؤدي إضافة MCP إلى إيقاف مُشغِّل التنبيه الخاص بـ AutoResolve حتى يعيد شخص ما اعتماده.",
+      "dialogThen": "ثم يعيد هذا التشغيل التخطيط باستخدام {mcp}. لن يتغير شيء حتى يعتمد شخص ما الخطة الجديدة.",
+      "dialogConfirm": "أضف وأعد التخطيط",
+      "addFailed": "تعذّرت إضافة {mcp}. حاول مرة أخرى.",
+      "needs": "يحتاج هذا الإصلاح إلى {mcp}: {action}"
+    },
+    "verdict": {
+      "question": "هل نجح هذا الإصلاح؟",
+      "yes": "نعم",
+      "no": "لا، لم ينجح",
+      "noteLabel": "ما الذي لا يزال غير صحيح؟",
+      "stillFiring": "لا يزال {trigger} قيد الإطلاق.",
+      "filledFrom": "تم التعبئة من {trigger}.",
+      "planAgain": "إعادة التخطيط",
+      "agent": "الوكيل",
+      "fixed": "تم الإصلاح",
+      "notFixed": "لم ينجح الإصلاح",
+      "byAt": "{name}، {time}",
+      "noteAt": "{note} · {time}",
+      "failed": "لم يتم حفظ إجابتك. حاول مرة أخرى."
+    },
+    "corrections": {
+      "title": "التصحيحات",
+      "help": "يقرأ كل تشغيل جديد من AutoResolve هذه التصحيحات. وهي لا تعتمد أي شيء أبدًا.",
+      "source": "من {run} بواسطة {name}",
+      "runOf": "تشغيل {time}",
+      "sourceGone": "من تشغيل لم يعد موجودًا، {time} بواسطة {name}",
+      "removeFailed": "لم تتم إزالة التصحيح. حاول مرة أخرى."
+    },
+    "incident": {
+      "title": "AutoResolve",
+      "note": "تشغيل واحد لكل حادث. يسأل قبل تغيير أي شيء.",
+      "loading": "جارٍ تحميل AutoResolve…",
+      "loadFailed": "تعذّر تحميل AutoResolve لهذا الحادث.",
+      "newRun": "تشغيل جديد لهذا الحادث",
+      "liveRun": "هذا هو تشغيل الحادث. يمكن بدء تشغيل جديد عند انتهائه.",
+      "openRun": "فتح التشغيل",
+      "related": "عمليات AutoResolve المحفوظة لتنبيهات هذا الحادث",
+      "suggestedFor": "مقترَح للحوادث الواردة من {alert}",
+      "startsOn": "يبدأ عند {alert}",
+      "run": "التشغيل",
+      "runLocked": "{run} هو التشغيل المباشر لهذا الحادث. يمكن بدء تشغيل جديد عند انتهائه.",
+      "empty": "لم يتم تشغيل أي AutoResolve على هذا الحادث، ولم يُحفظ أي منها لتنبيهاته."
+    }
   },
   "autobotInvestigate": {
     "greeting": "ما الذي يجب أن نحقّق فيه؟",

@@ -127,6 +127,7 @@ export function useServiceCorrelation() {
     timeWindowMinutes: number = 5,
     currentStream?: string,
     window?: { start: number; end: number },
+    checkData = false,
   ): Promise<CorrelationResult | null> {
     error.value = null;
     noMatch.value = false;
@@ -174,6 +175,7 @@ export function useServiceCorrelation() {
         resolve_from_source: true,
         start_time: window?.start,
         end_time: window?.end,
+        ...(checkData && window ? { check_data: true } : {}),
       };
 
       const response = await serviceStreamsApi.correlate(orgIdentifier.value, correlationRequest);

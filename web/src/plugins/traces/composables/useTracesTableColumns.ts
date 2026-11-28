@@ -286,12 +286,16 @@ export function useTracesTableColumns() {
         header: raw(`${t("traces.timestamp")} (${store.state.timezone})`),
         size: 210,
         meta: { sortable: true, headerClass: "capitalize!" },
-        accessorFn: (row: any) =>
-          timestampToTimezoneDate(
-            (row[timestampCol] ?? row["zo_sql_timestamp"]) / 1000,
+        accessorFn: (row: any) => {
+          const micros = row[timestampCol] ?? row["zo_sql_timestamp"];
+          // A typed-SQL row may have no timestamp; formatting it would print "Invalid DateTime".
+          if (micros === undefined || micros === null) return "";
+          return timestampToTimezoneDate(
+            micros / 1000,
             store.state.timezone,
             "yyyy-MM-dd HH:mm:ss.SSS",
-          ),
+          );
+        },
       });
 
     // Inject LLM columns just before service_latency in traces mode.

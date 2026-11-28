@@ -576,6 +576,18 @@ describe("ServiceGraphNodeSidePanel", () => {
       );
     });
 
+    it("asks correlate for has_data over the panel window on the metrics tab", async () => {
+      await wrapper.find('[data-test="service-graph-node-panel-tab-metrics"]').trigger("click");
+      await flushPromises();
+
+      const request = vi.mocked(correlateStreams).mock.calls.at(-1)?.[1];
+      expect(request).toMatchObject({
+        check_data: true,
+        start_time: baseTimeRange.startTime,
+        end_time: baseTimeRange.endTime,
+      });
+    });
+
     it("should show error state when metricsCorrelationError is set", async () => {
       vi.mocked(correlateStreams).mockRejectedValueOnce(new Error("Network failure"));
 

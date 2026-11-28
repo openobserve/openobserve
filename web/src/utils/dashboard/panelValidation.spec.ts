@@ -15,6 +15,7 @@
 
 import { describe, expect, it, vi } from "vitest";
 import {
+  keepLoadedPanelChoices,
   panelConfigRangeError,
   validateConditions,
   validateDashboardJson,
@@ -1814,5 +1815,46 @@ describe.each([
       ],
     });
     expect(errors).toEqual([]);
+  });
+});
+
+describe("keepLoadedPanelChoices", () => {
+  const errorsFor = (data: any) => {
+    const errors: string[] = [];
+    validatePanel(
+      gt,
+      { data, layout: { currentQueryIndex: 0 } },
+      errors,
+      true,
+      [],
+      "dashboard",
+      { state: { zoConfig: {} } },
+      () => true,
+    );
+    return errors;
+  };
+  const logsPanel = (config: any) => ({
+    type: "logs",
+    queryType: "sql",
+    config,
+    queries: [{ query: 'SELECT * FROM "s"', customQuery: true, fields: {} }],
+  });
+
+  it("lets a loaded unknown choice save unchanged, without removing it", () => {
+    const panel = logsPanel({ logs_order: "sideways", logs_wrap: true });
+    keepLoadedPanelChoices(panel);
+    expect(errorsFor(panel)).toEqual([]);
+    expect(panel.config).toEqual({ logs_order: "sideways", logs_wrap: true });
+  });
+
+  it("still rejects an unknown value the panel did not load with", () => {
+    const panel = logsPanel({ logs_order: "sideways" });
+    keepLoadedPanelChoices(panel);
+    panel.config.logs_order = "random";
+    expect(errorsFor(panel)).toEqual([
+      gt("dashboard.utils.unsupportedConfigValue", { setting: "logs_order", value: "random" }),
+    ]);
+    expect(errorsFor(logsPanel({ logs_order: "sideways" }))).toHaveLength(1);
+    keepLoadedPanelChoices({ type: "logs" });
   });
 });

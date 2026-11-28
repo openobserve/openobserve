@@ -245,6 +245,33 @@ describe("applyFilterTerm", () => {
     });
   });
 
+  describe("top-level OR in the base value", () => {
+    it("brackets a top-level OR before ANDing the term", () => {
+      expect(
+        applyFilterTerm(
+          "operation_name = 'POST /charge'",
+          "service_name='web-frontend' OR service_name='payment-service'",
+        ),
+      ).toBe(
+        "(service_name='web-frontend' OR service_name='payment-service') and operation_name = 'POST /charge'",
+      );
+    });
+
+    it("brackets an OR that follows an AND", () => {
+      expect(applyFilterTerm("d='4'", "a='1' and b='2' or c='3'")).toBe(
+        "(a='1' and b='2' or c='3') and d='4'",
+      );
+    });
+
+    it("does not replace a condition inside one OR branch", () => {
+      expect(applyFilterTerm("a='9'", "a='1' or b='2'")).toBe("(a='1' or b='2') and a='9'");
+    });
+
+    it("leaves a bracketed OR as one condition", () => {
+      expect(applyFilterTerm("c='3'", "(a='1' or b='2')")).toBe("(a='1' or b='2') and c='3'");
+    });
+  });
+
   describe("single-part base value (no pipe)", () => {
     it("should set filter as the entire value when base is empty", () => {
       const result = applyFilterTerm("status='active'", "");

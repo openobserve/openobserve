@@ -16,6 +16,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="flex h-full min-h-0 w-full flex-col" data-test="dashboard-logs-panel">
+    <div
+      v-if="rows.length > 0 && fieldNotices.length > 0"
+      class="flex shrink-0 flex-col items-start gap-1 px-2 py-1"
+      data-test="dashboard-logs-panel-field-notices"
+    >
+      <OInlineNotice
+        v-for="notice in fieldNotices"
+        :key="notice.role"
+        :text="notice.text"
+        :data-test="`dashboard-logs-panel-field-notice-${notice.role}`"
+      />
+    </div>
     <!-- Without rows PanelSchemaRenderer draws the No Data state; an empty slot would not stop OTable's own. -->
     <OTable
       v-if="rows.length > 0"
@@ -88,6 +100,7 @@ import { useStore } from "vuex";
 import OTable from "@/lib/core/Table/OTable.vue";
 import JsonPreview from "@/plugins/logs/JsonPreview.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
+import OInlineNotice from "@/lib/feedback/InlineNotice/OInlineNotice.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { useLogsHighlighter } from "@/composables/useLogsHighlighter";
 import { severityIndicatorColor } from "@/utils/logs/statusParser";
@@ -97,12 +110,17 @@ import { timestampToTimezoneDate } from "@/utils/timezone";
 import { raw, useI18nTyped } from "@/types/i18n";
 import {
   toEpochMillis,
+  type LogsPanelFieldIssue,
+  type LogsPanelFieldRole,
   type LogsPanelFields,
   type LogsPanelRow,
 } from "@/utils/dashboard/convertLogsPanelData";
 
 const props = defineProps<{
-  data: { rows?: LogsPanelRow[]; fields?: LogsPanelFields } | null | undefined;
+  data:
+    | { rows?: LogsPanelRow[]; fields?: LogsPanelFields; fieldIssues?: LogsPanelFieldIssue[] }
+    | null
+    | undefined;
   config?: Record<string, any> | null;
 }>();
 
@@ -113,6 +131,13 @@ const store = useStore();
 const TIMESTAMP_COLUMN_SIZE = 236;
 // Same format the logs table shows its timestamps in.
 const TIMESTAMP_FORMAT = "yyyy-MM-dd HH:mm:ss.SSS";
+// Its own id, so a time field that is also the message field does not share the message column's cells.
+const TIME_COLUMN_ID = "_logs_panel_time";
+const NOTICE_KEYS = {
+  time: "dashboard.logsTimeFieldNoValues",
+  level: "dashboard.logsLevelFieldNoValues",
+  message: "dashboard.logsMessageFieldNoValues",
+} as const satisfies Record<LogsPanelFieldRole, string>;
 
 const rows = computed<LogsPanelRow[]>(() => props.data?.rows ?? []);
 const fields = computed<LogsPanelFields>(
@@ -131,22 +156,29 @@ const rowsBySource = computed(() => {
 });
 const rowKey = (row: any): string => String(rowsBySource.value.get(row)?.index ?? -1);
 
+const fieldNotices = computed(() =>
+  (props.data?.fieldIssues ?? []).map((issue) => ({
+    role: issue.role,
+    text: t(NOTICE_KEYS[issue.role], { field: raw(issue.field) }),
+  })),
+);
+
 const timeColumnId = computed(() =>
-  showTime.value && fields.value.time ? fields.value.time : undefined,
+  showTime.value && fields.value.time ? TIME_COLUMN_ID : undefined,
 );
 
 const columns = computed<OTableColumnDef<any>[]>(() => {
   const timezone = store.state.timezone;
   const out: any[] = [];
-  const timeField = timeColumnId.value;
-  if (timeField) {
+  const timeField = fields.value.time;
+  if (timeColumnId.value && timeField) {
     const format = (row: any) => {
       const millis = toEpochMillis(row?.[timeField]);
       return millis === null ? "" : timestampToTimezoneDate(millis, timezone, TIMESTAMP_FORMAT);
     };
     out.push({
-      name: timeField,
-      id: timeField,
+      name: TIME_COLUMN_ID,
+      id: TIME_COLUMN_ID,
       accessorFn: format,
       prop: format,
       label: t("search.timestampWithTimezone", { timezone }),

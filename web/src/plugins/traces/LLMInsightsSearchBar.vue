@@ -140,6 +140,8 @@ function clear() {
   if (props.applied) emit("apply", "");
 }
 
+defineExpose({ focus: () => editorRef.value?.editorObj?.focus?.() });
+
 // Bound on first focus: the editor exists only once Monaco has loaded.
 let enterBound = false;
 async function bindEnter() {

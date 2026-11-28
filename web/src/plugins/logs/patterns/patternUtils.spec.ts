@@ -28,7 +28,15 @@ import {
   formatBucketDuration,
   patternSeverityKey,
   patternSeverityKeyForPattern,
+  type PatternSetSqlOptions,
+  patternWhere,
 } from "./patternUtils";
+
+// A pattern as the extractor returns it, with its long constants as the terms.
+const withTerms = (template: string) => ({
+  template,
+  match_terms: extractConstantsFromPattern(template),
+});
 
 describe("extractConstantsFromPattern", () => {
   it("returns segments longer than 10 chars split by <*>", () => {
@@ -115,7 +123,7 @@ describe("escapeForMatchAll", () => {
 describe("buildPatternSqlQuery", () => {
   it("builds a SELECT with WHERE match_all clauses for long segments", () => {
     const sql = buildPatternSqlQuery(
-      "User authentication failed for <*> from address <*>",
+      withTerms("User authentication failed for <*> from address <*>"),
       "my_stream",
     );
     expect(sql).toBe(
@@ -124,12 +132,12 @@ describe("buildPatternSqlQuery", () => {
   });
 
   it("returns SELECT without WHERE when no segments are long enough", () => {
-    const sql = buildPatternSqlQuery("GET <*> 200", "my_stream");
+    const sql = buildPatternSqlQuery(withTerms("GET <*> 200"), "my_stream");
     expect(sql).toBe("SELECT * FROM 'my_stream'");
   });
 
   it("escapes special chars in constants", () => {
-    const sql = buildPatternSqlQuery("Error: it's a problem here <*> done", "my_stream");
+    const sql = buildPatternSqlQuery(withTerms("Error: it's a problem here <*> done"), "my_stream");
     expect(sql).toContain("match_all('Error: it''s a problem here')");
   });
 });
@@ -169,6 +177,7 @@ describe("buildPatternAlertData", () => {
   const mockPattern = {
     pattern_id: "pid-1",
     template: "User authentication failed for <*> from address <*>",
+    match_terms: ["User authentication failed for", "from address"],
     frequency: 500,
     percentage: 12.5,
     is_anomaly: false,
@@ -272,9 +281,14 @@ describe("buildPatternSetSqlQuery", () => {
   // extractConstantsFromPattern.
   const ERROR_PATTERN = "Connection refused to upstream <*>";
   const TIMEOUT_PATTERN = "Request deadline exceeded after <*>";
+  const setQuery = (o: PatternSetSqlOptions) =>
+    buildPatternSetSqlQuery({
+      ...o,
+      patterns: [...(o.includes ?? []), ...(o.excludes ?? [])].map(withTerms),
+    });
 
   it("builds an include-only query", () => {
-    const sql = buildPatternSetSqlQuery({
+    const sql = setQuery({
       streamName: "k8s_logs",
       includes: [ERROR_PATTERN],
     });
@@ -282,7 +296,7 @@ describe("buildPatternSetSqlQuery", () => {
   });
 
   it("ORs several includes, each bracketed against the surrounding ANDs", () => {
-    const sql = buildPatternSetSqlQuery({
+    const sql = setQuery({
       streamName: "k8s_logs",
       includes: [ERROR_PATTERN, TIMEOUT_PATTERN],
     });
@@ -293,7 +307,7 @@ describe("buildPatternSetSqlQuery", () => {
   });
 
   it("negates excludes as a group — the 'ignore these' case", () => {
-    const sql = buildPatternSetSqlQuery({
+    const sql = setQuery({
       streamName: "k8s_logs",
       excludes: [ERROR_PATTERN, TIMEOUT_PATTERN],
     });
@@ -304,7 +318,7 @@ describe("buildPatternSetSqlQuery", () => {
   });
 
   it("ANDs the current search filter in front — the headline use case", () => {
-    const sql = buildPatternSetSqlQuery({
+    const sql = setQuery({
       streamName: "k8s_logs",
       baseFilter: "code = 500",
       excludes: [ERROR_PATTERN],
@@ -315,7 +329,7 @@ describe("buildPatternSetSqlQuery", () => {
   });
 
   it("combines base filter, includes and excludes in that order", () => {
-    const sql = buildPatternSetSqlQuery({
+    const sql = setQuery({
       streamName: "k8s_logs",
       baseFilter: "code = 500",
       includes: [ERROR_PATTERN],
@@ -328,7 +342,7 @@ describe("buildPatternSetSqlQuery", () => {
   });
 
   it("emits a count projection for threshold-on-number alerts", () => {
-    const sql = buildPatternSetSqlQuery({
+    const sql = setQuery({
       streamName: "k8s_logs",
       includes: [ERROR_PATTERN],
       select: "count",
@@ -339,7 +353,7 @@ describe("buildPatternSetSqlQuery", () => {
   });
 
   it("drops patterns with no distinctive constants rather than emitting a bare clause", () => {
-    const sql = buildPatternSetSqlQuery({
+    const sql = setQuery({
       streamName: "k8s_logs",
       includes: ["<*> <*>"],
     });
@@ -347,37 +361,35 @@ describe("buildPatternSetSqlQuery", () => {
   });
 
   it("selects everything when nothing at all is supplied", () => {
-    expect(buildPatternSetSqlQuery({ streamName: "k8s_logs" })).toBe("SELECT * FROM 'k8s_logs'");
+    expect(setQuery({ streamName: "k8s_logs" })).toBe("SELECT * FROM 'k8s_logs'");
   });
 
   it.each(["status=500 --404", "status=500 -- note", "status=500\n-- note"])(
     "strips a comment from the base filter so it cannot swallow the pattern terms: %j",
     (baseFilter) => {
-      expect(
-        buildPatternSetSqlQuery({ streamName: "k8s_logs", baseFilter, excludes: [ERROR_PATTERN] }),
-      ).toBe(
+      expect(setQuery({ streamName: "k8s_logs", baseFilter, excludes: [ERROR_PATTERN] })).toBe(
         "SELECT * FROM 'k8s_logs' WHERE (status=500) AND NOT (match_all('Connection refused to upstream'))",
       );
     },
   );
 
   it("keeps -- inside a string literal of the base filter, and drops a comment-only base", () => {
-    expect(buildPatternSetSqlQuery({ streamName: "k8s_logs", baseFilter: "msg = 'a -- b'" })).toBe(
+    expect(setQuery({ streamName: "k8s_logs", baseFilter: "msg = 'a -- b'" })).toBe(
       "SELECT * FROM 'k8s_logs' WHERE (msg = 'a -- b')",
     );
-    expect(buildPatternSetSqlQuery({ streamName: "k8s_logs", baseFilter: "-- note" })).toBe(
+    expect(setQuery({ streamName: "k8s_logs", baseFilter: "-- note" })).toBe(
       "SELECT * FROM 'k8s_logs'",
     );
   });
 
   it("ignores a whitespace-only base filter", () => {
-    expect(buildPatternSetSqlQuery({ streamName: "k8s_logs", baseFilter: "   " })).toBe(
+    expect(setQuery({ streamName: "k8s_logs", baseFilter: "   " })).toBe(
       "SELECT * FROM 'k8s_logs'",
     );
   });
 
   it("escapes quotes in pattern text", () => {
-    const sql = buildPatternSetSqlQuery({
+    const sql = setQuery({
       streamName: "k8s_logs",
       includes: ["cannot open user's configuration file <*>"],
     });
@@ -385,8 +397,8 @@ describe("buildPatternSetSqlQuery", () => {
   });
 
   it("agrees with buildPatternSqlQuery for the single-include case", () => {
-    expect(buildPatternSetSqlQuery({ streamName: "s", includes: [ERROR_PATTERN] })).toBe(
-      buildPatternSqlQuery(ERROR_PATTERN, "s"),
+    expect(setQuery({ streamName: "s", includes: [ERROR_PATTERN] })).toBe(
+      buildPatternSqlQuery(withTerms(ERROR_PATTERN), "s"),
     );
   });
 });
@@ -415,130 +427,84 @@ describe("pattern severity buckets", () => {
   });
 });
 
+describe("patternWhere", () => {
+  it("subtracts the terms of other patterns it also returns", () => {
+    expect(
+      patternWhere({
+        template: "t",
+        match_terms: ["login", "done"],
+        exclude_terms: [["failure"], ["via_upstream", "200"]],
+      }),
+    ).toBe(
+      "match_all('login') AND match_all('done') AND NOT match_all('failure') " +
+        "AND NOT (match_all('via_upstream') AND match_all('200'))",
+    );
+    expect(patternWhere({ template: "t", match_block: "shared" })).toBeNull();
+  });
+});
+
 describe("resolvePatternMatchTerms", () => {
-  const A = "core event seq=<:NUM> info from <*> status 500";
-  const B = "core event seq=<:NUM> warn from <*> status 404";
-  const C = "core event seq=<:NUM> debug via <*> status 200";
+  const A = "core event seq=<:NUM> info from <*>";
 
-  it("keeps the long-constant rule when it already selects the pattern", () => {
-    const t = "User authentication failed for <*> from host <*>";
-    const other = "Disk usage exceeded threshold on <*>";
-    expect(resolvePatternMatchTerms(t, [t, other])).toEqual(extractConstantsFromPattern(t));
+  it("returns the extractor's terms for the template", () => {
+    const terms = ["core event seq=", "info from"];
+    expect(resolvePatternMatchTerms(A, [{ template: A, match_terms: terms }])).toEqual(terms);
   });
 
-  it("keeps the long-constant rule when no template list is available", () => {
-    expect(resolvePatternMatchTerms(A)).toEqual(["core event seq="]);
-  });
-
-  it("falls back to every constant segment when the long ones are shared", () => {
-    expect(resolvePatternMatchTerms(A, [A, B, C])).toEqual([
-      "core event seq=",
-      "info from",
-      "status 500",
-    ]);
-  });
-
-  it("returns null when even every constant is shared with another pattern", () => {
-    const x = "core event seq=<:NUM> info from <*>";
-    const y = "core event seq=<:NUM> info from <*> status 500";
-    expect(resolvePatternMatchTerms(x, [x, y])).toBeNull();
-  });
-
-  it("filters a short-only template on its short segments when they are unique", () => {
-    expect(resolvePatternMatchTerms("GET <*> 200", ["GET <*> 200", "POST <*> 500"])).toEqual([
-      "GET",
-      "200",
-    ]);
-    expect(resolvePatternMatchTerms("GET <*>", ["GET <*>"])).toEqual(["GET"]);
-  });
-
-  it("keeps long-only behaviour for a short-only template without the template list", () => {
-    expect(resolvePatternMatchTerms("GET <*> 200")).toBeNull();
-  });
-
-  it("returns null for a short-only template whose text another pattern shares", () => {
-    expect(resolvePatternMatchTerms("GET <*>", ["GET <*>", "GET <*> 200"])).toBeNull();
-  });
-
-  it("matches `_` and `%` in a term as literal text, as the backend now does", () => {
-    const a = "foo_bar <*>";
-    const b = "fooxbar <*>";
-    expect(resolvePatternMatchTerms(a, [a, b])).toEqual(["foo_bar"]);
-    expect(resolvePatternMatchTerms(b, [a, b])).toEqual(["fooxbar"]);
-    const c = "50%off <*>";
-    expect(resolvePatternMatchTerms(c, [c, "50 big sale off <*>"])).toEqual(["50%off"]);
-  });
-
-  it("matches case-insensitively and ignores a leading re: or surrounding stars", () => {
-    expect(resolvePatternMatchTerms("GET <*>", ["GET <*>", "xget y <*>"])).toBeNull();
-    expect(resolvePatternMatchTerms("*abc* <*>", ["*abc* <*>", "zabcz <*>"])).toBeNull();
-  });
-
-  it("returns null for an all-wildcard template", () => {
-    expect(resolvePatternMatchTerms("<*> <*>", ["<*> <*>", A])).toBeNull();
-  });
-
-  it("is not fooled by the pattern's own entry in the list", () => {
-    expect(resolvePatternMatchTerms(A, [A])).toEqual(["core event seq="]);
+  it("is null when the extractor gave none or the template is unknown", () => {
+    expect(resolvePatternMatchTerms(A, [{ template: A, match_block: "shared" }])).toBeNull();
+    expect(resolvePatternMatchTerms(A)).toBeNull();
   });
 });
 
 describe("patternFilterBlockedReason", () => {
-  const A = "core event seq=<:NUM> info from <*> status 500";
-  const B = "core event seq=<:NUM> warn from <*> status 404";
+  const A = "core event seq=<:NUM> info from <*>";
 
-  it("is null when the pattern can be filtered", () => {
-    expect(patternFilterBlockedReason(A, [A, B])).toBeNull();
-  });
-
-  it("is 'none' for a template with no constant text", () => {
-    expect(patternFilterBlockedReason("<*> <:NUM>", ["<*> <:NUM>", A])).toBe("none");
-  });
-
-  it("is null for a short-only template whose text is unique", () => {
-    expect(patternFilterBlockedReason("GET <*>", ["GET <*>", "POST <*>"])).toBeNull();
-  });
-
-  it("is 'shared' for a short-only template whose text another pattern shares", () => {
-    expect(patternFilterBlockedReason("GET <*>", ["GET <*>", "GET <*> 200"])).toBe("shared");
-  });
-
-  it("is 'shared' when every constant also sits in another template", () => {
-    const x = "core event seq=<:NUM> info from <*>";
-    expect(patternFilterBlockedReason(x, [x, A])).toBe("shared");
+  it.each([
+    [{ template: A, match_terms: ["info from"] }, null],
+    [{ template: A, match_block: "shared" as const }, "shared"],
+    [{ template: A, match_block: "no_text" as const }, "none"],
+  ])("reads the extractor's verdict: %j → %s", (pattern, reason) => {
+    expect(patternFilterBlockedReason(A, [pattern])).toBe(reason);
   });
 });
 
-describe("pattern clauses for templates that share a long prefix", () => {
+describe("pattern clauses use the extractor's terms", () => {
   const A = "core event seq=<:NUM> info from <*> status 500";
   const B = "core event seq=<:NUM> warn from <*> status 404";
   const SHARED = "core event seq=<:NUM> info from <*>";
-  const ALL = [A, B];
-
-  it("keeps the long-constants-only query without a template list", () => {
-    expect(buildPatternSqlQuery(A, "s")).toBe(
-      "SELECT * FROM 's' WHERE match_all('core event seq=')",
-    );
-  });
+  const PATTERNS = [
+    { template: A, match_terms: ["core event seq=", "info from", "status 500"] },
+    { template: B, match_terms: ["core event seq=", "warn from", "status 404"] },
+    { template: SHARED, match_block: "shared" as const },
+  ];
 
   it("ORs and negates the full term sets in a set query", () => {
     expect(
-      buildPatternSetSqlQuery({ streamName: "s", includes: [A], excludes: [B], allTemplates: ALL }),
+      buildPatternSetSqlQuery({
+        streamName: "s",
+        includes: [A],
+        excludes: [B],
+        patterns: PATTERNS,
+      }),
     ).toBe(
       "SELECT * FROM 's' WHERE match_all('core event seq=') AND match_all('info from') AND match_all('status 500') AND NOT (match_all('core event seq=') AND match_all('warn from') AND match_all('status 404'))",
     );
   });
 
-  it("drops a pattern nothing separates from the others", () => {
+  it("drops a pattern the extractor could not separate", () => {
     expect(
-      buildPatternSetSqlQuery({ streamName: "s", includes: [SHARED], allTemplates: [SHARED, A] }),
+      buildPatternSetSqlQuery({ streamName: "s", includes: [SHARED], patterns: PATTERNS }),
     ).toBe("SELECT * FROM 's'");
   });
 });
 
 describe("buildPatternLogsSql", () => {
-  it("matches the pattern's literal segments, never _all or a raw <*>", () => {
-    const sql = buildPatternLogsSql("Payment <*> failed for order <*> at gateway", "app", []);
+  const T = "Payment <*> failed for order <*>";
+  const terms = [{ template: T, match_terms: ["failed for order"] }];
+
+  it("matches the extractor's terms, never _all or a raw <*>", () => {
+    const sql = buildPatternLogsSql(T, "app", terms);
     expect(sql).toBe(
       "SELECT * FROM 'app' WHERE match_all('failed for order') ORDER BY _timestamp DESC",
     );
@@ -547,18 +513,13 @@ describe("buildPatternLogsSql", () => {
   });
 
   it("keeps the scope the patterns were mined under", () => {
-    const sql = buildPatternLogsSql(
-      "Payment <*> failed for order <*>",
-      "app",
-      [],
-      "level = 'error'",
-    );
-    expect(sql).toBe(
+    expect(buildPatternLogsSql(T, "app", terms, "level = 'error'")).toBe(
       "SELECT * FROM 'app' WHERE (level = 'error') AND match_all('failed for order') ORDER BY _timestamp DESC",
     );
   });
 
-  it("returns null when no text separates the pattern from the others", () => {
-    expect(buildPatternLogsSql("<*> <*>", "app", [])).toBeNull();
+  it("returns null when the extractor found no terms for the pattern", () => {
+    expect(buildPatternLogsSql(T, "app", [{ template: T, match_block: "shared" }])).toBeNull();
+    expect(buildPatternLogsSql(T, "app")).toBeNull();
   });
 });

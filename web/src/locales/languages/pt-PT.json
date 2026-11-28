@@ -527,7 +527,9 @@
       "linkedDomains": "domínios vinculados",
       "domainMappings": "mapeamentos de domínio",
       "domainRequests": "solicitações de vínculo",
-      "blockedUsers": "utilizadores bloqueados"
+      "blockedUsers": "utilizadores bloqueados",
+      "autoresolveRuns": "execuções",
+      "savedAutoResolve": "AutoResolves guardados"
     },
     "demo": {
       "pageTitle": "Estados vazios — conjunto completo para revisão",
@@ -652,6 +654,23 @@
     "noOncallUnrouted": {
       "title": "Nada precisa de um responsável",
       "description": "Todos os alertas que dispararam chegaram a uma equipa."
+    },
+    "noAutoResolveRuns": {
+      "title": "Ainda não existem execuções",
+      "description": "As execuções iniciadas por si e pela sua equipa aparecem aqui."
+    },
+    "noAutoResolveConnections": {
+      "title": "Adicione primeiro um MCP",
+      "description": "Um AutoResolve atua através dos MCPs que a sua organização adicionou, como um alojamento de código, uma ferramenta de implementação ou um cluster. Esta organização ainda não tem nenhum."
+    },
+    "noUsable": {
+      "mcps": "Nenhum MCP que possa utilizar",
+      "aiToolsets": "Nenhum conjunto de ferramentas de IA que possa utilizar",
+      "askAdmin": "Peça acesso a um administrador em IAM › Funções."
+    },
+    "noSavedAutoResolve": {
+      "title": "Ainda não existem AutoResolves guardados",
+      "description": "Abra uma execução concluída e escolha Guardar como AutoResolve para executar novamente o seu objetivo, ou para a iniciar quando um alerta for disparado."
     }
   },
   "accessBoundary": {
@@ -2075,6 +2094,7 @@
   },
   "menu": {
     "alertCalibration": "Calibração de alertas",
+    "autoresolve": "AutoResolve",
     "autoobserve": "AutoObserve",
     "upgradeToProPlan": "Atualizar para o Plano PRO",
     "home": "Início",
@@ -9224,6 +9244,9 @@
     "logsMessageField": "Campo da mensagem",
     "logsLevelField": "Campo do nível",
     "logsTimeField": "Campo da hora",
+    "logsTimeFieldNoValues": "O campo de tempo \"{field}\" não tem timestamps válidos",
+    "logsLevelFieldNoValues": "O campo de nível \"{field}\" não tem valores nos resultados",
+    "logsMessageFieldNoValues": "O campo de mensagem \"{field}\" não tem valores nos resultados",
     "htmlPanelFieldTooltip": "Deixe vazio para detetar a coluna a partir dos resultados da consulta",
     "logsOrder": "Ordem",
     "logsOrderNewest": "Mais recentes primeiro",
@@ -18531,7 +18554,16 @@
     "panelTimeSeriesFor": "Série temporal para {stream}",
     "panelTimeSeriesForWithType": "Série temporal para {stream} ({type})",
     "logsPanelTitle": "Logs - {stream}",
-    "logsPanelDescription": "Logs correlacionados para o serviço {service}"
+    "logsPanelDescription": "Logs correlacionados para o serviço {service}",
+    "noDataInScope": "Sem dados neste âmbito",
+    "noDataInScopeReason": "Nenhuma linha corresponde a estes filtros neste intervalo de tempo.",
+    "droppedCount": "+{count} descartado | +{count} descartados",
+    "droppedTitle": "Não usados como filtros",
+    "droppedNoRows": "Nenhuma linha com {value}",
+    "droppedNoField": "Campo não existe nestes streams",
+    "allNoDataTitle": "Nenhuma métrica tem dados neste âmbito",
+    "allNoDataScope": "{scope}, {window}",
+    "allNoDataAction": "Mostrar métricas sem dados"
   },
   "search_scheduler_job": {
     "title": "Agendador de tarefas de pesquisa",
@@ -20597,6 +20629,13 @@
       "sampleExpected": "Saída Esperada",
       "fromTrace": "Do span de trace {id}",
       "openInPlaygroundFailed": "Não foi possível abrir este span no Playground."
+    },
+    "largeStream": {
+      "notice": "{stream}: cerca de {size} neste intervalo, sem filtro de agente. Pode demorar minutos.",
+      "pickAgent": "Escolher um agente",
+      "addFilter": "Adicionar um filtro",
+      "runAnyway": "Executar mesmo assim",
+      "notRun": "Não executado"
     }
   },
   "onlineEvals": {
@@ -21894,7 +21933,10 @@
       "excludeFromQuery": "Excluir",
       "createAlertAction": "Criar alerta",
       "noMatchTerms": "Este padrão não possui texto distinto para filtrar.",
-      "noDistinctTextTooltip": "Cada parte de texto fixo deste padrão também aparece noutro padrão, por isso um filtro corresponderia também aos respetivos registos.",
+      "noDistinctTextTooltip": "O texto deste padrão também aparece nos logs de outro padrão, muitas vezes a mesma mensagem com um nível de log diferente, pelo que um filtro não o consegue contar isoladamente.",
+      "volumeUnsupported": "O volume não está disponível para pesquisas que usam WITH, JOIN, UNION, um alias de tabela ou uma subconsulta.",
+      "volumeFailedRetry": "Não foi possível carregar o volume. O servidor pode estar ocupado; tente novamente.",
+      "volumeFailed": "Não foi possível carregar o volume deste padrão.",
       "noStreamSelected": "Nenhum stream selecionado. Selecione um stream antes de criar um alerta.",
       "alertBroadMatch": "Este padrão não possui texto constante distinto — a consulta do alerta corresponderá amplamente. Considere adicionar filtros manuais."
     },
@@ -34659,6 +34701,464 @@
     "fixedToNow": "Termina agora, não se altera",
     "gateOrder": "O início tem de ser anterior ao fim.",
     "gateInvalid": "Intervalo inválido."
+  },
+  "autoresolve": {
+    "title": "AutoResolve",
+    "runTitle": "Execução do AutoResolve",
+    "runNotFound": "Esta execução não foi encontrada",
+    "runNotFoundHint": "Pode ter sido removida ou a ligação pode estar errada.",
+    "runForbidden": "Não tem acesso a esta execução",
+    "namesMore": "{count} mais | {count} mais",
+    "mcp": {
+      "count": "{count} MCP | {count} MCPs",
+      "the": "o MCP {names} | os MCPs {names}",
+      "theDescribed": "o MCP {name} ({description})",
+      "described": "{name} ({description})"
+    },
+    "stage": {
+      "investigate": "Investigar",
+      "ask": "Perguntar",
+      "proceed": "Avançar",
+      "check": "Verificar",
+      "outcome": "Resultado"
+    },
+    "state": {
+      "investigating": "A investigar",
+      "waitingApproval": "A aguardar aprovação",
+      "proceeding": "A avançar",
+      "checking": "A verificar",
+      "worked": "Funcionou",
+      "noChange": "Sem alterações",
+      "cantFix": "Não é possível corrigir com estes MCPs",
+      "notNeeded": "Já não é necessário",
+      "worse": "Pior",
+      "declined": "Recusado",
+      "lapsed": "Caducado",
+      "stepFailed": "O passo falhou",
+      "outcomeUnknown": "Resultado desconhecido",
+      "failed": "Falhou",
+      "proposed": "Proposto",
+      "approved": "Aprovado",
+      "running": "Em execução",
+      "done": "Concluído",
+      "held": "Em espera",
+      "notRun": "Não executado",
+      "superseded": "Substituído"
+    },
+    "subtitle": "Escreva o que pretende que seja feito. Investiga, pergunta antes de qualquer alteração, avança e verifica.",
+    "tabs": {
+      "home": "Início",
+      "runs": "Execuções",
+      "saved": "Guardados"
+    },
+    "home": {
+      "examplesTitle": "Experimente uma destas",
+      "examples": {
+        "checkout": "Descubra por que o serviço de checkout devolve erros 5xx e corrija-o",
+        "payment": "Que alterações recentes afetaram o serviço de pagamentos?",
+        "ingestion": "Por que aumentou o atraso de ingestão na última hora?"
+      },
+      "startFailed": "Não foi possível iniciar a execução. Tente novamente."
+    },
+    "goalBox": {
+      "heading": "O que deve ser feito?",
+      "placeholder": "Descreva o resultado que pretende, por exemplo: descubra por que um serviço está a falhar e corrija-o",
+      "productData": "dados de {product}",
+      "canUse": "{mcps} e {data} | {mcps} e {data}",
+      "start": "Iniciar",
+      "asksFirst": "Pode consultar livremente. Pede a sua autorização antes de alterar qualquer coisa.",
+      "addConnection": "Adicionar um MCP",
+      "connectionsLabel": "MCPs que esta execução pode utilizar"
+    },
+    "connectionPicker": {
+      "chooseOne": "Escolha pelo menos um MCP.",
+      "upTo": "Até {mcps}",
+      "noneYouCanUse": "Não há MCPs que possa utilizar. Peça acesso a um administrador em IAM › Funções.",
+      "noneYet": "Esta organização ainda não tem MCPs. Adicione um em Definições › Conjuntos de ferramentas de IA."
+    },
+    "runs": {
+      "regionNote": "As execuções e os AutoResolves guardados pertencem à região onde foram criados.",
+      "recent": "Execuções recentes",
+      "viewAll": "Ver todas as execuções",
+      "search": "Pesquisar objetivos",
+      "stateGroup": {
+        "live": "Em tempo real",
+        "waiting": "A aguardar",
+        "ended": "Terminadas"
+      },
+      "startedBy": "Iniciado por",
+      "anyone": "Qualquer pessoa",
+      "me": "Eu",
+      "connection": "MCP",
+      "column": {
+        "lastRun": "Última execução",
+        "goal": "Objetivo",
+        "state": "Estado",
+        "startedBy": "Iniciado por",
+        "connections": "MCPs",
+        "took": "Duração"
+      },
+      "tookSoFar": "{time} até agora"
+    },
+    "orgAdmins": "Administradores da organização",
+    "approvers": {
+      "roles": "função {names} | funções {names}",
+      "groups": "grupo {names} | grupos {names}",
+      "separator": "; "
+    },
+    "connection": {
+      "removeConnection": "Remover {name}",
+      "removedChip": "{name} (removido)",
+      "moreRemoved": "e mais {count} removido | e mais {count} removidos",
+      "writeCredential": "Credencial para alterações aprovadas (opcional)",
+      "writeCredentialHelp": "Utilizada apenas em passos aprovados por uma pessoa. Quando estiver vazia, os passos aprovados utilizam os cabeçalhos do MCP acima.",
+      "writeValueSet": "Definida. Escreva um novo valor para a substituir.",
+      "writeValueRequired": "Introduza um valor",
+      "addWriteHeader": "Adicionar cabeçalho de credencial",
+      "draftWriteHeader": "Cabeçalho da alteração aprovada {name}"
+    },
+    "duration": {
+      "minutesSeconds": "{minutes} min {seconds} s"
+    },
+    "run": {
+      "reconnecting": "A restabelecer ligação…",
+      "working": "A processar…",
+      "investigating": "A investigar",
+      "investigatingNote": "As chamadas que apenas consultam passam diretamente. A execução pergunta-lhe antes da primeira alteração.",
+      "investigated": "Investigado",
+      "investigatedMeta": "{count} chamada, {duration} | {count} chamadas, {duration}",
+      "investigatedWithEvidence": "{calls} · {cited}",
+      "steps": "Passos",
+      "passCorrected": "Corrigido por {name} às {time}",
+      "passNotFixed": "Marcado como não corrigido por {name} às {time}",
+      "passPlannedAgain": "Planeado novamente às {time}",
+      "calls": "Chamadas",
+      "approvedBy": "Aprovado por {name} às {time}",
+      "stepCount": "{count} passo | {count} passos",
+      "stepLabel": "passo {seq}",
+      "proceedingNote": "Apenas as chamadas aprovadas são efetuadas, por ordem, uma vez cada. Qualquer outra alteração pausa a execução e volta a perguntar.",
+      "checking": "A verificar o resultado há {elapsed}",
+      "checkingAgain": "A verificar o resultado novamente há {elapsed}",
+      "investigatingFor": "A investigar há {elapsed}",
+      "proceedingFor": "A prosseguir há {elapsed}",
+      "silent": "O modelo de IA não responde há {quiet}. Vai tentar novamente ou parar às {time}.",
+      "silentOn": "O modelo de IA não responde há {quiet}. Vai tentar novamente ou parar em {time}.",
+      "revertHint": "Solicitar uma reversão exige nova aprovação antes de qualquer alteração.",
+      "raiseRevert": "Solicitar reversão",
+      "revertNote": "A verificação indica pior. Proponha uma alteração que reverta os passos aprovados.",
+      "planChanged": "O plano mudou; reveja-o novamente",
+      "approveFailed": "Não foi possível guardar a aprovação. Tente novamente.",
+      "declineFailed": "Não foi possível recusar o pedido. Tente novamente.",
+      "replanFailed": "Não foi possível pedir um novo plano. Tente novamente.",
+      "notice": {
+        "stepFailed": "O passo {step} falhou. Executado: {ran}. Não executado: {notRun}.",
+        "noSteps": "nenhum",
+        "outcomeUnknown": "Foi enviado um passo, mas não chegou resposta. Não será repetido.",
+        "failed": "A execução falhou e parou.",
+        "failedWith": "A execução falhou e parou. {reason}",
+        "stepFailedWith": "{reason} Executado: {ran}. Não executado: {notRun}.",
+        "stepFailedAlone": "O passo {step} falhou.",
+        "outcomeUnknownWith": "Foi enviado um passo, mas não chegou resposta. Não será repetido. {reason}",
+        "held": "A execução foi pausada: tentou uma chamada não aprovada, pelo que essa chamada foi retida."
+      },
+      "outcome": {
+        "checkedAt": "Verificado às {time}",
+        "endedAt": "Terminado às {time}",
+        "error": "A execução reportou um erro: {reason}"
+      },
+      "timeline": {
+        "title": "Cronologia",
+        "planned": "O agente propôs um plano",
+        "optionBand": "{title} ({band})",
+        "correctionOn": "Correção enviada por {name} em {option}: {kind}",
+        "notFixedOn": "{option} não resolveu: {note}",
+        "attemptEnded": "Terminado: {result}"
+      },
+      "evidence": {
+        "started": "Iniciado por {name}",
+        "approved": "{name} aprovou {option}",
+        "approvedPlan": "{name} aprovou o plano",
+        "stepSent": "Passo {seq} enviado: {tool}",
+        "stepDone": "Passo {seq} concluído: {tool}",
+        "stepDoneWith": "Passo {seq} concluído: {detail}",
+        "stepFailed": "Passo {seq} falhou: {tool}",
+        "stepFailedWith": "Passo {seq} falhou: {detail}",
+        "span": "{from} a {to}",
+        "ended": "Execução terminada",
+        "correction": "Correção enviada por {name}: {kind}",
+        "planAgain": "Novo plano solicitado por {name}",
+        "notFixedNote": "Não resolveu: {note}",
+        "remembered": "{time} · Memorizado para execuções futuras",
+        "connectionAdded": "{name} adicionou {mcp} a este AutoResolve e pediu um novo plano",
+        "connectionAddedRun": "{name} adicionou {mcp} a esta execução e pediu um novo plano",
+        "triggerOff": "O acionador do alerta está desativado até alguém o voltar a aprovar.",
+        "planningAgain": "A planear novamente",
+        "markedFixed": "Marcado como resolvido por {name}"
+      },
+      "facts": {
+        "title": "Esta execução",
+        "startedBy": "Iniciado por",
+        "started": "Iniciado",
+        "canUse": "Pode utilizar",
+        "canApprove": "Pode aprovar",
+        "option": "Opção",
+        "approval": "Aprovação",
+        "check": "Verificação",
+        "outcome": "Resultado",
+        "notChosen": "Ainda não escolhida",
+        "noneChosen": "Nenhuma escolhida",
+        "notAsked": "Ainda não solicitado",
+        "notAskedEnded": "Não solicitado",
+        "correctedNotApproved": "Corrigido, nunca aprovado",
+        "waitingForYou": "À espera de si. Expira às {time}",
+        "waitingForYouOn": "À espera de si. Expira {time}",
+        "waitingFor": "À espera de {names}. Expira às {time}",
+        "waitingForOn": "À espera de {names}. Expira {time}",
+        "lapsedAt": "Expirou às {time}",
+        "lapsedOn": "Expirou {time}",
+        "checkNotRun": "Ainda não executada",
+        "checkRunning": "Em curso",
+        "checkMet": "Cumprida",
+        "checkNotMet": "Não cumprida",
+        "checkDidNotRun": "Não foi executada",
+        "notKnown": "Ainda não se sabe",
+        "evidenceNote": "Todas as chamadas são mantidas como evidência, com os respetivos argumentos e resultado.",
+        "notInAutoResolve": "Não incluído neste AutoResolve: {mcps}"
+      }
+    },
+    "approval": {
+      "optionsLabel": "Opções",
+      "recommended": "Recomendado",
+      "ruledOut": "Excluído: {list}",
+      "evidenceSummary": "{count} leitura citada, {decisive} decisiva | {count} leituras citadas, {decisive} decisivas",
+      "unverified": "{count} citação não verificada | {count} citações não verificadas",
+      "viewEvidence": "Ver evidências",
+      "stepSummary": "{count} passo através de {mcps} | {count} passos através de {mcps}",
+      "omitted": "{count} outra opção foi omitida: {reason} | {count} outras opções foram omitidas: {reason}",
+      "omittedNoReason": "{count} outra opção foi omitida. | {count} outras opções foram omitidas.",
+      "missingCapability": "Nenhum dos MCPs desta execução consegue fazer isto: {capability}",
+      "inFull": "{title} na íntegra",
+      "changes": "A aprovar alterações em {mcps}.",
+      "canApprove": "Podem aprovar: {names}",
+      "lapsesAt": "Expira às {time}",
+      "lapsesOn": "Expira em {time}",
+      "decline": "Recusar",
+      "askDifferent": "Pedir um plano diferente",
+      "approve": "Aprovar e continuar",
+      "noteLabel": "O que deve o novo plano fazer de diferente?",
+      "notePlaceholder": "Por exemplo: manter a alteração num pull request",
+      "sendNote": "Pedir um novo plano",
+      "cannotApprove": "Não pode aprovar alterações através de {mcps}. Podem aprovar: {approvers}.",
+      "connectionRemoved": "{mcps} foi removido após a criação deste plano, pelo que esta opção não pode ser aprovada. | {mcps} foram removidos após a criação deste plano, pelo que esta opção não pode ser aprovada.",
+      "connectionRemovedOther": "{mcps} foi removido após a criação deste plano, pelo que esta opção não pode ser aprovada. Escolha outra opção ou peça um plano diferente. | {mcps} foram removidos após a criação deste plano, pelo que esta opção não pode ser aprovada. Escolha outra opção ou peça um plano diferente.",
+      "aRemovedConnection": "Um MCP desta opção",
+      "removedNote": "Crie um plano que não use {mcps}; foi removido. | Crie um plano que não use {mcps}; foram removidos.",
+      "lapsedAt": "Este pedido expirou às {time}.",
+      "lapsedOn": "Este pedido expirou em {time}.",
+      "lapsed": "Este pedido expirou.",
+      "lapsedBody": "Ninguém o aprovou a tempo, pelo que nada foi alterado. O alvo pode ter mudado entretanto; comece de novo para obter um plano atual.",
+      "startAgain": "Começar de novo",
+      "startAgainFailed": "Não foi possível iniciar novamente a execução. Tente novamente.",
+      "connectionsGone": "O MCP utilizado nesta execução foi removido. | Os MCPs utilizados nesta execução foram removidos.",
+      "chooseConnections": "Escolher MCPs",
+      "heldCall": "{tool} através de {mcp}",
+      "changedSincePlan": "Outra execução alterou {mcps} desde que este plano foi criado. Verifique se a alteração ainda é necessária antes de aprovar. | {count} outras execuções alteraram {mcps} desde que este plano foi criado. Verifique se a alteração ainda é necessária antes de aprovar.",
+      "viewChangedRun": "Ver essa execução | Ver a execução mais recente",
+      "heldWhilePlanning": "Durante a investigação, tentou uma alteração, pelo que essa chamada foi retida e não executada: {tools}. | Durante a investigação, tentou {count} alterações, pelo que essas chamadas foram retidas e não executadas: {tools}.",
+      "declined": "Este pedido foi recusado. Nada foi alterado.",
+      "correctPlan": "Corrigir este plano",
+      "partialFix": "Correção parcial",
+      "partialFixLeaves": "Deixa por fazer: {text}"
+    },
+    "step": {
+      "runningFor": "Em execução há {elapsed}",
+      "reason": "Motivo do agente",
+      "arguments": "Argumentos",
+      "preview": "Pré-visualização",
+      "dryRunAfter": "A execução de teste é feita depois de aprovar; a execução para se esta falhar.",
+      "result": "Resultado",
+      "error": "Erro",
+      "held": "Não está no plano aprovado",
+      "showAll": "Mostrar os argumentos completos",
+      "showFullResult": "Mostrar o resultado completo",
+      "showLess": "Mostrar menos",
+      "refChip": "{arg} do passo {step}",
+      "refNote": "Preenchido pelo sistema com o resultado do passo {steps}, não pelo agente. | Preenchido pelo sistema com os resultados dos passos {steps}, não pelo agente."
+    },
+    "savedTitle": "AutoResolve guardado",
+    "saved": {
+      "back": "AutoResolves guardados",
+      "newTitle": "Guardar como AutoResolve",
+      "saveAsAutoResolve": "Guardar como AutoResolve",
+      "runNow": "Executar agora",
+      "deleteTitle": "Eliminar este AutoResolve?",
+      "deleteMessage": "O seu gatilho para e já não pode ser executado. As execuções anteriores mantêm-se.",
+      "deleted": "AutoResolve eliminado",
+      "deleteFailed": "O AutoResolve não foi eliminado. Tente novamente.",
+      "runFailed": "Não foi possível iniciar o AutoResolve. Tente novamente.",
+      "saveFailed": "O AutoResolve não foi guardado. Tente novamente.",
+      "notFoundHint": "Pode ter sido eliminado.",
+      "runNotLoaded": "Não foi possível carregar a execução a guardar",
+      "field": {
+        "goal": "Objetivo",
+        "connections": "MCPs",
+        "runsWhen": "Executa quando",
+        "trigger": "Gatilho",
+        "approval": "Aprovação",
+        "savedBy": "Guardado por"
+      },
+      "kind": {
+        "person": "Iniciado por uma pessoa",
+        "alert": "Um alerta dispara",
+        "incident": "Um incidente é aberto"
+      },
+      "runsWhenAlert": "Um alerta dispara: {alert}",
+      "runsWhenIncident": "Um incidente é aberto a partir de {alert}",
+      "runsWhenAlertGone": "Um alerta dispara, mas o respetivo alerta foi eliminado",
+      "runsWhenIncidentGone": "Um incidente é aberto, mas o respetivo alerta foi eliminado",
+      "triggerSwitch": "Iniciar execuções a partir deste gatilho",
+      "triggerApproved": "Aprovado por {name} em {time}",
+      "paused": "Em pausa até nova aprovação: uma edição desativou este gatilho. Ao ativá-lo, aprova-o em seu nome.",
+      "approval": "Aprovações pedidas no canal {slack}.",
+      "savedBy": "{name} em {time}",
+      "openSourceRun": "Abrir a execução a partir da qual foi guardado",
+      "regionNotice": "Esta região não executa alertas e incidentes, pelo que este gatilho não será disparado aqui.",
+      "connectionsRemoved": "{mcps} foi removido. Remova-o deste AutoResolve ou adicione-o novamente. | {mcps} foram removidos. Remova-os deste AutoResolve ou adicione-os novamente.",
+      "slackUnavailable": "A aprovação via Slack não está disponível nesta instalação, pelo que os gatilhos de alertas e incidentes não podem ser ativados.",
+      "slackUnavailableOn": "A aprovação via Slack não está disponível nesta instalação, pelo que as execuções deste gatilho não podem ser aprovadas no Slack. Desative-o ou aprove-as no ecrã.",
+      "lastRuns": "Últimas execuções",
+      "lastRunsMore": "A mostrar as {shown} execuções mais recentes de {total}.",
+      "lastRunsEmpty": "As execuções deste AutoResolve aparecem aqui, quer tenham sido iniciadas por uma pessoa quer pelo respetivo gatilho.",
+      "triggerState": {
+        "on": "Ativado",
+        "off": "Desativado",
+        "paused": "Em pausa até nova aprovação"
+      },
+      "form": {
+        "name": "Nome",
+        "goal": "Objetivo",
+        "connections": "MCPs",
+        "connectionsHelp": "As suas execuções só podem usar estes MCPs.",
+        "connectionsPlaceholder": "Adicionar MCPs",
+        "connectionsNotFilled": "Esta execução usou {mcps}, que foi removido, pelo que não foi preenchido. | Esta execução usou {mcps}, que foram removidos, pelo que não foram preenchidos.",
+        "runsWhen": "Executa quando",
+        "alert": "Alerta",
+        "incidentAlert": "Alerta que abre o incidente",
+        "alertPlaceholder": "Escolha um alerta",
+        "alertGone": "Alerta eliminado",
+        "alertsForbidden": "Não tem acesso aos alertas, por isso não é possível listar nenhum aqui.",
+        "alertsFailed": "Não foi possível carregar os alertas. Reabra este formulário para tentar novamente.",
+        "connectionsFailed": "Não foi possível carregar os MCPs. Reabra este formulário para tentar novamente.",
+        "alertsNone": "Esta organização ainda não tem alertas. Crie um em Alertas primeiro.",
+        "createTriggerHelp": "Guardar ativa este acionador. Cada execução solicita aprovação no canal {slack} de aprovações.",
+        "editPausesHelp": "Alterar o objetivo, os MCPs ou o acionador desativa o acionador até que alguém que possa aprovar o volte a ativar.",
+        "nameRequired": "Introduza um nome.",
+        "goalRequired": "Introduza um objetivo.",
+        "tooLong": "Utilize {max} caracteres ou menos.",
+        "alertRequired": "Escolha um alerta.",
+        "save": "Guardar AutoResolve",
+        "saveChanges": "Guardar alterações"
+      },
+      "list": {
+        "search": "Pesquisar AutoResolves guardados",
+        "column": {
+          "name": "Nome",
+          "runsWhen": "É executado quando",
+          "trigger": "Acionador",
+          "connections": "MCPs",
+          "savedBy": "Guardado por",
+          "updated": "Atualizado"
+        }
+      },
+      "loadFailed": "Não foi possível carregar o AutoResolve"
+    },
+    "andMore": "e mais {count} | e mais {count}",
+    "correction": {
+      "title": "O que está errado com este plano?",
+      "kindsLabel": "O que está errado",
+      "kind": {
+        "wrongCause": "Causa errada",
+        "wrongFix": "Correção errada",
+        "outOfScope": "Vai além deste AutoResolve",
+        "notFixed": "Não corrigiu"
+      },
+      "help": {
+        "none": "Escolha o que está errado e depois indique-o na nota.",
+        "wrongCause": "Causa errada: o agente atribuiu a culpa à coisa errada, por isso a correção aponta para o local errado.",
+        "wrongFix": "Correção errada: a causa está certa, mas a alteração não é a que pretende.",
+        "outOfScope": "Vai além deste AutoResolve: o plano altera coisas que este AutoResolve devia deixar intactas."
+      },
+      "draft": {
+        "wrongCause": "\"{option}\" aponta para a causa errada.",
+        "wrongFix": "\"{option}\" não é a alteração que pretendo.",
+        "outOfScope": "\"{option}\" altera mais do que este AutoResolve devia."
+      },
+      "noteLabel": "Nota",
+      "noteHelp": "O agente lê isto antes de voltar a planear.",
+      "notePickFirst": "Escolha primeiro o que está errado",
+      "remember": "Memorizar para execuções futuras de \"{name}\"",
+      "rememberHelp": "As execuções posteriores veem esta nota. Pode removê-la do AutoResolve.",
+      "send": "Enviar correção"
+    },
+    "correctionsUsed": {
+      "chip": "Utilizou {count} correção | Utilizou {count} correções",
+      "title": "Correções utilizadas por este plano",
+      "thisRun": "{name}, esta execução, {time}",
+      "earlierRun": "{name}, uma execução anterior, {time}",
+      "manage": "Gerir correções no AutoResolve"
+    },
+    "missing": {
+      "title": "Esta correção precisa de {mcp}, que este AutoResolve não tem",
+      "titleRun": "Esta correção precisa de {mcp}, que esta execução não tem",
+      "add": "Adicionar {mcp} e planear novamente",
+      "orPartial": "Ou aprove a correção parcial abaixo. | Ou aprove uma das correções parciais abaixo.",
+      "cannotAdd": "Só quem pode aprovar alterações através de {mcp} o pode adicionar.",
+      "dialogAutoResolve": "AutoResolve",
+      "dialogConnection": "MCP a adicionar",
+      "dialogTriggerOff": "Adicionar um MCP desativa o acionador de alerta do AutoResolve até que alguém o aprove novamente.",
+      "dialogThen": "Esta execução volta então a planear com {mcp}. Nada muda até que alguém aprove o novo plano.",
+      "dialogConfirm": "Adicionar e planear novamente",
+      "addFailed": "Não foi possível adicionar {mcp}. Tente novamente.",
+      "needs": "Esta correção precisa de {mcp}: {action}"
+    },
+    "verdict": {
+      "question": "Isto resolveu o problema?",
+      "yes": "Sim",
+      "no": "Não, não resolveu",
+      "noteLabel": "O que ainda não está certo?",
+      "stillFiring": "{trigger} ainda está disparado",
+      "filledFrom": "Preenchido a partir de {trigger}.",
+      "planAgain": "Planear novamente",
+      "agent": "Agente",
+      "fixed": "Corrigido",
+      "notFixed": "Não resolveu",
+      "byAt": "{name}, {time}",
+      "noteAt": "{note} · {time}",
+      "failed": "A sua resposta não foi guardada. Tente novamente."
+    },
+    "corrections": {
+      "title": "Correções",
+      "help": "Cada nova execução deste AutoResolve lê estas correções. Nunca aprovam nada.",
+      "source": "De {run}, por {name}",
+      "runOf": "execução de {time}",
+      "sourceGone": "De uma execução que já não existe, {time} por {name}",
+      "removeFailed": "A correção não foi removida. Tente novamente."
+    },
+    "incident": {
+      "title": "AutoResolve",
+      "note": "Uma execução por incidente. Pede confirmação antes de alterar qualquer coisa.",
+      "loading": "A carregar o AutoResolve…",
+      "loadFailed": "Não foi possível carregar o AutoResolve deste incidente.",
+      "newRun": "Nova execução para este incidente",
+      "liveRun": "Esta é a execução do incidente. Uma nova execução pode começar quando esta terminar.",
+      "openRun": "Abrir execução",
+      "related": "AutoResolves guardados para os alertas deste incidente",
+      "suggestedFor": "Sugerido para incidentes de {alert}",
+      "startsOn": "Começa em {alert}",
+      "run": "Executar",
+      "runLocked": "{run} é a execução em tempo real deste incidente. Uma nova execução pode começar quando esta terminar.",
+      "empty": "Nenhum AutoResolve foi executado neste incidente e nenhum está guardado para os seus alertas."
+    }
   },
   "autobotInvestigate": {
     "greeting": "O que devemos investigar?",

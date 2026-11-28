@@ -4,6 +4,7 @@ import {
   candidateMenu,
   correlatedByKeys,
   correlatedByLabel,
+  droppedDimensions,
   headerVersion,
   locationDimensions,
 } from "./correlationHeader";
@@ -129,5 +130,30 @@ describe("header version", () => {
     { ambiguous: true, instanceVersion: "1.2.0", serviceVersion: "1.3.0", shown: "" },
   ])("shows $shown", ({ shown, ...input }) => {
     expect(headerVersion(input)).toBe(shown);
+  });
+});
+
+describe("dropped dimensions", () => {
+  it("lists a dimension the server dropped on every stream as a missing field", () => {
+    const streams = [
+      stream({ k8s_cluster: "c1" }, ["k8s-pod-name"]),
+      stream({ k8s_cluster: "c1" }, ["k8s-pod-name", "host_name"]),
+    ];
+    expect(droppedDimensions(streams, groups)).toEqual([
+      { id: "k8s-pod-name", field: "k8s_pod_name", reason: "missing" },
+      { id: "host_name", field: "host_name", reason: "missing" },
+    ]);
+  });
+
+  it("leaves out a dimension that is applied on another stream, and the service", () => {
+    const streams = [
+      stream({}, ["k8s-namespace", "service"]),
+      stream({ k8s_namespace_name: "shop" }),
+    ];
+    expect(droppedDimensions(streams, groups)).toEqual([]);
+  });
+
+  it("is empty when nothing was dropped", () => {
+    expect(droppedDimensions([stream({ k8s_cluster: "c1" })], groups)).toEqual([]);
   });
 });

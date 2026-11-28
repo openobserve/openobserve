@@ -9242,6 +9242,9 @@
     "logsMessageField": "Message field",
     "logsLevelField": "Level field",
     "logsTimeField": "Time field",
+    "logsTimeFieldNoValues": "Time field \"{field}\" has no valid timestamps",
+    "logsLevelFieldNoValues": "Level field \"{field}\" has no values in the results",
+    "logsMessageFieldNoValues": "Message field \"{field}\" has no values in the results",
     "htmlPanelFieldTooltip": "Leave empty to detect the column from the query results",
     "logsOrder": "Order",
     "logsOrderNewest": "Newest first",
@@ -18549,7 +18552,16 @@
     "panelTimeSeriesFor": "Time series for {stream}",
     "panelTimeSeriesForWithType": "Time series for {stream} ({type})",
     "logsPanelTitle": "Logs - {stream}",
-    "logsPanelDescription": "Correlated logs for service {service}"
+    "logsPanelDescription": "Correlated logs for service {service}",
+    "noDataInScope": "No data in this scope",
+    "noDataInScopeReason": "No rows match these filters in this time range.",
+    "droppedCount": "+{count} dropped | +{count} dropped",
+    "droppedTitle": "Not used as filters",
+    "droppedNoRows": "No rows with {value}",
+    "droppedNoField": "Field not on these streams",
+    "allNoDataTitle": "No metric has data in this scope",
+    "allNoDataScope": "{scope}, {window}",
+    "allNoDataAction": "Show metrics without data"
   },
   "search_scheduler_job": {
     "title": "Search Job Scheduler",
@@ -20615,6 +20627,13 @@
       "sampleExpected": "Expected Output",
       "fromTrace": "From trace span {id}",
       "openInPlaygroundFailed": "Could not open this span in the Playground"
+    },
+    "largeStream": {
+      "notice": "{stream}: about {size} in this range, no agent filter. May take minutes.",
+      "pickAgent": "Pick an agent",
+      "addFilter": "Add a filter",
+      "runAnyway": "Run anyway",
+      "notRun": "Not run"
     }
   },
   "onlineEvals": {
@@ -21912,7 +21931,10 @@
       "excludeFromQuery": "Exclude",
       "createAlertAction": "Create alert",
       "noMatchTerms": "This pattern has no distinctive text to filter on.",
-      "noDistinctTextTooltip": "Every piece of fixed text in this pattern also appears in another pattern, so a filter would match their logs too.",
+      "noDistinctTextTooltip": "This pattern's text also appears in another pattern's logs, often the same message at a different log level, so a filter can't count it on its own.",
+      "volumeUnsupported": "Volume isn't available for searches that use WITH, JOIN, UNION, a table alias or a subquery.",
+      "volumeFailedRetry": "Couldn't load the volume. The server may be busy, so try again.",
+      "volumeFailed": "Couldn't load the volume for this pattern.",
       "noStreamSelected": "No stream selected. Please select a stream before creating an alert.",
       "alertBroadMatch": "This pattern has no distinctive constant text — the alert query will match broadly. Consider adding manual filters."
     },

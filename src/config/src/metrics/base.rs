@@ -503,6 +503,20 @@ pub static USAGE_ENQUEUE_FAILURES_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
+/// Audit rows dropped because the remote reporting retry buffer was full.
+pub static AUDIT_REQUEUE_DROPPED_TOTAL: Lazy<IntCounter> = Lazy::new(|| {
+    IntCounter::with_opts(
+        Opts::new(
+            "audit_requeue_dropped_total",
+            "Audit rows dropped because the remote reporting retry buffer was full.".to_owned()
+                + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+    )
+    .expect("Metric created")
+});
+
 /// Trial-quota pool movements dropped before reaching the database — SPEC
 /// §9B.1 row 9, alerted on by **A5**, and the direct signal for §11 **F8**.
 ///
@@ -3350,6 +3364,9 @@ pub(crate) fn register(registry: &Registry) {
         .register(Box::new(USAGE_ENQUEUE_FAILURES_TOTAL.clone()))
         .expect("Metric registered");
     registry
+        .register(Box::new(AUDIT_REQUEUE_DROPPED_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
         .register(Box::new(TRIAL_QUOTA_FLUSH_DROPS_TOTAL.clone()))
         .expect("Metric registered");
     registry
@@ -3934,6 +3951,7 @@ mod tests {
         let _ = SYNTHETICS_STEP_ZERO_FALLBACK_TOTAL.clone();
         let _ = SYNTHETICS_COMPOSITION_GUARD_FAILURES_TOTAL.clone();
         let _ = USAGE_ENQUEUE_FAILURES_TOTAL.clone();
+        let _ = AUDIT_REQUEUE_DROPPED_TOTAL.clone();
         let _ = TRIAL_QUOTA_FLUSH_DROPS_TOTAL.clone();
         let _ = METERING_OFFSET_AGE_SECONDS.clone();
         let _ = METERING_BILLING_ROWS.clone();

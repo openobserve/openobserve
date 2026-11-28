@@ -527,7 +527,9 @@
       "linkedDomains": "gekoppelde domeinen",
       "domainMappings": "domeinmappings",
       "domainRequests": "koppelverzoeken",
-      "blockedUsers": "geblokkeerde gebruikers"
+      "blockedUsers": "geblokkeerde gebruikers",
+      "autoresolveRuns": "uitvoeringen",
+      "savedAutoResolve": "opgeslagen AutoResolves"
     },
     "demo": {
       "pageTitle": "Lege statussen — volledige set ter beoordeling",
@@ -652,6 +654,23 @@
     "noOncallUnrouted": {
       "title": "Niets heeft een eigenaar nodig",
       "description": "Elk alarm dat afging, bereikte een team."
+    },
+    "noAutoResolveRuns": {
+      "title": "Nog geen uitvoeringen",
+      "description": "Uitvoeringen die jij en je team starten, verschijnen hier."
+    },
+    "noAutoResolveConnections": {
+      "title": "Voeg eerst een MCP toe",
+      "description": "Een AutoResolve werkt via de MCP's die je organisatie heeft toegevoegd, zoals een codehost, een deploytool of een cluster. Deze organisatie heeft er nog geen toegevoegd."
+    },
+    "noUsable": {
+      "mcps": "Geen MCP's die je kunt gebruiken",
+      "aiToolsets": "Geen AI-toolsets die je kunt gebruiken",
+      "askAdmin": "Vraag een beheerder om toegang in IAM › Rollen."
+    },
+    "noSavedAutoResolve": {
+      "title": "Nog geen opgeslagen AutoResolves",
+      "description": "Open een afgeronde uitvoering en kies Opslaan als AutoResolve om het doel opnieuw uit te voeren, of om deze te starten wanneer een alarm afgaat."
     }
   },
   "accessBoundary": {
@@ -2075,6 +2094,7 @@
   },
   "menu": {
     "alertCalibration": "Alarmkalibratie",
+    "autoresolve": "AutoResolve",
     "autoobserve": "AutoObserve",
     "upgradeToProPlan": "Upgrade naar PRO Plan",
     "home": "Home",
@@ -9224,6 +9244,9 @@
     "logsMessageField": "Berichtveld",
     "logsLevelField": "Niveauveld",
     "logsTimeField": "Tijdveld",
+    "logsTimeFieldNoValues": "Tijdveld \"{field}\" heeft geen geldige tijdstempels",
+    "logsLevelFieldNoValues": "Niveauveld \"{field}\" heeft geen waarden in de resultaten",
+    "logsMessageFieldNoValues": "Berichtveld \"{field}\" heeft geen waarden in de resultaten",
     "htmlPanelFieldTooltip": "Laat leeg om de kolom uit de queryresultaten te bepalen",
     "logsOrder": "Volgorde",
     "logsOrderNewest": "Nieuwste eerst",
@@ -18531,7 +18554,16 @@
     "panelTimeSeriesFor": "Tijdreeks voor {stream}",
     "panelTimeSeriesForWithType": "Tijdreeks voor {stream} ({type})",
     "logsPanelTitle": "Logs - {stream}",
-    "logsPanelDescription": "Gecorreleerde logs voor service {service}"
+    "logsPanelDescription": "Gecorreleerde logs voor service {service}",
+    "noDataInScope": "Geen gegevens in dit bereik",
+    "noDataInScopeReason": "Geen rijen komen overeen met deze filters in dit tijdsbereik.",
+    "droppedCount": "+{count} weggelaten | +{count} weggelaten",
+    "droppedTitle": "Niet als filter gebruikt",
+    "droppedNoRows": "Geen rijen met {value}",
+    "droppedNoField": "Veld niet in deze streams",
+    "allNoDataTitle": "Geen metriek heeft gegevens in dit bereik",
+    "allNoDataScope": "{scope}, {window}",
+    "allNoDataAction": "Metrieken zonder gegevens tonen"
   },
   "search_scheduler_job": {
     "title": "Planner voor zoektaken",
@@ -20597,6 +20629,13 @@
       "sampleExpected": "Verwachte output",
       "fromTrace": "Van trace-span {id}",
       "openInPlaygroundFailed": "Kon deze span niet openen in de Playground."
+    },
+    "largeStream": {
+      "notice": "{stream}: ongeveer {size} in dit bereik, geen agentfilter. Kan minuten duren.",
+      "pickAgent": "Kies een agent",
+      "addFilter": "Filter toevoegen",
+      "runAnyway": "Toch uitvoeren",
+      "notRun": "Niet uitgevoerd"
     }
   },
   "onlineEvals": {
@@ -21894,7 +21933,10 @@
       "excludeFromQuery": "Uitsluiten",
       "createAlertAction": "Alarm maken",
       "noMatchTerms": "Dit patroon heeft geen onderscheidende tekst om op te filteren.",
-      "noDistinctTextTooltip": "Elk vast stuk tekst in dit patroon komt ook voor in een ander patroon, dus een filter zou ook hun logs matchen.",
+      "noDistinctTextTooltip": "De tekst van dit patroon komt ook voor in de logs van een ander patroon, vaak hetzelfde bericht op een ander logniveau, dus een filter kan het niet op zichzelf tellen.",
+      "volumeUnsupported": "Het volume is niet beschikbaar voor zoekopdrachten met WITH, JOIN, UNION, een tabelalias of een subquery.",
+      "volumeFailedRetry": "Het volume kon niet worden geladen. De server is mogelijk bezet, probeer het opnieuw.",
+      "volumeFailed": "Het volume voor dit patroon kon niet worden geladen.",
       "noStreamSelected": "Geen stream geselecteerd. Selecteer een stream voordat u een alarm maakt.",
       "alertBroadMatch": "Dit patroon heeft geen onderscheidende constante tekst — de alarmquery zal breed matchen. Overweeg handmatige filters toe te voegen."
     },
@@ -34659,6 +34701,464 @@
     "fixedToNow": "Eindigt nu, verschuift niet",
     "gateOrder": "Start moet vóór einde liggen.",
     "gateInvalid": "Geen geldig bereik."
+  },
+  "autoresolve": {
+    "title": "AutoResolve",
+    "runTitle": "AutoResolve-uitvoering",
+    "runNotFound": "Deze uitvoering is niet gevonden",
+    "runNotFoundHint": "Mogelijk is deze verwijderd, of de link is onjuist.",
+    "runForbidden": "Je hebt geen toegang tot deze uitvoering",
+    "namesMore": "{count} meer | {count} meer",
+    "mcp": {
+      "count": "{count} MCP | {count} MCP's",
+      "the": "de {names} MCP | de {names} MCP's",
+      "theDescribed": "de {name} MCP ({description})",
+      "described": "{name} ({description})"
+    },
+    "stage": {
+      "investigate": "Onderzoeken",
+      "ask": "Vragen",
+      "proceed": "Doorgaan",
+      "check": "Controleren",
+      "outcome": "Uitkomst"
+    },
+    "state": {
+      "investigating": "Bezig met onderzoeken",
+      "waitingApproval": "Wacht op goedkeuring",
+      "proceeding": "Wordt voortgezet",
+      "checking": "Bezig met controleren",
+      "worked": "Gelukt",
+      "noChange": "Geen wijziging",
+      "cantFix": "Kan niet worden opgelost met deze MCP's",
+      "notNeeded": "Niet meer nodig",
+      "worse": "Slechter",
+      "declined": "Afgewezen",
+      "lapsed": "Verlopen",
+      "stepFailed": "Stap mislukt",
+      "outcomeUnknown": "Uitkomst onbekend",
+      "failed": "Mislukt",
+      "proposed": "Voorgesteld",
+      "approved": "Goedgekeurd",
+      "running": "Wordt uitgevoerd",
+      "done": "Klaar",
+      "held": "In de wacht",
+      "notRun": "Niet uitgevoerd",
+      "superseded": "Vervangen"
+    },
+    "subtitle": "Typ wat je gedaan wilt hebben. Het onderzoekt, vraagt toestemming voordat er iets wordt gewijzigd, gaat verder en controleert.",
+    "tabs": {
+      "home": "Home",
+      "runs": "Uitvoeringen",
+      "saved": "Opgeslagen"
+    },
+    "home": {
+      "examplesTitle": "Probeer een van deze",
+      "examples": {
+        "checkout": "Zoek uit waarom de checkoutservice 5xx-fouten retourneert en los het op.",
+        "payment": "Welke recente wijzigingen hebben de paymentservice geraakt?",
+        "ingestion": "Waarom is de ingestievertraging het afgelopen uur toegenomen?"
+      },
+      "startFailed": "De uitvoering kon niet starten. Probeer het opnieuw."
+    },
+    "goalBox": {
+      "heading": "Wat moet er gebeuren?",
+      "placeholder": "Beschrijf het gewenste resultaat, bijvoorbeeld: zoek uit waarom een service faalt en los het op",
+      "productData": "{product}-gegevens",
+      "canUse": "{mcps} en {data} | {mcps}, en {data}",
+      "start": "Start",
+      "asksFirst": "Het kan vrij rondkijken. Het vraagt je om toestemming voordat het iets wijzigt.",
+      "addConnection": "Een MCP toevoegen",
+      "connectionsLabel": "MCP's die deze uitvoering kan gebruiken"
+    },
+    "connectionPicker": {
+      "chooseOne": "Kies ten minste één MCP.",
+      "upTo": "Maximaal {mcps}",
+      "noneYouCanUse": "Geen MCP's die je kunt gebruiken. Vraag een beheerder om toegang in IAM › Rollen.",
+      "noneYet": "Deze organisatie heeft nog geen MCP's. Voeg er eerst een toe in Instellingen › AI-toolsets."
+    },
+    "runs": {
+      "regionNote": "Uitvoeringen en opgeslagen AutoResolves horen bij de regio waar ze zijn gemaakt.",
+      "recent": "Recente uitvoeringen",
+      "viewAll": "Alle uitvoeringen bekijken",
+      "search": "Doelen zoeken",
+      "stateGroup": {
+        "live": "Live",
+        "waiting": "Wachtend",
+        "ended": "Beëindigd"
+      },
+      "startedBy": "Gestart door",
+      "anyone": "Iedereen",
+      "me": "Ik",
+      "connection": "MCP",
+      "column": {
+        "lastRun": "Laatste uitvoering",
+        "goal": "Doel",
+        "state": "Status",
+        "startedBy": "Gestart door",
+        "connections": "MCP's",
+        "took": "Duur"
+      },
+      "tookSoFar": "{time} tot nu toe"
+    },
+    "orgAdmins": "Org-beheerders",
+    "approvers": {
+      "roles": "rol {names} | rollen {names}",
+      "groups": "groep {names} | groepen {names}",
+      "separator": "; "
+    },
+    "connection": {
+      "removeConnection": "Verwijder {name}",
+      "removedChip": "{name} (verwijderd)",
+      "moreRemoved": "en nog {count} andere verwijderd | en nog {count} andere verwijderd",
+      "writeCredential": "Inloggegevens voor goedgekeurde wijzigingen (optioneel)",
+      "writeCredentialHelp": "Alleen gebruikt voor stappen die een persoon heeft goedgekeurd. Als dit leeg is, gebruiken goedgekeurde stappen de headers van de MCP hierboven.",
+      "writeValueSet": "Ingesteld. Typ een nieuwe waarde om deze te vervangen.",
+      "writeValueRequired": "Voer een waarde in",
+      "addWriteHeader": "Header voor inloggegevens toevoegen",
+      "draftWriteHeader": "Header voor goedgekeurde wijziging {name}"
+    },
+    "duration": {
+      "minutesSeconds": "{minutes} min {seconds} s"
+    },
+    "run": {
+      "reconnecting": "Opnieuw verbinden…",
+      "working": "Bezig…",
+      "investigating": "Wordt onderzocht",
+      "investigatingNote": "Aanroepen die alleen lezen, gaan direct door. De uitvoering vraagt je vóór de eerste wijziging om goedkeuring.",
+      "investigated": "Onderzocht",
+      "investigatedMeta": "{count} aanroep, {duration} | {count} aanroepen, {duration}",
+      "investigatedWithEvidence": "{calls} · {cited}",
+      "steps": "Stappen",
+      "passCorrected": "Gecorrigeerd door {name} op {time}",
+      "passNotFixed": "Gemarkeerd als niet opgelost door {name} op {time}",
+      "passPlannedAgain": "Opnieuw gepland op {time}",
+      "calls": "Aanroepen",
+      "approvedBy": "Goedgekeurd door {name} op {time}",
+      "stepCount": "{count} stap | {count} stappen",
+      "stepLabel": "stap {seq}",
+      "proceedingNote": "Alleen de goedgekeurde aanroepen gaan door, in volgorde, elk één keer. Elke andere wijziging pauzeert de uitvoering en vraagt opnieuw om goedkeuring.",
+      "checking": "Het resultaat wordt al {elapsed} gecontroleerd",
+      "checkingAgain": "Het resultaat wordt al {elapsed} opnieuw gecontroleerd",
+      "investigatingFor": "Wordt al {elapsed} onderzocht",
+      "proceedingFor": "Wordt al {elapsed} uitgevoerd",
+      "silent": "Het AI-model heeft al {quiet} niet geantwoord. Het probeert het opnieuw of stopt om {time}.",
+      "silentOn": "Het AI-model heeft al {quiet} niet geantwoord. Het probeert het opnieuw of stopt op {time}.",
+      "revertHint": "Het aanvragen van een terugdraaiing vraagt opnieuw om goedkeuring voordat er iets verandert.",
+      "raiseRevert": "Een terugdraaiing aanvragen",
+      "revertNote": "De controle geeft een slechter resultaat. Stel een wijziging voor die de goedgekeurde stappen terugdraait.",
+      "planChanged": "Het plan is gewijzigd; bekijk het opnieuw",
+      "approveFailed": "De goedkeuring kon niet worden opgeslagen. Probeer het opnieuw.",
+      "declineFailed": "Het verzoek kon niet worden geweigerd. Probeer het opnieuw.",
+      "replanFailed": "Er kon geen nieuw plan worden aangevraagd. Probeer het opnieuw.",
+      "notice": {
+        "stepFailed": "Stap {step} is mislukt. Uitgevoerd: {ran}. Niet uitgevoerd: {notRun}.",
+        "noSteps": "geen",
+        "outcomeUnknown": "Er is een stap verzonden, maar er kwam geen antwoord terug. Deze wordt niet opnieuw geprobeerd.",
+        "failed": "De uitvoering is mislukt en gestopt.",
+        "failedWith": "De uitvoering is mislukt en gestopt. {reason}",
+        "stepFailedWith": "{reason} Uitgevoerd: {ran}. Niet uitgevoerd: {notRun}.",
+        "stepFailedAlone": "Stap {step} is mislukt.",
+        "outcomeUnknownWith": "Er is een stap verzonden, maar er kwam geen antwoord terug. Deze wordt niet opnieuw geprobeerd. {reason}",
+        "held": "De uitvoering is gepauzeerd: er is een aanroep geprobeerd die niet was goedgekeurd, dus die aanroep is tegengehouden."
+      },
+      "outcome": {
+        "checkedAt": "Gecontroleerd op {time}",
+        "endedAt": "Beëindigd op {time}",
+        "error": "De uitvoering meldde een fout: {reason}"
+      },
+      "timeline": {
+        "title": "Tijdlijn",
+        "planned": "Agent heeft een plan voorgesteld",
+        "optionBand": "{title} ({band})",
+        "correctionOn": "Correctie verzonden door {name} op {option}: {kind}",
+        "notFixedOn": "{option} loste het niet op: {note}",
+        "attemptEnded": "Beëindigd: {result}"
+      },
+      "evidence": {
+        "started": "Gestart door {name}",
+        "approved": "{name} heeft {option} goedgekeurd",
+        "approvedPlan": "{name} heeft het plan goedgekeurd",
+        "stepSent": "Stap {seq} verzonden: {tool}",
+        "stepDone": "Stap {seq} voltooid: {tool}",
+        "stepDoneWith": "Stap {seq} voltooid: {detail}",
+        "stepFailed": "Stap {seq} mislukt: {tool}",
+        "stepFailedWith": "Stap {seq} mislukt: {detail}",
+        "span": "{from} tot {to}",
+        "ended": "Uitvoering beëindigd",
+        "correction": "Correctie verzonden door {name}: {kind}",
+        "planAgain": "Opnieuw plannen aangevraagd door {name}",
+        "notFixedNote": "Niet opgelost: {note}",
+        "remembered": "{time} · Onthouden voor toekomstige uitvoeringen",
+        "connectionAdded": "{name} heeft {mcp} aan deze AutoResolve toegevoegd en om een nieuw plan gevraagd",
+        "connectionAddedRun": "{name} heeft {mcp} aan deze uitvoering toegevoegd en om een nieuw plan gevraagd",
+        "triggerOff": "De alarmtrigger staat uit totdat iemand deze opnieuw goedkeurt.",
+        "planningAgain": "Opnieuw aan het plannen",
+        "markedFixed": "Gemarkeerd als opgelost door {name}"
+      },
+      "facts": {
+        "title": "Deze uitvoering",
+        "startedBy": "Gestart door",
+        "started": "Gestart",
+        "canUse": "Kan gebruiken",
+        "canApprove": "Kan goedkeuren",
+        "option": "Optie",
+        "approval": "Goedkeuring",
+        "check": "Controle",
+        "outcome": "Resultaat",
+        "notChosen": "Nog niet gekozen",
+        "noneChosen": "Niets gekozen",
+        "notAsked": "Nog niet gevraagd",
+        "notAskedEnded": "Niet gevraagd",
+        "correctedNotApproved": "Gecorrigeerd, nooit goedgekeurd",
+        "waitingForYou": "Wachten op jou. Verloopt om {time}",
+        "waitingForYouOn": "Wachten op jou. Verloopt {time}",
+        "waitingFor": "Wachten op {names}. Verloopt om {time}",
+        "waitingForOn": "Wachten op {names}. Verloopt {time}",
+        "lapsedAt": "Verlopen om {time}",
+        "lapsedOn": "Verlopen {time}",
+        "checkNotRun": "Nog niet uitgevoerd",
+        "checkRunning": "Bezig",
+        "checkMet": "Voldaan",
+        "checkNotMet": "Niet voldaan",
+        "checkDidNotRun": "Niet uitgevoerd",
+        "notKnown": "Nog niet bekend",
+        "evidenceNote": "Elke aanroep wordt als bewijs bewaard, met de argumenten en het resultaat.",
+        "notInAutoResolve": "Niet in deze AutoResolve: {mcps}"
+      }
+    },
+    "approval": {
+      "optionsLabel": "Opties",
+      "recommended": "Aanbevolen",
+      "ruledOut": "Uitgesloten: {list}",
+      "evidenceSummary": "{count} geciteerde leesactie, {decisive} doorslaggevend | {count} geciteerde leesacties, {decisive} doorslaggevend",
+      "unverified": "{count} bronvermelding niet geverifieerd | {count} bronvermeldingen niet geverifieerd",
+      "viewEvidence": "Bekijk bewijs",
+      "stepSummary": "{count} stap via {mcps} | {count} stappen via {mcps}",
+      "omitted": "{count} andere optie is weggelaten: {reason} | {count} andere opties zijn weggelaten: {reason}",
+      "omittedNoReason": "{count} andere optie is weggelaten. | {count} andere opties zijn weggelaten.",
+      "missingCapability": "Geen van de MCP's van deze uitvoering kan dit: {capability}",
+      "inFull": "{title} volledig",
+      "changes": "Wijzigingen aan {mcps} goedkeuren.",
+      "canApprove": "Kan goedkeuren: {names}",
+      "lapsesAt": "Vervalt om {time}",
+      "lapsesOn": "Vervalt op {time}",
+      "decline": "Afwijzen",
+      "askDifferent": "Vraag een ander plan aan",
+      "approve": "Goedkeuren en doorgaan",
+      "noteLabel": "Wat moet het nieuwe plan anders doen?",
+      "notePlaceholder": "Bijvoorbeeld: houd de wijziging in een pull request",
+      "sendNote": "Vraag een nieuw plan aan",
+      "cannotApprove": "Je kunt wijzigingen niet goedkeuren via {mcps}. Kan goedkeuren: {approvers}.",
+      "connectionRemoved": "{mcps} is verwijderd nadat dit plan is gemaakt, dus deze optie kan niet worden goedgekeurd. | {mcps} zijn verwijderd nadat dit plan is gemaakt, dus deze optie kan niet worden goedgekeurd.",
+      "connectionRemovedOther": "{mcps} is verwijderd nadat dit plan is gemaakt, dus deze optie kan niet worden goedgekeurd. Kies een andere optie of vraag een ander plan aan. | {mcps} zijn verwijderd nadat dit plan is gemaakt, dus deze optie kan niet worden goedgekeurd. Kies een andere optie of vraag een ander plan aan.",
+      "aRemovedConnection": "Een MCP van deze optie",
+      "removedNote": "Maak een plan dat {mcps} niet gebruikt; deze is verwijderd. | Maak een plan dat {mcps} niet gebruikt; deze zijn verwijderd.",
+      "lapsedAt": "Deze aanvraag is verlopen om {time}.",
+      "lapsedOn": "Deze aanvraag is verlopen op {time}.",
+      "lapsed": "Deze aanvraag is verlopen.",
+      "lapsedBody": "Niemand heeft het op tijd goedgekeurd, dus er is niets gewijzigd. Het doel kan sindsdien zijn gewijzigd; start opnieuw om een actueel plan te krijgen.",
+      "startAgain": "Opnieuw starten",
+      "startAgainFailed": "De uitvoering kon niet opnieuw worden gestart. Probeer het opnieuw.",
+      "connectionsGone": "De MCP die deze uitvoering gebruikte, is verwijderd. | De MCP's die deze uitvoering gebruikte, zijn verwijderd.",
+      "chooseConnections": "MCP's kiezen",
+      "heldCall": "{tool} via {mcp}",
+      "changedSincePlan": "Een andere uitvoering heeft {mcps} gewijzigd sinds dit plan is gemaakt. Controleer of de wijziging nog nodig is voordat je goedkeurt. | {count} andere uitvoeringen hebben {mcps} gewijzigd sinds dit plan is gemaakt. Controleer of de wijziging nog nodig is voordat je goedkeurt.",
+      "viewChangedRun": "Bekijk die uitvoering | Bekijk de nieuwste uitvoering",
+      "heldWhilePlanning": "Tijdens het onderzoek is een wijziging geprobeerd, dus die aanroep is tegengehouden en niet uitgevoerd: {tools}. | Tijdens het onderzoek zijn {count} wijzigingen geprobeerd, dus die aanroepen zijn tegengehouden en niet uitgevoerd: {tools}.",
+      "declined": "Deze aanvraag is afgewezen. Er is niets gewijzigd.",
+      "correctPlan": "Dit plan corrigeren",
+      "partialFix": "Gedeeltelijke oplossing",
+      "partialFixLeaves": "Blijft ongedaan: {text}"
+    },
+    "step": {
+      "runningFor": "Loopt al {elapsed}",
+      "reason": "Reden van de agent",
+      "arguments": "Argumenten",
+      "preview": "Voorbeeld",
+      "dryRunAfter": "Na je goedkeuring wordt een dry run uitgevoerd; de uitvoering stopt als deze mislukt.",
+      "result": "Resultaat",
+      "error": "Fout",
+      "held": "Niet in het goedgekeurde plan",
+      "showAll": "Toon de volledige argumenten",
+      "showFullResult": "Toon het volledige resultaat",
+      "showLess": "Minder tonen",
+      "refChip": "{arg} uit stap {step}",
+      "refNote": "Ingevuld door het systeem op basis van het resultaat van stap {steps}, niet door de agent. | Ingevuld door het systeem op basis van de resultaten van stappen {steps}, niet door de agent."
+    },
+    "savedTitle": "Opgeslagen AutoResolve",
+    "saved": {
+      "back": "Opgeslagen AutoResolves",
+      "newTitle": "Opslaan als AutoResolve",
+      "saveAsAutoResolve": "Opslaan als AutoResolve",
+      "runNow": "Nu uitvoeren",
+      "deleteTitle": "Deze AutoResolve verwijderen?",
+      "deleteMessage": "De trigger stopt en het kan niet meer worden uitgevoerd. Eerdere uitvoeringen blijven behouden.",
+      "deleted": "AutoResolve verwijderd",
+      "deleteFailed": "De AutoResolve is niet verwijderd. Probeer het opnieuw.",
+      "runFailed": "De AutoResolve kon niet starten. Probeer het opnieuw.",
+      "saveFailed": "De AutoResolve is niet opgeslagen. Probeer het opnieuw.",
+      "notFoundHint": "Het is mogelijk verwijderd.",
+      "runNotLoaded": "De uitvoering die opgeslagen moest worden, kon niet worden geladen",
+      "field": {
+        "goal": "Doel",
+        "connections": "MCP's",
+        "runsWhen": "Wordt uitgevoerd wanneer",
+        "trigger": "Trigger",
+        "approval": "Goedkeuring",
+        "savedBy": "Opgeslagen door"
+      },
+      "kind": {
+        "person": "Een persoon start het",
+        "alert": "Een alarm gaat af",
+        "incident": "Een incident wordt geopend"
+      },
+      "runsWhenAlert": "Een alarm gaat af: {alert}",
+      "runsWhenIncident": "Een incident wordt geopend vanuit {alert}",
+      "runsWhenAlertGone": "Een alarm gaat af, maar het bijbehorende alarm is verwijderd",
+      "runsWhenIncidentGone": "Een incident wordt geopend, maar het bijbehorende alarm is verwijderd",
+      "triggerSwitch": "Start uitvoeringen vanuit deze trigger",
+      "triggerApproved": "Goedgekeurd door {name} op {time}",
+      "paused": "Gepauzeerd tot opnieuw goedgekeurd: een bewerking heeft deze trigger uitgeschakeld. Als je hem inschakelt, keur je hem goed als jezelf.",
+      "approval": "Vraagt om goedkeuringen in het {slack}-kanaal.",
+      "savedBy": "{name} op {time}",
+      "openSourceRun": "Open de uitvoering waaruit het is opgeslagen",
+      "regionNotice": "Deze regio voert geen alarmen en incidenten uit, dus deze trigger gaat hier niet af.",
+      "connectionsRemoved": "{mcps} is verwijderd. Haal het uit deze AutoResolve of voeg het opnieuw toe. | {mcps} zijn verwijderd. Haal ze uit deze AutoResolve of voeg ze opnieuw toe.",
+      "slackUnavailable": "Slack-goedkeuring is niet beschikbaar op deze deployment, dus triggers voor alarmen en incidenten kunnen niet worden ingeschakeld.",
+      "slackUnavailableOn": "Slack-goedkeuring is niet beschikbaar op deze deployment, dus de uitvoeringen van deze trigger kunnen niet in Slack worden goedgekeurd. Schakel hem uit of keur ze op het scherm goed.",
+      "lastRuns": "Recente uitvoeringen",
+      "lastRunsMore": "Toont de {shown} nieuwste van {total} uitvoeringen.",
+      "lastRunsEmpty": "Uitvoeringen van deze AutoResolve verschijnen hier, ongeacht of een persoon of de trigger ze heeft gestart.",
+      "triggerState": {
+        "on": "Aan",
+        "off": "Uit",
+        "paused": "Gepauzeerd tot opnieuw goedgekeurd"
+      },
+      "form": {
+        "name": "Naam",
+        "goal": "Doel",
+        "connections": "MCP's",
+        "connectionsHelp": "De uitvoeringen kunnen alleen deze MCP's gebruiken.",
+        "connectionsPlaceholder": "MCP's toevoegen",
+        "connectionsNotFilled": "Deze uitvoering gebruikte {mcps}, die is verwijderd, dus het is niet ingevuld. | Deze uitvoering gebruikte {mcps}, die zijn verwijderd, dus ze zijn niet ingevuld.",
+        "runsWhen": "Wordt uitgevoerd wanneer",
+        "alert": "Alarm",
+        "incidentAlert": "Alarm dat het incident opent",
+        "alertPlaceholder": "Kies een alarm",
+        "alertGone": "Verwijderd alarm",
+        "alertsForbidden": "Je hebt geen toegang tot alarmen, dus hier kunnen er geen worden getoond.",
+        "alertsFailed": "Alarmen konden niet worden geladen. Open dit formulier opnieuw om het nog eens te proberen.",
+        "connectionsFailed": "MCP's konden niet worden geladen. Open dit formulier opnieuw om het nog eens te proberen.",
+        "alertsNone": "Deze organisatie heeft nog geen alarmen. Maak er eerst een aan in Alarmen.",
+        "createTriggerHelp": "Opslaan schakelt deze trigger in. Elke uitvoering vraagt om goedkeuring in het {slack}-kanaal voor goedkeuringen.",
+        "editPausesHelp": "Als je het doel, de MCP's of de trigger wijzigt, wordt de trigger uitgeschakeld tot iemand die kan goedkeuren hem weer inschakelt.",
+        "nameRequired": "Voer een naam in.",
+        "goalRequired": "Voer een doel in.",
+        "tooLong": "Gebruik maximaal {max} tekens.",
+        "alertRequired": "Kies een alarm.",
+        "save": "AutoResolve opslaan",
+        "saveChanges": "Wijzigingen opslaan"
+      },
+      "list": {
+        "search": "Opgeslagen AutoResolves zoeken",
+        "column": {
+          "name": "Naam",
+          "runsWhen": "Wordt uitgevoerd wanneer",
+          "trigger": "Trigger",
+          "connections": "MCP's",
+          "savedBy": "Opgeslagen door",
+          "updated": "Bijgewerkt"
+        }
+      },
+      "loadFailed": "De AutoResolve kon niet worden geladen"
+    },
+    "andMore": "en nog {count} meer | en nog {count} meer",
+    "correction": {
+      "title": "Wat is er mis met dit plan?",
+      "kindsLabel": "Wat is er mis",
+      "kind": {
+        "wrongCause": "Verkeerde oorzaak",
+        "wrongFix": "Verkeerde oplossing",
+        "outOfScope": "Gaat verder dan deze AutoResolve",
+        "notFixed": "Heeft het niet opgelost"
+      },
+      "help": {
+        "none": "Kies wat er mis is en licht het toe in de notitie.",
+        "wrongCause": "Verkeerde oorzaak: de agent wees de verkeerde oorzaak aan, dus de oplossing richt zich op de verkeerde plek.",
+        "wrongFix": "Verkeerde oplossing: de oorzaak klopt, maar de wijziging is niet wat je wilt.",
+        "outOfScope": "Gaat verder dan deze AutoResolve: het plan wijzigt zaken die deze AutoResolve met rust moet laten."
+      },
+      "draft": {
+        "wrongCause": "\"{option}\" richt zich op de verkeerde oorzaak.",
+        "wrongFix": "\"{option}\" is niet de wijziging die ik wil.",
+        "outOfScope": "\"{option}\" wijzigt meer dan deze AutoResolve zou moeten."
+      },
+      "noteLabel": "Notitie",
+      "noteHelp": "De agent leest dit voordat hij opnieuw een plan maakt.",
+      "notePickFirst": "Kies eerst wat er mis is",
+      "remember": "Onthouden voor toekomstige uitvoeringen van \"{name}\"",
+      "rememberHelp": "Latere uitvoeringen zien deze notitie. Je kunt deze verwijderen uit de AutoResolve.",
+      "send": "Correctie versturen"
+    },
+    "correctionsUsed": {
+      "chip": "{count} correctie gebruikt | {count} correcties gebruikt",
+      "title": "Correcties die dit plan heeft gebruikt",
+      "thisRun": "{name}, deze uitvoering, {time}",
+      "earlierRun": "{name}, een eerdere uitvoering, {time}",
+      "manage": "Correcties op de AutoResolve beheren"
+    },
+    "missing": {
+      "title": "Deze oplossing vereist {mcp}, die deze AutoResolve niet heeft",
+      "titleRun": "Deze oplossing heeft {mcp} nodig, maar deze run heeft die niet",
+      "add": "Voeg {mcp} toe en plan opnieuw",
+      "orPartial": "Of keur de gedeeltelijke oplossing hieronder goed. | Of keur een van de gedeeltelijke oplossingen hieronder goed.",
+      "cannotAdd": "Alleen mensen die wijzigingen via {mcp} kunnen goedkeuren, kunnen deze toevoegen.",
+      "dialogAutoResolve": "AutoResolve",
+      "dialogConnection": "MCP om toe te voegen",
+      "dialogTriggerOff": "Als je een MCP toevoegt, wordt de alarmtrigger van AutoResolve uitgeschakeld tot iemand deze opnieuw goedkeurt.",
+      "dialogThen": "Deze run plant dan opnieuw met {mcp}. Er verandert niets tot iemand het nieuwe plan goedkeurt.",
+      "dialogConfirm": "Toevoegen en opnieuw plannen",
+      "addFailed": "Toevoegen van {mcp} is mislukt. Probeer het opnieuw.",
+      "needs": "Deze oplossing heeft {mcp} nodig: {action}"
+    },
+    "verdict": {
+      "question": "Heeft dit het opgelost?",
+      "yes": "Ja",
+      "no": "Nee, niet opgelost",
+      "noteLabel": "Wat klopt er nog niet?",
+      "stillFiring": "{trigger} gaat nog steeds af",
+      "filledFrom": "Ingevuld vanuit {trigger}.",
+      "planAgain": "Opnieuw plannen",
+      "agent": "Agent",
+      "fixed": "Opgelost",
+      "notFixed": "Niet opgelost",
+      "byAt": "{name}, {time}",
+      "noteAt": "{note} · {time}",
+      "failed": "Je antwoord is niet opgeslagen. Probeer het opnieuw."
+    },
+    "corrections": {
+      "title": "Correcties",
+      "help": "Elke nieuwe run van deze AutoResolve leest ze. Ze keuren nooit iets goed.",
+      "source": "Van {run} door {name}",
+      "runOf": "run van {time}",
+      "sourceGone": "Van een run die niet meer bestaat, {time} door {name}",
+      "removeFailed": "De correctie is niet verwijderd. Probeer het opnieuw."
+    },
+    "incident": {
+      "title": "AutoResolve",
+      "note": "Eén run per incident. Er wordt om goedkeuring gevraagd voordat er iets wordt gewijzigd.",
+      "loading": "AutoResolve laden…",
+      "loadFailed": "AutoResolve voor dit incident kon niet worden geladen.",
+      "newRun": "Nieuwe run voor dit incident",
+      "liveRun": "Dit is de run van het incident. Een nieuwe run kan beginnen wanneer deze eindigt.",
+      "openRun": "Run openen",
+      "related": "Opgeslagen AutoResolves voor de alarmen van dit incident",
+      "suggestedFor": "Aanbevolen voor incidenten van {alert}",
+      "startsOn": "Start bij {alert}",
+      "run": "Run",
+      "runLocked": "{run} is de live run van dit incident. Een nieuwe run kan beginnen wanneer deze eindigt.",
+      "empty": "Er is nog geen AutoResolve uitgevoerd op dit incident en er is geen opgeslagen voor de bijbehorende alarmen."
+    }
   },
   "autobotInvestigate": {
     "greeting": "Wat moeten we onderzoeken?",

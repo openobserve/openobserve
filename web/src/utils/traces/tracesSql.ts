@@ -196,6 +196,9 @@ export const MATCH_ALL_FALLBACK_FIELD = "operation_name";
 
 const FIELD_UNITS: Record<string, string> = { duration: "µs", start_time: "ns", end_time: "ns" };
 
+// Exact-ns copies the client adds and the server's _timestamp; shown only when the query names them.
+const SHADOW_RESULT_KEYS = new Set(["_start_time_ns", "_end_time_ns", "_timestamp"]);
+
 const WORD_START = /[A-Za-z_]/;
 const WORD_CHAR = /[A-Za-z0-9_]/;
 const DIGIT = /[0-9]/;
@@ -379,9 +382,9 @@ export function insertTraceIdColumn(sql: string): string | null {
   return `${sql.slice(0, anchor.end)} trace_id,${sql.slice(anchor.end)}`;
 }
 
-/** Result shape from the returned columns: span rows open a span, trace rows open a trace. */
-export function resultShape(keys: string[]): TracesSqlShape {
-  if (keys.includes("trace_id") && keys.includes("span_id")) return "spans";
+/** Result shape: only whole-span rows (`SELECT *`) use the span table; other rows with trace_id open a trace. */
+export function resultShape(keys: string[], selectAll: boolean): TracesSqlShape {
+  if (selectAll && keys.includes("trace_id") && keys.includes("span_id")) return "spans";
   if (keys.includes("trace_id")) return "traces";
   return "rows";
 }
@@ -404,7 +407,10 @@ export function resultKeys(
   }
   const ordered = selectNames.filter((name) => seen.has(name));
   const named = new Set(ordered);
-  return [...ordered, ...[...seen].filter((key) => !named.has(key))];
+  return [
+    ...ordered,
+    ...[...seen].filter((key) => !named.has(key) && !SHADOW_RESULT_KEYS.has(key)),
+  ];
 }
 
 /** Fields with their stored time unit in `type`, which autocomplete shows as the detail. */

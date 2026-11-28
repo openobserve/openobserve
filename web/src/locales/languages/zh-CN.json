@@ -527,7 +527,9 @@
       "linkedDomains": "已关联域名",
       "domainMappings": "域名映射",
       "domainRequests": "关联请求",
-      "blockedUsers": "已阻止用户"
+      "blockedUsers": "已阻止用户",
+      "autoresolveRuns": "运行",
+      "savedAutoResolve": "已保存的 AutoResolve"
     },
     "demo": {
       "pageTitle": "空状态 — 完整集合供审查",
@@ -652,6 +654,23 @@
     "noOncallUnrouted": {
       "title": "无需归属人",
       "description": "所有已触发的告警都已送达团队。"
+    },
+    "noAutoResolveRuns": {
+      "title": "暂无运行",
+      "description": "您和团队启动的运行将显示在此处。"
+    },
+    "noAutoResolveConnections": {
+      "title": "请先添加 MCP",
+      "description": "AutoResolve 通过组织已添加的 MCP 执行操作，例如代码托管平台、部署工具或集群。此组织尚未添加任何 MCP。"
+    },
+    "noUsable": {
+      "mcps": "没有您可用的 MCP",
+      "aiToolsets": "没有您可用的 AI 工具集",
+      "askAdmin": "请在 IAM › 角色中向管理员申请访问权限。"
+    },
+    "noSavedAutoResolve": {
+      "title": "暂无已保存的 AutoResolve",
+      "description": "打开已完成的运行并选择“保存为 AutoResolve”，即可再次运行其目标，或在告警触发时启动它。"
     }
   },
   "accessBoundary": {
@@ -2075,6 +2094,7 @@
   },
   "menu": {
     "alertCalibration": "告警校准",
+    "autoresolve": "AutoResolve",
     "autoobserve": "AutoObserve",
     "upgradeToProPlan": "升级到 PRO 计划",
     "home": "主页",
@@ -9224,6 +9244,9 @@
     "logsMessageField": "消息字段",
     "logsLevelField": "级别字段",
     "logsTimeField": "时间字段",
+    "logsTimeFieldNoValues": "时间字段 \"{field}\" 没有有效的时间戳",
+    "logsLevelFieldNoValues": "级别字段 \"{field}\" 在结果中没有任何值",
+    "logsMessageFieldNoValues": "消息字段 \"{field}\" 在结果中没有任何值",
     "htmlPanelFieldTooltip": "留空则从查询结果中检测该列",
     "logsOrder": "顺序",
     "logsOrderNewest": "最新优先",
@@ -18531,7 +18554,16 @@
     "panelTimeSeriesFor": "{stream} 的时间序列",
     "panelTimeSeriesForWithType": "{stream} 的时间序列（{type}）",
     "logsPanelTitle": "日志 - {stream}",
-    "logsPanelDescription": "服务 {service} 的关联日志"
+    "logsPanelDescription": "服务 {service} 的关联日志",
+    "noDataInScope": "此范围内无数据",
+    "noDataInScopeReason": "此时间范围内没有与这些筛选条件匹配的行。",
+    "droppedCount": "+{count} 个已舍弃 | +{count} 个已舍弃",
+    "droppedTitle": "未用作筛选条件",
+    "droppedNoRows": "没有值为 {value} 的行",
+    "droppedNoField": "这些流中没有此字段",
+    "allNoDataTitle": "此范围内没有指标有数据",
+    "allNoDataScope": "{scope}，{window}",
+    "allNoDataAction": "显示无数据的指标"
   },
   "search_scheduler_job": {
     "title": "搜索任务调度器",
@@ -20597,6 +20629,13 @@
       "sampleExpected": "预期输出",
       "fromTrace": "来自追踪 Span {id}",
       "openInPlaygroundFailed": "无法在 Playground 中打开此 Span"
+    },
+    "largeStream": {
+      "notice": "{stream}：此范围内约 {size}，没有代理筛选。可能需要数分钟。",
+      "pickAgent": "选择代理",
+      "addFilter": "添加筛选条件",
+      "runAnyway": "仍然运行",
+      "notRun": "未运行"
     }
   },
   "onlineEvals": {
@@ -21894,7 +21933,10 @@
       "excludeFromQuery": "排除",
       "createAlertAction": "创建告警",
       "noMatchTerms": "此模式没有可筛选的独特文本。",
-      "noDistinctTextTooltip": "此模式中的每段固定文本也出现在其他模式中，因此筛选器也会匹配它们的日志。",
+      "noDistinctTextTooltip": "此模式的文本也出现在另一个模式的日志中，通常是同一消息的不同日志级别，因此过滤器无法单独统计它。",
+      "volumeUnsupported": "使用 WITH、JOIN、UNION、表别名或子查询的搜索无法显示数量。",
+      "volumeFailedRetry": "无法加载数量，服务器可能繁忙，请重试。",
+      "volumeFailed": "无法加载此模式的数量。",
       "noStreamSelected": "未选择数据流。请先选择数据流再创建告警。",
       "alertBroadMatch": "此模式没有独特的常量文本 — 告警查询将匹配广泛。请考虑添加手动筛选。"
     },
@@ -34659,6 +34701,464 @@
     "fixedToNow": "现在结束，不会变动",
     "gateOrder": "开始时间必须早于结束时间。",
     "gateInvalid": "不是有效的时间范围。"
+  },
+  "autoresolve": {
+    "title": "AutoResolve",
+    "runTitle": "AutoResolve 运行",
+    "runNotFound": "未找到此运行",
+    "runNotFoundHint": "它可能已被删除，或者链接有误。",
+    "runForbidden": "您无权访问此运行",
+    "namesMore": "另有 {count} 个 | 另有 {count} 个",
+    "mcp": {
+      "count": "{count} 个 MCP | {count} 个 MCP",
+      "the": "{names} MCP | {names} MCP",
+      "theDescribed": "{name} MCP（{description}）",
+      "described": "{name}（{description}）"
+    },
+    "stage": {
+      "investigate": "调查",
+      "ask": "询问",
+      "proceed": "执行",
+      "check": "检查",
+      "outcome": "结果"
+    },
+    "state": {
+      "investigating": "调查中",
+      "waitingApproval": "等待审批",
+      "proceeding": "执行中",
+      "checking": "检查中",
+      "worked": "已解决",
+      "noChange": "无变化",
+      "cantFix": "无法通过这些 MCP 修复",
+      "notNeeded": "已不再需要",
+      "worse": "更糟",
+      "declined": "已拒绝",
+      "lapsed": "已超时",
+      "stepFailed": "步骤失败",
+      "outcomeUnknown": "结果未知",
+      "failed": "失败",
+      "proposed": "已提议",
+      "approved": "已批准",
+      "running": "运行中",
+      "done": "已完成",
+      "held": "已搁置",
+      "notRun": "未运行",
+      "superseded": "已被取代"
+    },
+    "subtitle": "输入您希望完成的事项。它会先调查，在任何变更前询问，然后执行并检查。",
+    "tabs": {
+      "home": "主页",
+      "runs": "运行",
+      "saved": "已保存"
+    },
+    "home": {
+      "examplesTitle": "试试这些",
+      "examples": {
+        "checkout": "查明结账服务为何返回 5xx 错误并修复它",
+        "payment": "最近哪些变更涉及支付服务？",
+        "ingestion": "为什么过去一小时数据摄取延迟上升了？"
+      },
+      "startFailed": "运行无法启动，请重试。"
+    },
+    "goalBox": {
+      "heading": "需要做什么？",
+      "placeholder": "描述你期望的结果，例如：查明某个服务失败的原因并修复它",
+      "productData": "{product} 数据",
+      "canUse": "{mcps} 和 {data} | {mcps}，以及 {data}",
+      "start": "开始",
+      "asksFirst": "它可以自由查看，但在做任何更改前会先征求你的同意。",
+      "addConnection": "添加 MCP",
+      "connectionsLabel": "本次运行可使用的 MCP"
+    },
+    "connectionPicker": {
+      "chooseOne": "请至少选择一个 MCP。",
+      "upTo": "最多 {mcps}",
+      "noneYouCanUse": "没有你可以使用的 MCP。请在 IAM › 角色 中向管理员申请访问权限。",
+      "noneYet": "此组织还没有 MCP。请先在 设置 › AI 工具集 中添加一个。"
+    },
+    "runs": {
+      "regionNote": "运行记录和已保存的 AutoResolve 归属于其创建时所在的区域。",
+      "recent": "最近的运行",
+      "viewAll": "查看所有运行",
+      "search": "搜索目标",
+      "stateGroup": {
+        "live": "实时",
+        "waiting": "等待中",
+        "ended": "已结束"
+      },
+      "startedBy": "发起人",
+      "anyone": "任何人",
+      "me": "我",
+      "connection": "MCP",
+      "column": {
+        "lastRun": "上次运行",
+        "goal": "目标",
+        "state": "状态",
+        "startedBy": "发起人",
+        "connections": "MCP",
+        "took": "耗时"
+      },
+      "tookSoFar": "已耗时 {time}"
+    },
+    "orgAdmins": "组织管理员",
+    "approvers": {
+      "roles": "角色 {names} | 角色 {names}",
+      "groups": "组 {names} | 组 {names}",
+      "separator": "；"
+    },
+    "connection": {
+      "removeConnection": "移除 {name}",
+      "removedChip": "{name}（已移除）",
+      "moreRemoved": "以及另外 {count} 个已移除 | 以及另外 {count} 个已移除",
+      "writeCredential": "已批准变更所用的凭证（可选）",
+      "writeCredentialHelp": "仅用于经人工批准的步骤。留空时，已批准的步骤将使用上方 MCP 的请求头。",
+      "writeValueSet": "已设置。输入新值即可替换。",
+      "writeValueRequired": "请输入值",
+      "addWriteHeader": "添加凭证请求头",
+      "draftWriteHeader": "已批准变更标头 {name}"
+    },
+    "duration": {
+      "minutesSeconds": "{minutes} 分 {seconds} 秒"
+    },
+    "run": {
+      "reconnecting": "正在重新连接…",
+      "working": "正在处理…",
+      "investigating": "调查中",
+      "investigatingNote": "只读调用会直接通过。本次运行会在首次变更前征求你的同意。",
+      "investigated": "已调查",
+      "investigatedMeta": "{count} 次调用，{duration} | {count} 次调用，{duration}",
+      "investigatedWithEvidence": "{calls} · {cited}",
+      "steps": "步骤",
+      "passCorrected": "由 {name} 于 {time} 更正",
+      "passNotFixed": "由 {name} 于 {time} 标记为未修复",
+      "passPlannedAgain": "于 {time} 重新规划",
+      "calls": "调用",
+      "approvedBy": "由 {name} 于 {time} 批准",
+      "stepCount": "{count} 个步骤 | {count} 个步骤",
+      "stepLabel": "步骤 {seq}",
+      "proceedingNote": "仅已批准的调用会按顺序各执行一次。任何其他变更都会暂停本次运行并再次询问。",
+      "checking": "正在检查结果，已耗时 {elapsed}",
+      "checkingAgain": "正在再次检查结果，已耗时 {elapsed}",
+      "investigatingFor": "正在调查，已耗时 {elapsed}",
+      "proceedingFor": "正在继续执行，已耗时 {elapsed}",
+      "silent": "AI 模型已有 {quiet} 未响应。它将在 {time} 重试或停止。",
+      "silentOn": "AI 模型已有 {quiet} 未响应。它将在 {time} 重试或停止。",
+      "revertHint": "发起回退会再次请求批准，批准前不会发生任何变更。",
+      "raiseRevert": "发起回退",
+      "revertNote": "检查结果显示更差。请提出一项可回退已批准步骤的变更。",
+      "planChanged": "计划已变更；请重新查看",
+      "approveFailed": "无法保存批准。请重试。",
+      "declineFailed": "无法拒绝该请求。请重试。",
+      "replanFailed": "无法请求新计划。请重试。",
+      "notice": {
+        "stepFailed": "步骤 {step} 失败。已运行：{ran}。未运行：{notRun}。",
+        "noSteps": "无",
+        "outcomeUnknown": "已发送一个步骤，但未收到响应。该步骤不会重试。",
+        "failed": "运行失败并已停止。",
+        "failedWith": "运行失败并已停止。{reason}",
+        "stepFailedWith": "{reason} 已运行：{ran}。未运行：{notRun}。",
+        "stepFailedAlone": "步骤 {step} 失败。",
+        "outcomeUnknownWith": "已发送一个步骤，但未收到响应。该步骤不会重试。{reason}",
+        "held": "运行已暂停：它尝试了未经批准的调用，因此该调用被拦截。"
+      },
+      "outcome": {
+        "checkedAt": "已于 {time} 检查",
+        "endedAt": "结束于 {time}",
+        "error": "运行报告错误：{reason}"
+      },
+      "timeline": {
+        "title": "时间线",
+        "planned": "Agent 提出了计划",
+        "optionBand": "{title}（{band}）",
+        "correctionOn": "由 {name} 就 {option} 发送的更正：{kind}",
+        "notFixedOn": "{option} 未能修复：{note}",
+        "attemptEnded": "已结束：{result}"
+      },
+      "evidence": {
+        "started": "由 {name} 启动",
+        "approved": "{name} 批准了 {option}",
+        "approvedPlan": "{name} 批准了计划",
+        "stepSent": "步骤 {seq} 已发送：{tool}",
+        "stepDone": "步骤 {seq} 已完成：{tool}",
+        "stepDoneWith": "步骤 {seq} 已完成：{detail}",
+        "stepFailed": "步骤 {seq} 失败：{tool}",
+        "stepFailedWith": "步骤 {seq} 失败：{detail}",
+        "span": "{from} 至 {to}",
+        "ended": "运行已结束",
+        "correction": "{name} 发送了更正：{kind}",
+        "planAgain": "{name} 请求重新规划",
+        "notFixedNote": "未修复：{note}",
+        "remembered": "{time} · 已记住，供后续运行使用",
+        "connectionAdded": "{name} 将 {mcp} 添加到此 AutoResolve，并要求重新规划",
+        "connectionAddedRun": "{name} 将 {mcp} 添加到此运行，并要求重新规划",
+        "triggerOff": "告警触发器已关闭，直到有人重新批准。",
+        "planningAgain": "正在重新规划",
+        "markedFixed": "由 {name} 标记为已修复"
+      },
+      "facts": {
+        "title": "本次运行",
+        "startedBy": "启动者",
+        "started": "启动时间",
+        "canUse": "可使用",
+        "canApprove": "可审批",
+        "option": "选项",
+        "approval": "审批",
+        "check": "检查",
+        "outcome": "结果",
+        "notChosen": "尚未选择",
+        "noneChosen": "未选择任何项",
+        "notAsked": "尚未询问",
+        "notAskedEnded": "未询问",
+        "correctedNotApproved": "已更正，从未批准",
+        "waitingForYou": "等待您处理。将于 {time} 失效",
+        "waitingForYouOn": "等待您处理。将于 {time} 失效",
+        "waitingFor": "等待 {names}。将于 {time} 失效",
+        "waitingForOn": "等待 {names}。将于 {time} 失效",
+        "lapsedAt": "已于 {time} 失效",
+        "lapsedOn": "已于 {time} 失效",
+        "checkNotRun": "尚未运行",
+        "checkRunning": "进行中",
+        "checkMet": "已满足",
+        "checkNotMet": "未满足",
+        "checkDidNotRun": "未运行",
+        "notKnown": "尚不清楚",
+        "evidenceNote": "每次调用都会作为证据保留，包含其参数和结果。",
+        "notInAutoResolve": "不在此 AutoResolve 中：{mcps}"
+      }
+    },
+    "approval": {
+      "optionsLabel": "选项",
+      "recommended": "推荐",
+      "ruledOut": "已排除：{list}",
+      "evidenceSummary": "引用读取 {count} 条，决定性 {decisive} 条 | 引用读取 {count} 条，决定性 {decisive} 条",
+      "unverified": "{count} 条引用未验证 | {count} 条引用未验证",
+      "viewEvidence": "查看证据",
+      "stepSummary": "经由 {mcps} 执行 {count} 个步骤 | 经由 {mcps} 执行 {count} 个步骤",
+      "omitted": "另有 {count} 个选项未包含在内：{reason} | 另有 {count} 个选项未包含在内：{reason}",
+      "omittedNoReason": "另有 {count} 个选项未包含在内。 | 另有 {count} 个选项未包含在内。",
+      "missingCapability": "本次运行使用的 MCP 均无法执行此操作：{capability}",
+      "inFull": "{title} 完整版",
+      "changes": "正在批准对 {mcps} 的更改。",
+      "canApprove": "可批准人员：{names}",
+      "lapsesAt": "将于 {time} 失效",
+      "lapsesOn": "失效时间：{time}",
+      "decline": "拒绝",
+      "askDifferent": "请求其他方案",
+      "approve": "批准并继续",
+      "noteLabel": "新方案应做出哪些不同调整？",
+      "notePlaceholder": "例如：将更改保留在拉取请求中",
+      "sendNote": "请求新方案",
+      "cannotApprove": "您无法通过 {mcps} 批准更改。可批准人员：{approvers}。",
+      "connectionRemoved": "制定此方案后，{mcps} 已被移除，因此无法批准此选项。 | 制定此方案后，{mcps} 已被移除，因此无法批准此选项。",
+      "connectionRemovedOther": "制定此方案后，{mcps} 已被移除，因此无法批准此选项。请选择其他选项或请求其他方案。 | 制定此方案后，{mcps} 已被移除，因此无法批准此选项。请选择其他选项或请求其他方案。",
+      "aRemovedConnection": "此选项中的某个 MCP",
+      "removedNote": "请制定不使用 {mcps} 的方案；该 MCP 已被移除。 | 请制定不使用 {mcps} 的方案；这些 MCP 已被移除。",
+      "lapsedAt": "此请求已于 {time} 失效。",
+      "lapsedOn": "此请求于 {time} 失效。",
+      "lapsed": "此请求已失效。",
+      "lapsedBody": "无人及时批准，因此未做任何更改。目标可能已发生变化；请重新开始以获取最新方案。",
+      "startAgain": "重新开始",
+      "startAgainFailed": "本次运行无法重新开始。请重试。",
+      "connectionsGone": "本次运行使用的 MCP 已被移除。 | 本次运行使用的 MCP 已被移除。",
+      "chooseConnections": "选择 MCP",
+      "heldCall": "通过 {mcp} 调用 {tool}",
+      "changedSincePlan": "制定此方案后，另一次运行更改了 {mcps}。批准前请确认该更改是否仍然需要。 | 制定此方案后，另有 {count} 次运行更改了 {mcps}。批准前请确认该更改是否仍然需要。",
+      "viewChangedRun": "查看那次运行 | 查看最新运行",
+      "heldWhilePlanning": "调查期间，它尝试进行更改，因此该调用被暂缓执行：{tools}。 | 调查期间，它尝试进行 {count} 项更改，因此这些调用被暂缓执行：{tools}。",
+      "declined": "此请求已被拒绝。未做任何更改。",
+      "correctPlan": "修正此方案",
+      "partialFix": "部分修复",
+      "partialFixLeaves": "未完成项：{text}"
+    },
+    "step": {
+      "runningFor": "已运行 {elapsed}",
+      "reason": "Agent 的原因",
+      "arguments": "参数",
+      "preview": "预览",
+      "dryRunAfter": "试运行会在您批准后执行；如果失败，运行将停止。",
+      "result": "结果",
+      "error": "错误",
+      "held": "不在已批准的方案中",
+      "showAll": "显示完整参数",
+      "showFullResult": "显示完整结果",
+      "showLess": "收起",
+      "refChip": "{arg}（来自步骤 {step}）",
+      "refNote": "由系统根据步骤 {steps} 的结果填写，而非由智能体填写。 | 由系统根据步骤 {steps} 的结果填写，而非由智能体填写。"
+    },
+    "savedTitle": "已保存的 AutoResolve",
+    "saved": {
+      "back": "已保存的 AutoResolve",
+      "newTitle": "另存为 AutoResolve",
+      "saveAsAutoResolve": "另存为 AutoResolve",
+      "runNow": "立即运行",
+      "deleteTitle": "删除此 AutoResolve？",
+      "deleteMessage": "其触发器将停止，且无法再运行。历史运行记录会保留。",
+      "deleted": "AutoResolve 已删除",
+      "deleteFailed": "未能删除该 AutoResolve。请重试。",
+      "runFailed": "AutoResolve 无法启动。请重试。",
+      "saveFailed": "未能保存该 AutoResolve。请重试。",
+      "notFoundHint": "它可能已被删除。",
+      "runNotLoaded": "无法加载要保存的运行记录",
+      "field": {
+        "goal": "目标",
+        "connections": "MCP",
+        "runsWhen": "运行时机",
+        "trigger": "触发器",
+        "approval": "审批",
+        "savedBy": "保存者"
+      },
+      "kind": {
+        "person": "由人启动",
+        "alert": "告警触发",
+        "incident": "事件开启"
+      },
+      "runsWhenAlert": "告警触发：{alert}",
+      "runsWhenIncident": "由 {alert} 开启事件",
+      "runsWhenAlertGone": "告警触发，但其告警已被删除",
+      "runsWhenIncidentGone": "事件开启，但其告警已被删除",
+      "triggerSwitch": "允许此触发器启动运行",
+      "triggerApproved": "由 {name} 于 {time} 审批",
+      "paused": "暂停，等待重新审批：一次编辑关闭了此触发器。重新开启即以您的名义审批。",
+      "approval": "已在 {slack} 频道中请求审批。",
+      "savedBy": "{name} 于 {time}",
+      "openSourceRun": "打开其保存来源的运行记录",
+      "regionNotice": "此区域不运行告警与事件，因此此触发器在此不会触发。",
+      "connectionsRemoved": "{mcps} 已被移除。请将其从此 AutoResolve 中移除，或重新添加。 | {mcps} 已被移除。请将其从此 AutoResolve 中移除，或重新添加。",
+      "slackUnavailable": "此部署不支持 Slack 审批，因此无法开启告警和事件触发器。",
+      "slackUnavailableOn": "此部署不支持 Slack 审批，因此此触发器的运行无法在 Slack 中审批。请将其关闭，或在界面上审批。",
+      "lastRuns": "最近运行",
+      "lastRunsMore": "显示 {total} 次运行中最新的 {shown} 次。",
+      "lastRunsEmpty": "此 AutoResolve 的运行记录会显示在此处，无论是由人还是其触发器启动。",
+      "triggerState": {
+        "on": "开启",
+        "off": "关闭",
+        "paused": "已暂停，等待重新审批"
+      },
+      "form": {
+        "name": "名称",
+        "goal": "目标",
+        "connections": "MCP",
+        "connectionsHelp": "其运行只能使用这些 MCP。",
+        "connectionsPlaceholder": "添加 MCP",
+        "connectionsNotFilled": "此运行使用了 {mcps}，但已被移除，因此未填写。 | 此运行使用了 {mcps}，但已被移除，因此未填写。",
+        "runsWhen": "运行时机",
+        "alert": "告警",
+        "incidentAlert": "打开该事件的告警",
+        "alertPlaceholder": "选择告警",
+        "alertGone": "已删除的告警",
+        "alertsForbidden": "您无权访问告警，因此此处无法列出任何告警。",
+        "alertsFailed": "无法加载告警。请重新打开此表单重试。",
+        "connectionsFailed": "无法加载 MCP。请重新打开此表单重试。",
+        "alertsNone": "此组织尚无告警。请先在告警中创建一个。",
+        "createTriggerHelp": "保存后将开启此触发器。每次运行都会在 {slack} 审批频道中请求审批。",
+        "editPausesHelp": "更改目标、MCP 或触发器会关闭触发器，直到有审批权限的人重新开启。",
+        "nameRequired": "请输入名称。",
+        "goalRequired": "请输入目标。",
+        "tooLong": "请使用不超过 {max} 个字符。",
+        "alertRequired": "请选择一个告警。",
+        "save": "保存 AutoResolve",
+        "saveChanges": "保存更改"
+      },
+      "list": {
+        "search": "搜索已保存的 AutoResolve",
+        "column": {
+          "name": "名称",
+          "runsWhen": "运行条件",
+          "trigger": "触发器",
+          "connections": "MCP",
+          "savedBy": "保存者",
+          "updated": "更新时间"
+        }
+      },
+      "loadFailed": "无法加载该 AutoResolve"
+    },
+    "andMore": "以及另外 {count} 个 | 以及另外 {count} 个",
+    "correction": {
+      "title": "这个方案有什么问题？",
+      "kindsLabel": "问题所在",
+      "kind": {
+        "wrongCause": "原因错误",
+        "wrongFix": "修复错误",
+        "outOfScope": "超出此 AutoResolve 的范围",
+        "notFixed": "未修复问题"
+      },
+      "help": {
+        "none": "请选择问题所在，然后在备注中说明。",
+        "wrongCause": "原因错误：智能体归咎了错误的对象，因此其修复指向了错误的地方。",
+        "wrongFix": "修复错误：原因判断正确，但更改并非您想要的。",
+        "outOfScope": "超出此 AutoResolve 的范围：该方案更改了此 AutoResolve 不应触碰的内容。"
+      },
+      "draft": {
+        "wrongCause": "“{option}”针对的原因有误。",
+        "wrongFix": "“{option}”不是我想做的更改。",
+        "outOfScope": "“{option}”的更改超出了此 AutoResolve 应有的范围。"
+      },
+      "noteLabel": "备注",
+      "noteHelp": "智能体在再次规划前会阅读此内容。",
+      "notePickFirst": "请先选择问题所在",
+      "remember": "为“{name}”的后续运行记住此内容",
+      "rememberHelp": "后续运行会看到此备注。您可以从该 AutoResolve 中移除它。",
+      "send": "发送纠正"
+    },
+    "correctionsUsed": {
+      "chip": "使用了 {count} 条纠正 | 使用了 {count} 条纠正",
+      "title": "此方案使用的纠正",
+      "thisRun": "{name}，本次运行，{time}",
+      "earlierRun": "{name}，之前的运行，{time}",
+      "manage": "在 AutoResolve 上管理纠正"
+    },
+    "missing": {
+      "title": "此修复需要 {mcp}，而此 AutoResolve 没有该项",
+      "titleRun": "此修复需要 {mcp}，但本次运行未包含它。",
+      "add": "添加 {mcp} 并重新规划",
+      "orPartial": "或批准下方的部分修复。 | 或批准下方的部分修复。",
+      "cannotAdd": "只有能通过 {mcp} 批准更改的人才能添加它。",
+      "dialogAutoResolve": "AutoResolve",
+      "dialogConnection": "要添加的 MCP",
+      "dialogTriggerOff": "添加 MCP 会关闭 AutoResolve 的告警触发器，直到有人重新批准。",
+      "dialogThen": "随后本次运行会使用 {mcp} 重新规划。在有人批准新计划之前，不会发生任何更改。",
+      "dialogConfirm": "添加并重新规划",
+      "addFailed": "无法添加 {mcp}。请重试。",
+      "needs": "此修复需要 {mcp}：{action}"
+    },
+    "verdict": {
+      "question": "这次修复是否解决了问题？",
+      "yes": "是",
+      "no": "否，没有解决",
+      "noteLabel": "还有哪里仍不正确？",
+      "stillFiring": "{trigger} 仍在触发",
+      "filledFrom": "已根据 {trigger} 填写。",
+      "planAgain": "重新规划",
+      "agent": "智能体",
+      "fixed": "已修复",
+      "notFixed": "未修复",
+      "byAt": "{name}，{time}",
+      "noteAt": "{note} · {time}",
+      "failed": "您的回答未保存。请重试。"
+    },
+    "corrections": {
+      "title": "修正",
+      "help": "此 AutoResolve 的每次新运行都会读取这些内容。它们绝不会批准任何操作。",
+      "source": "来自 {run}，由 {name} 提供",
+      "runOf": "{time} 的运行",
+      "sourceGone": "来自一个已不存在的运行，{time}，由 {name}",
+      "removeFailed": "未能移除该修正。请重试。"
+    },
+    "incident": {
+      "title": "AutoResolve",
+      "note": "每个事件一次运行。在做出任何更改前，它会先询问。",
+      "loading": "正在加载 AutoResolve…",
+      "loadFailed": "无法加载此事件的 AutoResolve。",
+      "newRun": "为此事件新建运行",
+      "liveRun": "这是该事件的当前运行。它结束后可开始新运行。",
+      "openRun": "打开运行",
+      "related": "为此事件告警保存的 AutoResolve",
+      "suggestedFor": "针对来自 {alert} 的事件推荐",
+      "startsOn": "在 {alert} 上启动",
+      "run": "运行",
+      "runLocked": "{run} 是该事件的当前运行。结束后可开始新运行。",
+      "empty": "此事件尚未运行过 AutoResolve，其告警也没有保存任何 AutoResolve。"
+    }
   },
   "autobotInvestigate": {
     "greeting": "我们要调查什么？",
