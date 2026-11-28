@@ -873,6 +873,24 @@ describe("TracesAnalysisDashboard embedded (Logs Drill down page)", () => {
       expect(mockSearch.mock.calls[0][0].query.query.sql).not.toContain('"AWS"');
     });
 
+    it("drops UI-only fields from the dimensions and the count query, keeps schema fields", async () => {
+      mockSearch.mockResolvedValue({ data: { hits: [{}] } });
+      await remount({
+        streamFields: [
+          { name: "_end_time_ns", isSchemaField: false },
+          { name: "_id", isSchemaField: true },
+          { name: "plain_field" },
+          "str_field",
+          ...fields,
+        ],
+      });
+
+      const values = wrapper.vm.availableDimensions.map((d: any) => d.value);
+      expect(values).not.toContain("_end_time_ns");
+      expect(values).toEqual(expect.arrayContaining(["_id", "plain_field", "str_field"]));
+      expect(mockSearch.mock.calls[0][0].query.query.sql).not.toContain("_end_time_ns");
+    });
+
     it("does not query counts outside the Drill down page", async () => {
       wrapper.unmount();
       mockSearch.mockClear();

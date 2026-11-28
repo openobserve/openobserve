@@ -146,6 +146,16 @@ export const useStreamFields = () => {
       searchObj.meta.sqlMode = false;
     },
     querySource: () => searchObj.data.query,
+    // Explore pushes query "" for this stream; a non-empty or absent query (search, Refresh, Back) must still restore.
+    skipRestore: (stream: string) => {
+      const q = router?.currentRoute?.value?.query;
+      return (
+        q?.query === "" &&
+        String(q?.stream ?? "")
+          .split(",")
+          .includes(stream)
+      );
+    },
   });
   retainCorrelationQueryWatcher(correlationFilters.watchQuery);
 

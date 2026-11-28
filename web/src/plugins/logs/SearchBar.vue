@@ -4256,10 +4256,14 @@ export default defineComponent({
             toast(
               shortenedToHours > 0
                 ? {
-                    message: t("logs.searchBar.viewAppliedRangeShortened", {
-                      name: item.view_name,
-                      hours: shortenedToHours,
-                    }),
+                    message: t(
+                      "logs.searchBar.viewAppliedRangeShortened",
+                      {
+                        name: item.view_name,
+                        hours: shortenedToHours,
+                      },
+                      shortenedToHours,
+                    ),
                     variant: "warning",
                   }
                 : {
