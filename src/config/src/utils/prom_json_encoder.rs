@@ -95,7 +95,8 @@ impl JsonEncoder {
                             let upper_bound = b.upper_bound(); // f64
                             let cumulative_count = b.cumulative_count(); // f64
 
-                            upper_bounds.push(json!(upper_bound));
+                            // the series hash reads a non-string label as empty
+                            upper_bounds.push(Value::String(json!(upper_bound).to_string()));
                             cumulative_counts.push(json!(cumulative_count));
 
                             if upper_bound.is_sign_positive() && upper_bound.is_infinite() {
