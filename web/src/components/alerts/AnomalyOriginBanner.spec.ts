@@ -95,9 +95,14 @@ describe("AnomalyOriginBanner", () => {
   it("shows the values line from the link parameters", async () => {
     await mountBanner(VALUE_LINK);
     expect(find("values").text()).toBe(
-      "count(*) per 15 min: actual 208.00, expected 120.40-157.20, 18:00-19:00 UTC",
+      "count(*) per 15 min: actual 208.00, expected 120.40 – 157.20, 18:00-19:00 UTC",
     );
     expect(find("filter-not-applied").exists()).toBe(false);
+  });
+
+  it("writes a negative lower edge with a spaced dash, never as one number (#3763)", async () => {
+    await mountBanner({ ...VALUE_LINK, anomaly_lower: "-5", anomaly_upper: "3" });
+    expect(find("values").text()).toContain("expected -5.00 – 3.00,");
   });
 
   it("shows no numbers for an absence and no range for a partial drop", async () => {
